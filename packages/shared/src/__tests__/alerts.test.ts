@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import {
-	TIER1_ALERT_RULES,
-	getAlertRule,
-	type AlertSeverity,
-} from "../alerts";
+import { type AlertSeverity, TIER1_ALERT_RULES, getAlertRule } from "../alerts";
 import { ALERT_THRESHOLDS } from "../constants";
 
 describe("TIER1_ALERT_RULES", () => {
