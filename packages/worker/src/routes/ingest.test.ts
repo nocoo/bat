@@ -214,4 +214,46 @@ describe("POST /api/ingest", () => {
 		const res = await post(app, payload);
 		expect(res.status).toBe(204);
 	});
+
+	test("ingest triggers alert state changes (disk_full)", async () => {
+		const payload = makePayload();
+		// Disk at 95% should trigger disk_full alert
+		payload.disk = [
+			{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 5_000_000_000, used_pct: 95 },
+		];
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const alert = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "disk_full")
+			.first<{ severity: string; value: number }>();
+		expect(alert).not.toBeNull();
+		expect(alert?.severity).toBe("critical");
+		expect(alert?.value).toBe(95);
+	});
+
+	test("ingest clears alert when condition resolves", async () => {
+		// First: trigger disk_full
+		const alertPayload = makePayload();
+		alertPayload.disk = [
+			{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 5_000_000_000, used_pct: 95 },
+		];
+		await post(app, alertPayload);
+
+		// Verify alert exists
+		const before = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "disk_full")
+			.first();
+		expect(before).not.toBeNull();
+
+		// Then: condition clears
+		await post(app, makePayload());
+		const after = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "disk_full")
+			.first();
+		expect(after).toBeNull();
+	});
 });
