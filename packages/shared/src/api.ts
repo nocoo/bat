@@ -25,6 +25,8 @@ export interface HostOverviewItem {
 	os: string | null;
 	kernel: string | null;
 	arch: string | null;
+	cpu_model: string | null;
+	boot_time: number | null;
 	status: HostStatus;
 	cpu_usage_pct: number | null;
 	mem_used_pct: number | null;
