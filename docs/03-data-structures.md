@@ -100,8 +100,8 @@ CREATE TABLE metrics_hourly (
   net_rx_bytes_max REAL,             -- max rx bytes/sec peak in the hour
   net_tx_bytes_avg REAL,             -- avg tx bytes/sec
   net_tx_bytes_max REAL,             -- max tx bytes/sec peak
-  net_rx_errors    INTEGER,          -- sum of rx_errors in the hour
-  net_tx_errors    INTEGER,          -- sum of tx_errors in the hour
+  net_rx_errors    INTEGER,          -- sum of per-interval deltas in the hour
+  net_tx_errors    INTEGER,          -- sum of per-interval deltas in the hour
   PRIMARY KEY (host_id, hour_ts),
   FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
@@ -264,8 +264,8 @@ interface NetMetric {
   iface: string;
   rx_bytes_rate: number;    // bytes/sec over interval
   tx_bytes_rate: number;
-  rx_errors: number;
-  tx_errors: number;
+  rx_errors: number;        // error count delta in this interval (not cumulative counter)
+  tx_errors: number;        // error count delta in this interval (not cumulative counter)
   // NOTE: rx_packets/tx_packets from 01-metrics-catalogue.md are intentionally
   // excluded from the MVP payload. Packet rates add payload size without
   // actionable alerting value. Bytes + errors are sufficient for MVP.
@@ -454,8 +454,8 @@ interface MetricsDataPoint {
   net_rx_bytes_max: number | null;  // hourly only — max rx bytes/sec
   net_tx_bytes_avg: number | null;  // hourly only — avg tx bytes/sec
   net_tx_bytes_max: number | null;  // hourly only — max tx bytes/sec
-  net_rx_errors: number | null;     // hourly only — sum of rx_errors
-  net_tx_errors: number | null;     // hourly only — sum of tx_errors
+  net_rx_errors: number | null;     // hourly only — sum of per-interval deltas
+  net_tx_errors: number | null;     // hourly only — sum of per-interval deltas
   uptime_seconds: number | null;    // raw: uptime_seconds, hourly: uptime_min
   sample_count?: number;            // hourly only
 }

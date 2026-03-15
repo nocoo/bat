@@ -94,7 +94,11 @@ Output: array of `{ mount, total_bytes, avail_bytes, used_pct }`.
 
 Read `/sys/class/net/{iface}/statistics/{rx,tx}_{bytes,errors}` for each non-excluded interface. Packet counters (`rx_packets`, `tx_packets`) are defined in [01-metrics-catalogue.md](./01-metrics-catalogue.md) but excluded from MVP payload — bytes + errors are sufficient for alerting.
 
-**Rate calculation** (`rate.rs`): `rate = (current - previous) / interval_seconds`. Counters are u64 — handle wrap by treating `current < previous` as `current + (u64::MAX - previous)`.
+**Rate calculation** (`rate.rs`):
+- **Bytes**: `rate = (current - previous) / interval_seconds` → bytes/sec (gauge)
+- **Errors**: `delta = current - previous` → error count in the interval (not per-second rate, just the increment). This ensures each `metrics_raw` row records errors *during that interval*, not a cumulative counter. Hourly aggregation can safely sum these deltas.
+
+Counters are u64 — handle wrap by treating `current < previous` as `current + (u64::MAX - previous)`.
 
 Output: array of `{ iface, rx_bytes_rate, tx_bytes_rate, rx_errors, tx_errors }`.
 
