@@ -1,13 +1,14 @@
 "use client";
 
+import { AlertTable } from "@/components/alert-table";
 import { CpuChart, DiskBars, MemoryChart, NetworkChart } from "@/components/charts";
 import { formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHostMetrics, useHosts } from "@/lib/hooks";
-import { AlertTriangle, Clock, Cpu, Globe, HardDrive, Info } from "lucide-react";
+import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
+import { AlertTriangle, Clock, Cpu, Globe, HardDrive, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -53,6 +54,11 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 	);
 }
 
+export function formatBootTime(unixSeconds: number | null | undefined): string | null {
+	if (unixSeconds == null) return null;
+	return new Date(unixSeconds * 1000).toLocaleString();
+}
+
 export default function HostDetailPage() {
 	const params = useParams<{ id: string }>();
 	const hostId = params.id;
@@ -63,8 +69,10 @@ export default function HostDetailPage() {
 
 	const { data: hosts } = useHosts();
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hostId, from, now);
+	const { data: allAlerts } = useAlerts();
 
 	const host = hosts?.find((h) => h.host_id === hostId);
+	const hostAlerts = allAlerts?.filter((a) => a.host_id === hostId) ?? [];
 
 	return (
 		<AppShell
@@ -94,9 +102,26 @@ export default function HostDetailPage() {
 								<InfoRow label="OS" value={host.os} />
 								<InfoRow label="Kernel" value={host.kernel} />
 								<InfoRow label="Architecture" value={host.arch} />
+								<InfoRow label="CPU" value={host.cpu_model} />
 								<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
+								<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
 								<InfoRow label="Alerts" value={String(host.alert_count)} />
 							</div>
+						</CardContent>
+					</Card>
+				)}
+
+				{/* Per-host Active Alerts */}
+				{hostAlerts.length > 0 && (
+					<Card>
+						<CardHeader>
+							<CardTitle className="flex items-center gap-2 text-base">
+								<ShieldAlert className="h-4 w-4" />
+								Active Alerts ({hostAlerts.length})
+							</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<AlertTable alerts={hostAlerts} />
 						</CardContent>
 					</Card>
 				)}
