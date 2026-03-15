@@ -2,7 +2,7 @@
 
 ## Index
 
-- [01-probe-metrics-spec.md](./01-probe-metrics-spec.md) — VPS probe metrics specification: what to collect, how to collect, intervals
+- [01-metrics-catalogue.md](./01-metrics-catalogue.md) — Metrics catalogue: Tier 1 (MVP) + Tier 2 (post-MVP), procfs sources, alert rules, resource budget
 - [02-architecture.md](./02-architecture.md) — System architecture, key decisions, MVP scope, monorepo structure, deployment
 - [03-data-structures.md](./03-data-structures.md) — D1 schema, migration strategy, payload types, alert rules
 - [04-probe.md](./04-probe.md) — Rust probe: collectors, main loop, config, systemd

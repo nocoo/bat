@@ -4,7 +4,7 @@
 > All data structures referenced by [04-probe.md](./04-probe.md), [05-worker.md](./05-worker.md), and [06-dashboard.md](./06-dashboard.md) are defined here as the single source of truth.
 >
 > Related documents:
-> - [01-probe-metrics-spec.md](./01-probe-metrics-spec.md) — What the Probe collects (metrics definitions, payload examples)
+> - [01-metrics-catalogue.md](./01-metrics-catalogue.md) — What the Probe collects (metrics definitions, Tier 1 + Tier 2 catalogue)
 > - [02-architecture.md](./02-architecture.md) — System overview, deployment
 > - [05-worker.md](./05-worker.md) — How Worker uses these structures (ingest, queries, alerts)
 
@@ -210,7 +210,7 @@ Hosts are never auto-deleted. Instead:
 
 ### Metrics payload (Probe → Worker)
 
-Sent every 30s via `POST /api/ingest`. Full schema defined in [01-probe-metrics-spec.md § Tier 1 Payload](./01-probe-metrics-spec.md).
+Sent every 30s via `POST /api/ingest`. Full metric definitions in [01-metrics-catalogue.md § Tier 1](./01-metrics-catalogue.md).
 
 ```typescript
 // @bat/shared — packages/shared/src/metrics.ts
@@ -255,12 +255,16 @@ interface NetMetric {
   tx_bytes_rate: number;
   rx_errors: number;
   tx_errors: number;
+  // NOTE: rx_packets/tx_packets from 01-metrics-catalogue.md are intentionally
+  // excluded from the MVP payload. Packet rates add payload size without
+  // actionable alerting value. Bytes + errors are sufficient for MVP.
+  // Add in post-MVP if per-packet analysis is needed.
 }
 ```
 
 ### Identity payload (Probe → Worker)
 
-Sent on startup + every 6h via `POST /api/identity`. Corresponds to [01-probe-metrics-spec.md § 1.5 System Identity](./01-probe-metrics-spec.md).
+Sent on startup + every 6h via `POST /api/identity`. Metric definitions in [01-metrics-catalogue.md § 1.5 System Identity](./01-metrics-catalogue.md).
 
 ```typescript
 // @bat/shared — packages/shared/src/identity.ts
@@ -302,7 +306,7 @@ How payloads map to D1 columns (Worker performs this flattening at ingest time):
 
 ## Alert Rules
 
-6 Tier-1 rules for MVP, aligned with [01-probe-metrics-spec.md § Alerts the Server Should Derive](./01-probe-metrics-spec.md). Tier-2-dependent rules (SSH, firewall, ports, packages, containers, systemd) are deferred to post-MVP when Tier 2 collection is implemented.
+6 Tier-1 rules for MVP, aligned with [01-metrics-catalogue.md § Alert rules](./01-metrics-catalogue.md). The full catalogue defines 15 rules total — 6 MVP + 9 deferred (8 Tier-2-dependent + 1 Tier-1 low-priority). Deferred rules are implemented post-MVP when Tier 2 collection is added.
 
 | Rule ID | Field | Condition | Severity | Duration | From 01 spec |
 |---------|-------|-----------|----------|----------|--------------|
@@ -313,7 +317,7 @@ How payloads map to D1 columns (Worker performs this flattening at ingest time):
 | `steal_high` | `cpu.steal_pct` | > 10 | warning | 5 min | "oversold VPS detection" |
 | `host_offline` | `hosts.last_seen` | > 120s ago | critical | query-time | implicit |
 
-**Note**: 01 spec does not define a standalone "CPU high" rule (CPU load is context-dependent per-host).
+**Note**: [01-metrics-catalogue.md](./01-metrics-catalogue.md) defines a standalone "uptime anomaly" rule (`uptime_seconds < 300`, info severity) — deferred to post-MVP due to low priority. CPU load has no standalone rule (context-dependent per-host).
 
 ### Alert evaluation semantics
 
