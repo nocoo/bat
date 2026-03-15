@@ -1,15 +1,13 @@
-// Dashboard E2E tests — API proxy route integration tests
-// Tests the Next.js API routes that proxy to the Worker, verifying
-// auth checks, response forwarding, and error handling.
+// Dashboard integration tests — data transformations, formatters, API client
 import { describe, expect, test } from "bun:test";
 import type { MetricsDataPoint } from "@bat/shared";
-import { formatBootTime } from "../src/app/hosts/[id]/page";
-import { formatTriggeredAt } from "../src/components/alert-table";
-import { formatLastSeen, formatUptime } from "../src/components/host-card";
-import { ApiError } from "../src/lib/api";
-import { transformCpuData, transformDiskData, transformMemData } from "../src/lib/transforms";
+import { formatBootTime } from "../app/hosts/[id]/page";
+import { formatTriggeredAt } from "../components/alert-table";
+import { formatLastSeen, formatUptime } from "../components/host-card";
+import { ApiError } from "./api";
+import { transformCpuData, transformDiskData, transformMemData } from "./transforms";
 
-describe("Dashboard E2E — data transformations", () => {
+describe("Integration — data transformations", () => {
 	test("CPU transform extracts usage, iowait, steal", () => {
 		const data: MetricsDataPoint[] = [
 			{
@@ -114,7 +112,7 @@ describe("Dashboard E2E — data transformations", () => {
 	});
 });
 
-describe("Dashboard E2E — formatters", () => {
+describe("Integration — formatters", () => {
 	test("formatUptime formats seconds into human-readable string", () => {
 		expect(formatUptime(86400)).toBe("1d 0h");
 		expect(formatUptime(3661)).toBe("1h 1m");
@@ -150,7 +148,7 @@ describe("Dashboard E2E — formatters", () => {
 	});
 });
 
-describe("Dashboard E2E — API client", () => {
+describe("Integration — API client", () => {
 	test("ApiError has correct status and message", () => {
 		const err = new ApiError(401, "Unauthorized");
 		expect(err.status).toBe(401);

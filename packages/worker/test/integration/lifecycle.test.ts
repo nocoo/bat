@@ -1,4 +1,4 @@
-// Worker E2E tests — full request lifecycle through Hono app with mock D1
+// Worker integration tests — full request lifecycle through Hono app with mock D1
 import { beforeEach, describe, expect, test } from "bun:test";
 import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/shared";
 import { Hono } from "hono";
