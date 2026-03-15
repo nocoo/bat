@@ -77,8 +77,8 @@ Mount discovery: `/proc/mounts` → filter ext4, xfs, btrfs, overlay. Exclude tm
 |--------|------|------|--------|
 | `net.{iface}.rx_bytes_rate` | gauge | bytes/sec | `/sys/class/net/{iface}/statistics/rx_bytes` delta/interval |
 | `net.{iface}.tx_bytes_rate` | gauge | bytes/sec | `/sys/class/net/{iface}/statistics/tx_bytes` delta/interval |
-| `net.{iface}.rx_errors` | counter | int | `/sys/class/net/{iface}/statistics/rx_errors` |
-| `net.{iface}.tx_errors` | counter | int | `/sys/class/net/{iface}/statistics/tx_errors` |
+| `net.{iface}.rx_errors` | gauge | int | `/sys/class/net/{iface}/statistics/rx_errors` delta (per-interval count) |
+| `net.{iface}.tx_errors` | gauge | int | `/sys/class/net/{iface}/statistics/tx_errors` delta (per-interval count) |
 
 Interface discovery: list `/sys/class/net/`, exclude `lo`. Config excludes `docker0` by default.
 
