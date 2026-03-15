@@ -193,8 +193,10 @@ CREATE TABLE metrics_raw (
 CREATE INDEX idx_raw_host_ts ON metrics_raw(host_id, ts);
 
 -- Hourly aggregated metrics (90-day retention)
+-- No autoincrement id — (host_id, hour_ts) is the natural primary key.
+-- INSERT OR REPLACE on this composite PK performs an in-place overwrite
+-- without generating unstable row ids.
 CREATE TABLE metrics_hourly (
-  id               INTEGER PRIMARY KEY AUTOINCREMENT,
   host_id          TEXT    NOT NULL,
   hour_ts          INTEGER NOT NULL,
   sample_count     INTEGER NOT NULL,
@@ -216,10 +218,10 @@ CREATE TABLE metrics_hourly (
   uptime_min       INTEGER,
   disk_json        TEXT,
   net_json         TEXT,
-  FOREIGN KEY (host_id) REFERENCES hosts(host_id),
-  UNIQUE(host_id, hour_ts)
+  PRIMARY KEY (host_id, hour_ts),
+  FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
-CREATE INDEX idx_hourly_host_ts ON metrics_hourly(host_id, hour_ts);
+-- No separate index needed — PRIMARY KEY (host_id, hour_ts) is already indexed
 
 -- Active alerts
 CREATE TABLE alert_states (
@@ -246,7 +248,7 @@ CREATE TABLE alert_pending (
 **Design rationale**:
 - `disk_json` / `net_json` as JSON text — Dashboard always fetches full array, D1 `json_extract()` handles rare per-mount queries
 - `alert_pending` stages duration-based rules: condition first appears → track → promote to `alert_states` after sustained period
-- `UNIQUE(host_id, hour_ts)` enables idempotent `INSERT OR REPLACE` for aggregation reruns
+- `UNIQUE(host_id, hour_ts)` is the composite primary key — `INSERT OR REPLACE` performs in-place overwrite without generating unstable autoincrement ids
 
 ---
 
@@ -297,6 +299,21 @@ Single Worker invocation, D1 batch for atomicity:
 5. Return `204 No Content`
 
 **Why UPSERT instead of UPDATE**: The Probe sends identity on startup before any ingest, but identity can fail (network error, Worker cold start). If ingest required a pre-existing host row (via foreign key + UPDATE-only), the first metrics would be silently dropped. The UPSERT guarantees ingest is self-sufficient — it never fails because of a missing host row. When identity eventually succeeds, it fills in the full host metadata (os, kernel, arch, etc.).
+
+### Time source policy
+
+Two separate time sources, each authoritative for its purpose:
+
+| Field | Source | Why |
+|-------|--------|-----|
+| `metrics_raw.ts` | **Probe** (payload `timestamp`) | Chart X-axis must reflect when metrics were *measured*, not when they arrived. Network latency or retry delay should not shift data points. |
+| `hosts.last_seen` | **Worker** (`Date.now()` at request time) | Offline detection compares `last_seen` against server-side `now`. If `last_seen` used Probe time, NTP drift on a VPS could mask or fabricate offline alerts. |
+| `hosts.identity_updated_at` | **Worker** (`Date.now()`) | Same rationale as `last_seen`. |
+| `alert_states.triggered_at` | **Worker** (`Date.now()`) | Alert timing must be consistent with offline evaluation. |
+
+**Implication for ingest step 3**: The UPSERT writes `last_seen = Date.now()` (server time), NOT the Probe's `payload.timestamp`. The payload timestamp is only written to `metrics_raw.ts`.
+
+**Clock skew guard**: Worker rejects payloads where `abs(payload.timestamp - Date.now()) > 300` (5 min skew). This catches severely misconfigured NTP without breaking normal operation. Returns `400` with error message suggesting NTP sync.
 
 ### Identity update semantics
 
@@ -474,6 +491,14 @@ No `sysinfo` crate — direct procfs/sysfs parsing for minimal binary size.
 - `x86_64-unknown-linux-musl` (most VPS)
 - `aarch64-unknown-linux-musl` (ARM VPS)
 
+### Config path convention
+
+The binary looks for config in this order:
+1. `--config <path>` CLI argument (explicit override)
+2. `/etc/bat/config.toml` (hardcoded default)
+
+This means the systemd unit works without any flags — the binary finds `/etc/bat/config.toml` automatically.
+
 ### Systemd unit (`probe/dist/bat-probe.service`)
 
 ```ini
@@ -485,9 +510,18 @@ Wants=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/bat-probe
+# Config loaded from /etc/bat/config.toml by default (hardcoded in binary)
+# Override with: ExecStart=/usr/local/bin/bat-probe --config /path/to/other.toml
 Restart=always
 RestartSec=5
 MemoryMax=15M
+# Run as dedicated user (created during install)
+User=bat
+Group=bat
+# Probe only needs read access to /proc, /sys, /etc — no special privileges
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadOnlyPaths=/proc /sys /etc
 
 [Install]
 WantedBy=multi-user.target
@@ -748,20 +782,38 @@ cd packages/worker && wrangler deploy
   - `ALLOWED_EMAILS` — email allowlist
   - `USE_SECURE_COOKIES=true`
 
-### Probe on VPS
+### Probe on VPS (first-time install)
 
 ```bash
-# Copy binary
+# 1. Create dedicated user (no home dir, no login shell)
+ssh root@vps "useradd --system --no-create-home --shell /usr/sbin/nologin bat"
+
+# 2. Create config directory
+ssh root@vps "mkdir -p /etc/bat"
+
+# 3. Copy binary and set permissions
 scp bat-probe root@vps:/usr/local/bin/
+ssh root@vps "chmod 755 /usr/local/bin/bat-probe"
 
-# Copy config
+# 4. Copy config (edit worker_url and write_key first!)
 scp config.toml root@vps:/etc/bat/config.toml
+ssh root@vps "chmod 640 /etc/bat/config.toml && chown root:bat /etc/bat/config.toml"
 
-# Copy systemd unit
+# 5. Copy systemd unit
 scp bat-probe.service root@vps:/etc/systemd/system/
 
-# Enable and start
+# 6. Enable and start
 ssh root@vps "systemctl daemon-reload && systemctl enable --now bat-probe"
+
+# 7. Verify
+ssh root@vps "systemctl status bat-probe && journalctl -u bat-probe -n 10"
+```
+
+### Probe update (binary only)
+
+```bash
+scp bat-probe root@vps:/usr/local/bin/
+ssh root@vps "systemctl restart bat-probe"
 ```
 
 ---
