@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS _migrations (
 
 ## D1 Migration Strategy
 
-D1 has no built-in migration tool. We use a **numbered SQL files** convention:
+D1 has no built-in migration tool. We use a **numbered SQL files** convention with **manual execution**:
 
 ```
 packages/worker/migrations/
@@ -163,9 +163,9 @@ packages/worker/migrations/
 
 **Rules**:
 - Each migration file is **idempotent** where possible (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`). `ALTER TABLE ADD COLUMN` is not idempotent in SQLite — guard with a comment noting manual check.
-- Files are applied in numeric order. The `_migrations` meta-table tracks which have been applied.
-- The Worker cron (or a one-off script) checks `_migrations` on startup/deploy and runs unapplied files in order.
-- **MVP shortcut**: For the initial deployment, `0001_initial.sql` contains the full DDL (including `_migrations` table). Subsequent schema changes go into `0002_`, `0003_`, etc. Applied via `wrangler d1 execute bat-db --file=migrations/NNNN_*.sql` during deploy.
+- Files are applied in numeric order. The `_migrations` meta-table tracks which have been applied (for human reference, not auto-executed).
+- **Execution**: All migrations are applied manually via `wrangler d1 execute bat-db --file=migrations/NNNN_*.sql` during deploy. There is no auto-runner — the operator checks `_migrations` and runs unapplied files in order. This is sufficient for a 6-host system with infrequent schema changes.
+- **MVP**: `0001_initial.sql` contains the full DDL (including `_migrations` table). Subsequent schema changes go into `0002_`, `0003_`, etc.
 - **No down migrations**: D1 has no transactional DDL. If a migration is wrong, write a corrective forward migration.
 
 ---
@@ -384,6 +384,84 @@ export const INTERVALS = {
 
 ---
 
+## Response DTOs (Worker → Dashboard)
+
+Response types for Worker read routes. Consumed by Dashboard proxy and SWR hooks. These are the contracts between Worker and Dashboard.
+
+### GET /api/hosts → `HostOverviewItem[]`
+
+```typescript
+// @bat/shared — packages/shared/src/api.ts
+interface HostOverviewItem {
+  host_id: string;
+  hostname: string;
+  os: string | null;
+  kernel: string | null;
+  arch: string | null;
+  status: "healthy" | "warning" | "critical" | "offline";
+  cpu_usage_pct: number | null;    // latest metrics_raw value
+  mem_used_pct: number | null;     // latest metrics_raw value
+  uptime_seconds: number | null;   // latest metrics_raw value
+  last_seen: number;               // unix seconds (Worker time)
+  alert_count: number;             // count of active alerts for this host
+}
+```
+
+**Status derivation**: `"offline"` if `last_seen` stale > 120s → `"critical"` if any critical alert → `"warning"` if any warning alert → `"healthy"`. Query strategy in [05-worker.md § GET /api/hosts](./05-worker.md).
+
+### GET /api/hosts/:id/metrics → `MetricsQueryResponse`
+
+```typescript
+// @bat/shared — packages/shared/src/api.ts
+interface MetricsQueryResponse {
+  host_id: string;
+  resolution: "raw" | "hourly";    // which table was queried
+  from: number;                     // echoed back
+  to: number;                       // echoed back
+  data: MetricsDataPoint[];
+}
+
+interface MetricsDataPoint {
+  ts: number;
+  cpu_usage_pct: number | null;
+  cpu_iowait: number | null;
+  cpu_steal: number | null;
+  cpu_load1: number | null;
+  cpu_load5: number | null;
+  cpu_load15: number | null;
+  cpu_count: number | null;
+  mem_total: number | null;
+  mem_available: number | null;
+  mem_used_pct: number | null;
+  swap_total: number | null;
+  swap_used: number | null;         // raw: swap_used, hourly: swap_used_max
+  swap_used_pct: number | null;     // raw: swap_used_pct, hourly: swap_used_pct_avg
+  disk_json: string | null;         // JSON string, Dashboard parses
+  net_json: string | null;          // JSON string, Dashboard parses
+  uptime_seconds: number | null;    // raw: uptime_seconds, hourly: uptime_min
+  sample_count?: number;            // hourly only
+}
+```
+
+**Auto-resolution**: Worker decides based on `to - from`. If > 86400 (24h), query `metrics_hourly`; otherwise, query `metrics_raw`. Dashboard does not specify resolution.
+
+### GET /api/alerts → `AlertItem[]`
+
+```typescript
+// @bat/shared — packages/shared/src/api.ts
+interface AlertItem {
+  host_id: string;
+  hostname: string;                 // JOIN from hosts table
+  rule_id: string;
+  severity: "warning" | "critical";
+  value: number | null;
+  triggered_at: number;             // unix seconds (Worker time)
+  message: string | null;
+}
+```
+
+---
+
 ## API Route Constants
 
 ```typescript
@@ -427,5 +505,5 @@ Not applicable — `@bat/shared` is a pure types/constants package with no runti
 | 1.1 | `feat: add metrics payload types` | `packages/shared/src/metrics.ts` | Typecheck passes |
 | 1.2 | `feat: add identity payload types` | `packages/shared/src/identity.ts` | Typecheck passes |
 | 1.3 | `feat: add alert types and 6 tier-1 rules` | `packages/shared/src/alerts.ts`, `constants.ts` | Typecheck passes |
-| 1.4 | `feat: add api route types and constants` | `packages/shared/src/api.ts`, `index.ts` | Build + typecheck |
+| 1.4 | `feat: add api route types, response dtos, and constants` | `packages/shared/src/api.ts`, `index.ts` | Build + typecheck |
 | 1.5 | `test: add unit tests for shared types` | `packages/shared/src/__tests__/alerts.test.ts` | `bun test` passes |

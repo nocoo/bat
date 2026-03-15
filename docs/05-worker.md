@@ -52,12 +52,12 @@ Receives Tier-1 metrics payload from Probe. Single Worker invocation, D1 batch f
 1. Validate payload shape (lightweight check, no Zod — verify required fields exist and are correct types)
 2. **Clock skew guard**: Reject if `abs(payload.timestamp - Date.now() / 1000) > 300` (5 min). Return `400` with error message suggesting NTP sync. See [03-data-structures.md § Time source policy](./03-data-structures.md).
 3. **Check retirement**: If `host_id` exists in `hosts` with `is_active = 0`, return `403` with error message `"host is retired"`. This prevents silent dirty data from stale Probes. The operator must either stop the Probe or reactivate the host before metrics are accepted.
-4. `INSERT INTO metrics_raw` — flatten scalars, `JSON.stringify()` disk/net arrays. Column mapping in [03-data-structures.md § D1 column mapping](./03-data-structures.md).
-5. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname. Does NOT set `is_active` — only new hosts get the default `is_active = 1` from the DDL. `last_seen` = `Date.now()` (Worker time, not Probe time).
+4. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists before metrics insert (FK constraint). Uses `host_id` as fallback hostname. Does NOT set `is_active` — only new hosts get the default `is_active = 1` from the DDL. `last_seen` = `Date.now()` (Worker time, not Probe time).
+5. `INSERT INTO metrics_raw` — flatten scalars, `JSON.stringify()` disk/net arrays. Column mapping in [03-data-structures.md § D1 column mapping](./03-data-structures.md).
 6. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`. See [Alert evaluation](#alert-evaluation).
 7. Return `204 No Content`
 
-**Why UPSERT instead of UPDATE**: The Probe sends identity on startup before any ingest, but identity can fail (network error, Worker cold start). If ingest required a pre-existing host row (via foreign key + UPDATE-only), the first metrics would be silently dropped. The UPSERT guarantees ingest is self-sufficient — it never fails because of a missing host row. When identity eventually succeeds, it fills in the full host metadata (os, kernel, arch, etc.).
+**Why UPSERT hosts first**: `metrics_raw.host_id` has a foreign key to `hosts.host_id`. For a brand-new host, inserting metrics before the host row would violate the FK constraint. The UPSERT guarantees the host row exists before any metrics reference it.
 
 ### POST /api/identity (`routes/identity.ts`)
 
@@ -128,40 +128,49 @@ else:
 
 ### GET /api/hosts (`routes/hosts.ts`)
 
-Returns all active hosts (`is_active = 1`) with latest status info.
+Returns all active hosts (`is_active = 1`) as `HostOverviewItem[]` — including latest metrics, alert status, and offline detection. Response contract defined in [03-data-structures.md § GET /api/hosts](./03-data-structures.md).
 
-```sql
-SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time,
-       last_seen, identity_updated_at, created_at
-FROM hosts
-WHERE is_active = 1
-ORDER BY hostname
-```
+**Query strategy** (avoids N+1):
+
+1. Fetch active hosts: `SELECT * FROM hosts WHERE is_active = 1`
+2. Fetch latest metrics per host (single query with window function):
+   ```sql
+   SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds
+   FROM (
+     SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds,
+            ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY ts DESC) as rn
+     FROM metrics_raw
+     WHERE host_id IN (SELECT host_id FROM hosts WHERE is_active = 1)
+   ) WHERE rn = 1
+   ```
+3. Count active alerts per host:
+   ```sql
+   SELECT host_id, COUNT(*) as alert_count
+   FROM alert_states
+   WHERE host_id IN (SELECT host_id FROM hosts WHERE is_active = 1)
+   GROUP BY host_id
+   ```
+4. Derive per-host `status`:
+   - `"offline"` if `Date.now() / 1000 - last_seen > 120`
+   - `"critical"` if any critical alert (including virtual offline alert)
+   - `"warning"` if any warning alert
+   - `"healthy"` otherwise
+5. Merge into `HostOverviewItem[]`, return JSON
 
 ### GET /api/hosts/:id/metrics (`routes/hosts.ts`)
 
 Query parameters: `?from=<unix>&to=<unix>`
 
-**Auto-resolution**: If `to - from > 24h`, query `metrics_hourly`. Otherwise, query `metrics_raw`. The caller (Dashboard) does not need to specify resolution — the Worker decides based on time range.
+Returns `MetricsQueryResponse`. Response contract defined in [03-data-structures.md § GET /api/hosts/:id/metrics](./03-data-structures.md).
 
-```sql
--- Raw (≤ 24h range)
-SELECT * FROM metrics_raw
-WHERE host_id = ? AND ts BETWEEN ? AND ?
-ORDER BY ts
-
--- Hourly (> 24h range)
-SELECT * FROM metrics_hourly
-WHERE host_id = ? AND hour_ts BETWEEN ? AND ?
-ORDER BY hour_ts
-```
+**Auto-resolution**: If `to - from > 86400` (24h), query `metrics_hourly`. Otherwise, query `metrics_raw`. The caller (Dashboard) does not need to specify resolution — the Worker decides based on time range.
 
 ### GET /api/alerts (`routes/alerts.ts`)
 
-Returns all active alerts across all active hosts.
+Returns all active alerts across all active hosts as `AlertItem[]`. Response contract defined in [03-data-structures.md § GET /api/alerts](./03-data-structures.md).
 
 ```sql
-SELECT a.*, h.hostname
+SELECT a.host_id, a.rule_id, a.severity, a.value, a.triggered_at, a.message, h.hostname
 FROM alert_states a
 JOIN hosts h ON a.host_id = h.host_id
 WHERE h.is_active = 1
@@ -198,6 +207,8 @@ The health endpoint returns only aggregate counts — no host IDs, no alert deta
 3. Query `alert_states` for all active hosts
 4. Count per-host worst severity: critical > warning > healthy
 5. Derive overall status
+
+**Note**: The per-host status derivation logic (steps 2-4) is shared with `GET /api/hosts` — both endpoints compute status the same way. Extract into `services/status.ts` to avoid duplication.
 
 **HTTP status code logic** (three-level):
 - `200` — all hosts healthy, OR only `warning` alerts active → `"status": "healthy"` or `"degraded"`
@@ -247,7 +258,7 @@ Defined in `index.ts` scheduled handler.
 | `services/metrics.test.ts` | Auto-resolution logic: raw for ≤ 24h, hourly for > 24h. Column flattening. JSON stringify for disk/net |
 | `routes/ingest.test.ts` | Valid payload → 204. Invalid payload → 400. Clock skew → 400. Retired host → 403. Missing key → 401. Read key → 403 |
 | `routes/identity.test.ts` | Valid identity → 204, host created. Update existing → fields overwritten. Retired host → 403 |
-| `routes/hosts.test.ts` | List returns only active hosts. Metrics query returns correct resolution |
+| `routes/hosts.test.ts` | List returns `HostOverviewItem[]` with correct status derivation (healthy/warning/critical/offline), latest metrics merged, alert counts. Metrics query returns correct resolution |
 | `routes/health.test.ts` | All healthy → 200. Warning only → 200 degraded. Critical → 503. Offline detection → 503. Zero hosts → 503 empty |
 | `routes/alerts.test.ts` | Returns active alerts. Filters out retired hosts |
 
@@ -269,7 +280,7 @@ Test every Worker route against local Wrangler dev server:
 | Ingest invalid payload | `POST /api/ingest` | 400 |
 | Ingest retired host | `POST /api/ingest` | 403, host is retired |
 | Send identity | `POST /api/identity` | 204, host in D1 |
-| List hosts | `GET /api/hosts` | Returns registered hosts |
+| List hosts | `GET /api/hosts` | Returns `HostOverviewItem[]` with status, CPU, MEM, alerts |
 | Query raw metrics | `GET /api/hosts/:id/metrics?from=&to=` | Correct count, raw resolution |
 | Query hourly metrics | `GET /api/hosts/:id/metrics?from=&to=` | Hourly resolution for > 24h range |
 | Health all healthy | `GET /api/health` | 200, all hosts healthy |
@@ -301,7 +312,7 @@ Not applicable — Worker has no UI. API coverage is handled by L3.
 | 2.4 | `feat: add ingest route` | `routes/ingest.ts` | UT + manual curl → 204 |
 | 2.5 | `feat: add alert evaluation service` | `services/alerts.ts` | UT: all 6 rules, instant + duration |
 | 2.6 | `feat: wire alert evaluation into ingest` | `routes/ingest.ts` | UT: ingest triggers alert state changes |
-| 2.7 | `feat: add hosts list route` | `routes/hosts.ts` | UT: returns registered hosts |
+| 2.7 | `feat: add hosts list route with overview dto` | `routes/hosts.ts`, `services/status.ts` | UT: returns `HostOverviewItem[]` with status, metrics, alert counts |
 | 2.8 | `feat: add metrics query route with auto resolution` | `routes/hosts.ts` | UT: raw vs hourly selection |
 | 2.9 | `feat: add health endpoint with warning/critical distinction` | `routes/health.ts` | UT: 200 (healthy/warning-only), 503 (critical), offline detection |
 | 2.10 | `feat: add alerts list route` | `routes/alerts.ts` | UT: returns all active alerts across hosts |

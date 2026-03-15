@@ -83,7 +83,7 @@ Grid of `HostCard` components. Each card shows:
 - Uptime
 - Last seen timestamp
 
-Data source: `GET /api/hosts` (Dashboard proxy) via SWR hook with 30s refresh.
+Data source: `GET /api/hosts` (Dashboard proxy) → `HostOverviewItem[]` via SWR hook with 30s refresh. DTO defined in [03-data-structures.md § GET /api/hosts](./03-data-structures.md).
 
 ### `/hosts/[id]` — Host Detail
 
@@ -97,7 +97,7 @@ Time range picker options:
 - **Raw data ranges**: 1h, 6h, 24h → queries `GET /api/hosts/:id/metrics?from=&to=`
 - **Hourly data ranges**: 7d, 30d, 90d → same endpoint, Worker auto-selects hourly resolution
 
-Data source: `GET /api/hosts/[id]/metrics` via SWR hook.
+Data source: `GET /api/hosts/[id]/metrics` → `MetricsQueryResponse` via SWR hook. DTO defined in [03-data-structures.md § GET /api/hosts/:id/metrics](./03-data-structures.md).
 
 ### `/alerts` — Alerts Overview
 
@@ -108,7 +108,7 @@ Table of all active alerts across all hosts:
 - Triggered at timestamp
 - Current value
 
-Data source: `GET /api/alerts` (Dashboard proxy) via SWR hook with 30s refresh.
+Data source: `GET /api/alerts` (Dashboard proxy) → `AlertItem[]` via SWR hook with 30s refresh. DTO defined in [03-data-structures.md § GET /api/alerts](./03-data-structures.md).
 
 ---
 
@@ -132,11 +132,11 @@ export async function fetchAPI<T>(path: string, params?: Record<string, string>)
 
 ### SWR hooks (`lib/hooks/`)
 
-| Hook | Endpoint | Refresh |
-|------|----------|---------|
-| `useHosts()` | `/api/hosts` | 30s |
-| `useHostMetrics(id, from, to)` | `/api/hosts/[id]/metrics?from=&to=` | 30s |
-| `useAlerts()` | `/api/alerts` | 30s |
+| Hook | Endpoint | Response type | Refresh |
+|------|----------|---------------|---------|
+| `useHosts()` | `/api/hosts` | `HostOverviewItem[]` | 30s |
+| `useHostMetrics(id, from, to)` | `/api/hosts/[id]/metrics?from=&to=` | `MetricsQueryResponse` | 30s |
+| `useAlerts()` | `/api/alerts` | `AlertItem[]` | 30s |
 
 ---
 
@@ -211,9 +211,19 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 - Biome strict mode, zero errors + zero warnings
 - Typecheck: `tsc --noEmit`
 
-### L3
+### L3 — Proxy Route Integration Tests (`bun test`)
 
-Not applicable — Dashboard does not have its own API logic (only thin proxy). Worker API is tested in [05-worker.md § L3](./05-worker.md).
+Dashboard proxy routes are thin but contain real logic (session check, header injection, status passthrough, error mapping). These route handlers are tested as integration tests against a mock Worker backend:
+
+| Test | Route | Validates |
+|------|-------|-----------|
+| Authenticated request | `GET /api/hosts` | Session valid → forwards to Worker with `BAT_READ_KEY`, returns Worker response |
+| Unauthenticated request | `GET /api/hosts` | No session → 401, Worker never called |
+| Worker error passthrough | `GET /api/hosts` | Worker returns 500 → Dashboard returns 500 to browser |
+| Query param forwarding | `GET /api/hosts/[id]/metrics?from=&to=` | Params forwarded to Worker correctly |
+| All proxy routes covered | `GET /api/hosts`, `/api/hosts/[id]/metrics`, `/api/alerts` | Each route tested |
+
+**Note**: These are route-level integration tests (session mock + HTTP mock), not full E2E against a live Worker. Worker API correctness is covered by [05-worker.md § L3](./05-worker.md).
 
 ### L4 — BDD E2E (Playwright)
 
@@ -235,7 +245,7 @@ Core flows:
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | UT: proxy forwards with read key, rejects unauthenticated |
+| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy logic. L3: route integration tests (session mock, header forwarding, error passthrough) |
 | 4.2 | `feat: add api client and swr hooks` | `lib/api.ts`, `lib/hooks/*` | UT: fetch wrapper, mock responses |
 | 4.3 | `feat: add host card and status badge components` | `components/host-card.tsx`, `status-badge.tsx` | UT: render with mock data |
 | 4.4 | `feat: add hosts overview page` | `app/hosts/page.tsx` | Dev server: grid renders |

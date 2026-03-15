@@ -39,7 +39,7 @@ Full specification: [03-data-structures.md](./03-data-structures.md)
 | 1.1 | `feat: add metrics payload types` | `packages/shared/src/metrics.ts` | Typecheck passes |
 | 1.2 | `feat: add identity payload types` | `packages/shared/src/identity.ts` | Typecheck passes |
 | 1.3 | `feat: add alert types and 6 tier-1 rules` | `packages/shared/src/alerts.ts`, `constants.ts` | Typecheck passes |
-| 1.4 | `feat: add api route types and constants` | `packages/shared/src/api.ts`, `index.ts` | Build + typecheck |
+| 1.4 | `feat: add api route types, response dtos, and constants` | `packages/shared/src/api.ts`, `index.ts` | Build + typecheck |
 | 1.5 | `test: add unit tests for shared types` | `packages/shared/src/__tests__/alerts.test.ts` | `bun test` passes |
 
 ---
@@ -58,7 +58,7 @@ Full specification: [05-worker.md](./05-worker.md)
 | 2.4 | `feat: add ingest route` | `routes/ingest.ts` | UT + manual curl → 204 |
 | 2.5 | `feat: add alert evaluation service` | `services/alerts.ts` | UT: all 6 rules, instant + duration |
 | 2.6 | `feat: wire alert evaluation into ingest` | `routes/ingest.ts` | UT: ingest triggers alert state changes |
-| 2.7 | `feat: add hosts list route` | `routes/hosts.ts` | UT: returns registered hosts |
+| 2.7 | `feat: add hosts list route with overview dto` | `routes/hosts.ts`, `services/status.ts` | UT: returns `HostOverviewItem[]` with status, metrics, alert counts |
 | 2.8 | `feat: add metrics query route with auto resolution` | `routes/hosts.ts` | UT: raw vs hourly selection |
 | 2.9 | `feat: add health endpoint with warning/critical distinction` | `routes/health.ts` | UT: 200 (healthy/warning-only), 503 (critical), offline detection |
 | 2.10 | `feat: add alerts list route` | `routes/alerts.ts` | UT: returns all active alerts across hosts |
@@ -97,7 +97,7 @@ Full specification: [06-dashboard.md](./06-dashboard.md)
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | UT: proxy forwards with read key, rejects unauthenticated |
+| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy logic. L3: route integration tests (session mock, header forwarding, error passthrough) |
 | 4.2 | `feat: add api client and swr hooks` | `lib/api.ts`, `lib/hooks/*` | UT: fetch wrapper, mock responses |
 | 4.3 | `feat: add host card and status badge components` | `components/host-card.tsx`, `status-badge.tsx` | UT: render with mock data |
 | 4.4 | `feat: add hosts overview page` | `app/hosts/page.tsx` | Dev server: grid renders |
