@@ -7,7 +7,8 @@
     "typecheck": "turbo typecheck",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "test": "turbo test"
+    "test": "turbo test",
+    "prepare": "husky"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "husky": "^9.1.0",
     "turbo": "^2.5.0",
     "typescript": "^5.8.2"
   }

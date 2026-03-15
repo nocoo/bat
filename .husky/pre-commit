@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# pre-commit hook: typecheck + lint + unit tests with coverage
+
+set -euo pipefail
+
+echo "🦇 bat pre-commit checks..."
+
+# TypeScript typecheck
+echo "→ typecheck"
+pnpm turbo typecheck
+
+# Biome lint
+echo "→ lint"
+pnpm biome check .
+
+# Unit tests with coverage
+echo "→ unit tests"
+bash scripts/check-coverage.sh 90
+
+# Rust (only if probe/ changed)
+if git diff --cached --name-only | grep -q '^probe/'; then
+  echo "→ rust checks"
+  cd probe
+  cargo fmt --check
+  cargo clippy -- -D warnings
+  cargo test
+  cd ..
+fi
+
+echo "✔ pre-commit passed"

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# pre-push hook: API E2E tests
+
+set -euo pipefail
+
+echo "🦇 bat pre-push checks..."
+
+# Worker API E2E tests (self-bootstraps its own Wrangler dev server)
+echo "→ API E2E tests"
+pnpm --filter @bat/worker test:e2e
+
+echo "✔ pre-push passed"
