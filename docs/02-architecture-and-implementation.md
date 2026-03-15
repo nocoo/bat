@@ -90,7 +90,8 @@ bat/
 │   ├── worker/                     # @bat/worker — CF Worker
 │   │   ├── package.json
 │   │   ├── wrangler.toml
-│   │   ├── schema.sql              # D1 DDL
+│   │   ├── migrations/             # D1 migrations (sequential, numbered)
+│   │   │   └── 0001_initial.sql    # Initial schema DDL
 │   │   └── src/
 │   │       ├── index.ts            # Hono app + cron scheduled handler
 │   │       ├── types.ts            # Env bindings (DB, API_KEY, etc.)
@@ -194,8 +195,8 @@ CREATE INDEX idx_raw_host_ts ON metrics_raw(host_id, ts);
 
 -- Hourly aggregated metrics (90-day retention)
 -- No autoincrement id — (host_id, hour_ts) is the natural primary key.
--- INSERT OR REPLACE on this composite PK performs an in-place overwrite
--- without generating unstable row ids.
+-- Uses INSERT ... ON CONFLICT DO UPDATE (not INSERT OR REPLACE, which is
+-- delete+insert in SQLite and would break triggers/FK cascades/audit fields).
 CREATE TABLE metrics_hourly (
   host_id          TEXT    NOT NULL,
   hour_ts          INTEGER NOT NULL,
@@ -248,7 +249,34 @@ CREATE TABLE alert_pending (
 **Design rationale**:
 - `disk_json` / `net_json` as JSON text — Dashboard always fetches full array, D1 `json_extract()` handles rare per-mount queries
 - `alert_pending` stages duration-based rules: condition first appears → track → promote to `alert_states` after sustained period
-- `UNIQUE(host_id, hour_ts)` is the composite primary key — `INSERT OR REPLACE` performs in-place overwrite without generating unstable autoincrement ids
+- `UNIQUE(host_id, hour_ts)` is the composite primary key — `INSERT INTO metrics_hourly ... ON CONFLICT(host_id, hour_ts) DO UPDATE SET ...` performs a true in-place update (no delete+insert cycle, safe for triggers and FK cascades)
+
+### D1 Migration Strategy
+
+D1 has no built-in migration tool. We use a **numbered SQL files** convention:
+
+```
+packages/worker/migrations/
+├── 0001_initial.sql        # Initial schema (all CREATE TABLE/INDEX statements)
+├── 0002_add_foo_column.sql # Future: ALTER TABLE ... ADD COLUMN
+└── ...
+```
+
+**Rules**:
+- Each migration file is **idempotent** where possible (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`). `ALTER TABLE ADD COLUMN` is not idempotent in SQLite — guard with a comment noting manual check.
+- Files are applied in numeric order. A `_migrations` meta-table tracks which have been applied:
+
+```sql
+CREATE TABLE IF NOT EXISTS _migrations (
+  id      INTEGER PRIMARY KEY,
+  name    TEXT NOT NULL UNIQUE,
+  applied INTEGER NOT NULL DEFAULT (unixepoch())
+);
+```
+
+- The Worker cron (or a one-off script) checks `_migrations` on startup/deploy and runs unapplied files in order.
+- **MVP shortcut**: For the initial deployment, `0001_initial.sql` contains the full DDL (including `_migrations` table). Subsequent schema changes go into `0002_`, `0003_`, etc. Applied via `wrangler d1 execute bat-db --file=migrations/NNNN_*.sql` during deploy.
+- **No down migrations**: D1 has no transactional DDL. If a migration is wrong, write a corrective forward migration.
 
 ---
 
@@ -293,10 +321,11 @@ This means:
 Single Worker invocation, D1 batch for atomicity:
 
 1. Validate payload shape (lightweight check, no Zod)
-2. `INSERT INTO metrics_raw` — flatten scalars, stringify disk/net
-3. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname. Does NOT set `is_active` — a retired host receiving stray metrics should not auto-reactivate (only identity does that).
-4. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`
-5. Return `204 No Content`
+2. **Check retirement**: If `host_id` exists in `hosts` with `is_active = 0`, return `403` with error message `"host is retired"`. This prevents silent dirty data from stale Probes. The operator must either stop the Probe or reactivate the host before metrics are accepted.
+3. `INSERT INTO metrics_raw` — flatten scalars, stringify disk/net
+4. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname. Does NOT set `is_active` — only new hosts get the default `is_active = 1` from the DDL.
+5. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`
+6. Return `204 No Content`
 
 **Why UPSERT instead of UPDATE**: The Probe sends identity on startup before any ingest, but identity can fail (network error, Worker cold start). If ingest required a pre-existing host row (via foreign key + UPDATE-only), the first metrics would be silently dropped. The UPSERT guarantees ingest is self-sufficient — it never fails because of a missing host row. When identity eventually succeeds, it fills in the full host metadata (os, kernel, arch, etc.).
 
@@ -317,7 +346,7 @@ Two separate time sources, each authoritative for its purpose:
 
 ### Identity update semantics
 
-`POST /api/identity` performs a **full overwrite** of all identity fields:
+`POST /api/identity` performs a **full overwrite** of all identity fields. If the host exists with `is_active = 0`, the request is rejected with `403` (same as ingest — retired hosts cannot write any data).
 
 ```sql
 INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at)
@@ -395,12 +424,12 @@ This prevents warning-level alerts (iowait > 20%, steal > 10%) from triggering U
 
 **Overall status derivation**: `critical` if any active host critical → `degraded` if any active host warning → `healthy` otherwise.
 
-**Edge case — zero active hosts**: When no active hosts exist in D1 (fresh deployment, all retired), `/api/health` returns `200` with `"status": "empty"` and `total_hosts: 0`. This is distinct from `"healthy"` (which implies hosts are reporting normally). Uptime Kuma should be configured to alert on `"empty"` status persisting beyond the initial setup window — "no probes connected" is not the same as "everything is fine".
+**Edge case — zero active hosts**: When no active hosts exist in D1 (fresh deployment, all retired), `/api/health` returns `503` with `"status": "empty"` and `total_hosts: 0`. This is treated as critical — "no probes connected" is an operational problem, not a healthy state. Uptime Kuma's standard HTTP status code check (503 = down) handles this automatically with no body-parsing configuration.
 
 ### Hourly aggregation cron
 
 - Cron Trigger: `0 * * * *`
-- Aggregate previous complete hour → `INSERT OR REPLACE INTO metrics_hourly` (avg/max scalars, last sample disk/net JSON)
+- Aggregate previous complete hour → `INSERT INTO metrics_hourly ... ON CONFLICT(host_id, hour_ts) DO UPDATE SET ...` (avg/max scalars, last sample disk/net JSON)
 - Purge `metrics_raw WHERE ts < now - 7d`
 - Purge `metrics_hourly WHERE hour_ts < now - 90d`
 
@@ -624,6 +653,7 @@ Test every Worker route against local Wrangler dev server:
 | Ingest valid payload | `POST /api/ingest` | 204, data in D1 |
 | Ingest missing API key | `POST /api/ingest` | 401 |
 | Ingest invalid payload | `POST /api/ingest` | 400 |
+| Ingest retired host | `POST /api/ingest` | 403, host is retired |
 | Send identity | `POST /api/identity` | 204, host in D1 |
 | List hosts | `GET /api/hosts` | Returns registered hosts |
 | Query raw metrics | `GET /api/hosts/:id/metrics?from=&to=` | Correct count, raw resolution |
@@ -632,7 +662,7 @@ Test every Worker route against local Wrangler dev server:
 | Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
 | Health with critical | `GET /api/health` | 503, critical alert details |
 | Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
-| Zero hosts health | `GET /api/health` | 200, status "empty", total_hosts: 0 |
+| Zero hosts health | `GET /api/health` | 503, status "empty", total_hosts: 0 |
 | List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
 | Aggregation cron | `__scheduled` trigger | `metrics_hourly` populated, raw purged |
 | Unauthenticated API | `GET /api/hosts` (no key) | 401 |
@@ -699,7 +729,7 @@ pre-push:
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 2.1 | `feat: add d1 schema` | `packages/worker/schema.sql` | `wrangler d1 execute --local --file=schema.sql` |
+| 2.1 | `feat: add d1 schema and migration infrastructure` | `packages/worker/migrations/0001_initial.sql` | `wrangler d1 execute --local --file=migrations/0001_initial.sql` |
 | 2.2 | `feat: add api key auth middleware with read/write scopes` | `middleware/api-key.ts` | UT: write key on POST routes, read key on GET routes, reject cross-scope usage |
 | 2.3 | `feat: add identity route` | `routes/identity.ts`, `services/metrics.ts` | UT + manual curl |
 | 2.4 | `feat: add ingest route` | `routes/ingest.ts` | UT + manual curl → 204 |
@@ -764,8 +794,8 @@ wrangler d1 create bat-db
 wrangler secret put BAT_WRITE_KEY
 wrangler secret put BAT_READ_KEY
 
-# Apply schema
-wrangler d1 execute bat-db --file=packages/worker/schema.sql
+# Apply migrations (run each unapplied file in order)
+wrangler d1 execute bat-db --file=packages/worker/migrations/0001_initial.sql
 
 # Deploy
 cd packages/worker && wrangler deploy
