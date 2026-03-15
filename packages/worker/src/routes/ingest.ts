@@ -1,6 +1,7 @@
 // POST /api/ingest — receive and store metrics from probes
 import type { MetricsPayload } from "@bat/shared";
 import type { Context } from "hono";
+import { evaluateAlerts } from "../services/alerts.js";
 import { insertMetricsRaw, upsertHostLastSeen } from "../services/metrics.js";
 import type { AppEnv } from "../types.js";
 
@@ -90,6 +91,9 @@ export async function ingestRoute(c: Context<AppEnv>) {
 
 	// Insert metrics
 	await insertMetricsRaw(db, body.host_id, body);
+
+	// Evaluate alert rules against the new metrics
+	await evaluateAlerts(db, body.host_id, body, workerNow);
 
 	return c.body(null, 204);
 }
