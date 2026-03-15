@@ -8,7 +8,7 @@
 > - [03-data-structures.md](./03-data-structures.md) — Shared types testing (L1)
 > - [04-probe.md](./04-probe.md) — Probe testing (L1, L2, L3)
 > - [05-worker.md](./05-worker.md) — Worker testing (L1, L2, L3)
-> - [06-dashboard.md](./06-dashboard.md) — Dashboard testing (L1, L2, L3, L4)
+> - [06-dashboard.md](./06-dashboard.md) — Dashboard testing (L1, L2, L4)
 > - [08-commits.md](./08-commits.md) — Atomic commits plan
 
 ---
@@ -34,7 +34,7 @@ Pure logic tests. No network, no database, no UI rendering (except component sna
 |--------|------|----------------|----------------|
 | `@bat/shared` | Bun test | ≥ 90% | Alert rule definitions, threshold constants |
 | `@bat/worker` | Bun test | ≥ 90% | Alert evaluation (6 rules), aggregation SQL, metrics resolution, API key middleware, route handlers |
-| `@bat/dashboard` | Bun test | ≥ 90% | Data transforms, proxy logic, component rendering, proxy route integration (session mock + HTTP mock) |
+| `@bat/dashboard` | Bun test | ≥ 90% | Data transforms, proxy route handlers (session mock + HTTP mock), component rendering |
 | `probe/` | `cargo test` | ≥ 90% | Procfs parsing, delta calc, rate math, config parsing, payload serialization, retry logic |
 
 ### Testing conventions

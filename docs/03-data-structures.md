@@ -95,13 +95,24 @@ CREATE TABLE metrics_hourly (
   swap_used_pct_avg REAL,
   swap_used_pct_max REAL,            -- needed for mem_high alert (swap > 50%)
   uptime_min       INTEGER,
-  disk_json        TEXT,
-  net_json         TEXT,
+  disk_json        TEXT,             -- last sample (disk is capacity, not rate — last sample is representative)
+  net_rx_bytes_avg REAL,             -- avg rx bytes/sec across all interfaces in the hour
+  net_rx_bytes_max REAL,             -- max rx bytes/sec peak in the hour
+  net_tx_bytes_avg REAL,             -- avg tx bytes/sec
+  net_tx_bytes_max REAL,             -- max tx bytes/sec peak
+  net_rx_errors    INTEGER,          -- sum of rx_errors in the hour
+  net_tx_errors    INTEGER,          -- sum of tx_errors in the hour
   PRIMARY KEY (host_id, hour_ts),
   FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
 -- No separate index needed — PRIMARY KEY (host_id, hour_ts) is already indexed
 ```
+
+**Design rationale for hourly network fields**:
+- `net_json` (last sample) was misleading for long-range charts — it represents one instant, not the hour's traffic pattern
+- Scalar avg/max fields give Dashboard meaningful data for 7d/30d/90d network charts
+- Per-interface breakdown is lost in hourly aggregation — this is acceptable for MVP (6 hosts, typically 1 primary interface). Post-MVP can add per-interface hourly if needed
+- `disk_json` remains as last sample because disk usage is capacity (slow-changing), not a rate — last sample is representative of the hour
 
 **Write semantics**: Use `INSERT INTO metrics_hourly ... ON CONFLICT(host_id, hour_ts) DO UPDATE SET ...` — NOT `INSERT OR REPLACE`, which is delete+insert in SQLite and would break triggers/FK cascades/audit fields.
 
@@ -436,8 +447,15 @@ interface MetricsDataPoint {
   swap_total: number | null;
   swap_used: number | null;         // raw: swap_used, hourly: swap_used_max
   swap_used_pct: number | null;     // raw: swap_used_pct, hourly: swap_used_pct_avg
-  disk_json: string | null;         // JSON string, Dashboard parses
-  net_json: string | null;          // JSON string, Dashboard parses
+  disk_json: string | null;         // JSON string, Dashboard parses (raw: current, hourly: last sample)
+  // Network: raw uses net_json, hourly uses scalar fields
+  net_json: string | null;          // raw only — JSON string of NetMetric[]
+  net_rx_bytes_avg: number | null;  // hourly only — avg rx bytes/sec
+  net_rx_bytes_max: number | null;  // hourly only — max rx bytes/sec
+  net_tx_bytes_avg: number | null;  // hourly only — avg tx bytes/sec
+  net_tx_bytes_max: number | null;  // hourly only — max tx bytes/sec
+  net_rx_errors: number | null;     // hourly only — sum of rx_errors
+  net_tx_errors: number | null;     // hourly only — sum of tx_errors
   uptime_seconds: number | null;    // raw: uptime_seconds, hourly: uptime_min
   sample_count?: number;            // hourly only
 }

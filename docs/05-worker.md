@@ -237,7 +237,8 @@ Defined in `index.ts` scheduled handler.
    - `mem_total` (last sample), `mem_available_min`, `mem_used_pct_avg`, `mem_used_pct_max`
    - `swap_total` (last sample), `swap_used_max`, `swap_used_pct_avg`, `swap_used_pct_max`
    - `uptime_min`
-   - `disk_json`, `net_json` (last sample)
+   - `disk_json` (last sample — disk is capacity, not rate)
+   - Network: parse each row's `net_json`, sum across interfaces, then compute `net_rx_bytes_avg`, `net_rx_bytes_max`, `net_tx_bytes_avg`, `net_tx_bytes_max`, `net_rx_errors` (sum), `net_tx_errors` (sum)
    - `sample_count`
 3. Write: `INSERT INTO metrics_hourly ... ON CONFLICT(host_id, hour_ts) DO UPDATE SET ...`
 4. Purge old data:
@@ -285,7 +286,7 @@ Test every Worker route against local Wrangler dev server:
 | Query hourly metrics | `GET /api/hosts/:id/metrics?from=&to=` | Hourly resolution for > 24h range |
 | Health all healthy | `GET /api/health` | 200, all hosts healthy |
 | Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
-| Health with critical | `GET /api/health` | 503, critical alert details |
+| Health with critical | `GET /api/health` | 503, status "critical" |
 | Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
 | Zero hosts health | `GET /api/health` | 503, status "empty", total_hosts: 0 |
 | List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
