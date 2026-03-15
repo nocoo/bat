@@ -181,9 +181,9 @@ Per port: `{ port, bind, protocol, pid, process }`. Map via `/proc/{pid}/fd/` �
 
 ---
 
-## Alert Rules (all 14)
+## Alert Rules (all 15)
 
-The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 data (MVP), 8 require Tier 2 (post-MVP). Implementation of the 6 MVP rules in [03-data-structures.md § Alert rules](./03-data-structures.md) and [05-worker.md § Alert evaluation](./05-worker.md).
+The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 data (MVP), 1 uses Tier 1 but is deferred (low priority), 8 require Tier 2 (post-MVP). Implementation of the 6 MVP rules in [03-data-structures.md § Alert rules](./03-data-structures.md) and [05-worker.md § Alert evaluation](./05-worker.md).
 
 | # | Alert | Condition | Severity | Tier | Status |
 |---|-------|-----------|----------|------|--------|
