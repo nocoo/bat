@@ -2,7 +2,7 @@
 import type { MetricsPayload } from "@bat/shared";
 import type { Context } from "hono";
 import { evaluateAlerts } from "../services/alerts.js";
-import { insertMetricsRaw, upsertHostLastSeen } from "../services/metrics.js";
+import { ensureHostExists, insertMetricsRaw, updateHostLastSeen } from "../services/metrics.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -86,14 +86,18 @@ export async function ingestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Upsert host (ensures FK target exists) — use host_id as fallback hostname
-	await upsertHostLastSeen(db, body.host_id, body.host_id, workerNow);
+	// Ensure host record exists (FK target) without updating last_seen
+	await ensureHostExists(db, body.host_id, body.host_id, workerNow);
 
-	// Insert metrics
-	await insertMetricsRaw(db, body.host_id, body);
+	// Insert metrics — returns false if this is a duplicate (same host_id + ts)
+	const inserted = await insertMetricsRaw(db, body.host_id, body);
 
-	// Evaluate alert rules against the new metrics
-	await evaluateAlerts(db, body.host_id, body, workerNow);
+	// Only update last_seen and evaluate alerts for genuinely new data.
+	// Retried payloads with identical timestamps are no-ops from here.
+	if (inserted) {
+		await updateHostLastSeen(db, body.host_id, workerNow);
+		await evaluateAlerts(db, body.host_id, body, workerNow);
+	}
 
 	return c.body(null, 204);
 }

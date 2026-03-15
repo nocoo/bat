@@ -235,7 +235,8 @@ describe("POST /api/ingest", () => {
 
 	test("ingest clears alert when condition resolves", async () => {
 		// First: trigger disk_full
-		const alertPayload = makePayload();
+		const now = Math.floor(Date.now() / 1000);
+		const alertPayload = makePayload({ timestamp: now });
 		alertPayload.disk = [
 			{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 5_000_000_000, used_pct: 95 },
 		];
@@ -248,12 +249,57 @@ describe("POST /api/ingest", () => {
 			.first();
 		expect(before).not.toBeNull();
 
-		// Then: condition clears
-		await post(app, makePayload());
+		// Then: condition clears with a new timestamp (different data point)
+		await post(app, makePayload({ timestamp: now + 30 }));
 		const after = await db
 			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
 			.bind("host-001", "disk_full")
 			.first();
 		expect(after).toBeNull();
+	});
+
+	test("duplicate ingest is fully idempotent (no side effects on retry)", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const payload = makePayload({ timestamp: now });
+		payload.disk = [
+			{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 5_000_000_000, used_pct: 95 },
+		];
+
+		// First ingest — triggers alert, sets last_seen
+		await post(app, payload);
+
+		const hostAfterFirst = await db
+			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<{ last_seen: number }>();
+		const alertAfterFirst = await db
+			.prepare("SELECT triggered_at FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "disk_full")
+			.first<{ triggered_at: number }>();
+		expect(hostAfterFirst).not.toBeNull();
+		expect(alertAfterFirst).not.toBeNull();
+
+		// Second ingest — same payload, should be a no-op
+		await post(app, payload);
+
+		const hostAfterSecond = await db
+			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<{ last_seen: number }>();
+		const alertAfterSecond = await db
+			.prepare("SELECT triggered_at FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "disk_full")
+			.first<{ triggered_at: number }>();
+
+		// last_seen and triggered_at must not have changed
+		expect(hostAfterSecond?.last_seen).toBe(hostAfterFirst?.last_seen);
+		expect(alertAfterSecond?.triggered_at).toBe(alertAfterFirst?.triggered_at);
+
+		// Only one metrics row should exist
+		const metricsCount = await db
+			.prepare("SELECT COUNT(*) as cnt FROM metrics_raw WHERE host_id = ?")
+			.bind("host-001")
+			.first<{ cnt: number }>();
+		expect(metricsCount?.cnt).toBe(1);
 	});
 });
