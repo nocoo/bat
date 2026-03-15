@@ -41,5 +41,11 @@ coverage/
 # Bun
 bun.lock
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # Misc
 *.log
