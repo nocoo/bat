@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { Hono } from "hono";
-import { apiKeyAuth } from "./api-key";
 import type { AppEnv } from "../types";
+import { apiKeyAuth } from "./api-key";
 
 const WRITE_KEY = "test-write-key-123";
 const READ_KEY = "test-read-key-456";

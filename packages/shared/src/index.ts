@@ -14,7 +14,13 @@ export type {
 export type { HostRow, IdentityPayload } from "./identity.js";
 
 // Alert types and rules
-export type { AlertRule, AlertSeverity, AlertState, HealthResponse, HealthStatus } from "./alerts.js";
+export type {
+	AlertRule,
+	AlertSeverity,
+	AlertState,
+	HealthResponse,
+	HealthStatus,
+} from "./alerts.js";
 export { getAlertRule, TIER1_ALERT_RULES } from "./alerts.js";
 
 // Constants

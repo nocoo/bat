@@ -1,23 +1,23 @@
 {
-  "name": "@bat/shared",
-  "version": "0.0.1",
-  "private": true,
-  "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "scripts": {
-    "build": "tsc",
-    "typecheck": "tsc --noEmit",
-    "test": "bun test",
-    "test:coverage": "bun test --coverage"
-  },
-  "devDependencies": {
-    "typescript": "^5.8.2"
-  }
+	"name": "@bat/shared",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": "./dist/index.js",
+			"types": "./dist/index.d.ts"
+		}
+	},
+	"scripts": {
+		"build": "tsc",
+		"typecheck": "tsc --noEmit",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage"
+	},
+	"devDependencies": {
+		"typescript": "^5.8.2"
+	}
 }

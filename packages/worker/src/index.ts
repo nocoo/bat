@@ -1,6 +1,6 @@
 import { Hono } from "hono";
-import type { AppEnv } from "./types.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
+import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
 
