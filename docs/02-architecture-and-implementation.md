@@ -320,8 +320,8 @@ Two separate time sources, each authoritative for its purpose:
 `POST /api/identity` performs a **full overwrite** of all identity fields:
 
 ```sql
-INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, is_active)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(host_id) DO UPDATE SET
   hostname = excluded.hostname,
   os = excluded.os,
@@ -330,13 +330,14 @@ ON CONFLICT(host_id) DO UPDATE SET
   cpu_model = excluded.cpu_model,
   boot_time = excluded.boot_time,
   last_seen = excluded.last_seen,
-  identity_updated_at = excluded.identity_updated_at,
-  is_active = 1;  -- receiving identity reactivates a retired host
+  identity_updated_at = excluded.identity_updated_at;
+  -- NOTE: is_active is NOT touched — retirement is an explicit human decision.
+  -- A retired host receiving identity updates stays retired until manually reactivated.
 ```
 
 **Design choices**:
 - **Full overwrite**: Every field is replaced on each identity POST. The Probe always sends a complete identity payload, so partial updates add complexity without benefit.
-- **Reactivation**: Receiving an identity payload sets `is_active = 1`, which means redeploying a Probe to a previously retired host automatically brings it back.
+- **No auto-reactivation**: Identity updates do NOT change `is_active`. If a host was manually retired (`is_active = 0`), receiving new identity payloads (e.g. from a stale Probe or redeployment) does not silently bring it back. Reactivation requires explicit human action (same `wrangler d1 execute` as retirement, setting `is_active = 1`).
 - **Detecting changes**: Compare `boot_time` to detect reboots. Compare `kernel`/`os` to detect upgrades. `identity_updated_at` tracks when metadata was last refreshed.
 - **`host_id` is immutable**: It's the primary key. If a machine's `host_id` changes (new config), it appears as a new host. The old host stays retired until manually cleaned up.
 
@@ -347,7 +348,7 @@ Hosts are never auto-deleted. Instead:
 - **`is_active = 1`** (default): Host appears in `/api/hosts`, `/api/health`, `/api/alerts`
 - **`is_active = 0`** (retired): Host is excluded from all API responses and health checks. Metrics data follows normal retention (7d raw, 90d hourly) and ages out naturally.
 
-**How to retire a host**: Manual `PATCH /api/hosts/:id` with `{ "is_active": false }` via Dashboard (MVP: direct D1 console or wrangler command). Post-MVP: add a "retire" button in the Dashboard UI.
+**How to retire a host (MVP)**: Direct D1 console command — `wrangler d1 execute bat-db --command "UPDATE hosts SET is_active = 0 WHERE host_id = 'xxx'"`. No API route for retirement in MVP. Post-MVP: add `PATCH /api/hosts/:id` route (Write Key auth) and a "retire" button in the Dashboard UI.
 
 **Why not auto-retire**: Auto-retiring after N days of `last_seen` would mask real outages. A host that's been offline for 2 weeks might be a forgotten VM that still costs money — the persistent offline alert is intentional. Retirement is an explicit human decision.
 
@@ -455,7 +456,7 @@ loop {
     tick(30s) → collect_all() → POST /api/ingest
                  - cpu/net deltas are now "past 30s", not "since boot"
                  - retry 5x, exponential backoff 1s→60s
-                 - 401 → log error, don't retry (bad key)
+                 - 401/400 → log error, don't retry (bad key / bad clock — permanent errors)
                if 6h elapsed → resend identity
     SIGTERM/SIGINT → graceful shutdown
   }
