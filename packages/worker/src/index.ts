@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { apiKeyAuth } from "./middleware/api-key.js";
+import { alertsListRoute } from "./routes/alerts.js";
 import { healthRoute } from "./routes/health.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
@@ -25,5 +26,6 @@ app.post("/api/ingest", ingestRoute);
 // Read routes (dashboard → worker)
 app.get("/api/hosts", hostsListRoute);
 app.get("/api/hosts/:id/metrics", hostMetricsRoute);
+app.get("/api/alerts", alertsListRoute);
 
 export default app;
