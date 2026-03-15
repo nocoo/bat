@@ -2,6 +2,11 @@ name = "bat-worker"
 main = "src/index.ts"
 compatibility_date = "2025-03-14"
 
+# Cron trigger: hourly aggregation and data purge
+[triggers]
+crons = ["0 * * * *"]
+
+# Default (development) D1 binding
 [[d1_databases]]
 binding = "DB"
 database_name = "bat-db"
@@ -9,3 +14,17 @@ database_id = "placeholder-replace-with-real-id"
 
 [vars]
 ENVIRONMENT = "development"
+
+# Production environment overrides
+# Usage: wrangler deploy --env production
+# Secrets (set via `wrangler secret put`): BAT_WRITE_KEY, BAT_READ_KEY
+[env.production]
+name = "bat-worker"
+
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "bat-db-prod"
+database_id = "placeholder-replace-with-prod-id"
+
+[env.production.vars]
+ENVIRONMENT = "production"
