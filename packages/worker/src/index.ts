@@ -3,6 +3,7 @@ import { apiKeyAuth } from "./middleware/api-key.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
+import { hostMetricsRoute } from "./routes/metrics.js";
 import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
@@ -19,5 +20,6 @@ app.post("/api/ingest", ingestRoute);
 
 // Read routes (dashboard → worker)
 app.get("/api/hosts", hostsListRoute);
+app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 
 export default app;
