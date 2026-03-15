@@ -200,4 +200,40 @@ describe("GET /api/hosts", () => {
 		expect(body[0].mem_used_pct).toBeNull();
 		expect(body[0].uptime_seconds).toBeNull();
 	});
+
+	test("returns cpu_model and boot_time when available", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const bootTime = now - 86400;
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+			)
+			.bind(
+				"host-cpu",
+				"cpu-host",
+				"Ubuntu 24.04",
+				"6.8.0",
+				"x86_64",
+				"AMD EPYC 7763",
+				bootTime,
+				now,
+			)
+			.run();
+
+		const res = await get(app);
+		const body = (await res.json()) as HostOverviewItem[];
+		const item = body.find((h) => h.host_id === "host-cpu");
+		expect(item?.cpu_model).toBe("AMD EPYC 7763");
+		expect(item?.boot_time).toBe(bootTime);
+	});
+
+	test("cpu_model and boot_time are null when not set", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "host-001", "server-1", now);
+
+		const res = await get(app);
+		const body = (await res.json()) as HostOverviewItem[];
+		expect(body[0].cpu_model).toBeNull();
+		expect(body[0].boot_time).toBeNull();
+	});
 });

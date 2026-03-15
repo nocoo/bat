@@ -10,6 +10,8 @@ interface HostRow {
 	os: string | null;
 	kernel: string | null;
 	arch: string | null;
+	cpu_model: string | null;
+	boot_time: number | null;
 	last_seen: number;
 }
 
@@ -36,7 +38,9 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 
 	// 1. Get all active hosts
 	const hostsResult = await db
-		.prepare("SELECT host_id, hostname, os, kernel, arch, last_seen FROM hosts WHERE is_active = 1")
+		.prepare(
+			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen FROM hosts WHERE is_active = 1",
+		)
 		.all<HostRow>();
 	const hosts = hostsResult.results;
 
@@ -104,6 +108,8 @@ FROM (
 			os: host.os,
 			kernel: host.kernel,
 			arch: host.arch,
+			cpu_model: host.cpu_model,
+			boot_time: host.boot_time,
 			status,
 			cpu_usage_pct: metrics?.cpu_usage_pct ?? null,
 			mem_used_pct: metrics?.mem_used_pct ?? null,
