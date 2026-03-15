@@ -36,13 +36,9 @@ describe("proxyToWorker", () => {
 		let capturedUrl = "";
 		let capturedAuthHeader = "";
 
-		globalThis.fetch = (async (
-			input: string | URL | Request,
-			init?: RequestInit,
-		) => {
+		globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
 			capturedUrl = input.toString();
-			capturedAuthHeader =
-				(init?.headers as Record<string, string>)?.Authorization ?? "";
+			capturedAuthHeader = (init?.headers as Record<string, string>)?.Authorization ?? "";
 			return new Response(JSON.stringify([{ host_id: "h1" }]), {
 				status: 200,
 				headers: { "Content-Type": "application/json" },
@@ -51,9 +47,7 @@ describe("proxyToWorker", () => {
 
 		const res = await proxyToWorker("/api/hosts");
 		expect(res.status).toBe(200);
-		expect(capturedUrl).toBe(
-			"https://bat-worker.test.workers.dev/api/hosts",
-		);
+		expect(capturedUrl).toBe("https://bat-worker.test.workers.dev/api/hosts");
 		expect(capturedAuthHeader).toBe("Bearer test-read-key-123");
 		const body = (await res.json()) as Array<{ host_id: string }>;
 		expect(body).toEqual([{ host_id: "h1" }]);

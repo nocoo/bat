@@ -74,7 +74,11 @@ impl Sender {
         for attempt in 0..=MAX_RETRIES {
             if attempt > 0 {
                 let delay = backoff_duration(attempt - 1);
-                tracing::debug!(attempt, delay_ms = delay.as_millis(), "retrying after backoff");
+                tracing::debug!(
+                    attempt,
+                    delay_ms = delay.as_millis(),
+                    "retrying after backoff"
+                );
                 tokio::time::sleep(delay).await;
             }
 
