@@ -18,7 +18,7 @@ function buildRedirectUrl(req: NextRequest, pathname: string): URL {
 
 // Next.js 16 proxy convention (replaces middleware.ts)
 // NextAuth's auth() returns a middleware-compatible handler
-const authHandler = auth(async (req) => {
+const authHandler = auth(async (req: NextRequest & { auth?: unknown }) => {
 	const pathname = req.nextUrl.pathname;
 
 	// Allow auth routes (OAuth flow)
