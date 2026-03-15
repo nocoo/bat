@@ -5,6 +5,7 @@ pub struct MemInfo {
     pub mem_available: u64,
     pub mem_used_pct: f64,
     pub swap_total: u64,
+    #[allow(dead_code)]
     pub swap_free: u64,
     pub swap_used: u64,
     pub swap_used_pct: f64,
@@ -65,6 +66,15 @@ pub fn parse_meminfo(content: &str) -> Option<MemInfo> {
 fn parse_meminfo_line(line: &str, key: &str) -> Option<u64> {
     let rest = line.strip_prefix(key)?;
     rest.split_whitespace().next()?.parse().ok()
+}
+
+// ── Live reader (requires Linux /proc) ──────────────────────────────
+
+/// Read and parse `/proc/meminfo`.
+pub fn read_meminfo() -> Result<MemInfo, String> {
+    let content = std::fs::read_to_string("/proc/meminfo")
+        .map_err(|e| format!("read /proc/meminfo: {e}"))?;
+    parse_meminfo(&content).ok_or_else(|| "failed to parse /proc/meminfo".to_string())
 }
 
 #[cfg(test)]

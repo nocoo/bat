@@ -4,8 +4,10 @@ const REAL_FS_TYPES: &[&str] = &["ext4", "xfs", "btrfs", "overlay", "zfs", "f2fs
 /// A parsed mount entry from `/proc/mounts`.
 #[derive(Debug, Clone)]
 pub struct MountEntry {
+    #[allow(dead_code)]
     pub device: String,
     pub mount_point: String,
+    #[allow(dead_code)]
     pub fs_type: String,
 }
 
@@ -98,6 +100,19 @@ pub struct DiskInfo {
     pub total_bytes: u64,
     pub avail_bytes: u64,
     pub used_pct: f64,
+}
+
+// ── Live reader (requires Linux /proc) ──────────────────────────────
+
+/// Read `/proc/mounts`, filter, and collect disk metrics via `statvfs`.
+pub fn read_disk_metrics(
+    exclude_mounts: &[String],
+    exclude_fs_types: &[String],
+) -> Result<Vec<DiskInfo>, String> {
+    let content = std::fs::read_to_string("/proc/mounts")
+        .map_err(|e| format!("read /proc/mounts: {e}"))?;
+    let mounts = parse_mounts(&content, exclude_mounts, exclude_fs_types);
+    Ok(collect_disk(&mounts))
 }
 
 #[cfg(test)]
