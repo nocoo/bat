@@ -24,7 +24,7 @@ Replace Netdata (120-243MB RSS) across 6 VPS hosts with a purpose-built monitori
 Dashboard auth model:
   - User authenticates with Google OAuth on Dashboard (cookie stays on Dashboard domain)
   - Dashboard API Routes (Next.js /api/*) act as a server-side proxy to Worker
-  - Dashboard server holds BAT_API_KEY, adds Authorization header when calling Worker
+  - Dashboard server holds BAT_READ_KEY, adds Authorization header when calling Worker
   - Browser never talks to Worker directly — no cross-domain cookie issue
 ```
 
@@ -34,12 +34,13 @@ Dashboard auth model:
 |----------|--------|-----------|
 | Probe language | Rust | Single static binary, < 15MB RSS, < 10MB disk |
 | Transport | HTTPS POST JSON | CF Worker native, ~1KB/report, simple |
-| Auth (probe) | Shared API Key | `Authorization: Bearer <key>`, stored as Worker secret |
+| Auth (probe) | Write API Key | `Authorization: Bearer <BAT_WRITE_KEY>`, stored as Worker secret. Only accepted on write routes (`/api/ingest`, `/api/identity`) |
+| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/alerts`). Even if Railway env leaks, attacker cannot forge metrics or manipulate alerts |
 | Server | CF Worker + D1 | Serverless, free tier sufficient for 6 hosts |
 | Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges |
 | Dashboard | Next.js 16 + Bun (from Surety template) | Clone auth, UI, deployment from `../surety` |
 | Auth (dashboard) | Google OAuth + email allowlist | From Surety (`src/auth.ts`, `src/proxy.ts`); TOTP 2FA dropped for MVP (requires DB-backed TotpStore that conflicts with "delete db/") |
-| Auth (dashboard→worker) | Server-side API Key proxy | Dashboard API Routes hold `BAT_API_KEY`, proxy to Worker; browser never calls Worker directly |
+| Auth (dashboard→worker) | Server-side Read Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker; browser never calls Worker directly |
 | UI system | Basalt design system | 3-tier luminance, shadcn/ui, Recharts, 24-color chart palette |
 | Alerting | 6 Tier-1 rules, health endpoint | Uptime Kuma polls `GET /api/health` |
 | Monorepo | pnpm workspaces + Cargo | TS packages managed by pnpm, Rust probe by Cargo |
@@ -98,13 +99,13 @@ bat/
 │   │       │   ├── identity.ts     # POST /api/identity
 │   │       │   ├── hosts.ts        # GET /api/hosts, /api/hosts/:id/metrics
 │   │       │   ├── alerts.ts       # GET /api/alerts (all active alerts)
-│   │       │   └── health.ts       # GET /api/health, /api/health/:host_id
+│   │       │   └── health.ts       # GET /api/health (aggregate only, no per-host public endpoint)
 │   │       ├── services/
 │   │       │   ├── metrics.ts      # insertRaw(), queryMetrics()
 │   │       │   ├── alerts.ts       # evaluateAlerts(), 6 Tier-1 rules
 │   │       │   └── aggregation.ts  # aggregateHour(), purgeOld()
 │   │       └── middleware/
-│   │           └── api-key.ts      # Bearer token validation
+│   │           └── api-key.ts      # Read/write key validation (route-scoped)
 │   └── dashboard/                  # @bat/dashboard — Next.js 16 (from Surety)
 │       ├── package.json
 │       ├── next.config.ts
@@ -117,7 +118,7 @@ bat/
 │           │   ├── globals.css     # Basalt design tokens
 │           │   ├── page.tsx        # → /hosts redirect
 │           │   ├── login/page.tsx  # Google login (from Surety)
-│           │   ├── api/            # Server-side proxy to Worker (holds BAT_API_KEY)
+│           │   ├── api/            # Server-side proxy to Worker (holds BAT_READ_KEY)
 │           │   │   ├── hosts/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts
 │           │   │   ├── hosts/[id]/metrics/
@@ -137,7 +138,7 @@ bat/
 │           │   ├── status-badge.tsx
 │           │   └── charts/         # CPU, Memory, Disk, Network
 │           └── lib/
-│               ├── api.ts          # Fetch wrapper → Worker API
+│               ├── api.ts          # Fetch wrapper → Dashboard's own /api/* proxy routes
 │               └── hooks/          # SWR hooks (hosts, metrics, alerts)
 ├── pnpm-workspace.yaml             # packages: ["packages/*"]
 ├── package.json                    # root scripts
@@ -246,23 +247,25 @@ CREATE TABLE alert_pending (
 
 | Route | Auth | Method | Purpose |
 |-------|------|--------|---------|
-| `/api/ingest` | API Key | POST | Receive Tier-1 metrics, evaluate alerts |
-| `/api/identity` | API Key | POST | Receive/update host identity |
-| `/api/hosts` | API Key | GET | List all hosts with latest status |
-| `/api/hosts/:id/metrics` | API Key | GET | Query metrics (`?from=&to=`, auto raw/hourly) |
-| `/api/alerts` | API Key | GET | List all active alerts across all hosts |
+| `/api/ingest` | Write Key | POST | Receive Tier-1 metrics, evaluate alerts |
+| `/api/identity` | Write Key | POST | Receive/update host identity |
+| `/api/hosts` | Read Key | GET | List all hosts with latest status |
+| `/api/hosts/:id/metrics` | Read Key | GET | Query metrics (`?from=&to=`, auto raw/hourly) |
+| `/api/alerts` | Read Key | GET | List all active alerts across all hosts |
 | `/api/health` | Public | GET | Overall health (200/degraded/503) for Uptime Kuma |
-| `/api/health/:host_id` | Public | GET | Per-host health |
 
-All API Key routes use the same `Authorization: Bearer <key>` mechanism.
-Probe and Dashboard server both use this key — Probe for writes, Dashboard for reads.
+Two separate API keys stored as Worker secrets:
+- `BAT_WRITE_KEY` — used by Probe for `POST /api/ingest` and `POST /api/identity`
+- `BAT_READ_KEY` — used by Dashboard proxy for `GET` routes
+
+Worker middleware checks `Authorization: Bearer <key>` and matches against the appropriate secret based on HTTP method + route. This ensures that even if the Dashboard's Railway environment leaks, an attacker can only read data — they cannot forge metrics, manipulate `last_seen`, or create/clear alerts.
 
 ### Dashboard proxy architecture
 
 Dashboard (Next.js) exposes its own `/api/*` routes to the browser. These routes:
 
 1. Check the user's NextAuth session (Google OAuth cookie, same domain)
-2. If authenticated, forward the request to Worker with `Authorization: Bearer <BAT_API_KEY>`
+2. If authenticated, forward the request to Worker with `Authorization: Bearer <BAT_READ_KEY>`
 3. Return the Worker response to the browser
 
 ```
@@ -286,16 +289,18 @@ Single Worker invocation, D1 batch for atomicity:
 4. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`
 5. Return `204 No Content`
 
-### Alert rules (6 Tier-1 only for MVP)
+### Alert rules (Tier-1 subset for MVP, aligned with 01-probe-metrics-spec.md)
 
-| Rule ID | Field | Condition | Severity | Duration |
-|---------|-------|-----------|----------|----------|
-| `cpu_high` | `cpu.usage_pct` | > 90 | critical | 5 min |
-| `mem_warning` | `mem.used_pct` | > 90 / > 95 | warning / critical | instant |
-| `disk_full` | `disk.*.used_pct` | > 85 / > 95 | warning / critical | instant |
-| `iowait_high` | `cpu.iowait_pct` | > 20 | warning | 5 min |
-| `steal_high` | `cpu.steal_pct` | > 10 | warning | 5 min |
-| `host_offline` | `hosts.last_seen` | > 120s ago | critical | query-time |
+| Rule ID | Field | Condition | Severity | Duration | From 01 spec |
+|---------|-------|-----------|----------|----------|--------------|
+| `mem_high` | `mem.used_pct` + `swap.used_pct` | mem > 85 AND swap > 50 | critical | instant | "tongji OOM risk" |
+| `no_swap` | `swap.total_bytes` + `mem.used_pct` | swap == 0 AND mem > 70 | critical | instant | "tongji had 0 swap" |
+| `disk_full` | `disk.*.used_pct` | > 85 | critical | instant | "tongji root at 71%" |
+| `iowait_high` | `cpu.iowait_pct` | > 20 | warning | 5 min | "docker 30-34% iowait" |
+| `steal_high` | `cpu.steal_pct` | > 10 | warning | 5 min | "oversold VPS detection" |
+| `host_offline` | `hosts.last_seen` | > 120s ago | critical | query-time | implicit |
+
+Note: 01 spec does not define a standalone "CPU high" rule (CPU load is context-dependent per-host). The 6 rules above are the exact Tier-1-data-only subset of the 14 rules in 01. Tier-2-dependent rules (SSH, firewall, ports, packages, containers, systemd) are deferred to post-MVP when Tier 2 collection is implemented.
 
 **Alert evaluation**:
 - **Instant rules** (mem, disk): threshold exceeded → fire immediately
@@ -307,20 +312,15 @@ Single Worker invocation, D1 batch for atomicity:
 ```json
 {
   "status": "degraded",
-  "hosts": {
-    "jp.nocoo.cloud": { "status": "healthy", "alerts": [] },
-    "us.nocoo.cloud": {
-      "status": "warning",
-      "alerts": [{ "rule_id": "iowait_high", "severity": "warning", "value": 25.1 }]
-    },
-    "us2.nocoo.cloud": {
-      "status": "critical",
-      "alerts": [{ "rule_id": "cpu_high", "severity": "critical", "value": 92.3 }]
-    }
-  },
+  "total_hosts": 6,
+  "healthy": 4,
+  "warning": 1,
+  "critical": 1,
   "checked_at": 1742025600
 }
 ```
+
+The health endpoint returns only aggregate counts — no host IDs, no alert details, no internal state. Detailed per-host status is only available via the authenticated `GET /api/hosts` and `GET /api/alerts` routes (through the Dashboard proxy).
 
 **HTTP status code logic** (three-level):
 - `200` — all hosts healthy, OR only `warning` alerts active → `"status": "healthy"` or `"degraded"`
@@ -345,7 +345,7 @@ This prevents warning-level alerts (disk > 85%, iowait > 20%) from triggering Up
 
 ```toml
 worker_url = "https://bat-worker.your.workers.dev"
-api_key = "your-api-key"
+write_key = "your-write-key"
 host_id = "jp.nocoo.cloud"    # optional, defaults to hostname
 interval = 30                  # seconds
 
@@ -474,7 +474,7 @@ WantedBy=multi-user.target
 ### Data fetching
 
 - `lib/api.ts` — fetch wrapper, calls Dashboard's own `/api/*` proxy routes (NOT Worker directly)
-- Dashboard API Routes (`src/app/api/`) proxy to Worker server-side with `BAT_API_KEY`
+- Dashboard API Routes (`src/app/api/`) proxy to Worker server-side with `BAT_READ_KEY`
 - SWR hooks with 30s refresh for live view
 - Time range picker: 1h/6h/24h (raw data) → 7d/30d/90d (hourly auto-switch)
 
@@ -511,7 +511,7 @@ Reference: Basalt's `NetworkOpsDashboardPage` for widget patterns.
 - `services/alerts.ts` — alert evaluation with mock payloads (instant + duration rules, clear conditions)
 - `services/aggregation.ts` — aggregation SQL correctness
 - `services/metrics.ts` — raw/hourly resolution auto-selection
-- `middleware/api-key.ts` — accept valid, reject invalid/missing
+- `middleware/api-key.ts` — accept valid read/write keys, reject invalid/missing/cross-scope
 
 **Probe (`probe/`)**:
 - `collectors/cpu.rs` — parse `/proc/stat` fixture, delta calculation
@@ -547,11 +547,13 @@ Test every Worker route against local Wrangler dev server:
 | Health all healthy | `GET /api/health` | 200, all hosts healthy |
 | Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
 | Health with critical | `GET /api/health` | 503, critical alert details |
-| Health per host | `GET /api/health/:id` | Per-host status |
+| Health per host | `GET /api/health/:id` | **Removed** — per-host status is only via authenticated `/api/alerts` |
 | Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
 | List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
 | Aggregation cron | `__scheduled` trigger | `metrics_hourly` populated, raw purged |
-| Unauthenticated API | `GET /api/hosts` (no API key) | 401 |
+| Unauthenticated API | `GET /api/hosts` (no key) | 401 |
+| Write key on read route | `GET /api/hosts` (write key) | 403, scope mismatch |
+| Read key on write route | `POST /api/ingest` (read key) | 403, scope mismatch |
 
 **Server convention**: Worker dev on port 8787, API E2E on port 18787.
 
@@ -614,7 +616,7 @@ pre-push:
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
 | 2.1 | `feat: add d1 schema` | `packages/worker/schema.sql` | `wrangler d1 execute --local --file=schema.sql` |
-| 2.2 | `feat: add api key auth middleware` | `middleware/api-key.ts` | UT: valid/invalid/missing key |
+| 2.2 | `feat: add api key auth middleware with read/write scopes` | `middleware/api-key.ts` | UT: write key on POST routes, read key on GET routes, reject cross-scope usage |
 | 2.3 | `feat: add identity route` | `routes/identity.ts`, `services/metrics.ts` | UT + manual curl |
 | 2.4 | `feat: add ingest route` | `routes/ingest.ts` | UT + manual curl → 204 |
 | 2.5 | `feat: add alert evaluation service` | `services/alerts.ts` | UT: all 6 rules, instant + duration |
@@ -646,7 +648,7 @@ pre-push:
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | UT: proxy forwards with API key, rejects unauthenticated |
+| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | UT: proxy forwards with read key, rejects unauthenticated |
 | 4.2 | `feat: add api client and swr hooks` | `lib/api.ts`, `lib/hooks/*` | UT: fetch wrapper, mock responses |
 | 4.3 | `feat: add host card and status badge components` | `components/host-card.tsx`, `status-badge.tsx` | UT: render with mock data |
 | 4.4 | `feat: add hosts overview page` | `app/hosts/page.tsx` | Dev server: grid renders |
@@ -661,7 +663,7 @@ pre-push:
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
 | 5.1 | `chore: configure worker production deployment` | `wrangler.toml` (production D1 ID, secrets) | `wrangler deploy` succeeds |
-| 5.2 | `chore: configure dashboard dockerfile` | `Dockerfile`, `docker-compose.yml` | `docker build` + `docker run` on Railway |
+| 5.2 | `chore: configure dashboard dockerfile` | `Dockerfile` | `docker build` succeeds, Railway deployment works |
 | 5.3 | `docs: update readme with project overview` | `README.md` | Links to docs work |
 
 ---
@@ -674,8 +676,9 @@ pre-push:
 # Create D1 database
 wrangler d1 create bat-db
 
-# Set secrets
-wrangler secret put BAT_API_KEY
+# Set secrets (two separate keys)
+wrangler secret put BAT_WRITE_KEY
+wrangler secret put BAT_READ_KEY
 
 # Apply schema
 wrangler d1 execute bat-db --file=packages/worker/schema.sql
@@ -690,7 +693,7 @@ cd packages/worker && wrangler deploy
 - Dockerfile deployment (Bun standalone)
 - Environment variables:
   - `BAT_API_URL` — Worker URL
-  - `BAT_API_KEY` — Shared API Key (same key used by Probe; Dashboard proxy uses it to call Worker)
+  - `BAT_READ_KEY` — Read-only API Key for Worker (cannot write metrics or manipulate alerts)
   - `AUTH_SECRET` — NextAuth secret
   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (matches Surety's `auth.ts` env names)
   - `ALLOWED_EMAILS` — email allowlist
