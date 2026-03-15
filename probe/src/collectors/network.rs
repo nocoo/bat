@@ -91,12 +91,37 @@ pub fn compute_net_metrics(
 }
 
 /// Filter interface names, excluding configured ones.
+#[cfg(test)]
 pub fn filter_interfaces(interfaces: &[&str], exclude: &[String]) -> Vec<String> {
     interfaces
         .iter()
         .filter(|iface| !exclude.iter().any(|e| e == *iface))
         .map(|s| s.to_string())
         .collect()
+}
+
+// ── Live reader (requires Linux /sys) ───────────────────────────────
+
+const SYSFS_NET: &str = "/sys/class/net";
+
+/// Read counters for all non-excluded interfaces from sysfs.
+pub fn read_all_counters(
+    exclude: &[String],
+) -> Result<HashMap<String, NetCounters>, String> {
+    let interfaces =
+        list_interfaces(SYSFS_NET, exclude).map_err(|e| format!("list interfaces: {e}"))?;
+    let mut map = HashMap::new();
+    for iface in &interfaces {
+        match read_counters(SYSFS_NET, iface) {
+            Ok(c) => {
+                map.insert(iface.clone(), c);
+            }
+            Err(e) => {
+                tracing::warn!(iface, error = %e, "skipping interface");
+            }
+        }
+    }
+    Ok(map)
 }
 
 #[cfg(test)]

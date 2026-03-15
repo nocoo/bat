@@ -46,9 +46,6 @@ pub fn parse_uptime(content: &str) -> u64 {
         .unwrap_or(0)
 }
 
-/// Parse CPU model from `/proc/cpuinfo` (re-exports from cpu module for convenience).
-pub use crate::collectors::cpu::parse_cpu_model;
-
 /// Get system architecture via libc uname().
 ///
 /// Returns the `machine` field (e.g., "x86_64", "aarch64").
@@ -62,6 +59,36 @@ pub fn get_arch() -> String {
             String::from("unknown")
         }
     }
+}
+
+// ── Live readers (require Linux /proc, /etc) ────────────────────────
+
+/// Read hostname from `/etc/hostname`.
+pub fn read_hostname() -> Result<String, String> {
+    let content = std::fs::read_to_string("/etc/hostname")
+        .map_err(|e| format!("read /etc/hostname: {e}"))?;
+    Ok(parse_hostname(&content))
+}
+
+/// Read OS pretty name from `/etc/os-release`.
+pub fn read_os_release() -> Result<String, String> {
+    let content = std::fs::read_to_string("/etc/os-release")
+        .map_err(|e| format!("read /etc/os-release: {e}"))?;
+    Ok(parse_os_release(&content))
+}
+
+/// Read kernel version from `/proc/version`.
+pub fn read_kernel_version() -> Result<String, String> {
+    let content = std::fs::read_to_string("/proc/version")
+        .map_err(|e| format!("read /proc/version: {e}"))?;
+    Ok(parse_kernel_version(&content))
+}
+
+/// Read uptime in seconds from `/proc/uptime`.
+pub fn read_uptime() -> Result<u64, String> {
+    let content =
+        std::fs::read_to_string("/proc/uptime").map_err(|e| format!("read /proc/uptime: {e}"))?;
+    Ok(parse_uptime(&content))
 }
 
 #[cfg(test)]

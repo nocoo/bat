@@ -111,6 +111,41 @@ pub fn parse_cpu_model(content: &str) -> String {
     String::from("unknown")
 }
 
+// ── Live readers (require Linux /proc) ──────────────────────────────
+
+/// Read aggregate CPU jiffies from `/proc/stat`.
+pub fn read_jiffies() -> Result<CpuJiffies, String> {
+    let content =
+        std::fs::read_to_string("/proc/stat").map_err(|e| format!("read /proc/stat: {e}"))?;
+    parse_stat(&content).ok_or_else(|| "failed to parse cpu line from /proc/stat".to_string())
+}
+
+/// Read load averages from `/proc/loadavg`.
+pub fn read_loadavg() -> Result<(f64, f64, f64), String> {
+    let content = std::fs::read_to_string("/proc/loadavg")
+        .map_err(|e| format!("read /proc/loadavg: {e}"))?;
+    parse_loadavg(&content).ok_or_else(|| "failed to parse /proc/loadavg".to_string())
+}
+
+/// Read CPU core count from `/proc/cpuinfo`.
+pub fn read_cpu_count() -> Result<u32, String> {
+    let content = std::fs::read_to_string("/proc/cpuinfo")
+        .map_err(|e| format!("read /proc/cpuinfo: {e}"))?;
+    let count = parse_cpu_count(&content);
+    if count == 0 {
+        Err("no processors found in /proc/cpuinfo".to_string())
+    } else {
+        Ok(count)
+    }
+}
+
+/// Read CPU model from `/proc/cpuinfo`.
+pub fn read_cpu_model() -> Result<String, String> {
+    let content = std::fs::read_to_string("/proc/cpuinfo")
+        .map_err(|e| format!("read /proc/cpuinfo: {e}"))?;
+    Ok(parse_cpu_model(&content))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
