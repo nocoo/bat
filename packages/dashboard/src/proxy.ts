@@ -26,6 +26,11 @@ const authHandler = auth(async (req) => {
 		return NextResponse.next();
 	}
 
+	// Skip redirect for data API routes — they handle their own auth and return JSON 401
+	if (pathname.startsWith("/api/")) {
+		return NextResponse.next();
+	}
+
 	const isLoggedIn = !!req.auth;
 
 	// Not logged in → redirect to login (except if already on /login)
