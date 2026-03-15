@@ -65,8 +65,8 @@ pub fn get_arch() -> String {
 
 /// Read hostname from `/etc/hostname`.
 pub fn read_hostname() -> Result<String, String> {
-    let content = std::fs::read_to_string("/etc/hostname")
-        .map_err(|e| format!("read /etc/hostname: {e}"))?;
+    let content =
+        std::fs::read_to_string("/etc/hostname").map_err(|e| format!("read /etc/hostname: {e}"))?;
     Ok(parse_hostname(&content))
 }
 
@@ -79,8 +79,8 @@ pub fn read_os_release() -> Result<String, String> {
 
 /// Read kernel version from `/proc/version`.
 pub fn read_kernel_version() -> Result<String, String> {
-    let content = std::fs::read_to_string("/proc/version")
-        .map_err(|e| format!("read /proc/version: {e}"))?;
+    let content =
+        std::fs::read_to_string("/proc/version").map_err(|e| format!("read /proc/version: {e}"))?;
     Ok(parse_kernel_version(&content))
 }
 
@@ -138,16 +138,12 @@ ID=ubuntu
 NAME="Debian GNU/Linux"
 VERSION_ID="12"
 "#;
-        assert_eq!(
-            parse_os_release(content),
-            "Debian GNU/Linux 12 (bookworm)"
-        );
+        assert_eq!(parse_os_release(content), "Debian GNU/Linux 12 (bookworm)");
     }
 
     #[test]
     fn parse_kernel_version_normal() {
-        let content =
-            "Linux version 5.15.0-91-generic (buildd@lcy02-amd64-045) (gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, GNU ld (GNU Binutils for Ubuntu) 2.38) #101-Ubuntu SMP\n";
+        let content = "Linux version 5.15.0-91-generic (buildd@lcy02-amd64-045) (gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, GNU ld (GNU Binutils for Ubuntu) 2.38) #101-Ubuntu SMP\n";
         assert_eq!(parse_kernel_version(content), "5.15.0-91-generic");
     }
 

@@ -23,9 +23,7 @@ async fn main() {
         )
         .init();
 
-    let config_path = config::config_path_from_args(
-        &std::env::args().collect::<Vec<_>>(),
-    );
+    let config_path = config::config_path_from_args(&std::env::args().collect::<Vec<_>>());
     let cfg = config::load_config(&config_path).unwrap_or_else(|e| {
         eprintln!("Failed to load config from {}: {e}", config_path.display());
         std::process::exit(1);
@@ -39,17 +37,20 @@ async fn main() {
 
     let cpu_count = collectors::cpu::read_cpu_count().unwrap_or(1);
 
-    tracing::info!(host_id, cpu_count, interval = cfg.interval, "starting bat-probe");
+    tracing::info!(
+        host_id,
+        cpu_count,
+        interval = cfg.interval,
+        "starting bat-probe"
+    );
 
     // Send initial identity
     send_identity(&sender, &host_id).await;
 
     // Seed phase: read initial counters for delta calculation
     let mut prev_jiffies = collectors::cpu::read_jiffies().ok();
-    let mut prev_net_counters = collectors::network::read_all_counters(
-        &cfg.network.exclude_interfaces,
-    )
-    .ok();
+    let mut prev_net_counters =
+        collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
 
     let interval = Duration::from_secs(cfg.interval as u64);
     let mut ticker = tokio::time::interval(interval);
@@ -155,19 +156,17 @@ async fn collect_and_send(
     };
 
     // Disk
-    let disk: Vec<DiskMetric> = collectors::disk::read_disk_metrics(
-        &cfg.disk.exclude_mounts,
-        &cfg.disk.exclude_fs_types,
-    )
-    .unwrap_or_default()
-    .into_iter()
-    .map(|d| DiskMetric {
-        mount: d.mount,
-        total_bytes: d.total_bytes,
-        avail_bytes: d.avail_bytes,
-        used_pct: d.used_pct,
-    })
-    .collect();
+    let disk: Vec<DiskMetric> =
+        collectors::disk::read_disk_metrics(&cfg.disk.exclude_mounts, &cfg.disk.exclude_fs_types)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|d| DiskMetric {
+                mount: d.mount,
+                total_bytes: d.total_bytes,
+                avail_bytes: d.avail_bytes,
+                used_pct: d.used_pct,
+            })
+            .collect();
 
     // Network (delta from previous counters)
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();

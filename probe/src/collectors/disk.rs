@@ -109,8 +109,8 @@ pub fn read_disk_metrics(
     exclude_mounts: &[String],
     exclude_fs_types: &[String],
 ) -> Result<Vec<DiskInfo>, String> {
-    let content = std::fs::read_to_string("/proc/mounts")
-        .map_err(|e| format!("read /proc/mounts: {e}"))?;
+    let content =
+        std::fs::read_to_string("/proc/mounts").map_err(|e| format!("read /proc/mounts: {e}"))?;
     let mounts = parse_mounts(&content, exclude_mounts, exclude_fs_types);
     Ok(collect_disk(&mounts))
 }
@@ -195,10 +195,10 @@ btrfs-pool /mnt/storage btrfs rw,relatime 0 0
     fn parse_mounts_overlay_kept_by_default() {
         // Per docs: overlay is NOT excluded — Docker hosts need it visible.
         let mounts = parse_mounts(PROC_MOUNTS, &[], &[]);
-        assert!(mounts
-            .iter()
-            .any(|m| m.fs_type == "overlay"
-                && m.mount_point == "/var/lib/docker/overlay2/abc/merged"));
+        assert!(
+            mounts.iter().any(|m| m.fs_type == "overlay"
+                && m.mount_point == "/var/lib/docker/overlay2/abc/merged")
+        );
     }
 
     #[test]

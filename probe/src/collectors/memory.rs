@@ -72,8 +72,8 @@ fn parse_meminfo_line(line: &str, key: &str) -> Option<u64> {
 
 /// Read and parse `/proc/meminfo`.
 pub fn read_meminfo() -> Result<MemInfo, String> {
-    let content = std::fs::read_to_string("/proc/meminfo")
-        .map_err(|e| format!("read /proc/meminfo: {e}"))?;
+    let content =
+        std::fs::read_to_string("/proc/meminfo").map_err(|e| format!("read /proc/meminfo: {e}"))?;
     parse_meminfo(&content).ok_or_else(|| "failed to parse /proc/meminfo".to_string())
 }
 

@@ -22,10 +22,7 @@ pub struct NetInfo {
 /// List network interfaces from `/sys/class/net/`, excluding configured ones.
 ///
 /// In production, reads the directory listing. For tests, use `filter_interfaces`.
-pub fn list_interfaces(
-    sysfs_path: &str,
-    exclude: &[String],
-) -> std::io::Result<Vec<String>> {
+pub fn list_interfaces(sysfs_path: &str, exclude: &[String]) -> std::io::Result<Vec<String>> {
     let mut interfaces = Vec::new();
     for entry in std::fs::read_dir(sysfs_path)? {
         let entry = entry?;
@@ -105,9 +102,7 @@ pub fn filter_interfaces(interfaces: &[&str], exclude: &[String]) -> Vec<String>
 const SYSFS_NET: &str = "/sys/class/net";
 
 /// Read counters for all non-excluded interfaces from sysfs.
-pub fn read_all_counters(
-    exclude: &[String],
-) -> Result<HashMap<String, NetCounters>, String> {
+pub fn read_all_counters(exclude: &[String]) -> Result<HashMap<String, NetCounters>, String> {
     let interfaces =
         list_interfaces(SYSFS_NET, exclude).map_err(|e| format!("list interfaces: {e}"))?;
     let mut map = HashMap::new();
