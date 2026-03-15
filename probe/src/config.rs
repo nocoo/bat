@@ -57,7 +57,11 @@ pub fn load_config(path: &std::path::Path) -> Result<Config, String> {
 
 /// Parse config from a TOML string.
 pub fn parse_config(content: &str) -> Result<Config, String> {
-    toml::from_str(content).map_err(|e| format!("invalid config: {e}"))
+    let config: Config = toml::from_str(content).map_err(|e| format!("invalid config: {e}"))?;
+    if config.interval == 0 {
+        return Err("invalid config: interval must be > 0".to_string());
+    }
+    Ok(config)
 }
 
 #[cfg(test)]
@@ -161,5 +165,28 @@ worker_url = "https://bat-worker.example.workers.dev"
             config_path_from_args(&args),
             PathBuf::from("/etc/bat/config.toml")
         );
+    }
+
+    #[test]
+    fn reject_interval_zero() {
+        let content = r#"
+worker_url = "https://bat-worker.example.workers.dev"
+write_key = "secret-key"
+interval = 0
+"#;
+        let result = parse_config(content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("interval must be > 0"));
+    }
+
+    #[test]
+    fn accept_interval_one() {
+        let content = r#"
+worker_url = "https://bat-worker.example.workers.dev"
+write_key = "secret-key"
+interval = 1
+"#;
+        let cfg = parse_config(content).unwrap();
+        assert_eq!(cfg.interval, 1);
     }
 }
