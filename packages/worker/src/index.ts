@@ -1,13 +1,13 @@
 import { Hono } from "hono";
+import type { AppEnv } from "./types.js";
+import { apiKeyAuth } from "./middleware/api-key.js";
 
-type Bindings = {
-	DB: D1Database;
-	BAT_WRITE_KEY: string;
-	BAT_READ_KEY: string;
-};
+const app = new Hono<AppEnv>();
 
-const app = new Hono<{ Bindings: Bindings }>();
+// Global middleware
+app.use("/api/*", apiKeyAuth);
 
+// Root health check
 app.get("/", (c) => c.text("bat-worker ok"));
 
 export default app;
