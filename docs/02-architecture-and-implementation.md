@@ -38,7 +38,7 @@ Dashboard auth model:
 | Server | CF Worker + D1 | Serverless, free tier sufficient for 6 hosts |
 | Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges |
 | Dashboard | Next.js 16 + Bun (from Surety template) | Clone auth, UI, deployment from `../surety` |
-| Auth (dashboard) | Google OAuth + email allowlist + TOTP | Identical to Surety (`src/auth.ts`, `src/proxy.ts`) |
+| Auth (dashboard) | Google OAuth + email allowlist | From Surety (`src/auth.ts`, `src/proxy.ts`); TOTP 2FA dropped for MVP (requires DB-backed TotpStore that conflicts with "delete db/") |
 | Auth (dashboard→worker) | Server-side API Key proxy | Dashboard API Routes hold `BAT_API_KEY`, proxy to Worker; browser never calls Worker directly |
 | UI system | Basalt design system | 3-tier luminance, shadcn/ui, Recharts, 24-color chart palette |
 | Alerting | 6 Tier-1 rules, health endpoint | Uptime Kuma polls `GET /api/health` |
@@ -351,7 +351,10 @@ interval = 30                  # seconds
 
 [disk]
 exclude_mounts = ["/boot/efi", "/snap"]
-exclude_fs_types = ["tmpfs", "devtmpfs", "squashfs", "overlay"]
+exclude_fs_types = ["tmpfs", "devtmpfs", "squashfs"]
+# NOTE: overlay is NOT excluded — per 01-probe-metrics-spec.md it is a real
+# filesystem used by Docker. Docker hosts need overlay mounts visible.
+# Individual noisy mounts can be excluded via exclude_mounts instead.
 
 [network]
 exclude_interfaces = ["lo", "docker0"]
@@ -448,15 +451,15 @@ WantedBy=multi-user.target
 ### Bootstrap from `../surety`
 
 **Direct copy** (change nav items / branding only):
-- `src/auth.ts` — Google OAuth + email allowlist + TOTP 2FA
-- `src/proxy.ts` + `src/lib/proxy-logic.ts` — auth guard
+- `src/auth.ts` — Google OAuth + email allowlist (**strip TOTP references**: remove `isTotpEnabled()` / `consumeNonce()` callbacks; Surety's TOTP depends on `@/lib/totp` which requires a DB-backed `TotpStore` + `TOTP_MASTER_KEY` / `TOTP_HMAC_SECRET` env vars — not worth porting for a single-user monitoring dashboard)
+- `src/proxy.ts` + `src/lib/proxy-logic.ts` — auth guard (remove TOTP redirect logic, keep session check only)
 - `src/components/layout/*` — AppShell, Sidebar
 - `src/components/ui/*` — all shadcn/ui components
 - `src/app/globals.css` — Basalt design tokens
 - `src/app/login/page.tsx` — login page
 - `Dockerfile` — Bun standalone 3-stage build
 
-**Remove**: `db/` (Drizzle/SQLite), `repositories/`, insurance-specific pages, `services/backy.ts`
+**Remove**: `db/` (Drizzle/SQLite), `repositories/`, `lib/totp/` (TOTP 2FA module), insurance-specific pages, `services/backy.ts`
 
 ### Pages
 
@@ -687,8 +690,9 @@ cd packages/worker && wrangler deploy
 - Dockerfile deployment (Bun standalone)
 - Environment variables:
   - `BAT_API_URL` — Worker URL
+  - `BAT_API_KEY` — Shared API Key (same key used by Probe; Dashboard proxy uses it to call Worker)
   - `AUTH_SECRET` — NextAuth secret
-  - `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — Google OAuth
+  - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (matches Surety's `auth.ts` env names)
   - `ALLOWED_EMAILS` — email allowlist
   - `USE_SECURE_COOKIES=true`
 
