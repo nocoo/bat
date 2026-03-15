@@ -6,6 +6,7 @@ import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
+import { aggregateHour, purgeOldData } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
@@ -28,4 +29,18 @@ app.get("/api/hosts", hostsListRoute);
 app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 app.get("/api/alerts", alertsListRoute);
 
-export default app;
+export default {
+	fetch: app.fetch,
+	async scheduled(
+		_event: ScheduledEvent,
+		env: AppEnv["Bindings"],
+		_ctx: ExecutionContext,
+	) {
+		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
+		await aggregateHour(env.DB, hourTs);
+		await purgeOldData(env.DB, Math.floor(Date.now() / 1000));
+	},
+};
+
+// Export app for testing
+export { app };
