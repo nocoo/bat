@@ -1,7 +1,8 @@
 // Metrics insertion service — flattens MetricsPayload to D1 row
 import type { MetricsPayload } from "@bat/shared";
 
-/** Insert a raw metrics row into metrics_raw, flattening nested fields */
+/** Insert a raw metrics row into metrics_raw, flattening nested fields.
+ *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries. */
 export async function insertMetricsRaw(
 	db: D1Database,
 	hostId: string,
@@ -9,7 +10,7 @@ export async function insertMetricsRaw(
 ): Promise<void> {
 	await db
 		.prepare(
-			`INSERT INTO metrics_raw
+			`INSERT OR IGNORE INTO metrics_raw
   (host_id, ts, cpu_load1, cpu_load5, cpu_load15, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_count,
    mem_total, mem_available, mem_used_pct, swap_total, swap_used, swap_used_pct,
    disk_json, net_json, uptime_seconds)
