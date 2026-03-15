@@ -25,10 +25,10 @@ pub fn parse_kernel_version(content: &str) -> String {
     let fields: Vec<&str> = content.split_whitespace().collect();
     // Find "version" and take the next field
     for (i, field) in fields.iter().enumerate() {
-        if *field == "version" {
-            if let Some(ver) = fields.get(i + 1) {
-                return ver.to_string();
-            }
+        if *field == "version"
+            && let Some(ver) = fields.get(i + 1)
+        {
+            return ver.to_string();
         }
     }
     String::from("unknown")

@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 mod collectors;
 mod config;
 mod payload;

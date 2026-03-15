@@ -102,10 +102,10 @@ pub fn parse_cpu_count(content: &str) -> u32 {
 /// Parse the first `model name` from `/proc/cpuinfo`.
 pub fn parse_cpu_model(content: &str) -> String {
     for line in content.lines() {
-        if let Some(rest) = line.strip_prefix("model name") {
-            if let Some(value) = rest.trim().strip_prefix(':') {
-                return value.trim().to_string();
-            }
+        if let Some(rest) = line.strip_prefix("model name")
+            && let Some(value) = rest.trim().strip_prefix(':')
+        {
+            return value.trim().to_string();
         }
     }
     String::from("unknown")
