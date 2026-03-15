@@ -39,10 +39,10 @@ fn default_interval() -> u32 {
 /// Looks for `--config <path>`, falls back to `/etc/bat/config.toml`.
 pub fn config_path_from_args(args: &[String]) -> PathBuf {
     for (i, arg) in args.iter().enumerate() {
-        if arg == "--config" {
-            if let Some(path) = args.get(i + 1) {
-                return PathBuf::from(path);
-            }
+        if arg == "--config"
+            && let Some(path) = args.get(i + 1)
+        {
+            return PathBuf::from(path);
         }
     }
     PathBuf::from(DEFAULT_CONFIG_PATH)
