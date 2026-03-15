@@ -276,7 +276,7 @@ Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker
 This means:
 - Browser never needs to know the Worker URL or API Key
 - No cross-domain cookie issues
-- Worker auth stays simple (single API Key middleware for everything)
+- Worker auth stays simple (one middleware handles both keys, scoped by route: write key for POST, read key for GET)
 - Dashboard API Routes are thin proxies, no business logic
 
 ### Ingest critical path
@@ -285,9 +285,11 @@ Single Worker invocation, D1 batch for atomicity:
 
 1. Validate payload shape (lightweight check, no Zod)
 2. `INSERT INTO metrics_raw` — flatten scalars, stringify disk/net
-3. `UPDATE hosts SET last_seen = ?`
+3. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname until a proper identity payload arrives.
 4. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`
 5. Return `204 No Content`
+
+**Why UPSERT instead of UPDATE**: The Probe sends identity on startup before any ingest, but identity can fail (network error, Worker cold start). If ingest required a pre-existing host row (via foreign key + UPDATE-only), the first metrics would be silently dropped. The UPSERT guarantees ingest is self-sufficient — it never fails because of a missing host row. When identity eventually succeeds, it fills in the full host metadata (os, kernel, arch, etc.).
 
 ### Alert rules (Tier-1 subset for MVP, aligned with 01-probe-metrics-spec.md)
 
@@ -326,7 +328,7 @@ The health endpoint returns only aggregate counts — no host IDs, no alert deta
 - `200` — all hosts healthy, OR only `warning` alerts active → `"status": "healthy"` or `"degraded"`
 - `503` — any `critical` alert active → `"status": "critical"`
 
-This prevents warning-level alerts (disk > 85%, iowait > 20%) from triggering Uptime Kuma's downtime notification. Only critical conditions (CPU > 90% sustained, memory > 95%, disk > 95%, host offline) produce a 503.
+This prevents warning-level alerts (iowait > 20%, steal > 10%) from triggering Uptime Kuma's downtime notification. Only critical conditions (mem > 85% + swap > 50%, no swap + mem > 70%, disk > 85%, host offline) produce a 503.
 
 **Overall status derivation**: `critical` if any host critical → `degraded` if any host warning → `healthy` otherwise.
 
@@ -547,7 +549,6 @@ Test every Worker route against local Wrangler dev server:
 | Health all healthy | `GET /api/health` | 200, all hosts healthy |
 | Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
 | Health with critical | `GET /api/health` | 503, critical alert details |
-| Health per host | `GET /api/health/:id` | **Removed** — per-host status is only via authenticated `/api/alerts` |
 | Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
 | List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
 | Aggregation cron | `__scheduled` trigger | `metrics_hourly` populated, raw purged |
