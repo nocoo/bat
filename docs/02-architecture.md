@@ -1,7 +1,7 @@
 # 02 — System Architecture
 
 > High-level design, key decisions, MVP scope, monorepo structure, and deployment plan.
-> Prerequisite: [01-probe-metrics-spec.md](./01-probe-metrics-spec.md)
+> Prerequisite: [01-metrics-catalogue.md](./01-metrics-catalogue.md)
 >
 > Related documents:
 > - [03-data-structures.md](./03-data-structures.md) — D1 schema, migration strategy, payload types, alert rules

@@ -4,7 +4,7 @@
 > Targets: < 15 MB RSS, < 10 MB binary, < 0.1% idle CPU.
 >
 > Related documents:
-> - [01-probe-metrics-spec.md](./01-probe-metrics-spec.md) — What to collect, metric definitions, procfs sources
+> - [01-metrics-catalogue.md](./01-metrics-catalogue.md) — Metric definitions, procfs sources, Tier 1 + Tier 2 catalogue
 > - [02-architecture.md](./02-architecture.md) — System overview, deployment steps
 > - [03-data-structures.md](./03-data-structures.md) — Payload types, D1 column mapping
 > - [05-worker.md](./05-worker.md) — Worker ingest endpoint that receives Probe data
@@ -22,7 +22,7 @@ interval = 30                  # seconds
 [disk]
 exclude_mounts = ["/boot/efi", "/snap"]
 exclude_fs_types = ["tmpfs", "devtmpfs", "squashfs"]
-# NOTE: overlay is NOT excluded — per 01-probe-metrics-spec.md it is a real
+# NOTE: overlay is NOT excluded — per 01-metrics-catalogue.md it is a real
 # filesystem used by Docker. Docker hosts need overlay mounts visible.
 # Individual noisy mounts can be excluded via exclude_mounts instead.
 
@@ -42,7 +42,7 @@ This means the systemd unit works without any flags — the binary finds `/etc/b
 
 ## Collectors
 
-All Tier-1 collectors read procfs/sysfs directly — zero process fork, zero root required. Metric definitions match [01-probe-metrics-spec.md § Tier 1](./01-probe-metrics-spec.md).
+All Tier-1 collectors read procfs/sysfs directly — zero process fork, zero root required. Metric definitions match [01-metrics-catalogue.md § Tier 1](./01-metrics-catalogue.md).
 
 | Collector | Source | Notes |
 |-----------|--------|-------|
@@ -92,7 +92,7 @@ Output: array of `{ mount, total_bytes, avail_bytes, used_pct }`.
 
 ### Network collector (`collectors/network.rs`)
 
-Read `/sys/class/net/{iface}/statistics/{rx,tx}_{bytes,packets,errors}` for each non-excluded interface.
+Read `/sys/class/net/{iface}/statistics/{rx,tx}_{bytes,errors}` for each non-excluded interface. Packet counters (`rx_packets`, `tx_packets`) are defined in [01-metrics-catalogue.md](./01-metrics-catalogue.md) but excluded from MVP payload — bytes + errors are sufficient for alerting.
 
 **Rate calculation** (`rate.rs`): `rate = (current - previous) / interval_seconds`. Counters are u64 — handle wrap by treating `current < previous` as `current + (u64::MAX - previous)`.
 

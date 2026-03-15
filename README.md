@@ -4,7 +4,7 @@ Lightweight VPS monitoring system — replacing Netdata with a purpose-built pro
 
 ## Docs
 
-- [docs/01-probe-metrics-spec.md](./docs/01-probe-metrics-spec.md) — Probe metrics specification: what to collect, how, intervals, payload schema
+- [docs/01-metrics-catalogue.md](./docs/01-metrics-catalogue.md) — Metrics catalogue: Tier 1 (MVP) + Tier 2 (post-MVP), procfs sources, alert rules, resource budget
 - [docs/02-architecture.md](./docs/02-architecture.md) — System architecture, key decisions, MVP scope, monorepo structure, deployment
 - [docs/03-data-structures.md](./docs/03-data-structures.md) — D1 schema, migration strategy, payload types, alert rules
 - [docs/04-probe.md](./docs/04-probe.md) — Rust probe: collectors, main loop, config, systemd
