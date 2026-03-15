@@ -8,6 +8,7 @@
 		"start": "next start --port 7020",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test",
+		"test:e2e": "bun test e2e/",
 		"lint": "biome check ."
 	},
 	"dependencies": {
