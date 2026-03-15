@@ -97,7 +97,7 @@ Full specification: [06-dashboard.md](./06-dashboard.md)
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy logic. L3: route integration tests (session mock, header forwarding, error passthrough) |
+| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy route handlers (session mock, header forwarding, error passthrough) |
 | 4.2 | `feat: add api client and swr hooks` | `lib/api.ts`, `lib/hooks/*` | UT: fetch wrapper, mock responses |
 | 4.3 | `feat: add host card and status badge components` | `components/host-card.tsx`, `status-badge.tsx` | UT: render with mock data |
 | 4.4 | `feat: add hosts overview page` | `app/hosts/page.tsx` | Dev server: grid renders |

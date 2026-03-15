@@ -158,7 +158,9 @@ Charts receive raw API data and need ViewModel transformation:
 
 - **CPU chart**: Extract `cpu_usage_pct`, `cpu_iowait`, `cpu_steal` from metrics array, map to `{ ts, usage, iowait, steal }[]`
 - **Memory chart**: Extract `mem_used_pct`, map to `{ ts, used_pct }[]`, add threshold constant line
-- **Network chart**: Parse `net_json`, aggregate across interfaces or show per-interface, map to `{ ts, rx_rate, tx_rate }[]`
+- **Network chart**: Resolution-aware transform:
+  - **Raw** (≤ 24h): Parse `net_json`, aggregate across interfaces or show per-interface, map to `{ ts, rx_rate, tx_rate }[]`
+  - **Hourly** (> 24h): Use scalar fields `net_rx_bytes_avg`, `net_tx_bytes_avg` (or `_max` for peak overlay), map to `{ ts, rx_rate, tx_rate }[]`
 - **Disk bars**: Parse `disk_json` from latest sample, map to `{ mount, used_pct, total_bytes, avail_bytes }[]`
 
 These transformations are pure functions in `lib/transforms.ts`, unit-testable without rendering.
@@ -198,32 +200,27 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 | Test file | What |
 |-----------|------|
-| `lib/transforms.test.ts` | CPU/Memory/Network/Disk data transformation. Edge cases: empty arrays, missing fields, single data point |
+| `lib/transforms.test.ts` | CPU/Memory/Network/Disk data transformation. Edge cases: empty arrays, missing fields, single data point. Resolution-aware network transform (raw `net_json` vs hourly scalar fields) |
 | `lib/proxy-logic.test.ts` | Route decision table: authenticated → forward, unauthenticated → 401, path mapping correct |
 | `components/host-card.test.tsx` | Render with mock data: healthy/warning/critical/offline states |
 | `components/status-badge.test.tsx` | Correct color/text for each severity level |
 | `components/alert-table.test.tsx` | Render alert rows, host links, severity badges |
+| `app/api/hosts/route.test.ts` | Proxy route integration: session valid → forwards with `BAT_READ_KEY`; no session → 401; Worker 500 → passthrough; query params forwarded |
+| `app/api/alerts/route.test.ts` | Same proxy integration tests for alerts route |
+| `app/api/hosts/[id]/metrics/route.test.ts` | Same proxy integration tests for metrics route, including `from`/`to` param forwarding |
 
-**Coverage target**: ≥ 90% on `lib/transforms.ts`, `lib/proxy-logic.ts`, and ViewModel functions. Component tests focus on correctness of rendered output, not visual pixel-matching.
+**Coverage target**: ≥ 90% on `lib/transforms.ts`, `lib/proxy-logic.ts`, ViewModel functions, and proxy route handlers. Component tests focus on correctness of rendered output, not visual pixel-matching.
+
+**Note on proxy route tests**: These use session mocks + HTTP mocks (no live Worker), so they run as L1 alongside other unit tests. Worker API correctness is separately covered by [05-worker.md § L3](./05-worker.md).
 
 ### L2 — Lint
 
 - Biome strict mode, zero errors + zero warnings
 - Typecheck: `tsc --noEmit`
 
-### L3 — Proxy Route Integration Tests (`bun test`)
+### L3
 
-Dashboard proxy routes are thin but contain real logic (session check, header injection, status passthrough, error mapping). These route handlers are tested as integration tests against a mock Worker backend:
-
-| Test | Route | Validates |
-|------|-------|-----------|
-| Authenticated request | `GET /api/hosts` | Session valid → forwards to Worker with `BAT_READ_KEY`, returns Worker response |
-| Unauthenticated request | `GET /api/hosts` | No session → 401, Worker never called |
-| Worker error passthrough | `GET /api/hosts` | Worker returns 500 → Dashboard returns 500 to browser |
-| Query param forwarding | `GET /api/hosts/[id]/metrics?from=&to=` | Params forwarded to Worker correctly |
-| All proxy routes covered | `GET /api/hosts`, `/api/hosts/[id]/metrics`, `/api/alerts` | Each route tested |
-
-**Note**: These are route-level integration tests (session mock + HTTP mock), not full E2E against a live Worker. Worker API correctness is covered by [05-worker.md § L3](./05-worker.md).
+Not applicable — Dashboard has no server-side API logic beyond thin proxies (tested in L1 above). Worker API E2E is covered by [05-worker.md § L3](./05-worker.md).
 
 ### L4 — BDD E2E (Playwright)
 
@@ -245,7 +242,7 @@ Core flows:
 
 | # | Commit | Files | Verify |
 |---|--------|-------|--------|
-| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy logic. L3: route integration tests (session mock, header forwarding, error passthrough) |
+| 4.1 | `feat: add api proxy routes to worker` | `app/api/hosts/route.ts`, `app/api/alerts/route.ts`, etc. | L1 UT: proxy route handlers (session mock, header forwarding, error passthrough) |
 | 4.2 | `feat: add api client and swr hooks` | `lib/api.ts`, `lib/hooks/*` | UT: fetch wrapper, mock responses |
 | 4.3 | `feat: add host card and status badge components` | `components/host-card.tsx`, `status-badge.tsx` | UT: render with mock data |
 | 4.4 | `feat: add hosts overview page` | `app/hosts/page.tsx` | Dev server: grid renders |
