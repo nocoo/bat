@@ -1,0 +1,19 @@
+[Unit]
+Description=bat VPS monitoring probe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bat-probe
+Restart=always
+RestartSec=5
+MemoryMax=15M
+User=bat
+Group=bat
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadOnlyPaths=/proc /sys /etc
+
+[Install]
+WantedBy=multi-user.target
