@@ -81,9 +81,7 @@ FROM (
 
 	// 4. All alerts for status derivation
 	const alertsResult = await db
-		.prepare(
-			`SELECT host_id, severity FROM alert_states WHERE host_id IN (${placeholders})`,
-		)
+		.prepare(`SELECT host_id, severity FROM alert_states WHERE host_id IN (${placeholders})`)
 		.bind(...hostIds)
 		.all<AlertRow>();
 

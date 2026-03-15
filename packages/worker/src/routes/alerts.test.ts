@@ -29,9 +29,7 @@ async function insertHost(
 	isActive = 1,
 ) {
 	await db
-		.prepare(
-			"INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, ?)",
-		)
+		.prepare("INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, ?)")
 		.bind(hostId, hostname, lastSeen, isActive)
 		.run();
 }

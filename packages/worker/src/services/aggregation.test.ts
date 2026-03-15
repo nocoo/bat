@@ -54,10 +54,20 @@ async function insertRawMetrics(
      VALUES (?, ?, ?, ?, ?, ?, 0.3, 0.2, 4, ?, ?, ?, ?, ?, ?, '[]', ?, ?)`,
 		)
 		.bind(
-			hostId, ts, cpuPct, cpuIowait, cpuSteal, cpuLoad1,
-			memTotal, memAvailable, memPct,
-			swapTotal, swapUsed, swapUsedPct,
-			netJson, uptime,
+			hostId,
+			ts,
+			cpuPct,
+			cpuIowait,
+			cpuSteal,
+			cpuLoad1,
+			memTotal,
+			memAvailable,
+			memPct,
+			swapTotal,
+			swapUsed,
+			swapUsedPct,
+			netJson,
+			uptime,
 		)
 		.run();
 }
@@ -74,9 +84,24 @@ describe("aggregateHour", () => {
 		await insertHost(db, "host-001", hourTs + 1800);
 
 		// Insert 3 samples within the hour
-		await insertRawMetrics(db, "host-001", hourTs + 100, { cpuPct: 10, memPct: 40, memAvailable: 4_800_000_000, uptime: 86000 });
-		await insertRawMetrics(db, "host-001", hourTs + 200, { cpuPct: 30, memPct: 60, memAvailable: 3_200_000_000, uptime: 86100 });
-		await insertRawMetrics(db, "host-001", hourTs + 300, { cpuPct: 20, memPct: 50, memAvailable: 4_000_000_000, uptime: 86200 });
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			cpuPct: 10,
+			memPct: 40,
+			memAvailable: 4_800_000_000,
+			uptime: 86000,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			cpuPct: 30,
+			memPct: 60,
+			memAvailable: 3_200_000_000,
+			uptime: 86100,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 300, {
+			cpuPct: 20,
+			memPct: 50,
+			memAvailable: 4_000_000_000,
+			uptime: 86200,
+		});
 
 		await aggregateHour(db, hourTs);
 
@@ -87,17 +112,17 @@ describe("aggregateHour", () => {
 
 		expect(row).not.toBeNull();
 		// AVG(10, 30, 20) = 20
-		expect(row!.cpu_usage_avg).toBe(20);
+		expect(row?.cpu_usage_avg).toBe(20);
 		// MAX(10, 30, 20) = 30
-		expect(row!.cpu_usage_max).toBe(30);
+		expect(row?.cpu_usage_max).toBe(30);
 		// AVG(40, 60, 50) = 50
-		expect(row!.mem_used_pct_avg).toBe(50);
+		expect(row?.mem_used_pct_avg).toBe(50);
 		// MAX(40, 60, 50) = 60
-		expect(row!.mem_used_pct_max).toBe(60);
+		expect(row?.mem_used_pct_max).toBe(60);
 		// MIN(4.8B, 3.2B, 4.0B) = 3.2B
-		expect(row!.mem_available_min).toBe(3_200_000_000);
+		expect(row?.mem_available_min).toBe(3_200_000_000);
 		// MIN uptime = 86000
-		expect(row!.uptime_min).toBe(86000);
+		expect(row?.uptime_min).toBe(86000);
 	});
 
 	test("sample count is correct", async () => {
@@ -117,7 +142,7 @@ describe("aggregateHour", () => {
 			.bind("host-001", hourTs)
 			.first<{ sample_count: number }>();
 
-		expect(row!.sample_count).toBe(5);
+		expect(row?.sample_count).toBe(5);
 	});
 
 	test("network aggregation sums across interfaces per sample", async () => {
@@ -147,13 +172,13 @@ describe("aggregateHour", () => {
 		// Sample 2: rx=3000+4000=7000, tx=1500+2000=3500
 		// avg rx = (3000+7000)/2 = 5000, max rx = 7000
 		// avg tx = (1500+3500)/2 = 2500, max tx = 3500
-		expect(row!.net_rx_bytes_avg).toBe(5000);
-		expect(row!.net_rx_bytes_max).toBe(7000);
-		expect(row!.net_tx_bytes_avg).toBe(2500);
-		expect(row!.net_tx_bytes_max).toBe(3500);
+		expect(row?.net_rx_bytes_avg).toBe(5000);
+		expect(row?.net_rx_bytes_max).toBe(7000);
+		expect(row?.net_tx_bytes_avg).toBe(2500);
+		expect(row?.net_tx_bytes_max).toBe(3500);
 		// errors: 1+0+0+2=3 rx, 0+1+0+0=1 tx
-		expect(row!.net_rx_errors).toBe(3);
-		expect(row!.net_tx_errors).toBe(1);
+		expect(row?.net_rx_errors).toBe(3);
+		expect(row?.net_tx_errors).toBe(1);
 	});
 
 	test("idempotent (ON CONFLICT DO UPDATE)", async () => {
@@ -166,30 +191,34 @@ describe("aggregateHour", () => {
 		// First aggregation
 		await aggregateHour(db, hourTs);
 		const first = await db
-			.prepare("SELECT cpu_usage_avg, sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.prepare(
+				"SELECT cpu_usage_avg, sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?",
+			)
 			.bind("host-001", hourTs)
 			.first<{ cpu_usage_avg: number; sample_count: number }>();
-		expect(first!.cpu_usage_avg).toBe(20);
-		expect(first!.sample_count).toBe(2);
+		expect(first?.cpu_usage_avg).toBe(20);
+		expect(first?.sample_count).toBe(2);
 
 		// Add another sample and re-aggregate
 		await insertRawMetrics(db, "host-001", hourTs + 300, { cpuPct: 50 });
 		await aggregateHour(db, hourTs);
 
 		const second = await db
-			.prepare("SELECT cpu_usage_avg, sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.prepare(
+				"SELECT cpu_usage_avg, sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?",
+			)
 			.bind("host-001", hourTs)
 			.first<{ cpu_usage_avg: number; sample_count: number }>();
 		// AVG(10, 30, 50) = 30
-		expect(second!.cpu_usage_avg).toBe(30);
-		expect(second!.sample_count).toBe(3);
+		expect(second?.cpu_usage_avg).toBe(30);
+		expect(second?.sample_count).toBe(3);
 
 		// Still only 1 row
 		const count = await db
 			.prepare("SELECT COUNT(*) as cnt FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
 			.bind("host-001", hourTs)
 			.first<{ cnt: number }>();
-		expect(count!.cnt).toBe(1);
+		expect(count?.cnt).toBe(1);
 	});
 
 	test("skips inactive hosts", async () => {
@@ -220,7 +249,9 @@ describe("aggregateHour", () => {
 		await aggregateHour(db, hourTs);
 
 		const results = await db
-			.prepare("SELECT host_id, cpu_usage_avg FROM metrics_hourly WHERE hour_ts = ? ORDER BY host_id")
+			.prepare(
+				"SELECT host_id, cpu_usage_avg FROM metrics_hourly WHERE hour_ts = ? ORDER BY host_id",
+			)
 			.bind(hourTs)
 			.all<{ host_id: string; cpu_usage_avg: number }>();
 

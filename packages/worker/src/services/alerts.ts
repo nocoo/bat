@@ -40,8 +40,7 @@ function evaluateRules(payload: MetricsPayload): AlertEvalResult[] {
 	results.push({
 		ruleId: "no_swap",
 		fired:
-			payload.swap.total_bytes === 0 &&
-			payload.mem.used_pct > ALERT_THRESHOLDS.NO_SWAP_MEM_PCT,
+			payload.swap.total_bytes === 0 && payload.mem.used_pct > ALERT_THRESHOLDS.NO_SWAP_MEM_PCT,
 		severity: "critical",
 		value: payload.mem.used_pct,
 		message: `No swap configured, memory at ${payload.mem.used_pct.toFixed(1)}%`,
@@ -182,9 +181,7 @@ ON CONFLICT(host_id, rule_id) DO UPDATE SET
 			}
 			// Update last_value in pending
 			await db
-				.prepare(
-					`UPDATE alert_pending SET last_value = ? WHERE host_id = ? AND rule_id = ?`,
-				)
+				.prepare("UPDATE alert_pending SET last_value = ? WHERE host_id = ? AND rule_id = ?")
 				.bind(result.value, hostId, result.ruleId)
 				.run();
 		} else {

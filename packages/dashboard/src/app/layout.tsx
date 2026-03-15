@@ -33,8 +33,8 @@ export default function RootLayout({
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
-				{/* biome-ignore lint/security/noDangerouslySetInnerHtml: blocking script to prevent FOUC */}
 				<script
+					// biome-ignore lint/security/noDangerouslySetInnerHtml: blocking script to prevent FOUC
 					dangerouslySetInnerHTML={{
 						__html: `(function(){try{var s=localStorage.getItem("theme");var d=window.matchMedia("(prefers-color-scheme:dark)").matches;if(s==="dark"||(s!=="light"&&d))document.documentElement.classList.add("dark")}catch(e){}})()`,
 					}}
