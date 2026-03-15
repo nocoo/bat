@@ -51,7 +51,7 @@ Dashboard auth model:
 | Probe language | Rust | Single static binary, < 15MB RSS, < 10MB disk |
 | Transport | HTTPS POST JSON | CF Worker native, ~1KB/report, simple |
 | Auth (probe→worker) | Write API Key | `Authorization: Bearer <BAT_WRITE_KEY>`, stored as Worker secret. Only accepted on write routes (`/api/ingest`, `/api/identity`) |
-| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/alerts`). Even if Railway env leaks, attacker cannot forge metrics or manipulate alerts |
+| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/hosts/:id/metrics`, `/api/alerts`). Even if Railway env leaks, attacker cannot forge metrics or manipulate alerts |
 | Server | CF Worker + D1 | Serverless, free tier sufficient for 6 hosts |
 | Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges. Schema details in [03-data-structures.md](./03-data-structures.md) |
 | Dashboard | Next.js 16 + Bun (from Surety template) | Clone auth, UI, deployment from `../surety`. Details in [06-dashboard.md](./06-dashboard.md) |
