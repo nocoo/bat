@@ -3,27 +3,33 @@
 //
 // Prerequisites:
 //   - wrangler installed (devDependency)
-//   - Local D1 database (wrangler auto-creates on first run)
 //
 // Run: pnpm --filter @bat/worker test:e2e
 //
 // The test suite:
-//   1. Starts wrangler dev on port 18787 (local D1, ephemeral)
-//   2. Applies migrations
-//   3. Runs test cases against http://localhost:18787
-//   4. Tears down the server on exit
+//   1. Writes .dev.vars with test secrets
+//   2. Applies migrations to local D1 via wrangler d1 execute
+//   3. Starts wrangler dev on port 18787 (local D1)
+//   4. Runs test cases against http://localhost:18787
+//   5. Tears down the server and cleans up on exit
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/shared";
 
 const PORT = 18787;
 const BASE = `http://localhost:${PORT}`;
-const WRITE_KEY = process.env.BAT_WRITE_KEY ?? "e2e-write-key";
-const READ_KEY = process.env.BAT_READ_KEY ?? "e2e-read-key";
+const WRITE_KEY = "e2e-write-key";
+const READ_KEY = "e2e-read-key";
+const WORKER_ROOT = join(import.meta.dir, "../..");
+const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
+const DEV_VARS_PATH = join(WORKER_ROOT, ".dev.vars");
 
 let wranglerProc: ReturnType<typeof Bun.spawn> | null = null;
+let devVarsExistedBefore = false;
 
-async function waitForServer(url: string, timeoutMs = 15_000): Promise<void> {
+async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		try {
@@ -32,37 +38,81 @@ async function waitForServer(url: string, timeoutMs = 15_000): Promise<void> {
 		} catch {
 			// Server not ready yet
 		}
-		await Bun.sleep(200);
+		await Bun.sleep(300);
 	}
 	throw new Error(`Wrangler did not start within ${timeoutMs}ms`);
 }
 
+async function runCommand(cmd: string[], cwd: string): Promise<void> {
+	const proc = Bun.spawn(cmd, {
+		cwd,
+		stdout: "ignore",
+		stderr: "pipe",
+	});
+	const exitCode = await proc.exited;
+	if (exitCode !== 0) {
+		const stderr = await new Response(proc.stderr).text();
+		throw new Error(`Command failed (exit ${exitCode}): ${cmd.join(" ")}\n${stderr}`);
+	}
+}
+
 beforeAll(async () => {
-	// Start wrangler dev on the E2E port with local D1 and test secrets
+	// 1. Write .dev.vars so wrangler dev can read the secrets
+	devVarsExistedBefore = existsSync(DEV_VARS_PATH);
+	writeFileSync(DEV_VARS_PATH, `BAT_WRITE_KEY=${WRITE_KEY}\nBAT_READ_KEY=${READ_KEY}\n`);
+
+	// 2. Clean previous E2E persist dir for a fresh state
+	if (existsSync(PERSIST_DIR)) {
+		rmSync(PERSIST_DIR, { recursive: true, force: true });
+	}
+
+	// 3. Apply migrations to local D1 using the same persist path
+	const migrations = ["migrations/0001_initial.sql", "migrations/0002_dedup_constraint.sql"];
+	for (const migration of migrations) {
+		await runCommand(
+			[
+				"npx",
+				"wrangler",
+				"d1",
+				"execute",
+				"bat-db",
+				"--local",
+				"--persist-to",
+				".wrangler/e2e",
+				"--file",
+				migration,
+			],
+			WORKER_ROOT,
+		);
+	}
+
+	// 4. Start wrangler dev on the E2E port with local D1
 	wranglerProc = Bun.spawn(
 		["npx", "wrangler", "dev", "--port", String(PORT), "--local", "--persist-to", ".wrangler/e2e"],
 		{
-			cwd: import.meta.dir.replace("/test/e2e", ""),
-			env: {
-				...process.env,
-				BAT_WRITE_KEY: WRITE_KEY,
-				BAT_READ_KEY: READ_KEY,
-			},
+			cwd: WORKER_ROOT,
 			stdout: "ignore",
 			stderr: "ignore",
 		},
 	);
 
 	await waitForServer(`${BASE}/`);
-
-	// Apply migrations via the running server's local D1
-	// The migration is applied automatically by wrangler if d1_databases is configured
-});
+}, 60_000);
 
 afterAll(() => {
 	if (wranglerProc) {
 		wranglerProc.kill();
 		wranglerProc = null;
+	}
+
+	// Restore .dev.vars — remove only if we created it
+	if (!devVarsExistedBefore && existsSync(DEV_VARS_PATH)) {
+		rmSync(DEV_VARS_PATH);
+	}
+
+	// Clean up E2E persist dir
+	if (existsSync(PERSIST_DIR)) {
+		rmSync(PERSIST_DIR, { recursive: true, force: true });
 	}
 });
 
