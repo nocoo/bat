@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS metrics_raw (
   FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_raw_host_ts ON metrics_raw(host_id, ts);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_raw_host_ts ON metrics_raw(host_id, ts);
 
 -- Hourly aggregated metrics (90-day retention)
 CREATE TABLE IF NOT EXISTS metrics_hourly (
