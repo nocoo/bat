@@ -3,7 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { Activity, Github } from "lucide-react";
+import { Activity } from "lucide-react";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import LoadingScreen from "@/components/loading-screen";
 
