@@ -68,7 +68,7 @@ Dashboard auth model:
 - **Probe**: Tier 1 only (CPU, Memory, Disk, Network, Identity) — [04-probe.md](./04-probe.md)
 - **Worker**: Ingest, identity, metrics query API, health endpoint, hourly aggregation cron — [05-worker.md](./05-worker.md)
 - **Dashboard**: Host overview grid, host detail charts, alerts page, Google login — [06-dashboard.md](./06-dashboard.md)
-- **Alerts**: 6 Tier-1 rules only (CPU, Memory, Disk, IOWait, Steal, Offline) — [03-data-structures.md](./03-data-structures.md)
+- **Alerts**: 6 Tier-1 rules (see [03-data-structures.md § Alert rules](./03-data-structures.md))
 
 ---
 
@@ -121,6 +121,7 @@ bat/
 │   │       ├── services/
 │   │       │   ├── metrics.ts      # insertRaw(), queryMetrics()
 │   │       │   ├── alerts.ts       # evaluateAlerts(), 6 Tier-1 rules
+│   │       │   ├── status.ts       # deriveHostStatus() — shared by hosts + health routes
 │   │       │   └── aggregation.ts  # aggregateHour(), purgeOld()
 │   │       └── middleware/
 │   │           └── api-key.ts      # Read/write key validation (route-scoped)
