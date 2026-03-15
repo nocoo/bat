@@ -1,3 +1,4 @@
+mod collectors;
 mod config;
 mod payload;
 
