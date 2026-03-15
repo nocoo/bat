@@ -1,2 +1,37 @@
 // @bat/shared — barrel export
-// Types and constants will be added in Phase 1
+
+// Metrics payload types
+export type {
+	CpuMetrics,
+	DiskMetric,
+	MemMetrics,
+	MetricsPayload,
+	NetMetric,
+	SwapMetrics,
+} from "./metrics.js";
+
+// Identity payload types
+export type { HostRow, IdentityPayload } from "./identity.js";
+
+// Alert types and rules
+export type { AlertRule, AlertSeverity, AlertState, HealthResponse, HealthStatus } from "./alerts.js";
+export { getAlertRule, TIER1_ALERT_RULES } from "./alerts.js";
+
+// Constants
+export {
+	ALERT_THRESHOLDS,
+	AUTO_RESOLUTION_THRESHOLD_SECONDS,
+	INTERVALS,
+	RETENTION,
+} from "./constants.js";
+
+// API route types and constants
+export type {
+	AlertItem,
+	HostOverviewItem,
+	HostStatus,
+	MetricsDataPoint,
+	MetricsQueryResponse,
+	MetricsResolution,
+} from "./api.js";
+export { API_ROUTES } from "./api.js";
