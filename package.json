@@ -9,6 +9,14 @@
     "lint:fix": "biome check --write .",
     "test": "turbo test"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@biomejs/biome",
+      "esbuild",
+      "workerd",
+      "sharp"
+    ]
+  },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "turbo": "^2.5.0",
