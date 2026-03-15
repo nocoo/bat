@@ -10,11 +10,7 @@ interface AlertRow {
  * Derive host status from last_seen time and active alerts.
  * Priority: offline > critical > warning > healthy
  */
-export function deriveHostStatus(
-	lastSeen: number,
-	now: number,
-	alerts: AlertRow[],
-): HostStatus {
+export function deriveHostStatus(lastSeen: number, now: number, alerts: AlertRow[]): HostStatus {
 	// Offline if not seen within threshold
 	if (now - lastSeen > ALERT_THRESHOLDS.OFFLINE_SECONDS) {
 		return "offline";

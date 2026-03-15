@@ -41,9 +41,7 @@ export async function healthRoute(c: Context<AppEnv>) {
 
 	// Get all alerts for active hosts
 	const alertsResult = await db
-		.prepare(
-			`SELECT host_id, severity FROM alert_states WHERE host_id IN (${placeholders})`,
-		)
+		.prepare(`SELECT host_id, severity FROM alert_states WHERE host_id IN (${placeholders})`)
 		.bind(...hostIds)
 		.all<AlertRow>();
 

@@ -5,10 +5,7 @@ import { RETENTION } from "@bat/shared";
  * Aggregate raw metrics for all active hosts in a given hour.
  * Inserts/updates metrics_hourly rows.
  */
-export async function aggregateHour(
-	db: D1Database,
-	hourTs: number,
-): Promise<void> {
+export async function aggregateHour(db: D1Database, hourTs: number): Promise<void> {
 	const hourEnd = hourTs + 3600;
 
 	// Get all active hosts that have raw data in this hour
@@ -214,22 +211,13 @@ function aggregateNetwork(rows: RawRow[]): NetAggResult {
  * - metrics_raw: older than 7 days
  * - metrics_hourly: older than 90 days
  */
-export async function purgeOldData(
-	db: D1Database,
-	nowSeconds: number,
-): Promise<void> {
+export async function purgeOldData(db: D1Database, nowSeconds: number): Promise<void> {
 	const rawCutoff = nowSeconds - RETENTION.RAW_DAYS * 86400;
 	const hourlyCutoff = nowSeconds - RETENTION.HOURLY_DAYS * 86400;
 
-	await db
-		.prepare("DELETE FROM metrics_raw WHERE ts < ?")
-		.bind(rawCutoff)
-		.run();
+	await db.prepare("DELETE FROM metrics_raw WHERE ts < ?").bind(rawCutoff).run();
 
-	await db
-		.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?")
-		.bind(hourlyCutoff)
-		.run();
+	await db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(hourlyCutoff).run();
 }
 
 // --- Helpers ---

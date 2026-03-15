@@ -34,20 +34,20 @@ describe("TIER1_ALERT_RULES", () => {
 		for (const id of instantRules) {
 			const rule = TIER1_ALERT_RULES.find((r) => r.id === id);
 			expect(rule).toBeDefined();
-			expect(rule!.duration_seconds).toBe(0);
+			expect(rule?.duration_seconds).toBe(0);
 		}
 	});
 
 	test("duration rules have correct duration_seconds", () => {
 		const iowait = TIER1_ALERT_RULES.find((r) => r.id === "iowait_high");
 		expect(iowait).toBeDefined();
-		expect(iowait!.duration_seconds).toBe(ALERT_THRESHOLDS.IOWAIT_DURATION_SECONDS);
-		expect(iowait!.duration_seconds).toBe(300);
+		expect(iowait?.duration_seconds).toBe(ALERT_THRESHOLDS.IOWAIT_DURATION_SECONDS);
+		expect(iowait?.duration_seconds).toBe(300);
 
 		const steal = TIER1_ALERT_RULES.find((r) => r.id === "steal_high");
 		expect(steal).toBeDefined();
-		expect(steal!.duration_seconds).toBe(ALERT_THRESHOLDS.STEAL_DURATION_SECONDS);
-		expect(steal!.duration_seconds).toBe(300);
+		expect(steal?.duration_seconds).toBe(ALERT_THRESHOLDS.STEAL_DURATION_SECONDS);
+		expect(steal?.duration_seconds).toBe(300);
 	});
 
 	test("critical rules are mem_high, no_swap, disk_full, host_offline", () => {
@@ -67,9 +67,9 @@ describe("getAlertRule", () => {
 	test("returns the correct rule for a valid ID", () => {
 		const rule = getAlertRule("mem_high");
 		expect(rule).toBeDefined();
-		expect(rule!.id).toBe("mem_high");
-		expect(rule!.severity).toBe("critical");
-		expect(rule!.duration_seconds).toBe(0);
+		expect(rule?.id).toBe("mem_high");
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.duration_seconds).toBe(0);
 	});
 
 	test("returns undefined for an unknown ID", () => {

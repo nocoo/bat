@@ -1,16 +1,18 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import type { MetricsPayload } from "@bat/shared";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateAlerts, evaluateRules } from "./alerts";
 
-function makePayload(overrides?: Partial<{
-	mem_used_pct: number;
-	swap_used_pct: number;
-	swap_total_bytes: number;
-	disk_used_pct: number;
-	iowait_pct: number;
-	steal_pct: number;
-}>): MetricsPayload {
+function makePayload(
+	overrides?: Partial<{
+		mem_used_pct: number;
+		swap_used_pct: number;
+		swap_total_bytes: number;
+		disk_used_pct: number;
+		iowait_pct: number;
+		steal_pct: number;
+	}>,
+): MetricsPayload {
 	return {
 		host_id: "test-host",
 		timestamp: Math.floor(Date.now() / 1000),
@@ -75,9 +77,7 @@ describe("evaluateRules (pure function)", () => {
 	});
 
 	test("no_swap fires when swap == 0 AND mem > 70%", () => {
-		const results = evaluateRules(
-			makePayload({ swap_total_bytes: 0, mem_used_pct: 75 }),
-		);
+		const results = evaluateRules(makePayload({ swap_total_bytes: 0, mem_used_pct: 75 }));
 		const noSwap = results.find((r) => r.ruleId === "no_swap");
 		expect(noSwap?.fired).toBe(true);
 		expect(noSwap?.severity).toBe("critical");

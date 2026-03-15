@@ -19,16 +19,9 @@ function get(app: Hono<AppEnv>) {
 	return app.request(new Request("http://localhost/api/health"));
 }
 
-async function insertHost(
-	db: D1Database,
-	hostId: string,
-	lastSeen: number,
-	isActive = 1,
-) {
+async function insertHost(db: D1Database, hostId: string, lastSeen: number, isActive = 1) {
 	await db
-		.prepare(
-			"INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, ?)",
-		)
+		.prepare("INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, ?)")
 		.bind(hostId, hostId, lastSeen, isActive)
 		.run();
 }

@@ -31,11 +31,7 @@ app.get("/api/alerts", alertsListRoute);
 
 export default {
 	fetch: app.fetch,
-	async scheduled(
-		_event: ScheduledEvent,
-		env: AppEnv["Bindings"],
-		_ctx: ExecutionContext,
-	) {
+	async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
 		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
 		await aggregateHour(env.DB, hourTs);
 		await purgeOldData(env.DB, Math.floor(Date.now() / 1000));
