@@ -2,13 +2,14 @@
 import type { MetricsPayload } from "@bat/shared";
 
 /** Insert a raw metrics row into metrics_raw, flattening nested fields.
- *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries. */
+ *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries.
+ *  Returns true if a row was actually inserted, false if it was a duplicate. */
 export async function insertMetricsRaw(
 	db: D1Database,
 	hostId: string,
 	payload: MetricsPayload,
-): Promise<void> {
-	await db
+): Promise<boolean> {
+	const result = await db
 		.prepare(
 			`INSERT OR IGNORE INTO metrics_raw
   (host_id, ts, cpu_load1, cpu_load5, cpu_load15, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_count,
@@ -37,10 +38,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			payload.uptime_seconds,
 		)
 		.run();
+	return result.meta.changes > 0;
 }
 
-/** Upsert host record with last_seen (ensures FK target exists for metrics_raw) */
-export async function upsertHostLastSeen(
+/** Ensure host record exists (FK target for metrics_raw) without updating last_seen.
+ *  If the host already exists, this is a no-op. */
+export async function ensureHostExists(
 	db: D1Database,
 	hostId: string,
 	hostname: string,
@@ -50,9 +53,17 @@ export async function upsertHostLastSeen(
 		.prepare(
 			`INSERT INTO hosts (host_id, hostname, last_seen)
 VALUES (?, ?, ?)
-ON CONFLICT(host_id) DO UPDATE SET
-  last_seen = excluded.last_seen`,
+ON CONFLICT(host_id) DO NOTHING`,
 		)
 		.bind(hostId, hostname, now)
 		.run();
+}
+
+/** Update host last_seen timestamp. Called only when new metrics are actually inserted. */
+export async function updateHostLastSeen(
+	db: D1Database,
+	hostId: string,
+	now: number,
+): Promise<void> {
+	await db.prepare("UPDATE hosts SET last_seen = ? WHERE host_id = ?").bind(now, hostId).run();
 }
