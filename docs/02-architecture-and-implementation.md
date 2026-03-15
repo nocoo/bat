@@ -161,6 +161,8 @@ CREATE TABLE hosts (
   cpu_model  TEXT,
   boot_time  INTEGER,
   last_seen  INTEGER NOT NULL,
+  identity_updated_at INTEGER,       -- last time identity payload was received
+  is_active  INTEGER NOT NULL DEFAULT 1, -- 0 = retired/disabled, excluded from health + lists
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 );
 
@@ -203,9 +205,14 @@ CREATE TABLE metrics_hourly (
   cpu_load1_avg    REAL,
   cpu_load5_avg    REAL,
   cpu_load15_avg   REAL,
+  mem_total        INTEGER,          -- last sample (static per host, but needed for display)
+  mem_available_min INTEGER,         -- min available in the hour (worst case)
   mem_used_pct_avg REAL,
   mem_used_pct_max REAL,
+  swap_total       INTEGER,          -- last sample (needed for no_swap alert on hourly data)
+  swap_used_max    INTEGER,          -- max swap used in the hour
   swap_used_pct_avg REAL,
+  swap_used_pct_max REAL,            -- needed for mem_high alert (swap > 50%)
   uptime_min       INTEGER,
   disk_json        TEXT,
   net_json         TEXT,
@@ -249,7 +256,7 @@ CREATE TABLE alert_pending (
 |-------|------|--------|---------|
 | `/api/ingest` | Write Key | POST | Receive Tier-1 metrics, evaluate alerts |
 | `/api/identity` | Write Key | POST | Receive/update host identity |
-| `/api/hosts` | Read Key | GET | List all hosts with latest status |
+| `/api/hosts` | Read Key | GET | List active hosts with latest status (`is_active = 1`) |
 | `/api/hosts/:id/metrics` | Read Key | GET | Query metrics (`?from=&to=`, auto raw/hourly) |
 | `/api/alerts` | Read Key | GET | List all active alerts across all hosts |
 | `/api/health` | Public | GET | Overall health (200/degraded/503) for Uptime Kuma |
@@ -285,11 +292,49 @@ Single Worker invocation, D1 batch for atomicity:
 
 1. Validate payload shape (lightweight check, no Zod)
 2. `INSERT INTO metrics_raw` — flatten scalars, stringify disk/net
-3. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname until a proper identity payload arrives.
+3. `INSERT INTO hosts (host_id, hostname, last_seen, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(host_id) DO UPDATE SET last_seen = ?` — ensures host row exists even if identity was never received or failed. Uses `host_id` as fallback hostname. Does NOT set `is_active` — a retired host receiving stray metrics should not auto-reactivate (only identity does that).
 4. `evaluateAlerts(payload)` → UPSERT `alert_states` / `alert_pending`
 5. Return `204 No Content`
 
 **Why UPSERT instead of UPDATE**: The Probe sends identity on startup before any ingest, but identity can fail (network error, Worker cold start). If ingest required a pre-existing host row (via foreign key + UPDATE-only), the first metrics would be silently dropped. The UPSERT guarantees ingest is self-sufficient — it never fails because of a missing host row. When identity eventually succeeds, it fills in the full host metadata (os, kernel, arch, etc.).
+
+### Identity update semantics
+
+`POST /api/identity` performs a **full overwrite** of all identity fields:
+
+```sql
+INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, is_active)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+ON CONFLICT(host_id) DO UPDATE SET
+  hostname = excluded.hostname,
+  os = excluded.os,
+  kernel = excluded.kernel,
+  arch = excluded.arch,
+  cpu_model = excluded.cpu_model,
+  boot_time = excluded.boot_time,
+  last_seen = excluded.last_seen,
+  identity_updated_at = excluded.identity_updated_at,
+  is_active = 1;  -- receiving identity reactivates a retired host
+```
+
+**Design choices**:
+- **Full overwrite**: Every field is replaced on each identity POST. The Probe always sends a complete identity payload, so partial updates add complexity without benefit.
+- **Reactivation**: Receiving an identity payload sets `is_active = 1`, which means redeploying a Probe to a previously retired host automatically brings it back.
+- **Detecting changes**: Compare `boot_time` to detect reboots. Compare `kernel`/`os` to detect upgrades. `identity_updated_at` tracks when metadata was last refreshed.
+- **`host_id` is immutable**: It's the primary key. If a machine's `host_id` changes (new config), it appears as a new host. The old host stays retired until manually cleaned up.
+
+### Host lifecycle and retirement
+
+Hosts are never auto-deleted. Instead:
+
+- **`is_active = 1`** (default): Host appears in `/api/hosts`, `/api/health`, `/api/alerts`
+- **`is_active = 0`** (retired): Host is excluded from all API responses and health checks. Metrics data follows normal retention (7d raw, 90d hourly) and ages out naturally.
+
+**How to retire a host**: Manual `PATCH /api/hosts/:id` with `{ "is_active": false }` via Dashboard (MVP: direct D1 console or wrangler command). Post-MVP: add a "retire" button in the Dashboard UI.
+
+**Why not auto-retire**: Auto-retiring after N days of `last_seen` would mask real outages. A host that's been offline for 2 weeks might be a forgotten VM that still costs money — the persistent offline alert is intentional. Retirement is an explicit human decision.
+
+**Health endpoint behavior with retired hosts**: `GET /api/health` only counts active hosts. A fleet of 6 active + 2 retired shows `total_hosts: 6`.
 
 ### Alert rules (Tier-1 subset for MVP, aligned with 01-probe-metrics-spec.md)
 
@@ -330,7 +375,9 @@ The health endpoint returns only aggregate counts — no host IDs, no alert deta
 
 This prevents warning-level alerts (iowait > 20%, steal > 10%) from triggering Uptime Kuma's downtime notification. Only critical conditions (mem > 85% + swap > 50%, no swap + mem > 70%, disk > 85%, host offline) produce a 503.
 
-**Overall status derivation**: `critical` if any host critical → `degraded` if any host warning → `healthy` otherwise.
+**Overall status derivation**: `critical` if any active host critical → `degraded` if any active host warning → `healthy` otherwise.
+
+**Edge case — zero active hosts**: When no active hosts exist in D1 (fresh deployment, all retired), `/api/health` returns `200` with `"status": "empty"` and `total_hosts: 0`. This is distinct from `"healthy"` (which implies hosts are reporting normally). Uptime Kuma should be configured to alert on `"empty"` status persisting beyond the initial setup window — "no probes connected" is not the same as "everything is fine".
 
 ### Hourly aggregation cron
 
@@ -550,6 +597,7 @@ Test every Worker route against local Wrangler dev server:
 | Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
 | Health with critical | `GET /api/health` | 503, critical alert details |
 | Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
+| Zero hosts health | `GET /api/health` | 200, status "empty", total_hosts: 0 |
 | List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
 | Aggregation cron | `__scheduled` trigger | `metrics_hourly` populated, raw purged |
 | Unauthenticated API | `GET /api/hosts` (no key) | 401 |
