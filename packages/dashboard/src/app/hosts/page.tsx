@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHosts } from "@/lib/hooks";
 import { AlertTriangle, Server } from "lucide-react";
+import Link from "next/link";
 
 function HostsLoading() {
 	return (
@@ -39,7 +40,13 @@ function HostsEmpty() {
 		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
 			<Server className="h-12 w-12 mb-4" strokeWidth={1} />
 			<h2 className="text-lg font-semibold text-foreground">No hosts registered</h2>
-			<p className="mt-2 text-sm">Configure a probe to start monitoring.</p>
+			<p className="mt-2 text-sm">Deploy a probe to start monitoring your servers.</p>
+			<Link
+				href="/setup"
+				className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+			>
+				Setup Guide
+			</Link>
 		</div>
 	);
 }
