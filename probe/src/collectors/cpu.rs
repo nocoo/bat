@@ -95,6 +95,7 @@ pub fn parse_loadavg(content: &str) -> Option<(f64, f64, f64)> {
 }
 
 /// Count CPU cores from `/proc/cpuinfo` by counting `^processor` lines.
+#[allow(clippy::cast_possible_truncation)] // cpu_count fits in u32
 pub fn parse_cpu_count(content: &str) -> u32 {
     content
         .lines()

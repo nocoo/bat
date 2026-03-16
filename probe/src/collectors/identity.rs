@@ -37,13 +37,13 @@ pub fn parse_kernel_version(content: &str) -> String {
 /// Parse uptime in seconds from `/proc/uptime`.
 ///
 /// Format: `12345.67 98765.43` — first field is uptime in seconds.
+#[allow(clippy::cast_possible_truncation)] // uptime seconds fits in u64
 pub fn parse_uptime(content: &str) -> u64 {
     content
         .split_whitespace()
         .next()
         .and_then(|s| s.parse::<f64>().ok())
-        .map(|f| f as u64)
-        .unwrap_or(0)
+        .map_or(0, |f| f as u64)
 }
 
 /// Get system architecture via libc uname().
@@ -52,7 +52,7 @@ pub fn parse_uptime(content: &str) -> u64 {
 pub fn get_arch() -> String {
     unsafe {
         let mut utsname: libc::utsname = std::mem::zeroed();
-        if libc::uname(&mut utsname) == 0 {
+        if libc::uname(&raw mut utsname) == 0 {
             let machine = std::ffi::CStr::from_ptr(utsname.machine.as_ptr());
             machine.to_string_lossy().to_string()
         } else {

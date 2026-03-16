@@ -77,7 +77,7 @@ async fn main() {
                     identity_timer = tokio::time::Instant::now();
                 }
             }
-            _ = shutdown_signal() => {
+            () = shutdown_signal() => {
                 tracing::info!("received shutdown signal, exiting");
                 break;
             }
