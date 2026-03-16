@@ -244,6 +244,12 @@ fn collect_metrics(
     );
     *prev_disk_io = curr_disk_io;
 
+    // TCP connection state (Tier 3)
+    let tcp = collectors::tcp::read_tcp_state().map(|s| orchestrate::convert_tcp(&s));
+
+    // File descriptor usage (Tier 3)
+    let fd = collectors::fd::read_fd_info().map(|i| orchestrate::convert_fd(&i));
+
     orchestrate::build_metrics_payload(
         PROBE_VERSION,
         host_id,
@@ -259,6 +265,8 @@ fn collect_metrics(
         uptime_seconds,
         psi,
         disk_io,
+        tcp,
+        fd,
     )
 }
 

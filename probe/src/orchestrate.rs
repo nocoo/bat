@@ -5,10 +5,11 @@ use crate::collectors;
 use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
-    CpuMetrics, DiskIoMetric, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric,
-    PsiMetrics, SwapMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages,
-    Tier2FailedService, Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload,
-    Tier2Ports, Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates,
+    CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics, MetricsPayload,
+    NetMetric, PsiMetrics, SwapMetrics, TcpMetrics, Tier2DiskDeep, Tier2Docker,
+    Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
+    Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports, Tier2Security, Tier2Systemd,
+    Tier2TopDir, Tier2Updates,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -50,6 +51,8 @@ pub fn build_metrics_payload(
     uptime_seconds: u64,
     psi: Option<PsiMetrics>,
     disk_io: Option<Vec<DiskIoMetric>>,
+    tcp: Option<TcpMetrics>,
+    fd: Option<FdMetrics>,
 ) -> MetricsPayload {
     MetricsPayload {
         probe_version: probe_version.to_string(),
@@ -72,6 +75,8 @@ pub fn build_metrics_payload(
         uptime_seconds,
         psi,
         disk_io,
+        tcp,
+        fd,
     }
 }
 
@@ -177,6 +182,24 @@ pub fn compute_disk_io_delta(
     }
 
     Some(metrics)
+}
+
+/// Convert collector TCP state to payload TCP metrics.
+pub const fn convert_tcp(state: &collectors::tcp::TcpState) -> TcpMetrics {
+    TcpMetrics {
+        established: state.established,
+        time_wait: state.time_wait,
+        orphan: state.orphan,
+        allocated: state.allocated,
+    }
+}
+
+/// Convert collector FD info to payload FD metrics.
+pub const fn convert_fd(info: &collectors::fd::FdInfo) -> FdMetrics {
+    FdMetrics {
+        allocated: info.allocated,
+        max: info.max,
+    }
 }
 
 /// Compute boot time from current epoch seconds and uptime seconds.
@@ -505,6 +528,8 @@ mod tests {
             86400,
             None,
             None,
+            None,
+            None,
         );
         assert_eq!(p.host_id, "host-1");
         assert_eq!(p.timestamp, 1_700_000_000);
@@ -542,6 +567,8 @@ mod tests {
             vec![],
             vec![],
             0,
+            None,
+            None,
             None,
             None,
         );
@@ -1009,6 +1036,8 @@ mod tests {
             vec![],
             0,
             psi,
+            None,
+            None,
             None,
         );
         assert!(p.psi.is_some());

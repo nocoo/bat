@@ -1,8 +1,10 @@
 pub mod cpu;
 pub mod disk;
 pub mod disk_io;
+pub mod fd;
 pub mod identity;
 pub mod memory;
 pub mod network;
 pub mod psi;
+pub mod tcp;
 pub mod tier2;
