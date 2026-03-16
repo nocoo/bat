@@ -682,4 +682,23 @@ mod tests {
         let ts_march = parse_iso8601_to_unix("2024-03-01T00:00:00Z").unwrap();
         assert_eq!(ts_march - ts.unwrap(), 86400);
     }
+
+    #[test]
+    fn parse_docker_stats_with_blank_lines() {
+        let output = "\n{\"ID\":\"abc123\",\"Name\":\"web\",\"CPUPerc\":\"1.50%\",\"MemUsage\":\"50MiB / 1GiB\"}\n\n";
+        let stats = parse_docker_stats(output);
+        // Both ID and Name are inserted as keys
+        assert_eq!(stats.len(), 2);
+        assert!(stats.contains_key("abc123"));
+        assert!(stats.contains_key("web"));
+    }
+
+    #[test]
+    fn parse_docker_system_df_with_blank_lines() {
+        let output = "\n{\"Type\":\"Images\",\"TotalCount\":\"5\",\"Size\":\"1.5GB\",\"Reclaimable\":\"500MB\"}\n\n";
+        let result = parse_docker_system_df(output);
+        assert!(result.is_some());
+        let info = result.unwrap();
+        assert_eq!(info.total_count, 5);
+    }
 }
