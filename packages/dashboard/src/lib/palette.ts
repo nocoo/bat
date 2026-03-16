@@ -6,7 +6,7 @@
 const v = (token: string) => `hsl(var(--${token}))`;
 
 export const chart = {
-	vermilion: v("chart-1"),
+	pink: v("chart-1"),
 	sky: v("chart-2"),
 	teal: v("chart-3"),
 	green: v("chart-4"),

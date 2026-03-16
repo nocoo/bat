@@ -143,7 +143,13 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 						<div className="px-3 h-14 flex items-center">
 							<div className="flex w-full items-center justify-between px-3">
 								<div className="flex items-center gap-3">
-									<Image src="/logo-24.png" alt="bat" width={24} height={24} className="rounded-sm" />
+									<Image
+										src="/logo-24.png"
+										alt="bat"
+										width={24}
+										height={24}
+										className="rounded-sm"
+									/>
 									<span className="text-lg font-bold tracking-tighter">bat</span>
 									<Badge
 										variant="secondary"
