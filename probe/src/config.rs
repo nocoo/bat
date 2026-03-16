@@ -55,12 +55,36 @@ pub fn load_config(path: &std::path::Path) -> Result<Config, String> {
     parse_config(&content)
 }
 
+/// Validate that `worker_url` uses HTTPS (or HTTP for localhost only).
+fn validate_worker_url(raw: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(raw).map_err(|e| format!("invalid worker_url: {e}"))?;
+
+    match parsed.scheme() {
+        "https" => Ok(()),
+        "http" => {
+            let is_loopback = match parsed.host() {
+                Some(url::Host::Domain("localhost")) => true,
+                Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+                Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+                _ => false,
+            };
+            if is_loopback {
+                Ok(()) // allow http://localhost for development
+            } else {
+                Err("worker_url must use HTTPS (http:// only allowed for localhost)".into())
+            }
+        }
+        scheme => Err(format!("unsupported URL scheme '{scheme}', expected https")),
+    }
+}
+
 /// Parse config from a TOML string.
 pub fn parse_config(content: &str) -> Result<Config, String> {
     let config: Config = toml::from_str(content).map_err(|e| format!("invalid config: {e}"))?;
     if config.interval == 0 {
         return Err("invalid config: interval must be > 0".to_string());
     }
+    validate_worker_url(&config.worker_url)?;
     Ok(config)
 }
 
@@ -231,5 +255,74 @@ interval = 15
         let result = load_config(std::path::Path::new("/nonexistent/config.toml"));
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("failed to read config"));
+    }
+
+    #[test]
+    fn reject_http_remote_url() {
+        let content = r#"
+worker_url = "http://api.example.com"
+write_key = "secret-key"
+"#;
+        let result = parse_config(content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("HTTPS"));
+    }
+
+    #[test]
+    fn accept_https_url() {
+        let content = r#"
+worker_url = "https://api.example.com"
+write_key = "secret-key"
+"#;
+        assert!(parse_config(content).is_ok());
+    }
+
+    #[test]
+    fn accept_http_localhost() {
+        let content = r#"
+worker_url = "http://localhost:8080"
+write_key = "secret-key"
+"#;
+        assert!(parse_config(content).is_ok());
+    }
+
+    #[test]
+    fn accept_http_127_0_0_1() {
+        let content = r#"
+worker_url = "http://127.0.0.1:8080"
+write_key = "secret-key"
+"#;
+        assert!(parse_config(content).is_ok());
+    }
+
+    #[test]
+    fn accept_http_ipv6_loopback() {
+        let content = r#"
+worker_url = "http://[::1]:8080"
+write_key = "secret-key"
+"#;
+        assert!(parse_config(content).is_ok());
+    }
+
+    #[test]
+    fn reject_ftp_scheme() {
+        let content = r#"
+worker_url = "ftp://example.com"
+write_key = "secret-key"
+"#;
+        let result = parse_config(content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("unsupported URL scheme"));
+    }
+
+    #[test]
+    fn reject_no_scheme() {
+        let content = r#"
+worker_url = "example.com"
+write_key = "secret-key"
+"#;
+        let result = parse_config(content);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("invalid worker_url"));
     }
 }

@@ -13,6 +13,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 libc = "0.2"
 nix = { version = "0.30", features = ["fs"] }
+url = "2"
 
 [dev-dependencies]
 wiremock = "0.6"
