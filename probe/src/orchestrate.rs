@@ -5,10 +5,10 @@ use crate::collectors;
 use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
-    CpuMetrics, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric, SwapMetrics,
-    Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages, Tier2FailedService,
-    Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports,
-    Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates,
+    CpuMetrics, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric, PsiMetrics,
+    SwapMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages,
+    Tier2FailedService, Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload,
+    Tier2Ports, Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -48,6 +48,7 @@ pub fn build_metrics_payload(
     disk: Vec<DiskMetric>,
     net: Vec<NetMetric>,
     uptime_seconds: u64,
+    psi: Option<PsiMetrics>,
 ) -> MetricsPayload {
     MetricsPayload {
         probe_version: probe_version.to_string(),
@@ -68,6 +69,7 @@ pub fn build_metrics_payload(
         disk,
         net,
         uptime_seconds,
+        psi,
     }
 }
 
@@ -96,6 +98,27 @@ pub fn convert_net_infos(infos: Vec<collectors::network::NetInfo>) -> Vec<NetMet
             tx_errors: n.tx_errors,
         })
         .collect()
+}
+
+/// Convert collector PSI data to payload PSI metrics.
+pub const fn convert_psi(data: &collectors::psi::PsiData) -> PsiMetrics {
+    PsiMetrics {
+        cpu_some_avg10: data.cpu.some.avg10,
+        cpu_some_avg60: data.cpu.some.avg60,
+        cpu_some_avg300: data.cpu.some.avg300,
+        mem_some_avg10: data.memory.some.avg10,
+        mem_some_avg60: data.memory.some.avg60,
+        mem_some_avg300: data.memory.some.avg300,
+        mem_full_avg10: data.memory.full.avg10,
+        mem_full_avg60: data.memory.full.avg60,
+        mem_full_avg300: data.memory.full.avg300,
+        io_some_avg10: data.io.some.avg10,
+        io_some_avg60: data.io.some.avg60,
+        io_some_avg300: data.io.some.avg300,
+        io_full_avg10: data.io.full.avg10,
+        io_full_avg60: data.io.full.avg60,
+        io_full_avg300: data.io.full.avg300,
+    }
 }
 
 /// Compute boot time from current epoch seconds and uptime seconds.
@@ -422,6 +445,7 @@ mod tests {
             disk,
             net,
             86400,
+            None,
         );
         assert_eq!(p.host_id, "host-1");
         assert_eq!(p.timestamp, 1_700_000_000);
@@ -459,6 +483,7 @@ mod tests {
             vec![],
             vec![],
             0,
+            None,
         );
         assert!(p.disk.is_empty());
         assert!(p.net.is_empty());
@@ -830,5 +855,102 @@ mod tests {
         assert!(m60[0].rx_bytes_rate > m90[0].rx_bytes_rate);
         assert!((m30[0].rx_bytes_rate - 100.0).abs() < f64::EPSILON);
         assert!((m60[0].rx_bytes_rate - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn convert_psi_maps_all_fields() {
+        use collectors::psi::{PsiData, PsiLine, PsiResource};
+
+        let data = PsiData {
+            cpu: PsiResource {
+                some: PsiLine {
+                    avg10: 2.40,
+                    avg60: 2.13,
+                    avg300: 1.40,
+                },
+                full: PsiLine::default(),
+            },
+            memory: PsiResource {
+                some: PsiLine {
+                    avg10: 1.0,
+                    avg60: 0.5,
+                    avg300: 0.3,
+                },
+                full: PsiLine {
+                    avg10: 0.1,
+                    avg60: 0.05,
+                    avg300: 0.01,
+                },
+            },
+            io: PsiResource {
+                some: PsiLine {
+                    avg10: 0.50,
+                    avg60: 0.01,
+                    avg300: 0.0,
+                },
+                full: PsiLine {
+                    avg10: 0.30,
+                    avg60: 0.0,
+                    avg300: 0.0,
+                },
+            },
+        };
+
+        let psi = convert_psi(&data);
+        assert!((psi.cpu_some_avg10 - 2.40).abs() < f64::EPSILON);
+        assert!((psi.cpu_some_avg60 - 2.13).abs() < f64::EPSILON);
+        assert!((psi.cpu_some_avg300 - 1.40).abs() < f64::EPSILON);
+        assert!((psi.mem_some_avg10 - 1.0).abs() < f64::EPSILON);
+        assert!((psi.mem_full_avg10 - 0.1).abs() < f64::EPSILON);
+        assert!((psi.io_some_avg10 - 0.50).abs() < f64::EPSILON);
+        assert!((psi.io_full_avg10 - 0.30).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn build_metrics_payload_with_psi() {
+        let mem = MemMetrics {
+            total_bytes: 0,
+            available_bytes: 0,
+            used_pct: 0.0,
+        };
+        let swap = SwapMetrics {
+            total_bytes: 0,
+            used_bytes: 0,
+            used_pct: 0.0,
+        };
+        let psi = Some(PsiMetrics {
+            cpu_some_avg10: 5.0,
+            cpu_some_avg60: 3.0,
+            cpu_some_avg300: 1.0,
+            mem_some_avg10: 0.0,
+            mem_some_avg60: 0.0,
+            mem_some_avg300: 0.0,
+            mem_full_avg10: 0.0,
+            mem_full_avg60: 0.0,
+            mem_full_avg300: 0.0,
+            io_some_avg10: 0.0,
+            io_some_avg60: 0.0,
+            io_some_avg300: 0.0,
+            io_full_avg10: 0.0,
+            io_full_avg60: 0.0,
+            io_full_avg300: 0.0,
+        });
+        let p = build_metrics_payload(
+            "0.3.0",
+            "h",
+            0,
+            30,
+            1,
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0),
+            mem,
+            swap,
+            vec![],
+            vec![],
+            0,
+            psi,
+        );
+        assert!(p.psi.is_some());
+        assert!((p.psi.unwrap().cpu_some_avg10 - 5.0).abs() < f64::EPSILON);
     }
 }

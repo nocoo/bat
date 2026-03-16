@@ -12,6 +12,9 @@ pub struct MetricsPayload {
     pub disk: Vec<DiskMetric>,
     pub net: Vec<NetMetric>,
     pub uptime_seconds: u64,
+    /// Tier 3: PSI pressure — None if kernel < 4.20 or `CONFIG_PSI=n`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub psi: Option<PsiMetrics>,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +57,25 @@ pub struct NetMetric {
     pub tx_bytes_rate: f64,
     pub rx_errors: u64,
     pub tx_errors: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PsiMetrics {
+    pub cpu_some_avg10: f64,
+    pub cpu_some_avg60: f64,
+    pub cpu_some_avg300: f64,
+    pub mem_some_avg10: f64,
+    pub mem_some_avg60: f64,
+    pub mem_some_avg300: f64,
+    pub mem_full_avg10: f64,
+    pub mem_full_avg60: f64,
+    pub mem_full_avg300: f64,
+    pub io_some_avg10: f64,
+    pub io_some_avg60: f64,
+    pub io_some_avg300: f64,
+    pub io_full_avg10: f64,
+    pub io_full_avg60: f64,
+    pub io_full_avg300: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -256,6 +278,7 @@ mod tests {
                 tx_errors: 0,
             }],
             uptime_seconds: 86400,
+            psi: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -354,6 +377,7 @@ mod tests {
             disk: vec![],
             net: vec![],
             uptime_seconds: 0,
+            psi: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -646,6 +670,7 @@ mod tests {
                 },
             ],
             uptime_seconds: 86400,
+            psi: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -690,6 +715,7 @@ mod tests {
             disk: vec![],
             net: vec![],
             uptime_seconds: u64::MAX,
+            psi: None,
         };
 
         // Should serialize without panic
@@ -737,5 +763,98 @@ mod tests {
         assert!(json["reboot_required"].as_bool().unwrap());
         assert!(!obj.contains_key("cache_age_seconds"));
         assert!(json["list"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn metrics_payload_psi_none_omitted() {
+        let payload = MetricsPayload {
+            probe_version: "0.3.0".into(),
+            host_id: "h".into(),
+            timestamp: 0,
+            interval: 30,
+            cpu: CpuMetrics {
+                load1: 0.0,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 0.0,
+                iowait_pct: 0.0,
+                steal_pct: 0.0,
+                count: 1,
+            },
+            mem: MemMetrics {
+                total_bytes: 0,
+                available_bytes: 0,
+                used_pct: 0.0,
+            },
+            swap: SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+            disk: vec![],
+            net: vec![],
+            uptime_seconds: 0,
+            psi: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("psi"), "psi should be omitted when None");
+    }
+
+    #[test]
+    fn metrics_payload_psi_some_serialized() {
+        let payload = MetricsPayload {
+            probe_version: "0.3.0".into(),
+            host_id: "h".into(),
+            timestamp: 0,
+            interval: 30,
+            cpu: CpuMetrics {
+                load1: 0.0,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 0.0,
+                iowait_pct: 0.0,
+                steal_pct: 0.0,
+                count: 1,
+            },
+            mem: MemMetrics {
+                total_bytes: 0,
+                available_bytes: 0,
+                used_pct: 0.0,
+            },
+            swap: SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+            disk: vec![],
+            net: vec![],
+            uptime_seconds: 0,
+            psi: Some(PsiMetrics {
+                cpu_some_avg10: 2.40,
+                cpu_some_avg60: 2.13,
+                cpu_some_avg300: 1.40,
+                mem_some_avg10: 0.0,
+                mem_some_avg60: 0.0,
+                mem_some_avg300: 0.0,
+                mem_full_avg10: 0.0,
+                mem_full_avg60: 0.0,
+                mem_full_avg300: 0.0,
+                io_some_avg10: 0.50,
+                io_some_avg60: 0.01,
+                io_some_avg300: 0.0,
+                io_full_avg10: 0.30,
+                io_full_avg60: 0.0,
+                io_full_avg300: 0.0,
+            }),
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        assert!(json.get("psi").is_some(), "psi should be present when Some");
+        assert_eq!(json["psi"]["cpu_some_avg10"], 2.40);
+        assert_eq!(json["psi"]["cpu_some_avg60"], 2.13);
+        assert_eq!(json["psi"]["io_some_avg10"], 0.50);
+        assert_eq!(json["psi"]["io_full_avg10"], 0.30);
     }
 }
