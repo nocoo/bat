@@ -10,7 +10,7 @@ crons = ["0 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "bat-db"
-database_id = "placeholder-replace-with-real-id"
+database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 
 [vars]
 ENVIRONMENT = "development"
@@ -23,8 +23,8 @@ name = "bat-worker"
 
 [[env.production.d1_databases]]
 binding = "DB"
-database_name = "bat-db-prod"
-database_id = "placeholder-replace-with-prod-id"
+database_name = "bat-db"
+database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 
 [env.production.vars]
 ENVIRONMENT = "production"
