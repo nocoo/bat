@@ -13,7 +13,7 @@ pub fn compute_rate(prev: u64, curr: u64, interval_secs: u64) -> f64 {
 /// Compute counter delta, handling u64 wrap.
 ///
 /// If `curr < prev`, the counter wrapped around u64::MAX.
-pub fn compute_delta(prev: u64, curr: u64) -> u64 {
+pub const fn compute_delta(prev: u64, curr: u64) -> u64 {
     if curr >= prev {
         curr - prev
     } else {

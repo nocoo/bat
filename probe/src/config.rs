@@ -31,7 +31,7 @@ pub struct NetworkConfig {
     pub exclude_interfaces: Vec<String>,
 }
 
-fn default_interval() -> u32 {
+const fn default_interval() -> u32 {
     DEFAULT_INTERVAL
 }
 

@@ -12,7 +12,7 @@ pub struct CpuJiffies {
 }
 
 impl CpuJiffies {
-    fn total(&self) -> u64 {
+    const fn total(&self) -> u64 {
         self.user
             + self.nice
             + self.system
