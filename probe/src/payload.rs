@@ -54,6 +54,9 @@ pub struct MemMetrics {
     pub total_bytes: u64,
     pub available_bytes: u64,
     pub used_pct: f64,
+    /// Tier 3: OOM kills since last sample (delta from `/proc/vmstat` `oom_kill`)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oom_kills_delta: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -307,6 +310,7 @@ mod tests {
                 total_bytes: 4_000_000_000,
                 available_bytes: 2_000_000_000,
                 used_pct: 50.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: 2_000_000_000,
@@ -424,6 +428,7 @@ mod tests {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -690,6 +695,7 @@ mod tests {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -776,6 +782,7 @@ mod tests {
                 total_bytes: u64::MAX,
                 available_bytes: 0,
                 used_pct: 100.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: u64::MAX,
@@ -862,6 +869,7 @@ mod tests {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -906,6 +914,7 @@ mod tests {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
+                oom_kills_delta: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -943,5 +952,97 @@ mod tests {
         assert_eq!(json["psi"]["cpu_some_avg60"], 2.13);
         assert_eq!(json["psi"]["io_some_avg10"], 0.50);
         assert_eq!(json["psi"]["io_full_avg10"], 0.30);
+    }
+
+    #[test]
+    fn metrics_payload_oom_kills_none_omitted() {
+        let payload = MetricsPayload {
+            probe_version: "0.3.0".into(),
+            host_id: "h".into(),
+            timestamp: 0,
+            interval: 30,
+            cpu: CpuMetrics {
+                load1: 0.0,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 0.0,
+                iowait_pct: 0.0,
+                steal_pct: 0.0,
+                count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
+            },
+            mem: MemMetrics {
+                total_bytes: 1000,
+                available_bytes: 500,
+                used_pct: 50.0,
+                oom_kills_delta: None,
+            },
+            swap: SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+            disk: vec![],
+            net: vec![],
+            uptime_seconds: 0,
+            psi: None,
+            disk_io: None,
+            tcp: None,
+            fd: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        let mem = json["mem"].as_object().unwrap();
+        assert!(
+            !mem.contains_key("oom_kills_delta"),
+            "oom_kills_delta should be omitted when None"
+        );
+    }
+
+    #[test]
+    fn metrics_payload_oom_kills_some_serialized() {
+        let payload = MetricsPayload {
+            probe_version: "0.3.0".into(),
+            host_id: "h".into(),
+            timestamp: 0,
+            interval: 30,
+            cpu: CpuMetrics {
+                load1: 0.0,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 0.0,
+                iowait_pct: 0.0,
+                steal_pct: 0.0,
+                count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
+            },
+            mem: MemMetrics {
+                total_bytes: 1000,
+                available_bytes: 500,
+                used_pct: 50.0,
+                oom_kills_delta: Some(2),
+            },
+            swap: SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+            disk: vec![],
+            net: vec![],
+            uptime_seconds: 0,
+            psi: None,
+            disk_io: None,
+            tcp: None,
+            fd: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json["mem"]["oom_kills_delta"], 2);
     }
 }

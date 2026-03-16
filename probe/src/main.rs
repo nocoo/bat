@@ -85,6 +85,7 @@ async fn main() {
     let mut prev_net_counters =
         collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
     let mut prev_disk_io = collectors::disk_io::read_diskstats().ok();
+    let mut prev_oom_kills = collectors::memory::read_oom_kill();
 
     let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
@@ -113,6 +114,7 @@ async fn main() {
                     &mut prev_jiffies,
                     &mut prev_net_counters,
                     &mut prev_disk_io,
+                    &mut prev_oom_kills,
                     &mut last_sample_at,
                 );
 
@@ -187,6 +189,7 @@ fn spawn_tier2_task(sender: Sender, host_id: Arc<str>) {
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(clippy::too_many_arguments)]
 fn collect_metrics(
     host_id: &str,
     cfg: &config::Config,
@@ -194,6 +197,7 @@ fn collect_metrics(
     prev_jiffies: &mut Option<CpuJiffies>,
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
     prev_disk_io: &mut Option<Vec<collectors::disk_io::DiskIoCounters>>,
+    prev_oom_kills: &mut Option<u64>,
     last_sample_at: &mut tokio::time::Instant,
 ) -> payload::MetricsPayload {
     let now = tokio::time::Instant::now();
@@ -216,7 +220,10 @@ fn collect_metrics(
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
-    let (mem, swap) = orchestrate::build_mem_swap_metrics(mem_info.as_ref());
+    let curr_oom_kills = collectors::memory::read_oom_kill();
+    let oom_kills_delta = orchestrate::compute_oom_delta(*prev_oom_kills, curr_oom_kills);
+    *prev_oom_kills = curr_oom_kills;
+    let (mem, swap) = orchestrate::build_mem_swap_metrics(mem_info.as_ref(), oom_kills_delta);
 
     // Disk
     let disk = orchestrate::convert_disk_infos(
