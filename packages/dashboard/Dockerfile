@@ -39,7 +39,7 @@ FROM oven/bun:1 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=7020
+ENV PORT=7041
 
 # Copy built assets and dependencies
 COPY --from=builder /app/packages/dashboard/.next/standalone ./
@@ -49,6 +49,6 @@ COPY --from=builder /app/packages/dashboard/public ./packages/dashboard/public
 # Copy probe install script (served via /api/probe/install.sh)
 COPY probe/install.sh ./probe-assets/install.sh
 
-EXPOSE 7020
+EXPOSE 7041
 
 CMD ["bun", "packages/dashboard/server.js"]
