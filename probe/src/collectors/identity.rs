@@ -179,4 +179,28 @@ VERSION_ID="12"
     fn parse_uptime_small() {
         assert_eq!(parse_uptime("0.01 0.00\n"), 0);
     }
+
+    #[test]
+    fn get_arch_returns_nonempty() {
+        let arch = get_arch();
+        assert!(!arch.is_empty());
+        assert_ne!(arch, "unknown");
+    }
+
+    #[test]
+    fn parse_hostname_empty() {
+        assert_eq!(parse_hostname(""), "");
+    }
+
+    #[test]
+    fn parse_os_release_single_quoted() {
+        // Single quotes are not stripped — only double quotes are
+        let content = "PRETTY_NAME='Alpine Linux'\n";
+        assert_eq!(parse_os_release(content), "'Alpine Linux'");
+    }
+
+    #[test]
+    fn parse_uptime_non_numeric() {
+        assert_eq!(parse_uptime("not_a_number\n"), 0);
+    }
 }
