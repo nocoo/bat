@@ -6,6 +6,9 @@ use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
     CpuMetrics, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric, SwapMetrics,
+    Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages, Tier2FailedService,
+    Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports,
+    Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -157,6 +160,160 @@ pub fn build_identity_payload(
         cpu_model: cpu_model.to_string(),
         uptime_seconds,
         boot_time,
+    }
+}
+
+// --- Tier 2 conversion functions ---
+
+use crate::collectors::tier2::disk_deep::DiskDeepScanInfo;
+use crate::collectors::tier2::docker::DockerStatusInfo;
+use crate::collectors::tier2::ports::ListeningPort;
+use crate::collectors::tier2::security::SecurityPostureInfo;
+use crate::collectors::tier2::systemd::SystemdServicesInfo;
+use crate::collectors::tier2::updates::PackageUpdatesInfo;
+
+/// Convert collector ports to payload ports.
+pub fn convert_ports(ports: Vec<ListeningPort>) -> Tier2Ports {
+    Tier2Ports {
+        listening: ports
+            .into_iter()
+            .map(|p| Tier2ListeningPort {
+                port: p.port,
+                bind: p.bind,
+                protocol: p.protocol,
+                pid: p.pid,
+                process: p.process,
+            })
+            .collect(),
+    }
+}
+
+/// Convert collector updates to payload updates.
+pub fn convert_updates(info: PackageUpdatesInfo) -> Tier2Updates {
+    Tier2Updates {
+        total_count: info.total_count,
+        security_count: info.security_count,
+        list: info
+            .list
+            .into_iter()
+            .map(|u| Tier2PackageUpdate {
+                name: u.name,
+                current_version: u.current_version,
+                new_version: u.new_version,
+                is_security: u.is_security,
+            })
+            .collect(),
+        reboot_required: info.reboot_required,
+        cache_age_seconds: info.cache_age_seconds,
+    }
+}
+
+/// Convert collector systemd to payload systemd.
+pub fn convert_systemd(info: SystemdServicesInfo) -> Tier2Systemd {
+    Tier2Systemd {
+        failed_count: info.failed_count,
+        failed: info
+            .failed
+            .into_iter()
+            .map(|s| Tier2FailedService {
+                unit: s.unit,
+                load_state: s.load_state,
+                active_state: s.active_state,
+                sub_state: s.sub_state,
+                description: s.description,
+            })
+            .collect(),
+    }
+}
+
+/// Convert collector security to payload security.
+pub fn convert_security(info: SecurityPostureInfo) -> Tier2Security {
+    Tier2Security {
+        ssh_password_auth: info.ssh_password_auth,
+        ssh_root_login: info.ssh_root_login,
+        ssh_failed_logins_7d: info.ssh_failed_logins_7d,
+        firewall_active: info.firewall_active,
+        firewall_default_policy: info.firewall_default_policy,
+        fail2ban_active: info.fail2ban_active,
+        fail2ban_banned_count: info.fail2ban_banned_count,
+        unattended_upgrades_active: info.unattended_upgrades_active,
+    }
+}
+
+/// Convert collector docker to payload docker.
+pub fn convert_docker(info: DockerStatusInfo) -> Tier2Docker {
+    Tier2Docker {
+        installed: info.installed,
+        version: info.version,
+        containers: info
+            .containers
+            .into_iter()
+            .map(|c| Tier2DockerContainer {
+                id: c.id,
+                name: c.name,
+                image: c.image,
+                status: c.status,
+                state: c.state,
+                cpu_pct: c.cpu_pct,
+                mem_bytes: c.mem_bytes,
+                restart_count: c.restart_count,
+                started_at: c.started_at,
+            })
+            .collect(),
+        images: info.images.map(|i| Tier2DockerImages {
+            total_count: i.total_count,
+            total_bytes: i.total_bytes,
+            reclaimable_bytes: i.reclaimable_bytes,
+        }),
+    }
+}
+
+/// Convert collector disk deep to payload disk deep.
+pub fn convert_disk_deep(info: DiskDeepScanInfo) -> Tier2DiskDeep {
+    Tier2DiskDeep {
+        top_dirs: info
+            .top_dirs
+            .into_iter()
+            .map(|d| Tier2TopDir {
+                path: d.path,
+                size_bytes: d.size_bytes,
+            })
+            .collect(),
+        journal_bytes: info.journal_bytes,
+        large_files: info
+            .large_files
+            .into_iter()
+            .map(|f| Tier2LargeFile {
+                path: f.path,
+                size_bytes: f.size_bytes,
+            })
+            .collect(),
+    }
+}
+
+/// Build a [`Tier2Payload`] from collected tier 2 data.
+#[allow(clippy::too_many_arguments)]
+pub fn build_tier2_payload(
+    probe_version: &str,
+    host_id: &str,
+    timestamp: u64,
+    ports: Option<Tier2Ports>,
+    updates: Option<Tier2Updates>,
+    systemd: Option<Tier2Systemd>,
+    security: Option<Tier2Security>,
+    docker: Option<Tier2Docker>,
+    disk_deep: Option<Tier2DiskDeep>,
+) -> Tier2Payload {
+    Tier2Payload {
+        probe_version: probe_version.to_string(),
+        host_id: host_id.to_string(),
+        timestamp,
+        ports,
+        updates,
+        systemd,
+        security,
+        docker,
+        disk_deep,
     }
 }
 

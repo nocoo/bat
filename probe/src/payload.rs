@@ -69,6 +69,149 @@ pub struct IdentityPayload {
     pub boot_time: u64,
 }
 
+// --- Tier 2 payload types ---
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Payload {
+    pub probe_version: String,
+    pub host_id: String,
+    pub timestamp: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ports: Option<Tier2Ports>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub updates: Option<Tier2Updates>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub systemd: Option<Tier2Systemd>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub security: Option<Tier2Security>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub docker: Option<Tier2Docker>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disk_deep: Option<Tier2DiskDeep>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2ListeningPort {
+    pub port: u16,
+    pub bind: String,
+    pub protocol: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub process: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Ports {
+    pub listening: Vec<Tier2ListeningPort>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2PackageUpdate {
+    pub name: String,
+    pub current_version: String,
+    pub new_version: String,
+    pub is_security: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Updates {
+    pub total_count: u32,
+    pub security_count: u32,
+    pub list: Vec<Tier2PackageUpdate>,
+    pub reboot_required: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_age_seconds: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2FailedService {
+    pub unit: String,
+    pub load_state: String,
+    pub active_state: String,
+    pub sub_state: String,
+    pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Systemd {
+    pub failed_count: u32,
+    pub failed: Vec<Tier2FailedService>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Security {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_password_auth: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_root_login: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ssh_failed_logins_7d: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firewall_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub firewall_default_policy: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fail2ban_active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fail2ban_banned_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unattended_upgrades_active: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2DockerContainer {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub status: String,
+    pub state: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_pct: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mem_bytes: Option<u64>,
+    pub restart_count: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2DockerImages {
+    pub total_count: u32,
+    pub total_bytes: u64,
+    pub reclaimable_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Docker {
+    pub installed: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub containers: Vec<Tier2DockerContainer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub images: Option<Tier2DockerImages>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2TopDir {
+    pub path: String,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2LargeFile {
+    pub path: String,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2DiskDeep {
+    pub top_dirs: Vec<Tier2TopDir>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub journal_bytes: Option<u64>,
+    pub large_files: Vec<Tier2LargeFile>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
