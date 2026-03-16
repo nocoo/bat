@@ -80,6 +80,15 @@ require_root() {
     fi
 }
 
+# Escape a string for use as a TOML basic string value (between double quotes).
+# Handles: backslash, double-quote, dollar signs, and control characters.
+escape_toml() {
+    local val="$1"
+    val="${val//\\/\\\\}"   # \ → \\
+    val="${val//\"/\\\"}"   # " → \"
+    printf '%s' "$val"
+}
+
 detect_arch() {
     local arch
     arch="$(uname -m)"
@@ -166,13 +175,18 @@ do_install() {
 
     # Write config
     mkdir -p "${CONFIG_DIR}"
+    chown bat:bat "${CONFIG_DIR}"
     if [[ -f "${CONFIG_FILE}" && "$FORCE_CONFIG" != true ]]; then
         warn "Config already exists at ${CONFIG_FILE} — skipping (use --force-config to overwrite)"
     else
+        local escaped_url escaped_key
+        escaped_url="$(escape_toml "$WORKER_URL")"
+        escaped_key="$(escape_toml "$WRITE_KEY")"
         cat > "${CONFIG_FILE}" <<TOML
-worker_url = "${WORKER_URL}"
-write_key = "${WRITE_KEY}"
+worker_url = "${escaped_url}"
+write_key = "${escaped_key}"
 TOML
+        chown bat:bat "${CONFIG_FILE}"
         chmod 600 "${CONFIG_FILE}"
         ok "Config written to ${CONFIG_FILE}"
     fi

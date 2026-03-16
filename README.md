@@ -88,11 +88,17 @@ wrangler deploy --env production
 docker build -f packages/dashboard/Dockerfile .
 ```
 
-Required environment variables: `BAT_API_URL`, `BAT_READ_KEY`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS`.
+Required environment variables: `BAT_API_URL`, `BAT_READ_KEY`, `BAT_WRITE_KEY`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS`.
+
+Optional: `PROBE_BIN_DIR` (path to precompiled probe binaries, default `/app/probe-bin`).
 
 ### Probe (systemd)
 
 ```bash
+# One-liner install from dashboard Setup page:
+curl -fsSL https://<dashboard>/api/probe/install.sh | bash -s -- --url <worker_url> --key <write_key>
+
+# Or build manually:
 cd probe && cargo build --release
 # Copy binary and config to target host
 # Install systemd unit from probe/dist/bat-probe.service
