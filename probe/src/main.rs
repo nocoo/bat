@@ -117,14 +117,11 @@ async fn collect_and_send(
 
     // CPU usage (delta from previous jiffies)
     let curr_jiffies = collectors::cpu::read_jiffies().ok();
-    let (usage_pct, iowait_pct, steal_pct) = match (&*prev_jiffies, &curr_jiffies) {
-        (Some(prev), Some(curr)) => collectors::cpu::compute_cpu_usage(prev, curr),
-        _ => (0.0, 0.0, 0.0),
-    };
+    let cpu_usage = compute_cpu_delta(prev_jiffies.as_ref(), curr_jiffies.as_ref());
     *prev_jiffies = curr_jiffies;
 
     // Load averages
-    let (load1, load5, load15) = collectors::cpu::read_loadavg().unwrap_or((0.0, 0.0, 0.0));
+    let loadavg = collectors::cpu::read_loadavg().unwrap_or((0.0, 0.0, 0.0));
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
@@ -138,13 +135,7 @@ async fn collect_and_send(
 
     // Network (delta from previous counters)
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
-    let net: Vec<NetMetric> =
-        match (&*prev_net_counters, &curr_net) {
-            (Some(prev), Some(curr)) => convert_net_infos(
-                collectors::network::compute_net_metrics(prev, curr, u64::from(cfg.interval)),
-            ),
-            _ => vec![],
-        };
+    let net = compute_net_delta(prev_net_counters.as_ref(), curr_net.as_ref(), cfg.interval);
     *prev_net_counters = curr_net;
 
     // Uptime
@@ -155,8 +146,8 @@ async fn collect_and_send(
         timestamp,
         cfg.interval,
         cpu_count,
-        (usage_pct, iowait_pct, steal_pct),
-        (load1, load5, load15),
+        cpu_usage,
+        loadavg,
         mem,
         swap,
         disk,
@@ -197,6 +188,30 @@ async fn send_identity(sender: &Sender, host_id: &str) {
 
     if let Err(e) = sender.post("/api/identity", &payload).await {
         tracing::error!(error = %e, "failed to send identity");
+    }
+}
+
+/// Compute CPU usage delta from optional previous and current jiffies.
+fn compute_cpu_delta(prev: Option<&CpuJiffies>, curr: Option<&CpuJiffies>) -> (f64, f64, f64) {
+    match (prev, curr) {
+        (Some(p), Some(c)) => collectors::cpu::compute_cpu_usage(p, c),
+        _ => (0.0, 0.0, 0.0),
+    }
+}
+
+/// Compute network metrics delta from optional previous and current counters.
+fn compute_net_delta(
+    prev: Option<&HashMap<String, NetCounters>>,
+    curr: Option<&HashMap<String, NetCounters>>,
+    interval: u32,
+) -> Vec<NetMetric> {
+    match (prev, curr) {
+        (Some(p), Some(c)) => convert_net_infos(collectors::network::compute_net_metrics(
+            p,
+            c,
+            u64::from(interval),
+        )),
+        _ => vec![],
     }
 }
 
@@ -525,5 +540,98 @@ mod tests {
     #[test]
     fn compute_boot_time_zero_uptime() {
         assert_eq!(compute_boot_time(1_700_000_000, 0), 1_700_000_000);
+    }
+
+    #[test]
+    fn compute_cpu_delta_with_both() {
+        let prev = CpuJiffies {
+            user: 10000,
+            nice: 200,
+            system: 3000,
+            idle: 40000,
+            ..Default::default()
+        };
+        let curr = CpuJiffies {
+            user: 11000,
+            nice: 200,
+            system: 3500,
+            idle: 45000,
+            ..Default::default()
+        };
+        let (usage, _, _) = compute_cpu_delta(Some(&prev), Some(&curr));
+        assert!(usage > 0.0);
+    }
+
+    #[test]
+    fn compute_cpu_delta_missing_prev() {
+        let curr = CpuJiffies {
+            user: 11000,
+            ..Default::default()
+        };
+        let (usage, iowait, steal) = compute_cpu_delta(None, Some(&curr));
+        assert_eq!(usage, 0.0);
+        assert_eq!(iowait, 0.0);
+        assert_eq!(steal, 0.0);
+    }
+
+    #[test]
+    fn compute_cpu_delta_missing_curr() {
+        let prev = CpuJiffies {
+            user: 10000,
+            ..Default::default()
+        };
+        let (usage, iowait, steal) = compute_cpu_delta(Some(&prev), None);
+        assert_eq!(usage, 0.0);
+        assert_eq!(iowait, 0.0);
+        assert_eq!(steal, 0.0);
+    }
+
+    #[test]
+    fn compute_cpu_delta_both_none() {
+        let (usage, iowait, steal) = compute_cpu_delta(None, None);
+        assert_eq!(usage, 0.0);
+        assert_eq!(iowait, 0.0);
+        assert_eq!(steal, 0.0);
+    }
+
+    #[test]
+    fn compute_net_delta_with_both() {
+        use collectors::network::NetCounters;
+        let mut prev = HashMap::new();
+        prev.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 1000,
+                tx_bytes: 2000,
+                ..Default::default()
+            },
+        );
+        let mut curr = HashMap::new();
+        curr.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 4000,
+                tx_bytes: 5000,
+                ..Default::default()
+            },
+        );
+        let metrics = compute_net_delta(Some(&prev), Some(&curr), 30);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].iface, "eth0");
+    }
+
+    #[test]
+    fn compute_net_delta_missing_prev() {
+        use collectors::network::NetCounters;
+        let mut curr = HashMap::new();
+        curr.insert("eth0".to_string(), NetCounters::default());
+        let metrics = compute_net_delta(None, Some(&curr), 30);
+        assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn compute_net_delta_both_none() {
+        let metrics = compute_net_delta(None, None, 30);
+        assert!(metrics.is_empty());
     }
 }
