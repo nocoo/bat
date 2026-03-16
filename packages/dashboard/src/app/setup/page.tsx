@@ -8,14 +8,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useSetup } from "@/lib/hooks";
 import { AlertTriangle, ChevronRight, Terminal } from "lucide-react";
 
+/** Escape a string for use inside single quotes in a shell command. */
+function shellEscape(s: string): string {
+	return s.replace(/'/g, "'\\''");
+}
+
 export default function SetupPage() {
 	const { data: config, error, isLoading } = useSetup();
 
 	const installCmd =
 		config &&
 		`curl -fsSL ${config.dashboard_url}/api/probe/install.sh | bash -s -- \\
-  --url ${config.worker_url} \\
-  --key ${config.write_key}`;
+  --url '${shellEscape(config.worker_url)}' \\
+  --key '${shellEscape(config.write_key)}'`;
 
 	const uninstallCmd =
 		config && `curl -fsSL ${config.dashboard_url}/api/probe/install.sh | bash -s -- --uninstall`;

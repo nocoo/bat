@@ -19,8 +19,19 @@ export async function GET(req: Request) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 
-	const workerUrl = process.env.BAT_API_URL || "";
-	const writeKey = process.env.BAT_WRITE_KEY || "";
+	const workerUrl = process.env.BAT_API_URL;
+	const writeKey = process.env.BAT_WRITE_KEY;
+
+	const missing: string[] = [];
+	if (!workerUrl) missing.push("BAT_API_URL");
+	if (!writeKey) missing.push("BAT_WRITE_KEY");
+	if (missing.length > 0) {
+		return Response.json(
+			{ error: `Missing required environment variables: ${missing.join(", ")}` },
+			{ status: 503 },
+		);
+	}
+
 	const dashboardUrl = getDashboardUrl(req);
 
 	return Response.json({
