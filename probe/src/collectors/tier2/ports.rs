@@ -254,6 +254,7 @@ pub fn read_listening_ports_from(
 }
 
 /// Read listening ports from production paths.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_listening_ports() -> Vec<ListeningPort> {
     read_listening_ports_from(
         Path::new("/proc/net/tcp"),

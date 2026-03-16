@@ -287,6 +287,7 @@ const fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
 /// Collect Docker status from the system.
 ///
 /// Returns `None` if Docker is not installed.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_docker_status() -> Option<DockerStatusInfo> {
     // Check if Docker socket exists
     if !docker_socket_exists(Path::new("/var/run/docker.sock")) {
@@ -527,5 +528,158 @@ mod tests {
     #[test]
     fn iso8601_not_started() {
         assert!(parse_iso8601_to_unix("0001-01-01T00:00:00Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_no_t_separator() {
+        assert!(parse_iso8601_to_unix("2024-01-15 10:30:00Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_bad_date_parts() {
+        // Only two date components
+        assert!(parse_iso8601_to_unix("2024-01T10:30:00Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_bad_time_parts() {
+        // Only two time components
+        assert!(parse_iso8601_to_unix("2024-01-15T10:30Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_non_numeric_fields() {
+        assert!(parse_iso8601_to_unix("abcd-01-15T10:30:00Z").is_none());
+        assert!(parse_iso8601_to_unix("2024-xx-15T10:30:00Z").is_none());
+        assert!(parse_iso8601_to_unix("2024-01-15Txx:30:00Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_pre_epoch() {
+        // 1960-01-01T00:00:00Z is before Unix epoch → negative → None
+        assert!(parse_iso8601_to_unix("1960-01-01T00:00:00Z").is_none());
+    }
+
+    #[test]
+    fn iso8601_with_fractional_seconds() {
+        // Should parse fine, ignoring the fractional part
+        let ts = parse_iso8601_to_unix("2024-06-15T12:00:00.999999Z");
+        assert!(ts.is_some());
+    }
+
+    #[test]
+    fn iso8601_epoch() {
+        // Exactly the Unix epoch
+        let ts = parse_iso8601_to_unix("1970-01-01T00:00:00Z");
+        assert_eq!(ts, Some(0));
+    }
+
+    #[test]
+    fn parse_docker_stats_invalid_json_line() {
+        let output = "not valid json\n";
+        assert!(parse_docker_stats(output).is_empty());
+    }
+
+    #[test]
+    fn parse_docker_stats_missing_fields() {
+        // JSON with no ID or Name → nothing inserted
+        let output = r#"{"CPUPerc":"1.0%","MemUsage":"128MiB / 2GiB"}"#;
+        let stats = parse_docker_stats(output);
+        assert!(stats.is_empty());
+    }
+
+    #[test]
+    fn parse_docker_stats_name_keyed() {
+        let output =
+            r#"{"ID":"","Name":"mycontainer","CPUPerc":"3.5%","MemUsage":"512MiB / 8GiB"}"#;
+        let stats = parse_docker_stats(output);
+        assert!(stats.contains_key("mycontainer"));
+        assert!(!stats.contains_key(""));
+        let (cpu, mem) = stats["mycontainer"];
+        assert!((cpu - 3.5).abs() < f64::EPSILON);
+        assert_eq!(mem, 512 * 1024 * 1024);
+    }
+
+    #[test]
+    fn parse_docker_system_df_numeric_total_count() {
+        // TotalCount as JSON number instead of string
+        let output = r#"{"Active":"2","Reclaimable":"0B","Size":"1GiB","TotalCount":7,"Type":"Images","UniqueSize":"1GiB"}"#;
+        let info = parse_docker_system_df(output).unwrap();
+        assert_eq!(info.total_count, 7);
+    }
+
+    #[test]
+    fn parse_docker_system_df_invalid_json() {
+        assert!(parse_docker_system_df("not json\n").is_none());
+    }
+
+    #[test]
+    fn parse_docker_ps_missing_fields() {
+        // Minimal JSON with no recognized keys
+        let output = r#"{"foo":"bar"}"#;
+        let containers = parse_docker_ps(output);
+        assert_eq!(containers.len(), 1);
+        assert_eq!(containers[0].id, "");
+        assert_eq!(containers[0].name, "");
+    }
+
+    #[test]
+    fn parse_container_inspect_not_array() {
+        // Valid JSON but not an array
+        assert!(parse_container_inspect(r#"{"RestartCount": 1}"#).is_none());
+    }
+
+    #[test]
+    fn parse_container_inspect_no_restart_count() {
+        // Array with object missing RestartCount → defaults to 0
+        let json = r#"[{"State": {"StartedAt": "2024-01-15T10:30:00Z"}}]"#;
+        let (restart_count, started_at) = parse_container_inspect(json).unwrap();
+        assert_eq!(restart_count, 0);
+        assert!(started_at.is_some());
+    }
+
+    #[test]
+    fn parse_size_string_binary_tib() {
+        assert_eq!(parse_size_string_binary("1TiB"), 1024 * 1024 * 1024 * 1024);
+    }
+
+    #[test]
+    fn parse_size_string_binary_decimal_suffixes() {
+        assert_eq!(parse_size_string_binary("1TB"), 1_000_000_000_000);
+        assert_eq!(parse_size_string_binary("1GB"), 1_000_000_000);
+        assert_eq!(parse_size_string_binary("1MB"), 1_000_000);
+        assert_eq!(parse_size_string_binary("1kB"), 1000);
+    }
+
+    #[test]
+    fn parse_size_string_binary_unknown_suffix() {
+        assert_eq!(parse_size_string_binary("100XB"), 0);
+    }
+
+    #[test]
+    fn parse_size_string_binary_empty() {
+        assert_eq!(parse_size_string_binary(""), 0);
+    }
+
+    #[test]
+    fn parse_mem_usage_no_slash() {
+        // Just a raw size without " / total"
+        assert_eq!(parse_mem_usage("128MiB"), 128 * 1024 * 1024);
+    }
+
+    #[test]
+    fn docker_socket_exists_existing_path() {
+        // /tmp always exists on macOS/Linux
+        assert!(docker_socket_exists(Path::new("/tmp")));
+    }
+
+    #[test]
+    fn days_from_civil_leap_year() {
+        // 2024-02-29 is valid (leap year)
+        let ts = parse_iso8601_to_unix("2024-02-29T00:00:00Z");
+        assert!(ts.is_some());
+        // 2024-03-01 should be exactly 1 day later
+        let ts_march = parse_iso8601_to_unix("2024-03-01T00:00:00Z").unwrap();
+        assert_eq!(ts_march - ts.unwrap(), 86400);
     }
 }

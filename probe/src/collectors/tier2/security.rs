@@ -234,6 +234,7 @@ pub fn read_sshd_config_from(
 }
 
 /// Collect the full security posture from the system.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_security_posture() -> SecurityPostureInfo {
     // SSH config
     let (ssh_password_auth, ssh_root_login) = read_sshd_config_from(
@@ -556,5 +557,39 @@ target     prot opt source               destination
         );
         assert_eq!(pa, None);
         assert_eq!(rl, None);
+    }
+
+    #[test]
+    fn read_sshd_config_from_with_include_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let main_path = dir.path().join("sshd_config");
+        let conf_dir = dir.path().join("sshd_config.d");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+
+        std::fs::write(
+            &main_path,
+            "Include /etc/ssh/sshd_config.d/*.conf\nPermitRootLogin yes\n",
+        )
+        .unwrap();
+        std::fs::write(
+            conf_dir.join("50-cloud-init.conf"),
+            "PasswordAuthentication no\n",
+        )
+        .unwrap();
+
+        let (pa, rl) = read_sshd_config_from(&main_path, &conf_dir);
+        assert_eq!(pa, Some(false)); // include processed first
+        assert_eq!(rl, Some("yes".into()));
+    }
+
+    #[test]
+    fn resolve_sshd_config_no_include_appends() {
+        // When main has no Include directive, includes are appended at end
+        let main = "PermitRootLogin prohibit-password\n";
+        let includes = vec!["PasswordAuthentication no\n".to_string()];
+        let (pa, rl) = resolve_sshd_config(main, &includes);
+        // Main has no PasswordAuthentication, so include's "no" wins
+        assert_eq!(pa, Some(false));
+        assert_eq!(rl, Some("prohibit-password".into()));
     }
 }

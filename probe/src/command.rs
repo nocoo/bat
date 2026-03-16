@@ -165,4 +165,20 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap().trim(), "test");
     }
+
+    #[test]
+    fn command_exists_absolute_path() {
+        // /bin/echo should exist on all Unix systems
+        assert!(command_exists("/bin/echo") || command_exists("/usr/bin/echo"));
+        assert!(!command_exists("/nonexistent_path_xyz/fake_binary"));
+    }
+
+    #[test]
+    fn command_error_display_io() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+        let err = CommandError::Io(io_err);
+        let msg = format!("{err}");
+        assert!(msg.contains("io error"));
+        assert!(msg.contains("access denied"));
+    }
 }

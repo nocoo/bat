@@ -20,6 +20,9 @@ wiremock = "0.6"
 tempfile = "3"
 tokio = { version = "1", features = ["test-util"] }
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage_nightly)'] }
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 nursery = { level = "warn", priority = -1 }

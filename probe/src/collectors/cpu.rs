@@ -124,6 +124,7 @@ pub fn read_jiffies_from(path: &str) -> Result<CpuJiffies, String> {
 }
 
 /// Read aggregate CPU jiffies from `/proc/stat`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_jiffies() -> Result<CpuJiffies, String> {
     read_jiffies_from("/proc/stat")
 }
@@ -135,6 +136,7 @@ pub fn read_loadavg_from(path: &str) -> Result<(f64, f64, f64), String> {
 }
 
 /// Read load averages from `/proc/loadavg`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_loadavg() -> Result<(f64, f64, f64), String> {
     read_loadavg_from("/proc/loadavg")
 }
@@ -151,6 +153,7 @@ pub fn read_cpu_count_from(path: &str) -> Result<u32, String> {
 }
 
 /// Read CPU core count from `/proc/cpuinfo`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_cpu_count() -> Result<u32, String> {
     read_cpu_count_from("/proc/cpuinfo")
 }
@@ -162,6 +165,7 @@ pub fn read_cpu_model_from(path: &str) -> Result<String, String> {
 }
 
 /// Read CPU model from `/proc/cpuinfo`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_cpu_model() -> Result<String, String> {
     read_cpu_model_from("/proc/cpuinfo")
 }
