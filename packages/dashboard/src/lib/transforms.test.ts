@@ -8,8 +8,11 @@ import {
 	getTimeFormatter,
 	transformCpuData,
 	transformDiskData,
+	transformDiskIoData,
 	transformMemData,
 	transformNetData,
+	transformPsiData,
+	transformTcpData,
 } from "./transforms";
 
 function makePoint(overrides: Partial<MetricsDataPoint> = {}): MetricsDataPoint {
@@ -37,6 +40,34 @@ function makePoint(overrides: Partial<MetricsDataPoint> = {}): MetricsDataPoint 
 		net_rx_errors: null,
 		net_tx_errors: null,
 		uptime_seconds: null,
+		// Tier 3 fields
+		psi_cpu_some_avg10: null,
+		psi_cpu_some_avg60: null,
+		psi_cpu_some_avg300: null,
+		psi_mem_some_avg10: null,
+		psi_mem_some_avg60: null,
+		psi_mem_some_avg300: null,
+		psi_mem_full_avg10: null,
+		psi_mem_full_avg60: null,
+		psi_mem_full_avg300: null,
+		psi_io_some_avg10: null,
+		psi_io_some_avg60: null,
+		psi_io_some_avg300: null,
+		psi_io_full_avg10: null,
+		psi_io_full_avg60: null,
+		psi_io_full_avg300: null,
+		disk_io_json: null,
+		tcp_established: null,
+		tcp_time_wait: null,
+		tcp_orphan: null,
+		tcp_allocated: null,
+		context_switches_sec: null,
+		forks_sec: null,
+		procs_running: null,
+		procs_blocked: null,
+		oom_kills: null,
+		fd_allocated: null,
+		fd_max: null,
 		...overrides,
 	};
 }
@@ -174,5 +205,82 @@ describe("formatBytes", () => {
 		expect(formatBytes(1048576)).toBe("1.0 MB");
 		expect(formatBytes(1073741824)).toBe("1.0 GB");
 		expect(formatBytes(1099511627776)).toBe("1.0 TB");
+	});
+});
+
+// --- Tier 3 transforms ---
+
+describe("transformPsiData", () => {
+	test("extracts PSI avg60 fields", () => {
+		const result = transformPsiData([
+			makePoint({
+				ts: 100,
+				psi_cpu_some_avg60: 5.2,
+				psi_mem_some_avg60: 1.3,
+				psi_io_some_avg60: 0.5,
+			}),
+		]);
+		expect(result).toEqual([{ ts: 100, cpu: 5.2, memory: 1.3, io: 0.5 }]);
+	});
+
+	test("returns empty when no PSI data present", () => {
+		expect(transformPsiData([makePoint()])).toEqual([]);
+	});
+
+	test("null fields default to 0", () => {
+		const result = transformPsiData([makePoint({ ts: 100, psi_cpu_some_avg60: 3.0 })]);
+		expect(result).toEqual([{ ts: 100, cpu: 3.0, memory: 0, io: 0 }]);
+	});
+});
+
+describe("transformDiskIoData", () => {
+	test("parses disk_io_json and aggregates", () => {
+		const diskIoJson = JSON.stringify([
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 30,
+			},
+			{
+				device: "sdb",
+				read_iops: 5,
+				write_iops: 15,
+				read_bytes_sec: 512,
+				write_bytes_sec: 1024,
+				io_util_pct: 50,
+			},
+		]);
+		const result = transformDiskIoData([makePoint({ ts: 100, disk_io_json: diskIoJson })]);
+		expect(result).toEqual([{ ts: 100, read_iops: 15, write_iops: 35, io_util_pct: 50 }]);
+	});
+
+	test("returns empty when no disk_io data", () => {
+		expect(transformDiskIoData([makePoint()])).toEqual([]);
+	});
+
+	test("handles invalid JSON gracefully", () => {
+		const result = transformDiskIoData([makePoint({ ts: 100, disk_io_json: "bad" })]);
+		expect(result).toEqual([{ ts: 100, read_iops: 0, write_iops: 0, io_util_pct: 0 }]);
+	});
+});
+
+describe("transformTcpData", () => {
+	test("extracts TCP connection state fields", () => {
+		const result = transformTcpData([
+			makePoint({ ts: 100, tcp_established: 42, tcp_time_wait: 10, tcp_orphan: 2 }),
+		]);
+		expect(result).toEqual([{ ts: 100, established: 42, time_wait: 10, orphan: 2 }]);
+	});
+
+	test("returns empty when no TCP data", () => {
+		expect(transformTcpData([makePoint()])).toEqual([]);
+	});
+
+	test("null fields default to 0", () => {
+		const result = transformTcpData([makePoint({ ts: 100, tcp_established: 5 })]);
+		expect(result).toEqual([{ ts: 100, established: 5, time_wait: 0, orphan: 0 }]);
 	});
 });

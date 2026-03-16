@@ -12,6 +12,10 @@ export const chart = {
 	green: v("chart-4"),
 	lime: v("chart-5"),
 	amber: v("chart-6"),
+	purple: v("chart-7"),
+	orange: v("chart-8"),
+	indigo: v("chart-9"),
+	red: v("chart-10"),
 } as const;
 
 export const chartAxis = v("chart-axis");

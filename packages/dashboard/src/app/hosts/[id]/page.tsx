@@ -1,7 +1,15 @@
 "use client";
 
 import { AlertTable } from "@/components/alert-table";
-import { CpuChart, DiskBars, MemoryChart, NetworkChart } from "@/components/charts";
+import {
+	CpuChart,
+	DiskBars,
+	DiskIoChart,
+	MemoryChart,
+	NetworkChart,
+	PsiChart,
+	TcpChart,
+} from "@/components/charts";
 import { formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -10,7 +18,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
 import { hashHostId } from "@bat/shared";
-import { AlertTriangle, ChevronRight, Info, ShieldAlert } from "lucide-react";
+import { Activity, AlertTriangle, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -136,6 +144,27 @@ export default function HostDetailPage() {
 							/>
 							<DiskBars data={metricsResponse.data} />
 						</div>
+
+						{/* Advanced Metrics (T3) — shown when data is available */}
+						<Collapsible>
+							<CollapsibleTrigger asChild>
+								<button
+									type="button"
+									className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-2"
+								>
+									<ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
+									<Activity className="h-3.5 w-3.5" />
+									Advanced Metrics
+								</button>
+							</CollapsibleTrigger>
+							<CollapsibleContent>
+								<div className="grid gap-4 lg:grid-cols-2 mt-3">
+									<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+									<DiskIoChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+									<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+								</div>
+							</CollapsibleContent>
+						</Collapsible>
 					</div>
 				) : (
 					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
