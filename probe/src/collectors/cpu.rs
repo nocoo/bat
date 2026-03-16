@@ -117,37 +117,53 @@ pub fn parse_cpu_model(content: &str) -> String {
 
 // ── Live readers (require Linux /proc) ──────────────────────────────
 
+/// Read aggregate CPU jiffies from a file (parameterized path for testing).
+pub fn read_jiffies_from(path: &str) -> Result<CpuJiffies, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    parse_stat(&content).ok_or_else(|| format!("failed to parse cpu line from {path}"))
+}
+
 /// Read aggregate CPU jiffies from `/proc/stat`.
 pub fn read_jiffies() -> Result<CpuJiffies, String> {
-    let content =
-        std::fs::read_to_string("/proc/stat").map_err(|e| format!("read /proc/stat: {e}"))?;
-    parse_stat(&content).ok_or_else(|| "failed to parse cpu line from /proc/stat".to_string())
+    read_jiffies_from("/proc/stat")
+}
+
+/// Read load averages from a file (parameterized path for testing).
+pub fn read_loadavg_from(path: &str) -> Result<(f64, f64, f64), String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    parse_loadavg(&content).ok_or_else(|| format!("failed to parse {path}"))
 }
 
 /// Read load averages from `/proc/loadavg`.
 pub fn read_loadavg() -> Result<(f64, f64, f64), String> {
-    let content =
-        std::fs::read_to_string("/proc/loadavg").map_err(|e| format!("read /proc/loadavg: {e}"))?;
-    parse_loadavg(&content).ok_or_else(|| "failed to parse /proc/loadavg".to_string())
+    read_loadavg_from("/proc/loadavg")
 }
 
-/// Read CPU core count from `/proc/cpuinfo`.
-pub fn read_cpu_count() -> Result<u32, String> {
-    let content =
-        std::fs::read_to_string("/proc/cpuinfo").map_err(|e| format!("read /proc/cpuinfo: {e}"))?;
+/// Read CPU core count from a file (parameterized path for testing).
+pub fn read_cpu_count_from(path: &str) -> Result<u32, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
     let count = parse_cpu_count(&content);
     if count == 0 {
-        Err("no processors found in /proc/cpuinfo".to_string())
+        Err(format!("no processors found in {path}"))
     } else {
         Ok(count)
     }
 }
 
+/// Read CPU core count from `/proc/cpuinfo`.
+pub fn read_cpu_count() -> Result<u32, String> {
+    read_cpu_count_from("/proc/cpuinfo")
+}
+
+/// Read CPU model from a file (parameterized path for testing).
+pub fn read_cpu_model_from(path: &str) -> Result<String, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    Ok(parse_cpu_model(&content))
+}
+
 /// Read CPU model from `/proc/cpuinfo`.
 pub fn read_cpu_model() -> Result<String, String> {
-    let content =
-        std::fs::read_to_string("/proc/cpuinfo").map_err(|e| format!("read /proc/cpuinfo: {e}"))?;
-    Ok(parse_cpu_model(&content))
+    read_cpu_model_from("/proc/cpuinfo")
 }
 
 #[cfg(test)]
@@ -343,6 +359,62 @@ cpu MHz\t\t: 2400.000
     fn parse_stat_fewer_than_8_fields() {
         // Only 7 numeric fields — should return None
         assert!(parse_stat("cpu  1 2 3 4 5 6 7\n").is_none());
+    }
+
+    #[test]
+    fn read_jiffies_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("stat");
+        std::fs::write(&path, PROC_STAT).unwrap();
+        let jiffies = read_jiffies_from(path.to_str().unwrap()).unwrap();
+        assert_eq!(jiffies.user, 10_132_153);
+        assert_eq!(jiffies.idle, 46_828_483);
+    }
+
+    #[test]
+    fn read_jiffies_from_missing_file() {
+        let result = read_jiffies_from("/nonexistent/path/stat");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_loadavg_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("loadavg");
+        std::fs::write(&path, PROC_LOADAVG).unwrap();
+        let (l1, l5, l15) = read_loadavg_from(path.to_str().unwrap()).unwrap();
+        assert!((l1 - 0.50).abs() < f64::EPSILON);
+        assert!((l5 - 0.30).abs() < f64::EPSILON);
+        assert!((l15 - 0.20).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn read_cpu_count_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpuinfo");
+        std::fs::write(&path, PROC_CPUINFO).unwrap();
+        assert_eq!(read_cpu_count_from(path.to_str().unwrap()).unwrap(), 4);
+    }
+
+    #[test]
+    fn read_cpu_count_from_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpuinfo");
+        std::fs::write(&path, "").unwrap();
+        let result = read_cpu_count_from(path.to_str().unwrap());
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("no processors"));
+    }
+
+    #[test]
+    fn read_cpu_model_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpuinfo");
+        std::fs::write(&path, PROC_CPUINFO).unwrap();
+        assert_eq!(
+            read_cpu_model_from(path.to_str().unwrap()).unwrap(),
+            "Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz"
+        );
     }
 
     #[test]
