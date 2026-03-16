@@ -3,6 +3,7 @@
 // Source of truth: docs/03-data-structures.md § Communication Payloads
 
 export interface IdentityPayload {
+	probe_version?: string;
 	host_id: string;
 	hostname: string;
 	os: string; // PRETTY_NAME from /etc/os-release

@@ -2,6 +2,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct MetricsPayload {
+    pub probe_version: String,
     pub host_id: String,
     pub timestamp: u64,
     pub interval: u32,
@@ -57,6 +58,7 @@ pub struct NetMetric {
 
 #[derive(Debug, Serialize)]
 pub struct IdentityPayload {
+    pub probe_version: String,
     pub host_id: String,
     pub hostname: String,
     pub os: String,
@@ -74,6 +76,7 @@ mod tests {
     #[test]
     fn metrics_payload_serializes_expected_fields() {
         let payload = MetricsPayload {
+            probe_version: "0.2.0".into(),
             host_id: "test-host".into(),
             timestamp: 1_700_000_000,
             interval: 30,
@@ -115,6 +118,7 @@ mod tests {
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
 
         // Top-level fields
+        assert_eq!(json["probe_version"], "0.2.0");
         assert_eq!(json["host_id"], "test-host");
         assert_eq!(json["timestamp"], 1_700_000_000_u64);
         assert_eq!(json["interval"], 30);
@@ -154,6 +158,7 @@ mod tests {
     #[test]
     fn identity_payload_serializes_expected_fields() {
         let payload = IdentityPayload {
+            probe_version: "0.2.0".into(),
             host_id: "test-host".into(),
             hostname: "myserver".into(),
             os: "Ubuntu 22.04.3 LTS".into(),
@@ -166,6 +171,7 @@ mod tests {
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
 
+        assert_eq!(json["probe_version"], "0.2.0");
         assert_eq!(json["host_id"], "test-host");
         assert_eq!(json["hostname"], "myserver");
         assert_eq!(json["os"], "Ubuntu 22.04.3 LTS");
@@ -179,6 +185,7 @@ mod tests {
     #[test]
     fn metrics_payload_empty_arrays() {
         let payload = MetricsPayload {
+            probe_version: "0.2.0".into(),
             host_id: "h".into(),
             timestamp: 0,
             interval: 30,

@@ -40,6 +40,7 @@ export interface NetMetric {
 }
 
 export interface MetricsPayload {
+	probe_version?: string;
 	host_id: string;
 	timestamp: number; // Unix seconds, Probe clock
 	interval: number; // 30
