@@ -207,6 +207,8 @@ fn collect_metrics(
     // CPU usage (delta from previous jiffies)
     let curr_jiffies = collectors::cpu::read_jiffies().ok();
     let cpu_usage = orchestrate::compute_cpu_delta(prev_jiffies.as_ref(), curr_jiffies.as_ref());
+    let cpu_ext =
+        orchestrate::compute_cpu_ext(prev_jiffies.as_ref(), curr_jiffies.as_ref(), elapsed);
     *prev_jiffies = curr_jiffies;
 
     // Load averages
@@ -258,6 +260,7 @@ fn collect_metrics(
         cpu_count,
         cpu_usage,
         loadavg,
+        cpu_ext,
         mem,
         swap,
         disk,

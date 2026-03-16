@@ -1,4 +1,4 @@
-/// Raw jiffies from `/proc/stat` cpu line.
+/// Raw jiffies from `/proc/stat` cpu line, plus process/context metrics.
 #[derive(Debug, Clone, Default)]
 pub struct CpuJiffies {
     pub user: u64,
@@ -9,6 +9,11 @@ pub struct CpuJiffies {
     pub irq: u64,
     pub softirq: u64,
     pub steal: u64,
+    // Tier 3: extracted from same /proc/stat file
+    pub ctxt: u64,      // cumulative context switches
+    pub processes: u64, // cumulative forks
+    pub procs_running: u32,
+    pub procs_blocked: u32,
 }
 
 impl CpuJiffies {
@@ -31,6 +36,8 @@ impl CpuJiffies {
 /// cpu  user nice system idle iowait irq softirq steal guest guest_nice
 /// ```
 pub fn parse_stat(content: &str) -> Option<CpuJiffies> {
+    let mut jiffies: Option<CpuJiffies> = None;
+
     for line in content.lines() {
         // Match "cpu " (with trailing space) to get the aggregate line,
         // not per-core lines like "cpu0", "cpu1", etc.
@@ -40,7 +47,7 @@ pub fn parse_stat(content: &str) -> Option<CpuJiffies> {
                 .filter_map(|f| f.parse().ok())
                 .collect();
             if fields.len() >= 8 {
-                return Some(CpuJiffies {
+                jiffies = Some(CpuJiffies {
                     user: fields[0],
                     nice: fields[1],
                     system: fields[2],
@@ -49,11 +56,28 @@ pub fn parse_stat(content: &str) -> Option<CpuJiffies> {
                     irq: fields[5],
                     softirq: fields[6],
                     steal: fields[7],
+                    ..Default::default()
                 });
             }
+        } else if let Some(rest) = line.strip_prefix("ctxt ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            j.ctxt = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("processes ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            j.processes = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("procs_running ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            j.procs_running = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("procs_blocked ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            j.procs_blocked = rest.trim().parse().unwrap_or(0);
         }
     }
-    None
+    jiffies
 }
 
 /// Compute CPU usage percentages from two jiffies samples.
@@ -179,6 +203,10 @@ mod tests {
 cpu  10132153 290696 3084719 46828483 16683 0 25195 0 0 0
 cpu0 1393280 32966 572056 13343292 6130 0 17875 0 0 0
 cpu1 3585920 73768 503820 11226932 3694 0 4894 0 0 0
+ctxt 1234567890
+processes 56789
+procs_running 2
+procs_blocked 0
 ";
 
     const PROC_STAT_WITH_STEAL: &str = "\
@@ -239,6 +267,7 @@ cpu MHz\t\t: 2400.000
             irq: 0,
             softirq: 0,
             steal: 0,
+            ..Default::default()
         };
         let curr = CpuJiffies {
             user: 11000,
@@ -249,6 +278,7 @@ cpu MHz\t\t: 2400.000
             irq: 0,
             softirq: 0,
             steal: 0,
+            ..Default::default()
         };
         // total delta = (11000+200+3500+45000+600) - (10000+200+3000+40000+500) = 60300 - 53700 = 6600
         // busy delta = (11000+200+3500) - (10000+200+3000) = 14700 - 13200 = 1500
@@ -422,6 +452,25 @@ cpu MHz\t\t: 2400.000
     }
 
     #[test]
+    fn parse_stat_extended_fields() {
+        let jiffies = parse_stat(PROC_STAT).unwrap();
+        assert_eq!(jiffies.ctxt, 1_234_567_890);
+        assert_eq!(jiffies.processes, 56789);
+        assert_eq!(jiffies.procs_running, 2);
+        assert_eq!(jiffies.procs_blocked, 0);
+    }
+
+    #[test]
+    fn parse_stat_no_extended_fields() {
+        // PROC_STAT_WITH_STEAL has no ctxt/processes/procs_* lines
+        let jiffies = parse_stat(PROC_STAT_WITH_STEAL).unwrap();
+        assert_eq!(jiffies.ctxt, 0);
+        assert_eq!(jiffies.processes, 0);
+        assert_eq!(jiffies.procs_running, 0);
+        assert_eq!(jiffies.procs_blocked, 0);
+    }
+
+    #[test]
     fn compute_usage_saturating_sub_wrapround() {
         // curr values smaller than prev (e.g. counter reset)
         // saturating_sub should clamp to 0, not panic
@@ -434,6 +483,7 @@ cpu MHz\t\t: 2400.000
             irq: 100,
             softirq: 50,
             steal: 150,
+            ..Default::default()
         };
         let curr = CpuJiffies {
             user: 1000,
@@ -444,6 +494,7 @@ cpu MHz\t\t: 2400.000
             irq: 0,
             softirq: 0,
             steal: 0,
+            ..Default::default()
         };
         // total_delta saturates to 0 → returns (0.0, 0.0, 0.0)
         let (usage, iowait, steal) = compute_cpu_usage(&prev, &curr);

@@ -35,6 +35,18 @@ pub struct CpuMetrics {
     pub iowait_pct: f64,
     pub steal_pct: f64,
     pub count: u32,
+    /// Tier 3: context switches per second (delta from `/proc/stat` ctxt)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_switches_sec: Option<f64>,
+    /// Tier 3: forks per second (delta from `/proc/stat` processes)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub forks_sec: Option<f64>,
+    /// Tier 3: number of processes in runnable state
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub procs_running: Option<u32>,
+    /// Tier 3: number of processes waiting for I/O
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub procs_blocked: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -286,6 +298,10 @@ mod tests {
                 iowait_pct: 1.2,
                 steal_pct: 0.0,
                 count: 4,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: 4_000_000_000,
@@ -399,6 +415,10 @@ mod tests {
                 iowait_pct: 0.0,
                 steal_pct: 0.0,
                 count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
@@ -661,6 +681,10 @@ mod tests {
                 iowait_pct: 0.0,
                 steal_pct: 0.0,
                 count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
@@ -743,6 +767,10 @@ mod tests {
                 iowait_pct: 100.0,
                 steal_pct: 100.0,
                 count: u32::MAX,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: u64::MAX,
@@ -825,6 +853,10 @@ mod tests {
                 iowait_pct: 0.0,
                 steal_pct: 0.0,
                 count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
@@ -865,6 +897,10 @@ mod tests {
                 iowait_pct: 0.0,
                 steal_pct: 0.0,
                 count: 1,
+                context_switches_sec: None,
+                forks_sec: None,
+                procs_running: None,
+                procs_blocked: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
