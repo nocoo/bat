@@ -278,4 +278,42 @@ btrfs-pool /mnt/storage btrfs rw,relatime 0 0
         let result = read_disk_metrics_from("/nonexistent/mounts", &[], &[]);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn collect_disk_real_tmp() {
+        // /tmp is a real mount point on macOS and Linux, statvfs should succeed
+        let mounts = vec![MountEntry {
+            device: "/dev/test".into(),
+            mount_point: "/tmp".into(),
+            fs_type: "ext4".into(),
+        }];
+        let results = collect_disk(&mounts);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].total_bytes > 0);
+        assert_eq!(results[0].mount, "/tmp");
+    }
+
+    #[test]
+    fn collect_disk_nonexistent_path() {
+        // statvfs fails on nonexistent path → skipped
+        let mounts = vec![MountEntry {
+            device: "/dev/test".into(),
+            mount_point: "/nonexistent/path/to/nowhere".into(),
+            fs_type: "ext4".into(),
+        }];
+        let results = collect_disk(&mounts);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn collect_disk_null_byte_path() {
+        // CString::new fails on null byte → continue (skipped)
+        let mounts = vec![MountEntry {
+            device: "/dev/test".into(),
+            mount_point: "/tmp/\0invalid".into(),
+            fs_type: "ext4".into(),
+        }];
+        let results = collect_disk(&mounts);
+        assert!(results.is_empty());
+    }
 }
