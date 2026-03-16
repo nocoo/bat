@@ -1,7 +1,7 @@
 // @bat/shared — Alert types and Tier-1 rules
 // Source of truth: docs/03-data-structures.md § Alert Rules
 
-import { ALERT_THRESHOLDS } from "./constants.js";
+import { ALERT_THRESHOLDS, TIER3_THRESHOLDS } from "./constants.js";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
@@ -123,10 +123,48 @@ export const TIER2_ALERT_RULES: readonly AlertRule[] = [
 	},
 ] as const;
 
-/** All alert rules (Tier 1 + Tier 2) */
+/**
+ * 6 Tier-3 alert rules for procfs-native signals.
+ * Evaluated during /api/ingest (same as Tier 1).
+ */
+export const TIER3_ALERT_RULES: readonly AlertRule[] = [
+	{
+		id: "cpu_pressure",
+		severity: "warning",
+		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+	},
+	{
+		id: "mem_pressure",
+		severity: "warning",
+		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+	},
+	{
+		id: "io_pressure",
+		severity: "warning",
+		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+	},
+	{
+		id: "disk_io_saturated",
+		severity: "warning",
+		duration_seconds: TIER3_THRESHOLDS.DISK_IO_DURATION_SECONDS,
+	},
+	{
+		id: "tcp_conn_leak",
+		severity: "warning",
+		duration_seconds: TIER3_THRESHOLDS.TCP_DURATION_SECONDS,
+	},
+	{
+		id: "oom_kill",
+		severity: "critical",
+		duration_seconds: 0, // instant
+	},
+] as const;
+
+/** All alert rules (Tier 1 + Tier 2 + Tier 3) */
 export const ALL_ALERT_RULES: readonly AlertRule[] = [
 	...TIER1_ALERT_RULES,
 	...TIER2_ALERT_RULES,
+	...TIER3_ALERT_RULES,
 ] as const;
 
 /** Lookup a rule by ID across all tiers */

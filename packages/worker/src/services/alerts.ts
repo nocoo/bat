@@ -2,8 +2,8 @@
 // Source of truth: docs/03-data-structures.md § Alert Rules
 // Source of truth: docs/05-worker.md § Alert Evaluation
 
-import { ALERT_THRESHOLDS, TIER2_THRESHOLDS } from "@bat/shared";
-import type { MetricsPayload } from "@bat/shared";
+import { ALERT_THRESHOLDS, TIER2_THRESHOLDS, TIER3_THRESHOLDS } from "@bat/shared";
+import type { DiskIoMetric, MetricsPayload } from "@bat/shared";
 
 type AlertSeverity = "info" | "warning" | "critical";
 
@@ -105,6 +105,99 @@ function evaluateRules(payload: MetricsPayload): AlertEvalResult[] {
 				: "",
 		durationSeconds: 0,
 	});
+
+	// --- Tier 3 rules ---
+
+	// cpu_pressure: PSI cpu_some_avg60 > 25% → warning, 5 min duration
+	const cpuPsi = payload.psi?.cpu_some_avg60;
+	if (cpuPsi != null) {
+		results.push({
+			ruleId: "cpu_pressure",
+			fired: cpuPsi > TIER3_THRESHOLDS.PSI_CPU_PCT,
+			severity: "warning",
+			value: cpuPsi,
+			message: cpuPsi > TIER3_THRESHOLDS.PSI_CPU_PCT ? `CPU pressure ${cpuPsi.toFixed(1)}%` : "",
+			durationSeconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+		});
+	}
+
+	// mem_pressure: PSI mem_some_avg60 > 10% → warning, 5 min duration
+	const memPsi = payload.psi?.mem_some_avg60;
+	if (memPsi != null) {
+		results.push({
+			ruleId: "mem_pressure",
+			fired: memPsi > TIER3_THRESHOLDS.PSI_MEM_PCT,
+			severity: "warning",
+			value: memPsi,
+			message: memPsi > TIER3_THRESHOLDS.PSI_MEM_PCT ? `Memory pressure ${memPsi.toFixed(1)}%` : "",
+			durationSeconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+		});
+	}
+
+	// io_pressure: PSI io_some_avg60 > 20% → warning, 5 min duration
+	const ioPsi = payload.psi?.io_some_avg60;
+	if (ioPsi != null) {
+		results.push({
+			ruleId: "io_pressure",
+			fired: ioPsi > TIER3_THRESHOLDS.PSI_IO_PCT,
+			severity: "warning",
+			value: ioPsi,
+			message: ioPsi > TIER3_THRESHOLDS.PSI_IO_PCT ? `I/O pressure ${ioPsi.toFixed(1)}%` : "",
+			durationSeconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
+		});
+	}
+
+	// disk_io_saturated: ANY disk_io[].io_util_pct > 80% → warning, 5 min duration
+	if (payload.disk_io && payload.disk_io.length > 0) {
+		let saturatedDevice: DiskIoMetric | null = null;
+		for (const device of payload.disk_io) {
+			if (device.io_util_pct > TIER3_THRESHOLDS.DISK_IO_UTIL_PCT) {
+				saturatedDevice = device;
+				break;
+			}
+		}
+		results.push({
+			ruleId: "disk_io_saturated",
+			fired: saturatedDevice !== null,
+			severity: "warning",
+			value:
+				saturatedDevice?.io_util_pct ?? Math.max(0, ...payload.disk_io.map((d) => d.io_util_pct)),
+			message: saturatedDevice
+				? `Disk ${saturatedDevice.device} I/O utilization at ${saturatedDevice.io_util_pct.toFixed(1)}%`
+				: "",
+			durationSeconds: TIER3_THRESHOLDS.DISK_IO_DURATION_SECONDS,
+		});
+	}
+
+	// tcp_conn_leak: tcp.time_wait > 500 → warning, 5 min duration
+	if (payload.tcp != null) {
+		results.push({
+			ruleId: "tcp_conn_leak",
+			fired: payload.tcp.time_wait > TIER3_THRESHOLDS.TCP_TIME_WAIT,
+			severity: "warning",
+			value: payload.tcp.time_wait,
+			message:
+				payload.tcp.time_wait > TIER3_THRESHOLDS.TCP_TIME_WAIT
+					? `TCP TIME_WAIT at ${payload.tcp.time_wait}`
+					: "",
+			durationSeconds: TIER3_THRESHOLDS.TCP_DURATION_SECONDS,
+		});
+	}
+
+	// oom_kill: oom_kills_delta > 0 → critical, instant
+	if (payload.mem.oom_kills_delta != null) {
+		results.push({
+			ruleId: "oom_kill",
+			fired: payload.mem.oom_kills_delta > 0,
+			severity: "critical",
+			value: payload.mem.oom_kills_delta,
+			message:
+				payload.mem.oom_kills_delta > 0
+					? `${payload.mem.oom_kills_delta} OOM kill(s) detected`
+					: "",
+			durationSeconds: 0,
+		});
+	}
 
 	return results;
 }

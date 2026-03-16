@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { MetricsPayload } from "@bat/shared";
+import type { DiskIoMetric, MetricsPayload, PsiMetrics, TcpMetrics } from "@bat/shared";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateAlerts, evaluateRules } from "./alerts";
 
@@ -12,6 +12,10 @@ function makePayload(
 		iowait_pct: number;
 		steal_pct: number;
 		uptime_seconds: number;
+		psi: PsiMetrics;
+		disk_io: DiskIoMetric[];
+		tcp: TcpMetrics;
+		oom_kills_delta: number;
 	}>,
 ): MetricsPayload {
 	return {
@@ -31,6 +35,7 @@ function makePayload(
 			total_bytes: 4_000_000_000,
 			available_bytes: 2_000_000_000,
 			used_pct: overrides?.mem_used_pct ?? 50,
+			oom_kills_delta: overrides?.oom_kills_delta,
 		},
 		swap: {
 			total_bytes: overrides?.swap_total_bytes ?? 2_000_000_000,
@@ -55,6 +60,30 @@ function makePayload(
 			},
 		],
 		uptime_seconds: overrides?.uptime_seconds ?? 86400,
+		psi: overrides?.psi,
+		disk_io: overrides?.disk_io,
+		tcp: overrides?.tcp,
+	};
+}
+
+function makePsi(overrides?: Partial<PsiMetrics>): PsiMetrics {
+	return {
+		cpu_some_avg10: 0,
+		cpu_some_avg60: 0,
+		cpu_some_avg300: 0,
+		mem_some_avg10: 0,
+		mem_some_avg60: 0,
+		mem_some_avg300: 0,
+		mem_full_avg10: 0,
+		mem_full_avg60: 0,
+		mem_full_avg300: 0,
+		io_some_avg10: 0,
+		io_some_avg60: 0,
+		io_some_avg300: 0,
+		io_full_avg10: 0,
+		io_full_avg60: 0,
+		io_full_avg300: 0,
+		...overrides,
 	};
 }
 
@@ -137,6 +166,144 @@ describe("evaluateRules (pure function)", () => {
 		const results = evaluateRules(makePayload({ uptime_seconds: 86400 }));
 		const uptime = results.find((r) => r.ruleId === "uptime_anomaly");
 		expect(uptime?.fired).toBe(false);
+	});
+
+	// --- Tier 3 rules ---
+
+	test("cpu_pressure fires when psi.cpu_some_avg60 > 25", () => {
+		const psi = makePsi({ cpu_some_avg60: 30 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "cpu_pressure");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(300);
+	});
+
+	test("cpu_pressure does not fire at exactly 25", () => {
+		const psi = makePsi({ cpu_some_avg60: 25 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "cpu_pressure");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("cpu_pressure absent when no PSI data", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "cpu_pressure");
+		expect(rule).toBeUndefined();
+	});
+
+	test("mem_pressure fires when psi.mem_some_avg60 > 10", () => {
+		const psi = makePsi({ mem_some_avg60: 15 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "mem_pressure");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+	});
+
+	test("mem_pressure does not fire at exactly 10", () => {
+		const psi = makePsi({ mem_some_avg60: 10 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "mem_pressure");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("io_pressure fires when psi.io_some_avg60 > 20", () => {
+		const psi = makePsi({ io_some_avg60: 25 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "io_pressure");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+	});
+
+	test("io_pressure does not fire at exactly 20", () => {
+		const psi = makePsi({ io_some_avg60: 20 });
+		const results = evaluateRules(makePayload({ psi }));
+		const rule = results.find((r) => r.ruleId === "io_pressure");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("disk_io_saturated fires when any device io_util_pct > 80", () => {
+		const disk_io = [
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 85,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_io_saturated");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.value).toBe(85);
+		expect(rule?.message).toContain("sda");
+	});
+
+	test("disk_io_saturated does not fire at exactly 80", () => {
+		const disk_io = [
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 80,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_io_saturated");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("disk_io_saturated absent when no disk_io data", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "disk_io_saturated");
+		expect(rule).toBeUndefined();
+	});
+
+	test("tcp_conn_leak fires when time_wait > 500", () => {
+		const tcp = { established: 10, time_wait: 600, orphan: 0, allocated: 50 };
+		const results = evaluateRules(makePayload({ tcp }));
+		const rule = results.find((r) => r.ruleId === "tcp_conn_leak");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(300);
+	});
+
+	test("tcp_conn_leak does not fire at exactly 500", () => {
+		const tcp = { established: 10, time_wait: 500, orphan: 0, allocated: 50 };
+		const results = evaluateRules(makePayload({ tcp }));
+		const rule = results.find((r) => r.ruleId === "tcp_conn_leak");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("tcp_conn_leak absent when no tcp data", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "tcp_conn_leak");
+		expect(rule).toBeUndefined();
+	});
+
+	test("oom_kill fires when oom_kills_delta > 0", () => {
+		const results = evaluateRules(makePayload({ oom_kills_delta: 3 }));
+		const rule = results.find((r) => r.ruleId === "oom_kill");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.durationSeconds).toBe(0); // instant
+		expect(rule?.message).toContain("3 OOM kill(s)");
+	});
+
+	test("oom_kill does not fire when oom_kills_delta == 0", () => {
+		const results = evaluateRules(makePayload({ oom_kills_delta: 0 }));
+		const rule = results.find((r) => r.ruleId === "oom_kill");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("oom_kill absent when oom_kills_delta is undefined", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "oom_kill");
+		expect(rule).toBeUndefined();
 	});
 });
 
@@ -275,5 +442,127 @@ describe("evaluateAlerts (with D1 mock)", () => {
 		const ruleIds = alerts.results.map((a) => a.rule_id).sort();
 		expect(ruleIds).toContain("disk_full");
 		expect(ruleIds).toContain("mem_high");
+	});
+
+	// --- Tier 3 D1 integration tests ---
+
+	test("oom_kill instant alert creates alert_states row", async () => {
+		const payload = makePayload({ oom_kills_delta: 2 });
+		await evaluateAlerts(db, hostId, payload, now);
+
+		const alert = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "oom_kill")
+			.first<{ severity: string; value: number; message: string }>();
+
+		expect(alert).not.toBeNull();
+		expect(alert?.severity).toBe("critical");
+		expect(alert?.value).toBe(2);
+		expect(alert?.message).toContain("OOM kill");
+	});
+
+	test("oom_kill clears when oom_kills_delta == 0", async () => {
+		// Fire
+		await evaluateAlerts(db, hostId, makePayload({ oom_kills_delta: 1 }), now);
+		const before = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "oom_kill")
+			.first();
+		expect(before).not.toBeNull();
+
+		// Clear
+		await evaluateAlerts(db, hostId, makePayload({ oom_kills_delta: 0 }), now + 30);
+		const after = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "oom_kill")
+			.first();
+		expect(after).toBeNull();
+	});
+
+	test("cpu_pressure duration rule promotes after 5 min", async () => {
+		const psi = makePsi({ cpu_some_avg60: 30 });
+		const payload = makePayload({ psi });
+
+		// First sample — should go to alert_pending
+		await evaluateAlerts(db, hostId, payload, now);
+		const pending = await db
+			.prepare("SELECT * FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "cpu_pressure")
+			.first<{ first_seen: number }>();
+		expect(pending).not.toBeNull();
+
+		// Not yet in alert_states
+		const alertBefore = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "cpu_pressure")
+			.first();
+		expect(alertBefore).toBeNull();
+
+		// Second sample at t+300 — should promote
+		await evaluateAlerts(db, hostId, payload, now + 300);
+		const alert = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "cpu_pressure")
+			.first<{ severity: string }>();
+		expect(alert).not.toBeNull();
+		expect(alert?.severity).toBe("warning");
+	});
+
+	test("tcp_conn_leak duration rule clears when condition resolves", async () => {
+		const tcp = { established: 10, time_wait: 600, orphan: 0, allocated: 50 };
+
+		// Start tracking
+		await evaluateAlerts(db, hostId, makePayload({ tcp }), now);
+		// Promote
+		await evaluateAlerts(db, hostId, makePayload({ tcp }), now + 300);
+
+		const alertBefore = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "tcp_conn_leak")
+			.first();
+		expect(alertBefore).not.toBeNull();
+
+		// Condition clears
+		const tcpOk = { established: 10, time_wait: 100, orphan: 0, allocated: 50 };
+		await evaluateAlerts(db, hostId, makePayload({ tcp: tcpOk }), now + 330);
+
+		const alertAfter = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "tcp_conn_leak")
+			.first();
+		const pendingAfter = await db
+			.prepare("SELECT * FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "tcp_conn_leak")
+			.first();
+		expect(alertAfter).toBeNull();
+		expect(pendingAfter).toBeNull();
+	});
+
+	test("T3 rules not evaluated when T3 data absent (no side effects)", async () => {
+		// Basic payload without PSI/disk_io/tcp/oom
+		await evaluateAlerts(db, hostId, makePayload(), now);
+
+		// No T3 alert_states or alert_pending rows should exist
+		const t3Rules = [
+			"cpu_pressure",
+			"mem_pressure",
+			"io_pressure",
+			"disk_io_saturated",
+			"tcp_conn_leak",
+			"oom_kill",
+		];
+		for (const ruleId of t3Rules) {
+			const alert = await db
+				.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, ruleId)
+				.first();
+			expect(alert).toBeNull();
+
+			const pending = await db
+				.prepare("SELECT * FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, ruleId)
+				.first();
+			expect(pending).toBeNull();
+		}
 	});
 });
