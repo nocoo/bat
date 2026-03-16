@@ -229,6 +229,9 @@ fn collect_metrics(
     // Uptime
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
+    // PSI pressure (Tier 3)
+    let psi = collectors::psi::read_psi().map(|data| orchestrate::convert_psi(&data));
+
     orchestrate::build_metrics_payload(
         PROBE_VERSION,
         host_id,
@@ -242,6 +245,7 @@ fn collect_metrics(
         disk,
         net,
         uptime_seconds,
+        psi,
     )
 }
 
