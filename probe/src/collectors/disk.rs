@@ -71,8 +71,8 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
         match nix::sys::statvfs::statvfs(&*path) {
             Ok(stat) => {
                 let block_size = stat.block_size();
-                let total = stat.blocks() as u64 * block_size;
-                let avail = stat.blocks_available() as u64 * block_size;
+                let total = u64::from(stat.blocks()) * block_size;
+                let avail = u64::from(stat.blocks_available()) * block_size;
                 let used_pct = if total > 0 {
                     (total - avail) as f64 / total as f64 * 100.0
                 } else {

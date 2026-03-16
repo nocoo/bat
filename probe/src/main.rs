@@ -52,7 +52,7 @@ async fn main() {
     let mut prev_net_counters =
         collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
 
-    let interval = Duration::from_secs(cfg.interval as u64);
+    let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
     ticker.tick().await; // consume the immediate first tick
 
@@ -172,7 +172,7 @@ async fn collect_and_send(
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
     let net: Vec<NetMetric> = match (&*prev_net_counters, &curr_net) {
         (Some(prev), Some(curr)) => {
-            collectors::network::compute_net_metrics(prev, curr, cfg.interval as u64)
+            collectors::network::compute_net_metrics(prev, curr, u64::from(cfg.interval))
                 .into_iter()
                 .map(|n| NetMetric {
                     iface: n.iface,

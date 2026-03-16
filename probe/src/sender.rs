@@ -10,7 +10,7 @@ const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 const MAX_BACKOFF: Duration = Duration::from_secs(60);
 
 /// Permanent HTTP errors that should not be retried.
-fn is_permanent_error(status: u16) -> bool {
+const fn is_permanent_error(status: u16) -> bool {
     matches!(status, 400 | 401 | 403)
 }
 
