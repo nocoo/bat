@@ -7,7 +7,8 @@ export default function LoadingScreen() {
 			{/* Logo with orbital spinner */}
 			<div className="relative animate-in fade-in slide-in-from-bottom-4 duration-500">
 				<div className="flex h-72 w-72 items-center justify-center rounded-full bg-secondary dark:bg-[#171717] ring-1 ring-border overflow-hidden p-6">
-					<span className="text-4xl font-bold text-foreground">bat</span>
+					{/* eslint-disable-next-line @next/next/no-img-element */}
+					<img src="/logo-80.png" alt="bat" width={80} height={80} className="rounded-lg" />
 				</div>
 				{/* Orbital spinner — overlays the circle edge */}
 				<div className="absolute inset-[-4px] rounded-full border-[3px] border-transparent border-t-primary animate-spin" />
