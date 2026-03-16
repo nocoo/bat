@@ -206,4 +206,30 @@ host_id = ""
         let cfg = parse_config(content).unwrap();
         assert_eq!(cfg.host_id.as_deref(), Some(""));
     }
+
+    #[test]
+    fn load_config_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        std::fs::write(
+            &path,
+            r#"
+worker_url = "https://example.com"
+write_key = "key123"
+interval = 15
+"#,
+        )
+        .unwrap();
+        let cfg = load_config(&path).unwrap();
+        assert_eq!(cfg.worker_url, "https://example.com");
+        assert_eq!(cfg.write_key, "key123");
+        assert_eq!(cfg.interval, 15);
+    }
+
+    #[test]
+    fn load_config_missing_file() {
+        let result = load_config(std::path::Path::new("/nonexistent/config.toml"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("failed to read config"));
+    }
 }

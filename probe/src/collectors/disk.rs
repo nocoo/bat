@@ -108,15 +108,24 @@ pub struct DiskInfo {
 
 // ── Live reader (requires Linux /proc) ──────────────────────────────
 
+/// Read mounts from a file, filter, and collect disk metrics via `statvfs` (parameterized for testing).
+pub fn read_disk_metrics_from(
+    mounts_path: &str,
+    exclude_mounts: &[String],
+    exclude_fs_types: &[String],
+) -> Result<Vec<DiskInfo>, String> {
+    let content =
+        std::fs::read_to_string(mounts_path).map_err(|e| format!("read {mounts_path}: {e}"))?;
+    let mounts = parse_mounts(&content, exclude_mounts, exclude_fs_types);
+    Ok(collect_disk(&mounts))
+}
+
 /// Read `/proc/mounts`, filter, and collect disk metrics via `statvfs`.
 pub fn read_disk_metrics(
     exclude_mounts: &[String],
     exclude_fs_types: &[String],
 ) -> Result<Vec<DiskInfo>, String> {
-    let content =
-        std::fs::read_to_string("/proc/mounts").map_err(|e| format!("read /proc/mounts: {e}"))?;
-    let mounts = parse_mounts(&content, exclude_mounts, exclude_fs_types);
-    Ok(collect_disk(&mounts))
+    read_disk_metrics_from("/proc/mounts", exclude_mounts, exclude_fs_types)
 }
 
 #[cfg(test)]
@@ -250,5 +259,23 @@ btrfs-pool /mnt/storage btrfs rw,relatime 0 0
         let mounts = parse_mounts(content, &[], &[]);
         assert_eq!(mounts.len(), 1);
         assert_eq!(mounts[0].mount_point, "/data");
+    }
+
+    #[test]
+    fn read_disk_metrics_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mounts");
+        // Use a mount point that actually exists (tmp dir itself) so statvfs succeeds
+        let mount_content = format!("/dev/test {} ext4 rw,relatime 0 0\n", dir.path().display());
+        std::fs::write(&path, mount_content).unwrap();
+        let metrics = read_disk_metrics_from(path.to_str().unwrap(), &[], &[]).unwrap();
+        assert_eq!(metrics.len(), 1);
+        assert!(metrics[0].total_bytes > 0);
+    }
+
+    #[test]
+    fn read_disk_metrics_from_missing_file() {
+        let result = read_disk_metrics_from("/nonexistent/mounts", &[], &[]);
+        assert!(result.is_err());
     }
 }
