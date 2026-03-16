@@ -246,8 +246,8 @@ describe("Worker L3 E2E — real Wrangler", () => {
 		expect(Array.isArray(alerts)).toBe(true);
 	});
 
-	test("GET /api/health → 200", async () => {
-		const res = await fetch(`${BASE}/api/health`);
+	test("GET /api/live → 200", async () => {
+		const res = await fetch(`${BASE}/api/live`);
 		expect(res.status).toBe(200);
 	});
 

@@ -4,10 +4,10 @@ import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/sha
 import { Hono } from "hono";
 import { apiKeyAuth } from "../../src/middleware/api-key";
 import { alertsListRoute } from "../../src/routes/alerts";
-import { healthRoute } from "../../src/routes/health";
 import { hostsListRoute } from "../../src/routes/hosts";
 import { identityRoute } from "../../src/routes/identity";
 import { ingestRoute } from "../../src/routes/ingest";
+import { liveRoute } from "../../src/routes/live";
 import { hostMetricsRoute } from "../../src/routes/metrics";
 import { createMockD1 } from "../../src/test-helpers/mock-d1";
 import type { AppEnv } from "../../src/types";
@@ -22,7 +22,7 @@ function createApp(db: D1Database) {
 		return next();
 	});
 	app.use("/api/*", apiKeyAuth);
-	app.get("/api/health", healthRoute);
+	app.get("/api/live", liveRoute);
 	app.post("/api/identity", identityRoute);
 	app.post("/api/ingest", ingestRoute);
 	app.get("/api/hosts", hostsListRoute);
@@ -295,8 +295,8 @@ describe("Worker E2E — full lifecycle", () => {
 		expect(diskAlert?.severity).toBe("critical");
 	});
 
-	test("health endpoint returns 200 when hosts exist with no critical alerts", async () => {
-		// Need at least one host for health to return 200
+	test("live endpoint returns 200 when hosts exist with no critical alerts", async () => {
+		// Need at least one host for live to return 200
 		await app.request(
 			new Request("http://localhost/api/identity", {
 				method: "POST",
@@ -318,12 +318,12 @@ describe("Worker E2E — full lifecycle", () => {
 			}),
 		);
 
-		const res = await app.request(new Request("http://localhost/api/health"));
+		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.status).toBe(200);
 	});
 
-	test("health endpoint returns 503 when no hosts exist", async () => {
-		const res = await app.request(new Request("http://localhost/api/health"));
+	test("live endpoint returns 503 when no hosts exist", async () => {
+		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.status).toBe(503);
 	});
 

@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { HealthResponse } from "@bat/shared";
+import { BAT_VERSION, type HealthResponse } from "@bat/shared";
 import { Hono } from "hono";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
-import { healthRoute } from "./health";
+import { liveRoute } from "./live";
 
 function createApp(db: D1Database) {
 	const app = new Hono<AppEnv>();
@@ -11,12 +11,12 @@ function createApp(db: D1Database) {
 		c.env = { DB: db, BAT_WRITE_KEY: "wk", BAT_READ_KEY: "rk" };
 		return next();
 	});
-	app.get("/api/health", healthRoute);
+	app.get("/api/live", liveRoute);
 	return app;
 }
 
 function get(app: Hono<AppEnv>) {
-	return app.request(new Request("http://localhost/api/health"));
+	return app.request(new Request("http://localhost/api/live"));
 }
 
 async function insertHost(db: D1Database, hostId: string, lastSeen: number, isActive = 1) {
@@ -41,7 +41,7 @@ async function insertAlert(
 		.run();
 }
 
-describe("GET /api/health", () => {
+describe("GET /api/live", () => {
 	let db: D1Database;
 	let app: Hono<AppEnv>;
 
@@ -50,7 +50,7 @@ describe("GET /api/health", () => {
 		app = createApp(db);
 	});
 
-	test("all healthy → 200, status: healthy", async () => {
+	test("all healthy → 200, status: healthy, includes version", async () => {
 		const now = Math.floor(Date.now() / 1000);
 		await insertHost(db, "host-001", now);
 		await insertHost(db, "host-002", now);
@@ -59,6 +59,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("healthy");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.total_hosts).toBe(2);
 		expect(body.healthy).toBe(2);
 		expect(body.warning).toBe(0);
@@ -76,6 +77,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("degraded");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.healthy).toBe(1);
 		expect(body.warning).toBe(1);
 		expect(body.critical).toBe(0);
@@ -90,6 +92,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("critical");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.critical).toBe(1);
 	});
 
@@ -102,6 +105,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("critical");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.critical).toBe(1);
 		expect(body.healthy).toBe(0);
 	});
@@ -111,6 +115,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("empty");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.total_hosts).toBe(0);
 	});
 
@@ -126,6 +131,7 @@ describe("GET /api/health", () => {
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.status).toBe("critical");
+		expect(body.version).toBe(BAT_VERSION);
 		expect(body.total_hosts).toBe(3);
 		expect(body.healthy).toBe(1);
 		expect(body.warning).toBe(1);
@@ -140,5 +146,6 @@ describe("GET /api/health", () => {
 		const res = await get(app);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.total_hosts).toBe(1);
+		expect(body.version).toBe(BAT_VERSION);
 	});
 });

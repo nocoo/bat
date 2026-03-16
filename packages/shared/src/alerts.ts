@@ -24,6 +24,7 @@ export type HealthStatus = "healthy" | "degraded" | "critical" | "empty";
 
 export interface HealthResponse {
 	status: HealthStatus;
+	version: string;
 	total_hosts: number;
 	healthy: number;
 	warning: number;

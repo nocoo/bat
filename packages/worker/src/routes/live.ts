@@ -1,5 +1,5 @@
-// GET /api/health — public health check endpoint
-import type { HealthResponse, HostStatus } from "@bat/shared";
+// GET /api/live — public liveness + system health check endpoint
+import { BAT_VERSION, type HealthResponse, type HostStatus } from "@bat/shared";
 import type { Context } from "hono";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -14,7 +14,7 @@ interface AlertRow {
 	severity: string;
 }
 
-export async function healthRoute(c: Context<AppEnv>) {
+export async function liveRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
 	const now = Math.floor(Date.now() / 1000);
 
@@ -27,6 +27,7 @@ export async function healthRoute(c: Context<AppEnv>) {
 	if (hosts.length === 0) {
 		const response: HealthResponse = {
 			status: "empty",
+			version: BAT_VERSION,
 			total_hosts: 0,
 			healthy: 0,
 			warning: 0,
@@ -87,6 +88,7 @@ export async function healthRoute(c: Context<AppEnv>) {
 
 	const response: HealthResponse = {
 		status: overallStatus,
+		version: BAT_VERSION,
 		total_hosts: hosts.length,
 		healthy,
 		warning,
