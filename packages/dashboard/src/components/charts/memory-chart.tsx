@@ -27,12 +27,12 @@ export function MemoryChart({ data }: { data: MetricsDataPoint[] }) {
 	return (
 		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
 			{/* Header: icon + title + legend */}
-			<div className="mb-3 flex items-center justify-between">
+			<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
 				<div className="flex items-center gap-2 text-base font-semibold">
 					<HardDrive className="h-4 w-4" />
 					Memory
 				</div>
-				<div className="flex items-center gap-3">
+				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 					<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<span
 							className="inline-block h-2 w-2 rounded-full"

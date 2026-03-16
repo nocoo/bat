@@ -26,6 +26,9 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 	const { mobileOpen, setMobileOpen } = useSidebar();
 	const pathname = usePathname();
 
+	// Whether JS has resolved the viewport — before this, CSS drives visibility
+	const resolved = isMobile !== undefined;
+
 	// Close mobile sidebar on route change
 	// biome-ignore lint/correctness/useExhaustiveDependencies: pathname triggers sidebar close on route change
 	useEffect(() => {
@@ -44,12 +47,23 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 		};
 	}, [mobileOpen]);
 
+	// Desktop sidebar: shown by CSS on md+ before JS resolves, then by JS
+	const showDesktopSidebar = resolved ? !isMobile : true;
+	// Mobile drawer: only rendered after JS resolves on mobile
+	const showMobileDrawer = resolved && isMobile;
+	// Hamburger: shown by CSS on <md before JS resolves, then by JS
+	const showHamburger = resolved ? isMobile : true;
+
 	return (
 		<div className="flex min-h-screen w-full bg-background">
-			{/* Desktop sidebar */}
-			{!isMobile && <Sidebar />}
+			{/* Desktop sidebar — CSS-hidden on mobile before JS resolves */}
+			{showDesktopSidebar && (
+				<div className={resolved ? undefined : "hidden md:contents"}>
+					<Sidebar />
+				</div>
+			)}
 
-			{isMobile && (
+			{showMobileDrawer && (
 				<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
 					<SheetContent
 						side="left"
@@ -69,12 +83,12 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 				{/* Header — no border, matching basalt */}
 				<header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
 					<div className="flex items-center gap-3">
-						{isMobile && (
+						{showHamburger && (
 							<button
 								type="button"
 								onClick={() => setMobileOpen(true)}
 								aria-label="Open navigation menu"
-								className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+								className={`flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
 							>
 								<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
 							</button>

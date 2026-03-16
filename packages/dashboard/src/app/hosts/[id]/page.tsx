@@ -26,13 +26,13 @@ function TimeRangePicker({
 	onSelect,
 }: { selected: number; onSelect: (seconds: number) => void }) {
 	return (
-		<div className="flex gap-1">
+		<div className="flex flex-wrap gap-1">
 			{TIME_RANGES.map((range) => (
 				<button
 					key={range.label}
 					type="button"
 					onClick={() => onSelect(range.seconds)}
-					className={`px-3 py-1 rounded-md text-sm transition-colors ${
+					className={`px-2.5 py-1 rounded-md text-sm transition-colors ${
 						selected === range.seconds
 							? "bg-primary text-primary-foreground"
 							: "bg-secondary text-secondary-foreground hover:bg-secondary/80"
@@ -80,7 +80,7 @@ export default function HostDetailPage() {
 		>
 			<div className="space-y-6">
 				{/* Header */}
-				<div className="flex items-center justify-between">
+				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-center gap-3">
 						<h1 className="text-2xl font-bold">{host?.hostname ?? hostId}</h1>
 						{host && <StatusBadge status={host.status} />}
@@ -127,22 +127,33 @@ export default function HostDetailPage() {
 				)}
 
 				{metricsLoading ? (
-					<div className="grid gap-4 lg:grid-cols-2">
-						{Array.from({ length: 4 }, (_, i) => (
-							<div
-								key={`chart-skeleton-${i.toString()}`}
-								className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5"
-							>
-								<Skeleton className="h-64 w-full" />
-							</div>
-						))}
+					<div className="space-y-3">
+						<h2 className="text-lg font-semibold">Metrics</h2>
+						<div className="grid gap-4 lg:grid-cols-2">
+							{Array.from({ length: 4 }, (_, i) => (
+								<div
+									key={`chart-skeleton-${i.toString()}`}
+									className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5"
+								>
+									<Skeleton className="h-64 w-full" />
+								</div>
+							))}
+						</div>
 					</div>
 				) : metricsResponse ? (
-					<div className="grid gap-4 lg:grid-cols-2">
-						<CpuChart data={metricsResponse.data} />
-						<MemoryChart data={metricsResponse.data} />
-						<NetworkChart data={metricsResponse.data} resolution={metricsResponse.resolution} />
-						<DiskBars data={metricsResponse.data} />
+					<div className="space-y-3">
+						<div className="flex items-baseline justify-between">
+							<h2 className="text-lg font-semibold">Metrics</h2>
+							<span className="text-xs text-muted-foreground">
+								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
+							</span>
+						</div>
+						<div className="grid gap-4 lg:grid-cols-2">
+							<CpuChart data={metricsResponse.data} />
+							<MemoryChart data={metricsResponse.data} />
+							<NetworkChart data={metricsResponse.data} resolution={metricsResponse.resolution} />
+							<DiskBars data={metricsResponse.data} />
+						</div>
 					</div>
 				) : (
 					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
