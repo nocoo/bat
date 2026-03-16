@@ -131,59 +131,38 @@ async fn collect_and_send(
     let (mem, swap) = build_mem_swap_metrics(mem_info.as_ref());
 
     // Disk
-    let disk: Vec<DiskMetric> =
+    let disk = convert_disk_infos(
         collectors::disk::read_disk_metrics(&cfg.disk.exclude_mounts, &cfg.disk.exclude_fs_types)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|d| DiskMetric {
-                mount: d.mount,
-                total_bytes: d.total_bytes,
-                avail_bytes: d.avail_bytes,
-                used_pct: d.used_pct,
-            })
-            .collect();
+            .unwrap_or_default(),
+    );
 
     // Network (delta from previous counters)
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
-    let net: Vec<NetMetric> = match (&*prev_net_counters, &curr_net) {
-        (Some(prev), Some(curr)) => {
-            collectors::network::compute_net_metrics(prev, curr, u64::from(cfg.interval))
-                .into_iter()
-                .map(|n| NetMetric {
-                    iface: n.iface,
-                    rx_bytes_rate: n.rx_bytes_rate,
-                    tx_bytes_rate: n.tx_bytes_rate,
-                    rx_errors: n.rx_errors,
-                    tx_errors: n.tx_errors,
-                })
-                .collect()
-        }
-        _ => vec![],
-    };
+    let net: Vec<NetMetric> =
+        match (&*prev_net_counters, &curr_net) {
+            (Some(prev), Some(curr)) => convert_net_infos(
+                collectors::network::compute_net_metrics(prev, curr, u64::from(cfg.interval)),
+            ),
+            _ => vec![],
+        };
     *prev_net_counters = curr_net;
 
     // Uptime
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
-    let payload = MetricsPayload {
-        host_id: host_id.to_string(),
+    let payload = build_metrics_payload(
+        host_id,
         timestamp,
-        interval: cfg.interval,
-        cpu: CpuMetrics {
-            load1,
-            load5,
-            load15,
-            usage_pct,
-            iowait_pct,
-            steal_pct,
-            count: cpu_count,
-        },
+        cfg.interval,
+        cpu_count,
+        (usage_pct, iowait_pct, steal_pct),
+        (load1, load5, load15),
         mem,
         swap,
         disk,
         net,
         uptime_seconds,
-    };
+    );
 
     if let Err(e) = sender.post("/api/ingest", &payload).await {
         tracing::error!(error = %e, "failed to send metrics");
@@ -199,11 +178,11 @@ async fn send_identity(sender: &Sender, host_id: &str) {
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
     // boot_time = now - uptime
-    let boot_time = std::time::SystemTime::now()
+    let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs()
-        .saturating_sub(uptime_seconds);
+        .as_secs();
+    let boot_time = compute_boot_time(now_secs, uptime_seconds);
 
     let payload = build_identity_payload(
         host_id,
@@ -219,6 +198,74 @@ async fn send_identity(sender: &Sender, host_id: &str) {
     if let Err(e) = sender.post("/api/identity", &payload).await {
         tracing::error!(error = %e, "failed to send identity");
     }
+}
+
+/// Build a [`MetricsPayload`] from collected system values.
+#[allow(clippy::too_many_arguments)]
+fn build_metrics_payload(
+    host_id: &str,
+    timestamp: u64,
+    interval: u32,
+    cpu_count: u32,
+    usage: (f64, f64, f64),
+    loadavg: (f64, f64, f64),
+    mem: MemMetrics,
+    swap: SwapMetrics,
+    disk: Vec<DiskMetric>,
+    net: Vec<NetMetric>,
+    uptime_seconds: u64,
+) -> MetricsPayload {
+    MetricsPayload {
+        host_id: host_id.to_string(),
+        timestamp,
+        interval,
+        cpu: CpuMetrics {
+            load1: loadavg.0,
+            load5: loadavg.1,
+            load15: loadavg.2,
+            usage_pct: usage.0,
+            iowait_pct: usage.1,
+            steal_pct: usage.2,
+            count: cpu_count,
+        },
+        mem,
+        swap,
+        disk,
+        net,
+        uptime_seconds,
+    }
+}
+
+/// Convert collector disk infos to payload disk metrics.
+fn convert_disk_infos(infos: Vec<collectors::disk::DiskInfo>) -> Vec<DiskMetric> {
+    infos
+        .into_iter()
+        .map(|d| DiskMetric {
+            mount: d.mount,
+            total_bytes: d.total_bytes,
+            avail_bytes: d.avail_bytes,
+            used_pct: d.used_pct,
+        })
+        .collect()
+}
+
+/// Convert collector net infos to payload net metrics.
+fn convert_net_infos(infos: Vec<collectors::network::NetInfo>) -> Vec<NetMetric> {
+    infos
+        .into_iter()
+        .map(|n| NetMetric {
+            iface: n.iface,
+            rx_bytes_rate: n.rx_bytes_rate,
+            tx_bytes_rate: n.tx_bytes_rate,
+            rx_errors: n.rx_errors,
+            tx_errors: n.tx_errors,
+        })
+        .collect()
+}
+
+/// Compute boot time from current epoch seconds and uptime seconds.
+const fn compute_boot_time(now_secs: u64, uptime_secs: u64) -> u64 {
+    now_secs.saturating_sub(uptime_secs)
 }
 
 /// Build memory and swap metrics from an optional [`MemInfo`], defaulting to zero.
@@ -341,5 +388,142 @@ mod tests {
         assert_eq!(mem.available_bytes, 0);
         assert_eq!(swap.total_bytes, 0);
         assert_eq!(swap.used_bytes, 0);
+    }
+
+    #[test]
+    fn build_metrics_payload_normal() {
+        let mem = MemMetrics {
+            total_bytes: 4_000_000,
+            available_bytes: 2_000_000,
+            used_pct: 50.0,
+        };
+        let swap = SwapMetrics {
+            total_bytes: 1_000_000,
+            used_bytes: 500_000,
+            used_pct: 50.0,
+        };
+        let disk = vec![DiskMetric {
+            mount: "/".into(),
+            total_bytes: 100,
+            avail_bytes: 50,
+            used_pct: 50.0,
+        }];
+        let net = vec![NetMetric {
+            iface: "eth0".into(),
+            rx_bytes_rate: 100.0,
+            tx_bytes_rate: 200.0,
+            rx_errors: 0,
+            tx_errors: 0,
+        }];
+        let p = build_metrics_payload(
+            "host-1",
+            1_700_000_000,
+            30,
+            4,
+            (12.5, 1.2, 0.0),
+            (0.5, 0.3, 0.2),
+            mem,
+            swap,
+            disk,
+            net,
+            86400,
+        );
+        assert_eq!(p.host_id, "host-1");
+        assert_eq!(p.timestamp, 1_700_000_000);
+        assert_eq!(p.interval, 30);
+        assert_eq!(p.cpu.count, 4);
+        assert_eq!(p.cpu.usage_pct, 12.5);
+        assert_eq!(p.cpu.load1, 0.5);
+        assert_eq!(p.disk.len(), 1);
+        assert_eq!(p.net.len(), 1);
+        assert_eq!(p.uptime_seconds, 86400);
+    }
+
+    #[test]
+    fn build_metrics_payload_empty_collections() {
+        let mem = MemMetrics {
+            total_bytes: 0,
+            available_bytes: 0,
+            used_pct: 0.0,
+        };
+        let swap = SwapMetrics {
+            total_bytes: 0,
+            used_bytes: 0,
+            used_pct: 0.0,
+        };
+        let p = build_metrics_payload(
+            "h",
+            0,
+            30,
+            1,
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0),
+            mem,
+            swap,
+            vec![],
+            vec![],
+            0,
+        );
+        assert!(p.disk.is_empty());
+        assert!(p.net.is_empty());
+    }
+
+    #[test]
+    fn convert_disk_infos_normal() {
+        use collectors::disk::DiskInfo;
+        let infos = vec![DiskInfo {
+            mount: "/data".into(),
+            total_bytes: 1000,
+            avail_bytes: 400,
+            used_pct: 60.0,
+        }];
+        let metrics = convert_disk_infos(infos);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].mount, "/data");
+        assert_eq!(metrics[0].total_bytes, 1000);
+    }
+
+    #[test]
+    fn convert_disk_infos_empty() {
+        let metrics = convert_disk_infos(vec![]);
+        assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn convert_net_infos_normal() {
+        use collectors::network::NetInfo;
+        let infos = vec![NetInfo {
+            iface: "eth0".into(),
+            rx_bytes_rate: 100.0,
+            tx_bytes_rate: 200.0,
+            rx_errors: 1,
+            tx_errors: 2,
+        }];
+        let metrics = convert_net_infos(infos);
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].iface, "eth0");
+        assert_eq!(metrics[0].rx_bytes_rate, 100.0);
+    }
+
+    #[test]
+    fn convert_net_infos_empty() {
+        let metrics = convert_net_infos(vec![]);
+        assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn compute_boot_time_normal() {
+        assert_eq!(compute_boot_time(1_700_000_000, 86400), 1_699_913_600);
+    }
+
+    #[test]
+    fn compute_boot_time_uptime_exceeds_now() {
+        // saturating_sub should clamp to 0
+        assert_eq!(compute_boot_time(100, 200), 0);
+    }
+
+    #[test]
+    fn compute_boot_time_zero_uptime() {
+        assert_eq!(compute_boot_time(1_700_000_000, 0), 1_700_000_000);
     }
 }
