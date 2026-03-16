@@ -54,6 +54,7 @@ async fn main() {
     let mut ticker = tokio::time::interval(interval);
     ticker.tick().await; // consume the immediate first tick
 
+    let mut last_sample_at = tokio::time::Instant::now();
     let mut identity_timer = tokio::time::Instant::now();
     let identity_interval = Duration::from_secs(6 * 3600); // 6 hours
 
@@ -67,6 +68,7 @@ async fn main() {
                     cpu_count,
                     &mut prev_jiffies,
                     &mut prev_net_counters,
+                    &mut last_sample_at,
                 )
                 .await;
 
@@ -107,7 +109,11 @@ async fn collect_and_send(
     cpu_count: u32,
     prev_jiffies: &mut Option<CpuJiffies>,
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
+    last_sample_at: &mut tokio::time::Instant,
 ) {
+    let now = tokio::time::Instant::now();
+    let elapsed = now.duration_since(*last_sample_at);
+
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -131,14 +137,12 @@ async fn collect_and_send(
             .unwrap_or_default(),
     );
 
-    // Network (delta from previous counters)
+    // Network (delta from previous counters, using actual elapsed time)
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
-    let net = orchestrate::compute_net_delta(
-        prev_net_counters.as_ref(),
-        curr_net.as_ref(),
-        Duration::from_secs(u64::from(cfg.interval)),
-    );
+    let net =
+        orchestrate::compute_net_delta(prev_net_counters.as_ref(), curr_net.as_ref(), elapsed);
     *prev_net_counters = curr_net;
+    *last_sample_at = now;
 
     // Uptime
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
