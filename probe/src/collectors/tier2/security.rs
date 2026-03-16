@@ -592,4 +592,87 @@ target     prot opt source               destination
         assert_eq!(pa, Some(false));
         assert_eq!(rl, Some("prohibit-password".into()));
     }
+
+    #[test]
+    fn parse_password_auth_unknown_value() {
+        // Unknown value should return None (line 37: _ => None)
+        let config = "PasswordAuthentication maybe\n";
+        assert_eq!(parse_password_auth(config), None);
+    }
+
+    #[test]
+    fn parse_root_login_no_value_after_keyword() {
+        // PermitRootLogin with no value (line 58: parts.len() < 2)
+        let config = "PermitRootLogin\n";
+        assert_eq!(parse_root_login(config), None);
+    }
+
+    #[test]
+    fn parse_password_auth_no_value_after_keyword() {
+        // PasswordAuthentication with no value
+        let config = "PasswordAuthentication\n";
+        assert_eq!(parse_password_auth(config), None);
+    }
+
+    #[test]
+    fn parse_iptables_input_with_blank_lines() {
+        // Blank lines should be skipped (line 160)
+        let output = "\nChain INPUT (policy DROP)\n\ntarget     prot opt source               destination\n\n";
+        assert!(parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_iptables_chain_without_policy() {
+        // Chain INPUT line without "policy " substring (line 170: continue without setting policy)
+        let output =
+            "Chain INPUT (unknown format)\ntarget     prot opt source               destination\n";
+        assert!(!parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_iptables_num_header() {
+        // Lines starting with "num" should be skipped (line 174)
+        let output = "\
+Chain INPUT (policy ACCEPT)
+num  target     prot opt source               destination
+1    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0
+";
+        assert!(parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_fail2ban_status_tab_indented() {
+        // The tab-indented format (line 192-202)
+        let output = "   Currently banned:\t7\n";
+        assert_eq!(parse_fail2ban_status(output), Some(7));
+    }
+
+    #[test]
+    fn read_sshd_config_from_with_no_conf_files() {
+        // Include dir exists but has no .conf files
+        let dir = tempfile::tempdir().unwrap();
+        let main_path = dir.path().join("sshd_config");
+        let conf_dir = dir.path().join("sshd_config.d");
+        std::fs::create_dir_all(&conf_dir).unwrap();
+
+        std::fs::write(&main_path, "PasswordAuthentication yes\n").unwrap();
+        // Create a non-.conf file that should be ignored
+        std::fs::write(conf_dir.join("readme.txt"), "not a config\n").unwrap();
+
+        let (pa, rl) = read_sshd_config_from(&main_path, &conf_dir);
+        assert_eq!(pa, Some(true));
+        assert_eq!(rl, None);
+    }
+
+    #[test]
+    fn read_sshd_config_from_nonexistent_include_dir() {
+        // Main file exists but include dir doesn't — should still work (line 231)
+        let dir = tempfile::tempdir().unwrap();
+        let main_path = dir.path().join("sshd_config");
+        std::fs::write(&main_path, "PermitRootLogin no\n").unwrap();
+
+        let (pa, rl) = read_sshd_config_from(&main_path, &dir.path().join("nonexistent"));
+        assert_eq!(pa, None);
+        assert_eq!(rl, Some("no".into()));
+    }
 }

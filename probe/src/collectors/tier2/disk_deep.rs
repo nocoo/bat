@@ -342,4 +342,23 @@ mod tests {
         let files = parse_find_large_files(output);
         assert!(files.is_empty());
     }
+
+    #[test]
+    fn parse_du_output_with_blank_lines() {
+        // Blank lines interspersed should be skipped
+        let output = "\n1073741824\t/usr\n\n536870912\t/var\n\n";
+        let dirs = parse_du_output(output);
+        assert_eq!(dirs.len(), 2);
+        assert_eq!(dirs[0].path, "/usr");
+        assert_eq!(dirs[1].path, "/var");
+    }
+
+    #[test]
+    fn parse_find_large_files_with_blank_lines() {
+        // Blank lines interspersed should be skipped
+        let output = "\n524288000\t/var/log/syslog\n\n";
+        let files = parse_find_large_files(output);
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "/var/log/syslog");
+    }
 }
