@@ -11,8 +11,10 @@ use std::time::Duration;
 use collectors::cpu::CpuJiffies;
 use collectors::network::NetCounters;
 use sender::Sender;
+use tokio::time::MissedTickBehavior;
 
 #[tokio::main(flavor = "current_thread")]
+#[allow(clippy::too_many_lines)]
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -42,8 +44,30 @@ async fn main() {
         "starting bat-probe"
     );
 
-    // Send initial identity
-    send_identity(&sender, &host_id).await;
+    // Send initial identity (cancellable by shutdown)
+    let ctrl_c = tokio::signal::ctrl_c();
+    tokio::pin!(ctrl_c);
+
+    #[cfg(unix)]
+    let mut sigterm =
+        tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).unwrap();
+
+    let identity_payload = build_identity_payload(&host_id);
+    tokio::select! {
+        result = sender.post("/api/identity", &identity_payload) => {
+            if let Err(e) = result {
+                tracing::error!(error = %e, "failed to send identity");
+            }
+        }
+        _ = &mut ctrl_c => {
+            tracing::info!("received shutdown signal during identity send, exiting");
+            return;
+        }
+        _ = sigterm.recv(), if cfg!(unix) => {
+            tracing::info!("received shutdown signal during identity send, exiting");
+            return;
+        }
+    }
 
     // Seed phase: read initial counters for delta calculation
     let mut prev_jiffies = collectors::cpu::read_jiffies().ok();
@@ -52,6 +76,7 @@ async fn main() {
 
     let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
+    ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
     ticker.tick().await; // consume the immediate first tick
 
     let mut last_sample_at = tokio::time::Instant::now();
@@ -61,23 +86,59 @@ async fn main() {
     loop {
         tokio::select! {
             _ = ticker.tick() => {
-                collect_and_send(
-                    &sender,
+                // Phase 1: collect metrics (fast, synchronous logic)
+                let payload = collect_metrics(
                     &host_id,
                     &cfg,
                     cpu_count,
                     &mut prev_jiffies,
                     &mut prev_net_counters,
                     &mut last_sample_at,
-                )
-                .await;
+                );
 
+                // Phase 2: send metrics (slow, cancellable by shutdown)
+                tokio::select! {
+                    result = sender.post("/api/ingest", &payload) => {
+                        if let Err(e) = result {
+                            tracing::error!(error = %e, "failed to send metrics");
+                        }
+                    }
+                    _ = &mut ctrl_c => {
+                        tracing::info!("received shutdown signal during send, exiting");
+                        break;
+                    }
+                    _ = sigterm.recv(), if cfg!(unix) => {
+                        tracing::info!("received shutdown signal during send, exiting");
+                        break;
+                    }
+                }
+
+                // Periodic identity re-send
                 if identity_timer.elapsed() >= identity_interval {
-                    send_identity(&sender, &host_id).await;
+                    let id_payload = build_identity_payload(&host_id);
+                    tokio::select! {
+                        result = sender.post("/api/identity", &id_payload) => {
+                            if let Err(e) = result {
+                                tracing::error!(error = %e, "failed to send identity");
+                            }
+                        }
+                        _ = &mut ctrl_c => {
+                            tracing::info!("received shutdown signal during identity send, exiting");
+                            break;
+                        }
+                        _ = sigterm.recv(), if cfg!(unix) => {
+                            tracing::info!("received shutdown signal during identity send, exiting");
+                            break;
+                        }
+                    }
                     identity_timer = tokio::time::Instant::now();
                 }
             }
-            () = shutdown_signal() => {
+            _ = &mut ctrl_c => {
+                tracing::info!("received shutdown signal, exiting");
+                break;
+            }
+            _ = sigterm.recv(), if cfg!(unix) => {
                 tracing::info!("received shutdown signal, exiting");
                 break;
             }
@@ -85,32 +146,14 @@ async fn main() {
     }
 }
 
-async fn shutdown_signal() {
-    #[cfg(unix)]
-    {
-        let ctrl_c = tokio::signal::ctrl_c();
-        let mut sigterm =
-            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).unwrap();
-        tokio::select! {
-            _ = ctrl_c => {}
-            _ = sigterm.recv() => {}
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        tokio::signal::ctrl_c().await.ok();
-    }
-}
-
-async fn collect_and_send(
-    sender: &Sender,
+fn collect_metrics(
     host_id: &str,
     cfg: &config::Config,
     cpu_count: u32,
     prev_jiffies: &mut Option<CpuJiffies>,
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
     last_sample_at: &mut tokio::time::Instant,
-) {
+) -> payload::MetricsPayload {
     let now = tokio::time::Instant::now();
     let elapsed = now.duration_since(*last_sample_at);
 
@@ -147,7 +190,7 @@ async fn collect_and_send(
     // Uptime
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
-    let payload = orchestrate::build_metrics_payload(
+    orchestrate::build_metrics_payload(
         host_id,
         timestamp,
         cfg.interval,
@@ -159,14 +202,10 @@ async fn collect_and_send(
         disk,
         net,
         uptime_seconds,
-    );
-
-    if let Err(e) = sender.post("/api/ingest", &payload).await {
-        tracing::error!(error = %e, "failed to send metrics");
-    }
+    )
 }
 
-async fn send_identity(sender: &Sender, host_id: &str) {
+fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
     let hostname = collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".into());
     let os = collectors::identity::read_os_release().unwrap_or_else(|_| "unknown".into());
     let kernel = collectors::identity::read_kernel_version().unwrap_or_else(|_| "unknown".into());
@@ -181,7 +220,7 @@ async fn send_identity(sender: &Sender, host_id: &str) {
         .as_secs();
     let boot_time = orchestrate::compute_boot_time(now_secs, uptime_seconds);
 
-    let payload = orchestrate::build_identity_payload(
+    orchestrate::build_identity_payload(
         host_id,
         &hostname,
         &os,
@@ -190,9 +229,28 @@ async fn send_identity(sender: &Sender, host_id: &str) {
         &cpu_model,
         uptime_seconds,
         boot_time,
-    );
+    )
+}
 
-    if let Err(e) = sender.post("/api/identity", &payload).await {
-        tracing::error!(error = %e, "failed to send identity");
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn delay_behavior_skips_missed_ticks() {
+        tokio::time::pause();
+        let mut ticker = tokio::time::interval(Duration::from_secs(30));
+        ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+        ticker.tick().await; // consume first immediate tick
+
+        // Simulate a 91s handler delay
+        tokio::time::advance(Duration::from_secs(91)).await;
+        ticker.tick().await; // fires once (caught up)
+
+        // Next tick should wait a full 30s from now, not fire immediately
+        let before = tokio::time::Instant::now();
+        ticker.tick().await;
+        let waited = tokio::time::Instant::now() - before;
+        assert!(waited >= Duration::from_secs(29));
     }
 }
