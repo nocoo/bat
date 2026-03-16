@@ -34,10 +34,10 @@ pub enum SendError {
 impl fmt::Display for SendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SendError::Permanent { status, message } => {
+            Self::Permanent { status, message } => {
                 write!(f, "permanent error {status}: {message}")
             }
-            SendError::Transient { message } => {
+            Self::Transient { message } => {
                 write!(f, "transient error after retries: {message}")
             }
         }

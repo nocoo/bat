@@ -128,20 +128,8 @@ async fn collect_and_send(
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
-    let (mem, swap) = match &mem_info {
-        Some(info) => (
-            MemMetrics {
-                total_bytes: info.mem_total,
-                available_bytes: info.mem_available,
-                used_pct: info.mem_used_pct,
-            },
-            SwapMetrics {
-                total_bytes: info.swap_total,
-                used_bytes: info.swap_used,
-                used_pct: info.swap_used_pct,
-            },
-        ),
-        None => (
+    let (mem, swap) = mem_info.as_ref().map_or(
+        (
             MemMetrics {
                 total_bytes: 0,
                 available_bytes: 0,
@@ -153,7 +141,21 @@ async fn collect_and_send(
                 used_pct: 0.0,
             },
         ),
-    };
+        |info| {
+            (
+                MemMetrics {
+                    total_bytes: info.mem_total,
+                    available_bytes: info.mem_available,
+                    used_pct: info.mem_used_pct,
+                },
+                SwapMetrics {
+                    total_bytes: info.swap_total,
+                    used_bytes: info.swap_used,
+                    used_pct: info.swap_used_pct,
+                },
+            )
+        },
+    );
 
     // Disk
     let disk: Vec<DiskMetric> =
