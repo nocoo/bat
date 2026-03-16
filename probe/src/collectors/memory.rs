@@ -81,6 +81,31 @@ pub fn read_meminfo() -> Result<MemInfo, String> {
     read_meminfo_from("/proc/meminfo")
 }
 
+/// Parse the `oom_kill` counter from `/proc/vmstat` content.
+///
+/// Looks for the line `oom_kill <N>` and returns the cumulative count.
+/// Returns `None` if the line is not found (pre-4.13 kernels).
+pub fn parse_vmstat_oom_kill(content: &str) -> Option<u64> {
+    for line in content.lines() {
+        if let Some(rest) = line.strip_prefix("oom_kill ") {
+            return rest.trim().parse().ok();
+        }
+    }
+    None
+}
+
+/// Read OOM kill counter from a parameterized path (for testing).
+pub fn read_oom_kill_from(path: &str) -> Option<u64> {
+    let content = std::fs::read_to_string(path).ok()?;
+    parse_vmstat_oom_kill(&content)
+}
+
+/// Read OOM kill counter from `/proc/vmstat`.
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn read_oom_kill() -> Option<u64> {
+    read_oom_kill_from("/proc/vmstat")
+}
+
 #[cfg(test)]
 #[allow(clippy::float_cmp)]
 mod tests {
@@ -210,5 +235,53 @@ SwapFree:        0 kB
     fn read_meminfo_from_missing_file() {
         let result = read_meminfo_from("/nonexistent/path/meminfo");
         assert!(result.is_err());
+    }
+
+    const PROC_VMSTAT: &str = "\
+nr_free_pages 12345
+nr_zone_inactive_anon 678
+pgpgin 1234567
+pgpgout 2345678
+oom_kill 3
+";
+
+    const PROC_VMSTAT_NO_OOM: &str = "\
+nr_free_pages 12345
+pgpgin 1234567
+pgpgout 2345678
+";
+
+    #[test]
+    fn parse_vmstat_oom_kill_normal() {
+        assert_eq!(parse_vmstat_oom_kill(PROC_VMSTAT), Some(3));
+    }
+
+    #[test]
+    fn parse_vmstat_oom_kill_zero() {
+        let content = "oom_kill 0\n";
+        assert_eq!(parse_vmstat_oom_kill(content), Some(0));
+    }
+
+    #[test]
+    fn parse_vmstat_oom_kill_missing() {
+        assert!(parse_vmstat_oom_kill(PROC_VMSTAT_NO_OOM).is_none());
+    }
+
+    #[test]
+    fn parse_vmstat_oom_kill_empty() {
+        assert!(parse_vmstat_oom_kill("").is_none());
+    }
+
+    #[test]
+    fn read_oom_kill_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("vmstat");
+        std::fs::write(&path, PROC_VMSTAT).unwrap();
+        assert_eq!(read_oom_kill_from(path.to_str().unwrap()), Some(3));
+    }
+
+    #[test]
+    fn read_oom_kill_from_missing_file() {
+        assert!(read_oom_kill_from("/nonexistent/vmstat").is_none());
     }
 }

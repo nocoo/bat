@@ -240,6 +240,17 @@ pub const fn convert_fd(info: &collectors::fd::FdInfo) -> FdMetrics {
     }
 }
 
+/// Compute OOM kill delta from previous and current cumulative counters.
+///
+/// Returns `None` if either sample is missing. Returns `Some(0)` when
+/// both are present but no new kills occurred.
+pub const fn compute_oom_delta(prev: Option<u64>, curr: Option<u64>) -> Option<u64> {
+    match (prev, curr) {
+        (Some(p), Some(c)) => Some(c.saturating_sub(p)),
+        _ => None,
+    }
+}
+
 /// Compute boot time from current epoch seconds and uptime seconds.
 pub const fn compute_boot_time(now_secs: u64, uptime_secs: u64) -> u64 {
     now_secs.saturating_sub(uptime_secs)
@@ -248,6 +259,7 @@ pub const fn compute_boot_time(now_secs: u64, uptime_secs: u64) -> u64 {
 /// Build memory and swap metrics from an optional [`MemInfo`], defaulting to zero.
 pub fn build_mem_swap_metrics(
     mem_info: Option<&collectors::memory::MemInfo>,
+    oom_kills_delta: Option<u64>,
 ) -> (MemMetrics, SwapMetrics) {
     mem_info.map_or(
         (
@@ -255,6 +267,7 @@ pub fn build_mem_swap_metrics(
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
+                oom_kills_delta: None,
             },
             SwapMetrics {
                 total_bytes: 0,
@@ -268,6 +281,7 @@ pub fn build_mem_swap_metrics(
                     total_bytes: info.mem_total,
                     available_bytes: info.mem_available,
                     used_pct: info.mem_used_pct,
+                    oom_kills_delta,
                 },
                 SwapMetrics {
                     total_bytes: info.swap_total,
@@ -510,16 +524,17 @@ mod tests {
             swap_used: 500_000,
             swap_used_pct: 50.0,
         };
-        let (mem, swap) = build_mem_swap_metrics(Some(&info));
+        let (mem, swap) = build_mem_swap_metrics(Some(&info), Some(5));
         assert_eq!(mem.total_bytes, 4_000_000);
         assert_eq!(mem.available_bytes, 2_000_000);
+        assert_eq!(mem.oom_kills_delta, Some(5));
         assert_eq!(swap.total_bytes, 1_000_000);
         assert_eq!(swap.used_bytes, 500_000);
     }
 
     #[test]
     fn build_mem_swap_metrics_with_none() {
-        let (mem, swap) = build_mem_swap_metrics(None);
+        let (mem, swap) = build_mem_swap_metrics(None, None);
         assert_eq!(mem.total_bytes, 0);
         assert_eq!(mem.available_bytes, 0);
         assert_eq!(swap.total_bytes, 0);
@@ -532,6 +547,7 @@ mod tests {
             total_bytes: 4_000_000,
             available_bytes: 2_000_000,
             used_pct: 50.0,
+            oom_kills_delta: None,
         };
         let swap = SwapMetrics {
             total_bytes: 1_000_000,
@@ -587,6 +603,7 @@ mod tests {
             total_bytes: 0,
             available_bytes: 0,
             used_pct: 0.0,
+            oom_kills_delta: None,
         };
         let swap = SwapMetrics {
             total_bytes: 0,
@@ -1039,6 +1056,7 @@ mod tests {
             total_bytes: 0,
             available_bytes: 0,
             used_pct: 0.0,
+            oom_kills_delta: None,
         };
         let swap = SwapMetrics {
             total_bytes: 0,
@@ -1083,6 +1101,37 @@ mod tests {
         );
         assert!(p.psi.is_some());
         assert!((p.psi.unwrap().cpu_some_avg10 - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_oom_delta_normal() {
+        assert_eq!(compute_oom_delta(Some(5), Some(8)), Some(3));
+    }
+
+    #[test]
+    fn compute_oom_delta_no_change() {
+        assert_eq!(compute_oom_delta(Some(5), Some(5)), Some(0));
+    }
+
+    #[test]
+    fn compute_oom_delta_missing_prev() {
+        assert!(compute_oom_delta(None, Some(3)).is_none());
+    }
+
+    #[test]
+    fn compute_oom_delta_missing_curr() {
+        assert!(compute_oom_delta(Some(3), None).is_none());
+    }
+
+    #[test]
+    fn compute_oom_delta_both_none() {
+        assert!(compute_oom_delta(None, None).is_none());
+    }
+
+    #[test]
+    fn compute_oom_delta_counter_reset() {
+        // Counter reset: curr < prev → saturating_sub returns 0
+        assert_eq!(compute_oom_delta(Some(10), Some(3)), Some(0));
     }
 
     #[test]
