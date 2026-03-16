@@ -416,4 +416,150 @@ mod tests {
         let map = build_inode_pid_map(Path::new("/nonexistent_dir_xyz"));
         assert!(map.is_empty());
     }
+
+    // --- decode_ipv6_hex edge cases ---
+
+    #[test]
+    fn decode_ipv6_hex_ipv4_mapped() {
+        // ::ffff:127.0.0.1
+        // The code checks for "0000:0000:0000:0000:0000:ffff:" prefix after BE conversion.
+        // Each 32-bit word is stored in little-endian in /proc/net/tcp6.
+        // Words 0-3: all zeros (8 hex chars each)
+        // Word 4: needs to produce 0000:ffff after swap_bytes
+        //   BE = 0x0000ffff → LE bytes: ff ff 00 00 → hex: FFFF0000
+        // Word 5: 127.0.0.1 → 7f00:0001 → BE = 0x7f000001 → LE: 0100007F
+        assert_eq!(
+            decode_ipv6_hex("0000000000000000FFFF00000100007F"),
+            Some("::ffff:127.0.0.1".to_string())
+        );
+    }
+
+    #[test]
+    fn decode_ipv6_hex_regular_address() {
+        // A non-special IPv6 address — should return the full colon notation
+        // fe80::1 = fe80:0000:0000:0000:0000:0000:0000:0001
+        // In /proc/net/tcp6 each 32-bit word is little-endian:
+        // Word 0: fe80:0000 → bytes 00 00 80 FE → LE hex: FE800000
+        // But we need the LE representation. Let's pick a simpler address.
+        // 2001:0db8:0000:0000:0000:0000:0000:0001
+        // Word 0: 2001:0db8 → big-endian 0x20010db8 → le bytes b8 0d 01 20 → LE hex: B80D0120
+        // Word 1: 0000:0000 → 00000000
+        // Word 2: 0000:0000 → 00000000
+        // Word 3: 0000:0001 → big-endian 0x00000001 → le bytes 01 00 00 00 → LE hex: 01000000
+        let result = decode_ipv6_hex("B80D012000000000000000000100000");
+        // 31 chars → invalid length
+        assert_eq!(result, None);
+
+        // Correct 32-char version:
+        let result = decode_ipv6_hex("B80D01200000000000000000010000000");
+        // 33 chars → invalid
+        assert_eq!(result, None);
+
+        // Actual valid non-special address: use fd00::1
+        // fd00:0000:0000:0000:0000:0000:0000:0001
+        // Word 0: fd00:0000 → BE 0xfd000000 → LE bytes: 00 00 00 fd → hex 000000FD
+        // Word 1: 0000:0000 → 00000000
+        // Word 2: 0000:0000 → 00000000
+        // Word 3: 0000:0001 → BE 0x00000001 → LE bytes: 01 00 00 00 → 01000000
+        let result = decode_ipv6_hex("000000FD000000000000000001000000");
+        assert_eq!(
+            result,
+            Some("fd00:0000:0000:0000:0000:0000:0000:0001".to_string())
+        );
+    }
+
+    // --- parse_tcp_line edge cases ---
+
+    #[test]
+    fn parse_tcp_line_too_few_fields() {
+        assert!(parse_tcp_line("   0: 0100007F:0035 00000000:0000", false).is_none());
+    }
+
+    #[test]
+    fn parse_tcp_line_bad_address_format() {
+        // address without colon separator
+        let line = "   0: 0100007F0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 12345 1 0000000000000000 100 0 0 10 0";
+        assert!(parse_tcp_line(line, false).is_none());
+    }
+
+    // --- read_process_name ---
+
+    #[test]
+    fn read_process_name_from_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_dir = dir.path().join("1234");
+        std::fs::create_dir_all(&pid_dir).unwrap();
+        std::fs::write(pid_dir.join("comm"), "sshd\n").unwrap();
+        assert_eq!(read_process_name(dir.path(), 1234), "sshd");
+    }
+
+    #[test]
+    fn read_process_name_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(read_process_name(dir.path(), 9999), "");
+    }
+
+    // --- build_inode_pid_map with symlinks ---
+
+    #[cfg(unix)]
+    #[test]
+    fn build_inode_pid_map_with_symlinks() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_dir = dir.path().join("42");
+        let fd_dir = pid_dir.join("fd");
+        std::fs::create_dir_all(&fd_dir).unwrap();
+        std::fs::write(pid_dir.join("comm"), "nginx\n").unwrap();
+
+        // Create symlinks that look like socket:[inode]
+        std::os::unix::fs::symlink("socket:[99999]", fd_dir.join("3")).unwrap();
+        std::os::unix::fs::symlink("/dev/null", fd_dir.join("0")).unwrap(); // non-socket
+
+        let map = build_inode_pid_map(dir.path());
+        assert_eq!(map.len(), 1);
+        let (pid, name) = map.get(&99999).unwrap();
+        assert_eq!(*pid, 42);
+        assert_eq!(name, "nginx");
+    }
+
+    // --- read_listening_ports_from with tempdir ---
+
+    #[cfg(unix)]
+    #[test]
+    fn read_listening_ports_from_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Write mock /proc/net/tcp
+        let tcp_path = dir.path().join("tcp");
+        std::fs::write(&tcp_path, PROC_NET_TCP).unwrap();
+
+        // Write mock /proc/net/tcp6
+        let tcp6_path = dir.path().join("tcp6");
+        std::fs::write(&tcp6_path, PROC_NET_TCP6).unwrap();
+
+        // Create a mock proc dir with a pid that owns inode 12345
+        let proc_dir = dir.path().join("proc");
+        let pid_dir = proc_dir.join("100");
+        let fd_dir = pid_dir.join("fd");
+        std::fs::create_dir_all(&fd_dir).unwrap();
+        std::fs::write(pid_dir.join("comm"), "dnsmasq\n").unwrap();
+        std::os::unix::fs::symlink("socket:[12345]", fd_dir.join("4")).unwrap();
+
+        let ports = read_listening_ports_from(&tcp_path, &tcp6_path, &proc_dir);
+
+        // Should have 2 tcp LISTEN + 2 tcp6 LISTEN = 4
+        assert_eq!(ports.len(), 4);
+
+        // First port: 127.0.0.1:53 tcp with pid 100
+        let dns = ports
+            .iter()
+            .find(|p| p.port == 53 && p.protocol == "tcp")
+            .unwrap();
+        assert_eq!(dns.bind, "127.0.0.1");
+        assert_eq!(dns.pid, Some(100));
+        assert_eq!(dns.process, Some("dnsmasq".into()));
+
+        // 0.0.0.0:22 should have no pid (inode 23456 not in our map)
+        let ssh = ports.iter().find(|p| p.port == 22).unwrap();
+        assert_eq!(ssh.pid, None);
+    }
 }
