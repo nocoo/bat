@@ -122,6 +122,9 @@ export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
 
 // --- Time Formatting ---
 
+/** Threshold in seconds for switching from HH:MM to MM/DD HH:MM (7 days) */
+const LONG_RANGE_THRESHOLD = 604800;
+
 /** Format unix timestamp to HH:MM for chart axis labels */
 export function formatTime(ts: number): string {
 	const d = new Date(ts * 1000);
@@ -136,6 +139,11 @@ export function formatDateTime(ts: number): string {
 	const hours = d.getHours().toString().padStart(2, "0");
 	const minutes = d.getMinutes().toString().padStart(2, "0");
 	return `${month}/${day} ${hours}:${minutes}`;
+}
+
+/** Return the appropriate time formatter based on range duration */
+export function getTimeFormatter(rangeSeconds: number): (ts: number) => string {
+	return rangeSeconds >= LONG_RANGE_THRESHOLD ? formatDateTime : formatTime;
 }
 
 /** Format bytes/sec to human readable */
