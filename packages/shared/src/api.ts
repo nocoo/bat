@@ -91,6 +91,34 @@ export interface MetricsDataPoint {
 	net_tx_errors: number | null;
 	uptime_seconds: number | null;
 	sample_count?: number; // hourly only
+	// Tier 3 fields (nullable — absent from pre-T3 probes)
+	psi_cpu_some_avg10: number | null;
+	psi_cpu_some_avg60: number | null;
+	psi_cpu_some_avg300: number | null;
+	psi_mem_some_avg10: number | null;
+	psi_mem_some_avg60: number | null;
+	psi_mem_some_avg300: number | null;
+	psi_mem_full_avg10: number | null;
+	psi_mem_full_avg60: number | null;
+	psi_mem_full_avg300: number | null;
+	psi_io_some_avg10: number | null;
+	psi_io_some_avg60: number | null;
+	psi_io_some_avg300: number | null;
+	psi_io_full_avg10: number | null;
+	psi_io_full_avg60: number | null;
+	psi_io_full_avg300: number | null;
+	disk_io_json: string | null;
+	tcp_established: number | null;
+	tcp_time_wait: number | null;
+	tcp_orphan: number | null;
+	tcp_allocated: number | null;
+	context_switches_sec: number | null;
+	forks_sec: number | null;
+	procs_running: number | null;
+	procs_blocked: number | null;
+	oom_kills: number | null;
+	fd_allocated: number | null;
+	fd_max: number | null;
 }
 
 /** GET /api/alerts → AlertItem[] */

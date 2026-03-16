@@ -302,4 +302,98 @@ describe("POST /api/ingest", () => {
 			.first<{ cnt: number }>();
 		expect(metricsCount?.cnt).toBe(1);
 	});
+
+	test("T3 fields stored when present", async () => {
+		const payload = makePayload({
+			psi: {
+				cpu_some_avg10: 2.4,
+				cpu_some_avg60: 2.13,
+				cpu_some_avg300: 1.4,
+				mem_some_avg10: 0,
+				mem_some_avg60: 0,
+				mem_some_avg300: 0,
+				mem_full_avg10: 0,
+				mem_full_avg60: 0,
+				mem_full_avg300: 0,
+				io_some_avg10: 0.5,
+				io_some_avg60: 0.01,
+				io_some_avg300: 0,
+				io_full_avg10: 0.3,
+				io_full_avg60: 0,
+				io_full_avg300: 0,
+			},
+			disk_io: [
+				{
+					device: "sda",
+					read_iops: 10,
+					write_iops: 20,
+					read_bytes_sec: 102400,
+					write_bytes_sec: 204800,
+					io_util_pct: 3.2,
+				},
+			],
+			tcp: { established: 6, time_wait: 26, orphan: 0, allocated: 19 },
+			fd: { allocated: 1344, max: 1048576 },
+		});
+		payload.cpu.context_switches_sec = 889.9;
+		payload.cpu.forks_sec = 7.1;
+		payload.cpu.procs_running = 1;
+		payload.cpu.procs_blocked = 0;
+		payload.mem.oom_kills_delta = 0;
+
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_raw WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		// PSI
+		expect(row?.psi_cpu_some_avg10).toBe(2.4);
+		expect(row?.psi_cpu_some_avg60).toBe(2.13);
+		expect(row?.psi_io_some_avg10).toBe(0.5);
+		expect(row?.psi_io_full_avg10).toBe(0.3);
+
+		// Disk I/O
+		const diskIo = JSON.parse(row?.disk_io_json as string);
+		expect(diskIo).toBeArray();
+		expect(diskIo[0].device).toBe("sda");
+		expect(diskIo[0].io_util_pct).toBe(3.2);
+
+		// TCP
+		expect(row?.tcp_established).toBe(6);
+		expect(row?.tcp_time_wait).toBe(26);
+		expect(row?.tcp_orphan).toBe(0);
+		expect(row?.tcp_allocated).toBe(19);
+
+		// CPU extensions
+		expect(row?.context_switches_sec).toBe(889.9);
+		expect(row?.forks_sec).toBe(7.1);
+		expect(row?.procs_running).toBe(1);
+		expect(row?.procs_blocked).toBe(0);
+
+		// OOM kills
+		expect(row?.oom_kills).toBe(0);
+
+		// File descriptors
+		expect(row?.fd_allocated).toBe(1344);
+	});
+
+	test("T3 fields null when absent (backward compat)", async () => {
+		const res = await post(app, makePayload());
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_raw WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.psi_cpu_some_avg10).toBeNull();
+		expect(row?.disk_io_json).toBeNull();
+		expect(row?.tcp_established).toBeNull();
+		expect(row?.context_switches_sec).toBeNull();
+		expect(row?.oom_kills).toBeNull();
+		expect(row?.fd_allocated).toBeNull();
+	});
 });

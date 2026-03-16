@@ -62,7 +62,16 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
          disk_json, NULL as net_json,
          net_rx_bytes_avg, net_rx_bytes_max, net_tx_bytes_avg, net_tx_bytes_max,
          net_rx_errors, net_tx_errors,
-         uptime_min as uptime_seconds, sample_count
+         uptime_min as uptime_seconds, sample_count,
+         NULL as psi_cpu_some_avg10, NULL as psi_cpu_some_avg60, NULL as psi_cpu_some_avg300,
+         NULL as psi_mem_some_avg10, NULL as psi_mem_some_avg60, NULL as psi_mem_some_avg300,
+         NULL as psi_mem_full_avg10, NULL as psi_mem_full_avg60, NULL as psi_mem_full_avg300,
+         NULL as psi_io_some_avg10, NULL as psi_io_some_avg60, NULL as psi_io_some_avg300,
+         NULL as psi_io_full_avg10, NULL as psi_io_full_avg60, NULL as psi_io_full_avg300,
+         NULL as disk_io_json,
+         NULL as tcp_established, NULL as tcp_time_wait, NULL as tcp_orphan, NULL as tcp_allocated,
+         NULL as context_switches_sec, NULL as forks_sec, NULL as procs_running, NULL as procs_blocked,
+         NULL as oom_kills, NULL as fd_allocated, NULL as fd_max
        FROM metrics_hourly
        WHERE host_id = ? AND hour_ts >= ? AND hour_ts <= ?
        ORDER BY hour_ts ASC`,
@@ -89,7 +98,16 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
        NULL as net_rx_bytes_avg, NULL as net_rx_bytes_max,
        NULL as net_tx_bytes_avg, NULL as net_tx_bytes_max,
        NULL as net_rx_errors, NULL as net_tx_errors,
-       uptime_seconds
+       uptime_seconds,
+       psi_cpu_some_avg10, psi_cpu_some_avg60, psi_cpu_some_avg300,
+       psi_mem_some_avg10, psi_mem_some_avg60, psi_mem_some_avg300,
+       psi_mem_full_avg10, psi_mem_full_avg60, psi_mem_full_avg300,
+       psi_io_some_avg10, psi_io_some_avg60, psi_io_some_avg300,
+       psi_io_full_avg10, psi_io_full_avg60, psi_io_full_avg300,
+       disk_io_json,
+       tcp_established, tcp_time_wait, tcp_orphan, tcp_allocated,
+       context_switches_sec, forks_sec, procs_running, procs_blocked,
+       oom_kills, fd_allocated, fd_max
      FROM metrics_raw
      WHERE host_id = ? AND ts >= ? AND ts <= ?
      ORDER BY ts ASC`,
