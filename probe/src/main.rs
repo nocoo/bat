@@ -9,6 +9,7 @@ mod rate;
 mod sender;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use collectors::cpu::CpuJiffies;
@@ -37,14 +38,18 @@ async fn main() {
 
     let sender = Sender::new(&cfg.worker_url, &cfg.write_key);
 
-    let host_id = cfg.host_id.clone().unwrap_or_else(|| {
-        collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".to_string())
-    });
+    let host_id: Arc<str> = cfg
+        .host_id
+        .clone()
+        .unwrap_or_else(|| {
+            collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".to_string())
+        })
+        .into();
 
     let cpu_count = collectors::cpu::read_cpu_count().unwrap_or(1);
 
     tracing::info!(
-        host_id,
+        %host_id,
         cpu_count,
         interval = cfg.interval,
         "starting bat-probe"
@@ -93,23 +98,8 @@ async fn main() {
     let mut tier2_timer = tokio::time::Instant::now();
     let tier2_interval = Duration::from_secs(6 * 3600); // 6 hours
 
-    // Send initial tier2 (cancellable by shutdown)
-    let tier2_payload = collect_tier2(&host_id).await;
-    tokio::select! {
-        result = sender.post("/api/tier2", &tier2_payload) => {
-            if let Err(e) = result {
-                tracing::error!(error = %e, "failed to send tier2");
-            }
-        }
-        _ = &mut ctrl_c => {
-            tracing::info!("received shutdown signal during tier2 send, exiting");
-            return;
-        }
-        _ = sigterm.recv(), if cfg!(unix) => {
-            tracing::info!("received shutdown signal during tier2 send, exiting");
-            return;
-        }
-    }
+    // Send initial tier2 in background (does not block T1 seed)
+    spawn_tier2_task(sender.clone(), Arc::clone(&host_id));
 
     loop {
         tokio::select! {
@@ -162,24 +152,9 @@ async fn main() {
                     identity_timer = tokio::time::Instant::now();
                 }
 
-                // Periodic tier2 re-send
+                // Periodic tier2 re-send (spawned in background, never blocks T1)
                 if tier2_timer.elapsed() >= tier2_interval {
-                    let t2_payload = collect_tier2(&host_id).await;
-                    tokio::select! {
-                        result = sender.post("/api/tier2", &t2_payload) => {
-                            if let Err(e) = result {
-                                tracing::error!(error = %e, "failed to send tier2");
-                            }
-                        }
-                        _ = &mut ctrl_c => {
-                            tracing::info!("received shutdown signal during tier2 send, exiting");
-                            break;
-                        }
-                        _ = sigterm.recv(), if cfg!(unix) => {
-                            tracing::info!("received shutdown signal during tier2 send, exiting");
-                            break;
-                        }
-                    }
+                    spawn_tier2_task(sender.clone(), Arc::clone(&host_id));
                     tier2_timer = tokio::time::Instant::now();
                 }
             }
@@ -193,6 +168,20 @@ async fn main() {
             }
         }
     }
+}
+
+/// Spawn a background task that collects tier 2 data and sends it.
+///
+/// Runs independently of the T1 tick loop — T1 metrics are never delayed
+/// by slow T2 collectors (du, find, docker inspect, etc.).
+#[cfg_attr(coverage_nightly, coverage(off))]
+fn spawn_tier2_task(sender: Sender, host_id: Arc<str>) {
+    tokio::spawn(async move {
+        let t2_payload = collect_tier2(&host_id).await;
+        if let Err(e) = sender.post("/api/tier2", &t2_payload).await {
+            tracing::error!(error = %e, "failed to send tier2");
+        }
+    });
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
