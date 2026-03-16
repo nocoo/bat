@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, getAvatarColor } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
-import { Bell, LogOut, PanelLeft, Server } from "lucide-react";
+import { Bell, Download, LogOut, PanelLeft, Server } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +24,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
 	{ href: "/hosts", label: "Hosts", icon: Server },
 	{ href: "/alerts", label: "Alerts", icon: Bell },
+	{ href: "/setup", label: "Setup", icon: Download },
 ];
 
 // ── Main component ──
