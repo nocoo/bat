@@ -4,6 +4,7 @@ import { ThemeToggle } from "@/components/layout/theme-toggle";
 import LoadingScreen from "@/components/loading-screen";
 import { Activity } from "lucide-react";
 import { signIn } from "next-auth/react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -69,9 +70,9 @@ function LoginContent() {
 
 					{/* Content */}
 					<div className="flex flex-col items-center px-6 pt-8 pb-6">
-						{/* Logo placeholder */}
+						{/* Logo */}
 						<div className="h-20 w-20 overflow-hidden rounded-full bg-secondary dark:bg-[#171717] ring-1 ring-border flex items-center justify-center">
-							<Activity className="h-10 w-10 text-primary" strokeWidth={1.5} />
+							<Image src="/logo-80.png" alt="bat" width={80} height={80} className="rounded-full" />
 						</div>
 
 						<p className="mt-5 text-lg font-semibold text-foreground">Infrastructure Monitoring</p>
