@@ -6,11 +6,15 @@ export { BAT_VERSION } from "./version.js";
 // Metrics payload types
 export type {
 	CpuMetrics,
+	DiskIoMetric,
 	DiskMetric,
+	FdMetrics,
 	MemMetrics,
 	MetricsPayload,
 	NetMetric,
+	PsiMetrics,
 	SwapMetrics,
+	TcpMetrics,
 } from "./metrics.js";
 
 // Identity payload types
