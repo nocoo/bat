@@ -70,6 +70,7 @@ pub fn read_hostname_from(path: &str) -> Result<String, String> {
 }
 
 /// Read hostname from `/etc/hostname`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_hostname() -> Result<String, String> {
     read_hostname_from("/etc/hostname")
 }
@@ -81,6 +82,7 @@ pub fn read_os_release_from(path: &str) -> Result<String, String> {
 }
 
 /// Read OS pretty name from `/etc/os-release`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_os_release() -> Result<String, String> {
     read_os_release_from("/etc/os-release")
 }
@@ -92,6 +94,7 @@ pub fn read_kernel_version_from(path: &str) -> Result<String, String> {
 }
 
 /// Read kernel version from `/proc/version`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_kernel_version() -> Result<String, String> {
     read_kernel_version_from("/proc/version")
 }
@@ -103,6 +106,7 @@ pub fn read_uptime_from(path: &str) -> Result<u64, String> {
 }
 
 /// Read uptime in seconds from `/proc/uptime`.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_uptime() -> Result<u64, String> {
     read_uptime_from("/proc/uptime")
 }

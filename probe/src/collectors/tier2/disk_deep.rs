@@ -137,6 +137,7 @@ pub fn parse_size_string(s: &str) -> Option<u64> {
 }
 
 /// Collect disk deep scan information from the system.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_disk_deep_scan() -> DiskDeepScanInfo {
     // Run all three commands concurrently
     let (du_result, journal_result, find_result) = tokio::join!(
@@ -307,5 +308,38 @@ mod tests {
     #[test]
     fn parse_size_string_invalid() {
         assert_eq!(parse_size_string("abc"), None);
+    }
+
+    #[test]
+    fn parse_du_output_human_readable() {
+        // When du uses human-readable format (du -sh), size is like "256M"
+        let output = "256M\t/usr\n";
+        let dirs = parse_du_output(output);
+        assert_eq!(dirs.len(), 1);
+        assert_eq!(dirs[0].path, "/usr");
+        assert_eq!(dirs[0].size_bytes, 256_000_000);
+    }
+
+    #[test]
+    fn parse_du_output_single_field() {
+        // Line with no tab separator should be skipped
+        let output = "1024\n";
+        let dirs = parse_du_output(output);
+        assert!(dirs.is_empty());
+    }
+
+    #[test]
+    fn parse_find_large_files_no_tab() {
+        // Line without tab separator should be skipped
+        let output = "524288000 /var/log/syslog\n";
+        let files = parse_find_large_files(output);
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn parse_find_large_files_bad_size() {
+        let output = "notanumber\t/var/log/syslog\n";
+        let files = parse_find_large_files(output);
+        assert!(files.is_empty());
     }
 }

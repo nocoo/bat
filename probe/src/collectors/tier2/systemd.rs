@@ -72,6 +72,7 @@ pub fn parse_failed_units(output: &str) -> Vec<FailedService> {
 /// Collect failed systemd services from the system.
 ///
 /// Returns `None` if systemctl is not available.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_failed_services() -> Option<SystemdServicesInfo> {
     if !command::command_exists("systemctl") {
         return None;
@@ -200,6 +201,30 @@ dbus.socket loaded failed failed D-Bus System Message Bus Socket
     #[test]
     fn parse_failed_units_too_few_fields() {
         let output = "nginx.service loaded\n";
+        let services = parse_failed_units(output);
+        assert!(services.is_empty());
+    }
+
+    #[test]
+    fn parse_failed_units_only_unit_name() {
+        // Only one field — should be skipped (no load_state)
+        let output = "nginx.service\n";
+        let services = parse_failed_units(output);
+        assert!(services.is_empty());
+    }
+
+    #[test]
+    fn parse_failed_units_three_fields() {
+        // Missing sub_state — should be skipped
+        let output = "nginx.service loaded failed\n";
+        let services = parse_failed_units(output);
+        assert!(services.is_empty());
+    }
+
+    #[test]
+    fn parse_failed_units_four_fields_no_description() {
+        // Has all state fields but no description — should be skipped
+        let output = "nginx.service loaded failed failed\n";
         let services = parse_failed_units(output);
         assert!(services.is_empty());
     }

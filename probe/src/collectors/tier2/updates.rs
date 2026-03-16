@@ -94,6 +94,7 @@ pub fn read_cache_mtime_from(path: &std::path::Path) -> Option<u64> {
 /// Collect package update information from the system.
 ///
 /// Returns `None` if `apt` is not available.
+#[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_package_updates() -> Option<PackageUpdatesInfo> {
     if !command::command_exists("apt") {
         return None;
@@ -214,5 +215,31 @@ nginx/jammy-security 1.18.0-6ubuntu14.4 amd64 [upgradable from: 1.18.0-6ubuntu14
     #[test]
     fn read_cache_mtime_nonexistent() {
         assert!(read_cache_mtime_from(std::path::Path::new("/nonexistent_dir_xyz")).is_none());
+    }
+
+    #[test]
+    fn parse_apt_upgradable_line_without_slash() {
+        // Lines without '/' should be skipped
+        let output = "Listing... Done\nsome-garbage-line-no-slash\n";
+        let updates = parse_apt_upgradable(output);
+        assert!(updates.is_empty());
+    }
+
+    #[test]
+    fn read_cache_mtime_from_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("test-file");
+        std::fs::write(&file, "data").unwrap();
+        let mtime = read_cache_mtime_from(&file);
+        assert!(mtime.is_some());
+        assert!(mtime.unwrap() > 0);
+    }
+
+    #[test]
+    fn check_reboot_required_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let flag = dir.path().join("reboot-required");
+        std::fs::write(&flag, "").unwrap();
+        assert!(check_reboot_required_at(&flag));
     }
 }
