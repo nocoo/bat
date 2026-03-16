@@ -1,13 +1,13 @@
 // API Key auth middleware with read/write scope separation
 // Write routes: POST /api/ingest, POST /api/identity → BAT_WRITE_KEY
 // Read routes: GET /api/hosts, GET /api/hosts/:id/metrics, GET /api/alerts → BAT_READ_KEY
-// Public routes: GET /api/health → no auth required
+// Public routes: GET /api/live → no auth required
 
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../types.js";
 
 /** Routes that require no authentication */
-const PUBLIC_ROUTES = ["/api/health"];
+const PUBLIC_ROUTES = ["/api/live"];
 
 /** Routes that require write key (BAT_WRITE_KEY) */
 const WRITE_ROUTES = ["/api/ingest", "/api/identity"];

@@ -11,7 +11,7 @@ export const API_ROUTES = {
 	HOSTS: "/api/hosts",
 	HOST_METRICS: "/api/hosts/:id/metrics",
 	ALERTS: "/api/alerts",
-	HEALTH: "/api/health",
+	LIVE: "/api/live",
 } as const;
 
 // --- Response DTOs ---

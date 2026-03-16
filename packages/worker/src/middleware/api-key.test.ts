@@ -32,7 +32,7 @@ function createApp() {
 	app.get("/api/alerts", (c) => c.json([]));
 
 	// Public route
-	app.get("/api/health", (c) => c.json({ status: "healthy" }));
+	app.get("/api/live", (c) => c.json({ status: "healthy" }));
 
 	return app;
 }
@@ -49,8 +49,8 @@ describe("apiKeyAuth middleware", () => {
 	const app = createApp();
 
 	describe("public routes", () => {
-		test("GET /api/health requires no auth", async () => {
-			const res = await app.request(req("GET", "/api/health"));
+		test("GET /api/live requires no auth", async () => {
+			const res = await app.request(req("GET", "/api/live"));
 			expect(res.status).toBe(200);
 		});
 	});

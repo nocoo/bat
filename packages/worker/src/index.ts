@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import { alertsListRoute } from "./routes/alerts.js";
-import { healthRoute } from "./routes/health.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
+import { liveRoute } from "./routes/live.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
 import { aggregateHour, purgeOldData } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
@@ -18,7 +18,7 @@ app.use("/api/*", apiKeyAuth);
 app.get("/", (c) => c.text("bat-worker ok"));
 
 // Public routes (no auth)
-app.get("/api/health", healthRoute);
+app.get("/api/live", liveRoute);
 
 // Write routes (probe → worker)
 app.post("/api/identity", identityRoute);
