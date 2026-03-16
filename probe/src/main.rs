@@ -84,6 +84,7 @@ async fn main() {
     let mut prev_jiffies = collectors::cpu::read_jiffies().ok();
     let mut prev_net_counters =
         collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
+    let mut prev_disk_io = collectors::disk_io::read_diskstats().ok();
 
     let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
@@ -111,6 +112,7 @@ async fn main() {
                     cpu_count,
                     &mut prev_jiffies,
                     &mut prev_net_counters,
+                    &mut prev_disk_io,
                     &mut last_sample_at,
                 );
 
@@ -191,6 +193,7 @@ fn collect_metrics(
     cpu_count: u32,
     prev_jiffies: &mut Option<CpuJiffies>,
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
+    prev_disk_io: &mut Option<Vec<collectors::disk_io::DiskIoCounters>>,
     last_sample_at: &mut tokio::time::Instant,
 ) -> payload::MetricsPayload {
     let now = tokio::time::Instant::now();
@@ -232,6 +235,15 @@ fn collect_metrics(
     // PSI pressure (Tier 3)
     let psi = collectors::psi::read_psi().map(|data| orchestrate::convert_psi(&data));
 
+    // Disk I/O (Tier 3) — delta from previous diskstats sample
+    let curr_disk_io = collectors::disk_io::read_diskstats().ok();
+    let disk_io = orchestrate::compute_disk_io_delta(
+        prev_disk_io.as_deref(),
+        curr_disk_io.as_deref(),
+        elapsed,
+    );
+    *prev_disk_io = curr_disk_io;
+
     orchestrate::build_metrics_payload(
         PROBE_VERSION,
         host_id,
@@ -246,6 +258,7 @@ fn collect_metrics(
         net,
         uptime_seconds,
         psi,
+        disk_io,
     )
 }
 

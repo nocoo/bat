@@ -5,8 +5,8 @@ use crate::collectors;
 use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
-    CpuMetrics, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric, PsiMetrics,
-    SwapMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages,
+    CpuMetrics, DiskIoMetric, DiskMetric, IdentityPayload, MemMetrics, MetricsPayload, NetMetric,
+    PsiMetrics, SwapMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages,
     Tier2FailedService, Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload,
     Tier2Ports, Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates,
 };
@@ -49,6 +49,7 @@ pub fn build_metrics_payload(
     net: Vec<NetMetric>,
     uptime_seconds: u64,
     psi: Option<PsiMetrics>,
+    disk_io: Option<Vec<DiskIoMetric>>,
 ) -> MetricsPayload {
     MetricsPayload {
         probe_version: probe_version.to_string(),
@@ -70,6 +71,7 @@ pub fn build_metrics_payload(
         net,
         uptime_seconds,
         psi,
+        disk_io,
     }
 }
 
@@ -119,6 +121,62 @@ pub const fn convert_psi(data: &collectors::psi::PsiData) -> PsiMetrics {
         io_full_avg60: data.io.full.avg60,
         io_full_avg300: data.io.full.avg300,
     }
+}
+
+/// Compute disk I/O metrics from previous and current counter samples.
+///
+/// Returns a `Vec<DiskIoMetric>` with per-device IOPS, throughput, and utilization.
+/// Only includes devices present in both samples (new devices in `curr` are ignored
+/// on the first sample, same as network counters).
+pub fn compute_disk_io_delta(
+    prev: Option<&[collectors::disk_io::DiskIoCounters]>,
+    curr: Option<&[collectors::disk_io::DiskIoCounters]>,
+    elapsed: Duration,
+) -> Option<Vec<DiskIoMetric>> {
+    let (Some(prev), Some(curr)) = (prev, curr) else {
+        return None;
+    };
+
+    let elapsed_secs = elapsed.as_secs_f64();
+    if elapsed_secs <= 0.0 {
+        return Some(vec![]);
+    }
+    let elapsed_ms = elapsed.as_millis() as f64;
+
+    let mut metrics = Vec::new();
+
+    for curr_dev in curr {
+        if let Some(prev_dev) = prev.iter().find(|d| d.device == curr_dev.device) {
+            let reads_delta = curr_dev
+                .reads_completed
+                .saturating_sub(prev_dev.reads_completed);
+            let writes_delta = curr_dev
+                .writes_completed
+                .saturating_sub(prev_dev.writes_completed);
+            let sectors_read_delta = curr_dev.sectors_read.saturating_sub(prev_dev.sectors_read);
+            let sectors_written_delta = curr_dev
+                .sectors_written
+                .saturating_sub(prev_dev.sectors_written);
+            let io_ms_delta = curr_dev.io_ms.saturating_sub(prev_dev.io_ms);
+
+            let io_util_pct = if elapsed_ms > 0.0 {
+                (io_ms_delta as f64 / elapsed_ms * 100.0).min(100.0)
+            } else {
+                0.0
+            };
+
+            metrics.push(DiskIoMetric {
+                device: curr_dev.device.clone(),
+                read_iops: reads_delta as f64 / elapsed_secs,
+                write_iops: writes_delta as f64 / elapsed_secs,
+                read_bytes_sec: sectors_read_delta as f64 * 512.0 / elapsed_secs,
+                write_bytes_sec: sectors_written_delta as f64 * 512.0 / elapsed_secs,
+                io_util_pct,
+            });
+        }
+    }
+
+    Some(metrics)
 }
 
 /// Compute boot time from current epoch seconds and uptime seconds.
@@ -446,6 +504,7 @@ mod tests {
             net,
             86400,
             None,
+            None,
         );
         assert_eq!(p.host_id, "host-1");
         assert_eq!(p.timestamp, 1_700_000_000);
@@ -483,6 +542,7 @@ mod tests {
             vec![],
             vec![],
             0,
+            None,
             None,
         );
         assert!(p.disk.is_empty());
@@ -949,8 +1009,102 @@ mod tests {
             vec![],
             0,
             psi,
+            None,
         );
         assert!(p.psi.is_some());
         assert!((p.psi.unwrap().cpu_some_avg10 - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_disk_io_delta_both_none() {
+        assert!(compute_disk_io_delta(None, None, Duration::from_secs(30)).is_none());
+    }
+
+    #[test]
+    fn compute_disk_io_delta_missing_prev() {
+        use collectors::disk_io::DiskIoCounters;
+        let curr = vec![DiskIoCounters {
+            device: "sda".into(),
+            ..Default::default()
+        }];
+        assert!(compute_disk_io_delta(None, Some(&curr), Duration::from_secs(30)).is_none());
+    }
+
+    #[test]
+    fn compute_disk_io_delta_normal() {
+        use collectors::disk_io::DiskIoCounters;
+        let prev = vec![DiskIoCounters {
+            device: "sda".into(),
+            reads_completed: 1000,
+            sectors_read: 20000,
+            writes_completed: 5000,
+            sectors_written: 100000,
+            io_ms: 5000,
+        }];
+        let curr = vec![DiskIoCounters {
+            device: "sda".into(),
+            reads_completed: 1300,
+            sectors_read: 26000,
+            writes_completed: 5600,
+            sectors_written: 112000,
+            io_ms: 8000,
+        }];
+        let result =
+            compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].device, "sda");
+        // reads delta = 300, write delta = 600 over 30s
+        assert!((result[0].read_iops - 10.0).abs() < f64::EPSILON);
+        assert!((result[0].write_iops - 20.0).abs() < f64::EPSILON);
+        // sectors read delta = 6000 × 512 / 30 = 102400
+        assert!((result[0].read_bytes_sec - 102400.0).abs() < 0.1);
+        // sectors written delta = 12000 × 512 / 30 = 204800
+        assert!((result[0].write_bytes_sec - 204800.0).abs() < 0.1);
+        // io_ms delta = 3000ms over 30000ms = 10%
+        assert!((result[0].io_util_pct - 10.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn compute_disk_io_delta_new_device_ignored() {
+        use collectors::disk_io::DiskIoCounters;
+        let prev = vec![DiskIoCounters {
+            device: "sda".into(),
+            ..Default::default()
+        }];
+        let curr = vec![
+            DiskIoCounters {
+                device: "sda".into(),
+                reads_completed: 100,
+                ..Default::default()
+            },
+            DiskIoCounters {
+                device: "sdb".into(),
+                reads_completed: 50,
+                ..Default::default()
+            },
+        ];
+        let result =
+            compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();
+        // sdb not in prev → not in result
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].device, "sda");
+    }
+
+    #[test]
+    fn compute_disk_io_delta_util_capped_at_100() {
+        use collectors::disk_io::DiskIoCounters;
+        let prev = vec![DiskIoCounters {
+            device: "sda".into(),
+            io_ms: 0,
+            ..Default::default()
+        }];
+        let curr = vec![DiskIoCounters {
+            device: "sda".into(),
+            io_ms: 60000, // 60s of I/O in 30s = 200% → should cap at 100%
+            ..Default::default()
+        }];
+        let result =
+            compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();
+        assert!((result[0].io_util_pct - 100.0).abs() < f64::EPSILON);
     }
 }
