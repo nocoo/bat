@@ -99,7 +99,7 @@ export default function SetupPage() {
 					<Collapsible>
 						<Card>
 							<CollapsibleTrigger asChild>
-								<CardHeader className="cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-xl">
+								<CardHeader className="cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-[var(--radius-card)]">
 									<CardTitle className="text-base flex items-center gap-2">
 										<ChevronRight className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-90" />
 										Uninstall
