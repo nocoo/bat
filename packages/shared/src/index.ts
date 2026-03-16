@@ -43,4 +43,4 @@ export type {
 	MetricsQueryResponse,
 	MetricsResolution,
 } from "./api.js";
-export { API_ROUTES } from "./api.js";
+export { API_ROUTES, hashHostId } from "./api.js";

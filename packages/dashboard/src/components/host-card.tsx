@@ -40,7 +40,7 @@ function MetricRow({
 
 export function HostCard({ host }: { host: HostOverviewItem }) {
 	return (
-		<Link href={`/hosts/${host.host_id}`}>
+		<Link href={`/hosts/${host.hid}`}>
 			<Card
 				className="hover:border-primary/50 transition-colors cursor-pointer"
 				data-testid="host-card"

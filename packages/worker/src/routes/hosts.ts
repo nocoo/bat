@@ -1,5 +1,6 @@
 // GET /api/hosts — list all active hosts with overview DTO
 import type { HostOverviewItem } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -103,6 +104,7 @@ FROM (
 		const status = deriveHostStatus(host.last_seen, now, alerts);
 
 		return {
+			hid: hashHostId(host.host_id),
 			host_id: host.host_id,
 			hostname: host.hostname,
 			os: host.os,
