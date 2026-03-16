@@ -10,7 +10,7 @@ import type { AppEnv } from "../types.js";
 const PUBLIC_ROUTES = ["/api/live"];
 
 /** Routes that require write key (BAT_WRITE_KEY) */
-const WRITE_ROUTES = ["/api/ingest", "/api/identity"];
+const WRITE_ROUTES = ["/api/ingest", "/api/identity", "/api/tier2"];
 
 function extractBearerToken(header: string | undefined): string | null {
 	if (!header) return null;
