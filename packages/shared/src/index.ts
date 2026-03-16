@@ -28,7 +28,13 @@ export type {
 	HealthResponse,
 	HealthStatus,
 } from "./alerts.js";
-export { ALL_ALERT_RULES, getAlertRule, TIER1_ALERT_RULES, TIER2_ALERT_RULES } from "./alerts.js";
+export {
+	ALL_ALERT_RULES,
+	getAlertRule,
+	TIER1_ALERT_RULES,
+	TIER2_ALERT_RULES,
+	TIER3_ALERT_RULES,
+} from "./alerts.js";
 
 // Constants
 export {
@@ -38,6 +44,7 @@ export {
 	INTERVALS,
 	RETENTION,
 	TIER2_THRESHOLDS,
+	TIER3_THRESHOLDS,
 } from "./constants.js";
 
 // API route types and constants
