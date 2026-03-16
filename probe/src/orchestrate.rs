@@ -20,6 +20,39 @@ pub fn compute_cpu_delta(prev: Option<&CpuJiffies>, curr: Option<&CpuJiffies>) -
     }
 }
 
+/// Compute Tier 3 CPU extensions from previous and current jiffies.
+///
+/// Returns `(context_switches_sec, forks_sec, procs_running, procs_blocked)`.
+/// All `None` if either sample is missing.
+pub fn compute_cpu_ext(
+    prev: Option<&CpuJiffies>,
+    curr: Option<&CpuJiffies>,
+    elapsed: Duration,
+) -> (Option<f64>, Option<f64>, Option<u32>, Option<u32>) {
+    match (prev, curr) {
+        (Some(p), Some(c)) => {
+            let secs = elapsed.as_secs_f64();
+            let ctxt_sec = if secs > 0.0 {
+                Some(c.ctxt.saturating_sub(p.ctxt) as f64 / secs)
+            } else {
+                None
+            };
+            let forks_sec = if secs > 0.0 {
+                Some(c.processes.saturating_sub(p.processes) as f64 / secs)
+            } else {
+                None
+            };
+            (
+                ctxt_sec,
+                forks_sec,
+                Some(c.procs_running),
+                Some(c.procs_blocked),
+            )
+        }
+        _ => (None, None, None, None),
+    }
+}
+
 /// Compute network metrics delta from optional previous and current counters.
 pub fn compute_net_delta(
     prev: Option<&HashMap<String, NetCounters>>,
@@ -44,6 +77,7 @@ pub fn build_metrics_payload(
     cpu_count: u32,
     usage: (f64, f64, f64),
     loadavg: (f64, f64, f64),
+    cpu_ext: (Option<f64>, Option<f64>, Option<u32>, Option<u32>),
     mem: MemMetrics,
     swap: SwapMetrics,
     disk: Vec<DiskMetric>,
@@ -67,6 +101,10 @@ pub fn build_metrics_payload(
             iowait_pct: usage.1,
             steal_pct: usage.2,
             count: cpu_count,
+            context_switches_sec: cpu_ext.0,
+            forks_sec: cpu_ext.1,
+            procs_running: cpu_ext.2,
+            procs_blocked: cpu_ext.3,
         },
         mem,
         swap,
@@ -521,6 +559,7 @@ mod tests {
             4,
             (12.5, 1.2, 0.0),
             (0.5, 0.3, 0.2),
+            (None, None, None, None),
             mem,
             swap,
             disk,
@@ -562,6 +601,7 @@ mod tests {
             1,
             (0.0, 0.0, 0.0),
             (0.0, 0.0, 0.0),
+            (None, None, None, None),
             mem,
             swap,
             vec![],
@@ -1030,6 +1070,7 @@ mod tests {
             1,
             (0.0, 0.0, 0.0),
             (0.0, 0.0, 0.0),
+            (None, None, None, None),
             mem,
             swap,
             vec![],
@@ -1042,6 +1083,78 @@ mod tests {
         );
         assert!(p.psi.is_some());
         assert!((p.psi.unwrap().cpu_some_avg10 - 5.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_cpu_ext_normal() {
+        let prev = CpuJiffies {
+            ctxt: 1_000_000,
+            processes: 10000,
+            procs_running: 1,
+            procs_blocked: 0,
+            ..Default::default()
+        };
+        let curr = CpuJiffies {
+            ctxt: 1_030_000,
+            processes: 10300,
+            procs_running: 3,
+            procs_blocked: 1,
+            ..Default::default()
+        };
+        let (ctxt, forks, running, blocked) =
+            compute_cpu_ext(Some(&prev), Some(&curr), Duration::from_secs(30));
+        // ctxt delta = 30000 / 30s = 1000/s
+        assert!((ctxt.unwrap() - 1000.0).abs() < f64::EPSILON);
+        // processes delta = 300 / 30s = 10/s
+        assert!((forks.unwrap() - 10.0).abs() < f64::EPSILON);
+        assert_eq!(running, Some(3));
+        assert_eq!(blocked, Some(1));
+    }
+
+    #[test]
+    fn compute_cpu_ext_missing_prev() {
+        let curr = CpuJiffies {
+            ctxt: 1000,
+            ..Default::default()
+        };
+        let (ctxt, forks, running, blocked) =
+            compute_cpu_ext(None, Some(&curr), Duration::from_secs(30));
+        assert!(ctxt.is_none());
+        assert!(forks.is_none());
+        assert!(running.is_none());
+        assert!(blocked.is_none());
+    }
+
+    #[test]
+    fn compute_cpu_ext_both_none() {
+        let (ctxt, forks, running, blocked) = compute_cpu_ext(None, None, Duration::from_secs(30));
+        assert!(ctxt.is_none());
+        assert!(forks.is_none());
+        assert!(running.is_none());
+        assert!(blocked.is_none());
+    }
+
+    #[test]
+    fn compute_cpu_ext_zero_elapsed() {
+        let prev = CpuJiffies {
+            ctxt: 1000,
+            processes: 100,
+            ..Default::default()
+        };
+        let curr = CpuJiffies {
+            ctxt: 2000,
+            processes: 200,
+            procs_running: 2,
+            procs_blocked: 0,
+            ..Default::default()
+        };
+        let (ctxt, forks, running, blocked) =
+            compute_cpu_ext(Some(&prev), Some(&curr), Duration::from_secs(0));
+        // Zero elapsed → rates are None, gauges still populated
+        assert!(ctxt.is_none());
+        assert!(forks.is_none());
+        assert_eq!(running, Some(2));
+        assert_eq!(blocked, Some(0));
     }
 
     #[test]
