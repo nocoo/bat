@@ -58,10 +58,20 @@ docker build --platform linux/arm64 -f probe/Dockerfile.build -o probe/out .
 
 1. Bump version in root `package.json`, run `scripts/sync-version.sh`
 2. Build probe binaries for both architectures (see above)
-3. Upload binaries to Dashboard's `PROBE_BIN_DIR` (default `/app/probe-bin/`)
-   - Filenames must be `bat-probe-linux-x86_64` and `bat-probe-linux-aarch64`
-4. Deploy Worker (Cloudflare) and Dashboard (Railway)
-5. Verify: `curl https://<dashboard>/api/probe/bin/x86_64 -o /dev/null -w '%{http_code}'` → 200
+3. Upload binaries to R2 (`zhe` bucket) — **both** versioned and latest:
+   ```bash
+   VERSION=$(jq -r .version package.json)
+   wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
+   wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-aarch64" --file probe/out/bat-probe-linux-aarch64 --remote
+   wrangler r2 object put "zhe/apps/bat/latest/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
+   wrangler r2 object put "zhe/apps/bat/latest/bat-probe-linux-aarch64" --file probe/out/bat-probe-linux-aarch64 --remote
+   ```
+   - Public URL prefix: `https://s.zhe.to/apps/bat/`
+   - `install.sh` fetches from `latest/` by default — no script changes needed per release
+4. Commit, push, deploy Worker (Cloudflare) and Dashboard (Railway)
+5. Verify:
+   - `curl -sI https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64` → 200
+   - `curl -s https://bat.hexly.ai/api/probe/install.sh | head -1` → `#!/usr/bin/env bash`
 
 ### Installation
 
