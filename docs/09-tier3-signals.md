@@ -458,17 +458,17 @@ export interface MetricsPayload {
 
 ### Atomic Commits
 
-| # | Commit | Files | Verify |
-|---|--------|-------|--------|
-| 1 | `feat: add PSI pressure collector` | `collectors/psi.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse fixture, graceful None on missing |
-| 2 | `feat: add disk I/O collector` | `collectors/disk_io.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse diskstats fixture, delta calc, partition filtering |
-| 3 | `feat: add TCP connection state collector` | `collectors/tcp.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse sockstat fixture |
-| 4 | `feat: extend CPU collector with ctxt/forks/procs` | `collectors/cpu.rs`, `payload.rs`, `orchestrate.rs` | `cargo test` — parse extended /proc/stat, delta ctxt/forks |
-| 5 | `feat: add OOM kill counter to memory collector` | `collectors/memory.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse vmstat fixture, delta calc |
-| 6 | `feat: add file descriptor usage collector` | `collectors/fd.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse file-nr fixture |
-| 7 | `feat: add T3 worker ingest + D1 columns` | `packages/worker/`, `packages/shared/` | `bun test` — new columns accepted, old payloads still work |
-| 8 | `feat: add T3 alert rules (#16-21)` | `packages/worker/src/services/alerts.ts` | `bun test` — PSI/disk IO/TCP/OOM alert evaluation |
-| 9 | `feat: add T3 dashboard charts` | `packages/dashboard/` | Visual — PSI gauge, disk I/O timeline, TCP state bar |
+| # | Commit | Files | Verify | Status |
+|---|--------|-------|--------|--------|
+| 1 | `feat: add PSI pressure collector` | `collectors/psi.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse fixture, graceful None on missing | ✅ |
+| 2 | `feat: add disk I/O collector` | `collectors/disk_io.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse diskstats fixture, delta calc, partition filtering | ✅ |
+| 3 | `feat: add TCP connection state collector` | `collectors/tcp.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse sockstat fixture | ✅ |
+| 4 | `feat: extend CPU collector with ctxt/forks/procs` | `collectors/cpu.rs`, `payload.rs`, `orchestrate.rs` | `cargo test` — parse extended /proc/stat, delta ctxt/forks | ✅ |
+| 5 | `feat: add OOM kill counter to memory collector` | `collectors/memory.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse vmstat fixture, delta calc | ✅ |
+| 6 | `feat: add file descriptor usage collector` | `collectors/fd.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse file-nr fixture | ✅ |
+| 7 | `feat: add T3 worker ingest + D1 columns` | `packages/worker/`, `packages/shared/` | `bun test` — new columns accepted, old payloads still work | ✅ |
+| 8 | `feat: add T3 alert rules (#16-21)` | `packages/worker/src/services/alerts.ts` | `bun test` — PSI/disk IO/TCP/OOM alert evaluation | ✅ |
+| 9 | `feat: add T3 dashboard charts` | `packages/dashboard/` | Visual — PSI pressure, disk I/O, TCP connections | ✅ |
 
 ### D1 Schema Additions
 
