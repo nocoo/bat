@@ -181,9 +181,24 @@ Per port: `{ port, bind, protocol, pid, process }`. Map via `/proc/{pid}/fd/` �
 
 ---
 
-## Alert Rules (all 15)
+## Tier 3: Procfs-Native System Metrics (T1 cadence)
 
-The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 data (MVP), 1 uses Tier 1 but is deferred (low priority), 8 require Tier 2 (post-MVP). Implementation of the 6 MVP rules in [03-data-structures.md § Alert rules](./03-data-structures.md) and [05-worker.md § Alert evaluation](./05-worker.md).
+Lightweight T1 signal expansion — pure procfs reads added to the existing 30s tick. Zero external commands, zero new dependencies. Full design in [09-tier3-signals.md](./09-tier3-signals.md).
+
+| Signal | Source | Cost | Priority |
+|--------|--------|------|----------|
+| PSI pressure (cpu/mem/io avg10/60/300) | `/proc/pressure/{cpu,memory,io}` | 3 file reads | Critical |
+| Disk I/O (IOPS, throughput, utilization) | `/proc/diskstats` | 1 file read + delta | Critical |
+| TCP connection state (established/tw/orphan) | `/proc/net/sockstat` | 1 file read | High |
+| Context switches + forks | `/proc/stat` (already read) | 0 extra reads | Medium |
+| OOM kills (delta) | `/proc/vmstat` | 1 file read | Medium |
+| File descriptor usage | `/proc/sys/fs/file-nr` | 1 file read | Low |
+
+---
+
+## Alert Rules (all 21)
+
+The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 data (MVP), 1 uses Tier 1 but is deferred (low priority), 8 require Tier 2, 6 use Tier 3 (procfs-native). Implementation of the 6 MVP rules in [03-data-structures.md § Alert rules](./03-data-structures.md) and [05-worker.md § Alert evaluation](./05-worker.md). Tier 3 rules in [09-tier3-signals.md](./09-tier3-signals.md).
 
 | # | Alert | Condition | Severity | Tier | Status |
 |---|-------|-----------|----------|------|--------|
@@ -193,17 +208,23 @@ The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 dat
 | 4 | High iowait | `cpu.iowait_pct > 20` for 5 min | warning | 1 | **MVP** |
 | 5 | High steal | `cpu.steal_pct > 10` for 5 min | warning | 1 | **MVP** |
 | 6 | Host offline | `last_seen > 120s ago` | critical | — | **MVP** (server-side) |
-| 7 | Uptime anomaly | `uptime_seconds < 300` | info | 1 | **Deferred** |
-| 8 | Password auth | `ssh.password_auth == true` | critical | 2 | Deferred |
-| 9 | Root login | `ssh.root_login == "yes"` | critical | 2 | Deferred |
-| 10 | No firewall | `firewall.active == false` | critical | 2 | Deferred |
-| 11 | Public port | port on `0.0.0.0`, not in allowlist | warning | 2 | Deferred |
-| 12 | Security updates | `updates.security_count > 0` for 7d | warning | 2 | Deferred |
-| 13 | Container restart loop | `restart_count > 5` (cumulative) | critical | 2 | Deferred |
-| 14 | Systemd unit failed | `services.failed_count > 0` | warning | 2 | Deferred |
-| 15 | Reboot required | `reboot_required == true` for 7d | info | 2 | Deferred |
+| 7 | Uptime anomaly | `uptime_seconds < 300` | info | 1 | Implemented |
+| 8 | Password auth | `ssh.password_auth == true` | critical | 2 | Implemented |
+| 9 | Root login | `ssh.root_login == "yes"` | critical | 2 | Implemented |
+| 10 | No firewall | `firewall.active == false` | critical | 2 | Implemented |
+| 11 | Public port | port on `0.0.0.0`, not in allowlist | warning | 2 | Implemented |
+| 12 | Security updates | `updates.security_count > 0` for 7d | warning | 2 | Implemented |
+| 13 | Container restart loop | `restart_count > 5` (cumulative) | critical | 2 | Implemented |
+| 14 | Systemd unit failed | `services.failed_count > 0` | warning | 2 | Implemented |
+| 15 | Reboot required | `reboot_required == true` for 7d | info | 2 | Implemented |
+| 16 | CPU pressure | `psi.cpu_some_avg60 > 25` for 5 min | warning | 3 | Planned |
+| 17 | Memory pressure | `psi.mem_some_avg60 > 10` for 5 min | warning | 3 | Planned |
+| 18 | I/O pressure | `psi.io_some_avg60 > 20` for 5 min | warning | 3 | Planned |
+| 19 | Disk I/O saturated | `disk_io.io_util_pct > 80` for 5 min | warning | 3 | Planned |
+| 20 | TCP connection leak | `tcp.time_wait > 500` for 5 min | warning | 3 | Planned |
+| 21 | OOM kill detected | `oom_kills_delta > 0` (instant) | critical | 3 | Planned |
 
-**Note**: Rule #6 (host_offline) is server-side only — not derived from probe metrics. Rule #7 (uptime anomaly) uses Tier 1 data but is deferred to post-MVP (info severity, low priority).
+**Note**: Rule #6 (host_offline) is server-side only — not derived from probe metrics.
 
 ---
 
