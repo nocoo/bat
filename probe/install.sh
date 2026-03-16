@@ -186,10 +186,12 @@ do_install() {
 worker_url = "${escaped_url}"
 write_key = "${escaped_key}"
 TOML
-        chown bat:bat "${CONFIG_FILE}"
-        chmod 600 "${CONFIG_FILE}"
         ok "Config written to ${CONFIG_FILE}"
     fi
+
+    # Ensure correct ownership regardless of whether config was just written or pre-existing
+    chown bat:bat "${CONFIG_FILE}"
+    chmod 600 "${CONFIG_FILE}"
 
     # Install systemd service
     cat > "${SERVICE_FILE}" <<'SERVICE'

@@ -90,7 +90,7 @@ docker build -f packages/dashboard/Dockerfile .
 
 Required environment variables: `BAT_API_URL`, `BAT_READ_KEY`, `BAT_WRITE_KEY`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS`.
 
-Optional: `PROBE_BIN_DIR` (path to precompiled probe binaries, default `/app/probe-bin`).
+Binary distribution requires `PROBE_BIN_DIR` pointing to a directory containing `bat-probe-linux-x86_64` and/or `bat-probe-linux-aarch64` (default `/app/probe-bin`). Without this, `/api/probe/bin/:arch` will return 404.
 
 ### Probe (systemd)
 
@@ -102,6 +102,15 @@ curl -fsSL https://<dashboard>/api/probe/install.sh | bash -s -- --url <worker_u
 cd probe && cargo build --release
 # Copy binary and config to target host
 # Install systemd unit from probe/dist/bat-probe.service
+```
+
+Cross-compile for binary distribution:
+```bash
+# x86_64
+cargo build --release --target x86_64-unknown-linux-gnu
+# aarch64 (requires cross)
+cross build --release --target aarch64-unknown-linux-gnu
+# Place binaries in PROBE_BIN_DIR as bat-probe-linux-x86_64 / bat-probe-linux-aarch64
 ```
 
 ## Test Summary
