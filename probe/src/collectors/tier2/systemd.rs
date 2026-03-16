@@ -88,10 +88,10 @@ pub async fn collect_failed_services() -> Option<SystemdServicesInfo> {
         Ok(s) => s,
         Err(CommandError::NotFound) => return None,
         // systemctl may exit 1 when there are failed units, so we handle ExitStatus too
-        Err(CommandError::ExitStatus { stderr, .. }) => {
+        Err(CommandError::ExitStatus { stdout, stderr, .. }) => {
             tracing::debug!(stderr, "systemctl list-units returned non-zero");
-            // Try to parse stderr as well, but it's usually empty for this command
-            String::new()
+            // stdout contains the actual unit listing even on non-zero exit
+            stdout
         }
         Err(e) => {
             tracing::warn!(error = %e, "failed to run systemctl");

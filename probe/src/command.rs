@@ -13,7 +13,11 @@ pub enum CommandError {
     /// The command timed out.
     Timeout,
     /// The command exited with a non-zero status.
-    ExitStatus { code: i32, stderr: String },
+    ExitStatus {
+        code: i32,
+        stdout: String,
+        stderr: String,
+    },
     /// An I/O error occurred.
     Io(std::io::Error),
 }
@@ -23,7 +27,7 @@ impl fmt::Display for CommandError {
         match self {
             Self::NotFound => write!(f, "command not found"),
             Self::Timeout => write!(f, "command timed out"),
-            Self::ExitStatus { code, stderr } => {
+            Self::ExitStatus { code, stderr, .. } => {
                 write!(f, "exit code {code}: {stderr}")
             }
             Self::Io(e) => write!(f, "io error: {e}"),
@@ -59,8 +63,13 @@ pub async fn run_command(
                 })
             } else {
                 let code = output.status.code().unwrap_or(-1);
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
                 let stderr = String::from_utf8_lossy(&output.stderr).to_string();
-                Err(CommandError::ExitStatus { code, stderr })
+                Err(CommandError::ExitStatus {
+                    code,
+                    stdout,
+                    stderr,
+                })
             }
         }
     }
@@ -152,6 +161,7 @@ mod tests {
                 "{}",
                 CommandError::ExitStatus {
                     code: 1,
+                    stdout: String::new(),
                     stderr: "oops".into()
                 }
             ),
