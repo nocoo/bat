@@ -144,6 +144,44 @@ pub fn parse_ufw_status(output: &str) -> (bool, Option<String>) {
     (active, default_policy)
 }
 
+/// Check if iptables has any non-default INPUT rules.
+///
+/// Runs `iptables -L INPUT -n` and checks for rules beyond the default
+/// ACCEPT/DROP policy line and the header. Returns `true` if there are
+/// user-defined rules (indicating an active firewall), `false` if only
+/// default ACCEPT policy with no rules.
+pub fn parse_iptables_input(output: &str) -> bool {
+    let mut rule_count = 0;
+    let mut has_non_accept_policy = false;
+
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        // "Chain INPUT (policy DROP)" or "Chain INPUT (policy ACCEPT)"
+        if trimmed.starts_with("Chain INPUT") {
+            if let Some(policy_start) = trimmed.find("policy ") {
+                let policy = &trimmed[policy_start + 7..];
+                let policy = policy.trim_end_matches(')');
+                if policy != "ACCEPT" {
+                    has_non_accept_policy = true;
+                }
+            }
+            continue;
+        }
+        // Skip the column header line ("target     prot opt source  destination")
+        if trimmed.starts_with("target") || trimmed.starts_with("num") {
+            continue;
+        }
+        // Any other line is a rule
+        rule_count += 1;
+    }
+
+    // Active firewall = either a restrictive default policy or user-defined rules
+    has_non_accept_policy || rule_count > 0
+}
+
 /// Parse `fail2ban-client status sshd` output for banned count.
 ///
 /// Looks for "Currently banned:" line.
@@ -223,7 +261,7 @@ pub async fn collect_security_posture() -> SecurityPostureInfo {
         }
     };
 
-    // Firewall
+    // Firewall: try ufw first, then fall back to iptables
     let (firewall_active, firewall_default_policy) = if command::command_exists("ufw") {
         command::run_command_default("ufw", &["status"])
             .await
@@ -231,8 +269,15 @@ pub async fn collect_security_posture() -> SecurityPostureInfo {
                 let (active, policy) = parse_ufw_status(&output);
                 (Some(active), policy)
             })
+    } else if command::command_exists("iptables") {
+        // No ufw — check if iptables has any INPUT rules or a restrictive policy
+        let active = command::run_command_default("iptables", &["-L", "INPUT", "-n"])
+            .await
+            .is_ok_and(|output| parse_iptables_input(&output));
+        (Some(active), None)
     } else {
-        (None, None)
+        // Neither ufw nor iptables available — definitively no firewall
+        (Some(false), None)
     };
 
     // Fail2ban
@@ -462,6 +507,43 @@ Status for the jail: sshd
     #[test]
     fn parse_fail2ban_status_empty() {
         assert_eq!(parse_fail2ban_status(""), None);
+    }
+
+    // --- parse_iptables_input ---
+
+    #[test]
+    fn parse_iptables_drop_policy_no_rules() {
+        let output = "\
+Chain INPUT (policy DROP)
+target     prot opt source               destination
+";
+        assert!(parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_iptables_accept_policy_with_rules() {
+        let output = "\
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0            tcp dpt:22
+DROP       all  --  0.0.0.0/0            0.0.0.0/0
+";
+        assert!(parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_iptables_accept_policy_no_rules() {
+        // Default ACCEPT with zero rules = no firewall
+        let output = "\
+Chain INPUT (policy ACCEPT)
+target     prot opt source               destination
+";
+        assert!(!parse_iptables_input(output));
+    }
+
+    #[test]
+    fn parse_iptables_empty() {
+        assert!(!parse_iptables_input(""));
     }
 
     // --- read_sshd_config_from ---
