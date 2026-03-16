@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
-import { AlertTriangle, Clock, Cpu, Globe, HardDrive, Info, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -129,66 +129,20 @@ export default function HostDetailPage() {
 				{metricsLoading ? (
 					<div className="grid gap-4 lg:grid-cols-2">
 						{Array.from({ length: 4 }, (_, i) => (
-							<Card key={`chart-skeleton-${i.toString()}`}>
-								<CardContent className="py-6">
-									<Skeleton className="h-64 w-full" />
-								</CardContent>
-							</Card>
+							<div
+								key={`chart-skeleton-${i.toString()}`}
+								className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5"
+							>
+								<Skeleton className="h-64 w-full" />
+							</div>
 						))}
 					</div>
 				) : metricsResponse ? (
 					<div className="grid gap-4 lg:grid-cols-2">
-						{/* CPU Chart */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2 text-base">
-									<Cpu className="h-4 w-4" />
-									CPU
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<CpuChart data={metricsResponse.data} />
-							</CardContent>
-						</Card>
-
-						{/* Memory Chart */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2 text-base">
-									<HardDrive className="h-4 w-4" />
-									Memory
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<MemoryChart data={metricsResponse.data} />
-							</CardContent>
-						</Card>
-
-						{/* Network Chart */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2 text-base">
-									<Globe className="h-4 w-4" />
-									Network
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<NetworkChart data={metricsResponse.data} resolution={metricsResponse.resolution} />
-							</CardContent>
-						</Card>
-
-						{/* Disk Usage */}
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2 text-base">
-									<Clock className="h-4 w-4" />
-									Disk Usage
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<DiskBars data={metricsResponse.data} />
-							</CardContent>
-						</Card>
+						<CpuChart data={metricsResponse.data} />
+						<MemoryChart data={metricsResponse.data} />
+						<NetworkChart data={metricsResponse.data} resolution={metricsResponse.resolution} />
+						<DiskBars data={metricsResponse.data} />
 					</div>
 				) : (
 					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

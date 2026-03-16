@@ -1,66 +1,84 @@
 "use client";
 
-import { formatTime } from "@/lib/transforms";
-import { transformCpuData } from "@/lib/transforms";
+import { chart, chartAxis } from "@/lib/palette";
+import { formatTime, transformCpuData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
-import {
-	CartesianGrid,
-	Legend,
-	Line,
-	LineChart,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts";
+import { Cpu } from "lucide-react";
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltip } from "./chart-tooltip";
+import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
+
+const SERIES = [
+	{ key: "usage", label: "CPU Usage", color: chart.vermilion, width: 2 },
+	{ key: "iowait", label: "IO Wait", color: chart.sky, width: 1.5 },
+	{ key: "steal", label: "Steal", color: chart.teal, width: 1.5 },
+] as const;
 
 export function CpuChart({ data }: { data: MetricsDataPoint[] }) {
 	const chartData = transformCpuData(data);
 
 	if (chartData.length === 0) {
 		return (
-			<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-				No CPU data
+			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+				<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+					No CPU data
+				</div>
 			</div>
 		);
 	}
 
 	return (
-		<ResponsiveContainer width="100%" height={256}>
-			<LineChart data={chartData}>
-				<CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-				<XAxis dataKey="ts" tickFormatter={formatTime} className="text-xs" />
-				<YAxis domain={[0, 100]} tickFormatter={(v: number) => `${v}%`} className="text-xs" />
-				<Tooltip
-					labelFormatter={(label) => new Date(Number(label) * 1000).toLocaleString()}
-					formatter={(value) => [`${Number(value).toFixed(1)}%`]}
-				/>
-				<Legend />
-				<Line
-					type="monotone"
-					dataKey="usage"
-					name="CPU Usage"
-					stroke="var(--chart-1)"
-					dot={false}
-					strokeWidth={2}
-				/>
-				<Line
-					type="monotone"
-					dataKey="iowait"
-					name="IO Wait"
-					stroke="var(--chart-2)"
-					dot={false}
-					strokeWidth={1.5}
-				/>
-				<Line
-					type="monotone"
-					dataKey="steal"
-					name="Steal"
-					stroke="var(--chart-3)"
-					dot={false}
-					strokeWidth={1.5}
-				/>
-			</LineChart>
-		</ResponsiveContainer>
+		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+			{/* Header: icon + title + legend */}
+			<div className="mb-3 flex items-center justify-between">
+				<div className="flex items-center gap-2 text-base font-semibold">
+					<Cpu className="h-4 w-4" />
+					CPU
+				</div>
+				<div className="flex items-center gap-3">
+					{SERIES.map((s) => (
+						<span key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<span
+								className="inline-block h-2 w-2 rounded-full"
+								style={{ backgroundColor: s.color }}
+							/>
+							{s.label}
+						</span>
+					))}
+				</div>
+			</div>
+
+			<DashboardResponsiveContainer width="100%" height={256}>
+				<LineChart data={chartData}>
+					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
+					<XAxis
+						dataKey="ts"
+						tickFormatter={formatTime}
+						axisLine={false}
+						tickLine={false}
+						tick={{ fill: chartAxis, fontSize: 11 }}
+					/>
+					<YAxis
+						domain={[0, 100]}
+						tickFormatter={(v: number) => `${v}%`}
+						axisLine={false}
+						tickLine={false}
+						tick={{ fill: chartAxis, fontSize: 11 }}
+					/>
+					<Tooltip content={<ChartTooltip />} />
+					{SERIES.map((s) => (
+						<Line
+							key={s.key}
+							type="monotone"
+							dataKey={s.key}
+							name={s.label}
+							stroke={s.color}
+							dot={false}
+							strokeWidth={s.width}
+						/>
+					))}
+				</LineChart>
+			</DashboardResponsiveContainer>
+		</div>
 	);
 }
