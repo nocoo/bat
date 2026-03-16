@@ -70,11 +70,15 @@ fn parse_meminfo_line(line: &str, key: &str) -> Option<u64> {
 
 // ── Live reader (requires Linux /proc) ──────────────────────────────
 
+/// Read and parse meminfo from a file (parameterized path for testing).
+pub fn read_meminfo_from(path: &str) -> Result<MemInfo, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    parse_meminfo(&content).ok_or_else(|| format!("failed to parse {path}"))
+}
+
 /// Read and parse `/proc/meminfo`.
 pub fn read_meminfo() -> Result<MemInfo, String> {
-    let content =
-        std::fs::read_to_string("/proc/meminfo").map_err(|e| format!("read /proc/meminfo: {e}"))?;
-    parse_meminfo(&content).ok_or_else(|| "failed to parse /proc/meminfo".to_string())
+    read_meminfo_from("/proc/meminfo")
 }
 
 #[cfg(test)]
@@ -190,5 +194,21 @@ SwapFree:        0 kB
 ";
         let info = parse_meminfo(content).unwrap();
         assert_eq!(info.mem_total, 1000 * 1024);
+    }
+
+    #[test]
+    fn read_meminfo_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meminfo");
+        std::fs::write(&path, PROC_MEMINFO).unwrap();
+        let info = read_meminfo_from(path.to_str().unwrap()).unwrap();
+        assert_eq!(info.mem_total, 1_946_360 * 1024);
+        assert_eq!(info.mem_available, 562_176 * 1024);
+    }
+
+    #[test]
+    fn read_meminfo_from_missing_file() {
+        let result = read_meminfo_from("/nonexistent/path/meminfo");
+        assert!(result.is_err());
     }
 }

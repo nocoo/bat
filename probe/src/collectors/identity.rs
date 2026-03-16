@@ -63,32 +63,48 @@ pub fn get_arch() -> String {
 
 // ── Live readers (require Linux /proc, /etc) ────────────────────────
 
+/// Read hostname from a file (parameterized path for testing).
+pub fn read_hostname_from(path: &str) -> Result<String, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    Ok(parse_hostname(&content))
+}
+
 /// Read hostname from `/etc/hostname`.
 pub fn read_hostname() -> Result<String, String> {
-    let content =
-        std::fs::read_to_string("/etc/hostname").map_err(|e| format!("read /etc/hostname: {e}"))?;
-    Ok(parse_hostname(&content))
+    read_hostname_from("/etc/hostname")
+}
+
+/// Read OS pretty name from a file (parameterized path for testing).
+pub fn read_os_release_from(path: &str) -> Result<String, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    Ok(parse_os_release(&content))
 }
 
 /// Read OS pretty name from `/etc/os-release`.
 pub fn read_os_release() -> Result<String, String> {
-    let content = std::fs::read_to_string("/etc/os-release")
-        .map_err(|e| format!("read /etc/os-release: {e}"))?;
-    Ok(parse_os_release(&content))
+    read_os_release_from("/etc/os-release")
+}
+
+/// Read kernel version from a file (parameterized path for testing).
+pub fn read_kernel_version_from(path: &str) -> Result<String, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    Ok(parse_kernel_version(&content))
 }
 
 /// Read kernel version from `/proc/version`.
 pub fn read_kernel_version() -> Result<String, String> {
-    let content =
-        std::fs::read_to_string("/proc/version").map_err(|e| format!("read /proc/version: {e}"))?;
-    Ok(parse_kernel_version(&content))
+    read_kernel_version_from("/proc/version")
+}
+
+/// Read uptime in seconds from a file (parameterized path for testing).
+pub fn read_uptime_from(path: &str) -> Result<u64, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    Ok(parse_uptime(&content))
 }
 
 /// Read uptime in seconds from `/proc/uptime`.
 pub fn read_uptime() -> Result<u64, String> {
-    let content =
-        std::fs::read_to_string("/proc/uptime").map_err(|e| format!("read /proc/uptime: {e}"))?;
-    Ok(parse_uptime(&content))
+    read_uptime_from("/proc/uptime")
 }
 
 #[cfg(test)]
@@ -202,5 +218,52 @@ VERSION_ID="12"
     #[test]
     fn parse_uptime_non_numeric() {
         assert_eq!(parse_uptime("not_a_number\n"), 0);
+    }
+
+    #[test]
+    fn read_hostname_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("hostname");
+        std::fs::write(&path, "myserver\n").unwrap();
+        assert_eq!(
+            read_hostname_from(path.to_str().unwrap()).unwrap(),
+            "myserver"
+        );
+    }
+
+    #[test]
+    fn read_os_release_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("os-release");
+        std::fs::write(&path, "PRETTY_NAME=\"Ubuntu 22.04.3 LTS\"\nID=ubuntu\n").unwrap();
+        assert_eq!(
+            read_os_release_from(path.to_str().unwrap()).unwrap(),
+            "Ubuntu 22.04.3 LTS"
+        );
+    }
+
+    #[test]
+    fn read_kernel_version_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("version");
+        std::fs::write(&path, "Linux version 5.15.0-91-generic (buildd@host)\n").unwrap();
+        assert_eq!(
+            read_kernel_version_from(path.to_str().unwrap()).unwrap(),
+            "5.15.0-91-generic"
+        );
+    }
+
+    #[test]
+    fn read_uptime_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("uptime");
+        std::fs::write(&path, "86400.50 172800.00\n").unwrap();
+        assert_eq!(read_uptime_from(path.to_str().unwrap()).unwrap(), 86400);
+    }
+
+    #[test]
+    fn read_hostname_from_missing_file() {
+        let result = read_hostname_from("/nonexistent/path/hostname");
+        assert!(result.is_err());
     }
 }
