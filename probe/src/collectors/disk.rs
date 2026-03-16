@@ -65,25 +65,22 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
         let path = std::ffi::CString::new(mount.mount_point.as_bytes()).ok();
         let Some(path) = path else { continue };
 
-        match nix::sys::statvfs::statvfs(&*path) {
-            Ok(stat) => {
-                let block_size = stat.block_size();
-                let total = u64::from(stat.blocks()) * block_size;
-                let avail = u64::from(stat.blocks_available()) * block_size;
-                let used_pct = if total > 0 {
-                    (total - avail) as f64 / total as f64 * 100.0
-                } else {
-                    0.0
-                };
+        if let Ok(stat) = nix::sys::statvfs::statvfs(&*path) {
+            let block_size = stat.block_size();
+            let total = u64::from(stat.blocks()) * block_size;
+            let avail = u64::from(stat.blocks_available()) * block_size;
+            let used_pct = if total > 0 {
+                (total - avail) as f64 / total as f64 * 100.0
+            } else {
+                0.0
+            };
 
-                results.push(DiskInfo {
-                    mount: mount.mount_point.clone(),
-                    total_bytes: total,
-                    avail_bytes: avail,
-                    used_pct,
-                });
-            }
-            Err(_) => {}
+            results.push(DiskInfo {
+                mount: mount.mount_point.clone(),
+                total_bytes: total,
+                avail_bytes: avail,
+                used_pct,
+            });
         }
     }
 

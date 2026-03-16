@@ -3,7 +3,7 @@ pub fn parse_hostname(content: &str) -> String {
     content.trim().to_string()
 }
 
-/// Parse PRETTY_NAME from `/etc/os-release`.
+/// Parse `PRETTY_NAME` from `/etc/os-release`.
 ///
 /// Looks for `PRETTY_NAME="..."` or `PRETTY_NAME=...` line.
 pub fn parse_os_release(content: &str) -> String {
@@ -46,9 +46,9 @@ pub fn parse_uptime(content: &str) -> u64 {
         .map_or(0, |f| f as u64)
 }
 
-/// Get system architecture via libc uname().
+/// Get system architecture via libc `uname()`.
 ///
-/// Returns the `machine` field (e.g., "x86_64", "aarch64").
+/// Returns the `machine` field (e.g., `x86_64`, `aarch64`).
 pub fn get_arch() -> String {
     unsafe {
         let mut utsname: libc::utsname = std::mem::zeroed();

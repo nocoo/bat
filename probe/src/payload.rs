@@ -75,7 +75,7 @@ mod tests {
     fn metrics_payload_serializes_expected_fields() {
         let payload = MetricsPayload {
             host_id: "test-host".into(),
-            timestamp: 1700000000,
+            timestamp: 1_700_000_000,
             interval: 30,
             cpu: CpuMetrics {
                 load1: 0.5,
@@ -116,7 +116,7 @@ mod tests {
 
         // Top-level fields
         assert_eq!(json["host_id"], "test-host");
-        assert_eq!(json["timestamp"], 1700000000u64);
+        assert_eq!(json["timestamp"], 1_700_000_000_u64);
         assert_eq!(json["interval"], 30);
         assert_eq!(json["uptime_seconds"], 86400);
 
@@ -161,7 +161,7 @@ mod tests {
             arch: "x86_64".into(),
             cpu_model: "Intel Xeon E5-2680".into(),
             uptime_seconds: 86400,
-            boot_time: 1699913600,
+            boot_time: 1_699_913_600,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -173,7 +173,7 @@ mod tests {
         assert_eq!(json["arch"], "x86_64");
         assert_eq!(json["cpu_model"], "Intel Xeon E5-2680");
         assert_eq!(json["uptime_seconds"], 86400);
-        assert_eq!(json["boot_time"], 1699913600u64);
+        assert_eq!(json["boot_time"], 1_699_913_600_u64);
     }
 
     #[test]
