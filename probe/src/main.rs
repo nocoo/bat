@@ -232,18 +232,78 @@ async fn send_identity(sender: &Sender, host_id: &str) {
         .as_secs()
         .saturating_sub(uptime_seconds);
 
-    let payload = IdentityPayload {
-        host_id: host_id.to_string(),
-        hostname,
-        os,
-        kernel,
-        arch,
-        cpu_model,
+    let payload = build_identity_payload(
+        host_id,
+        &hostname,
+        &os,
+        &kernel,
+        &arch,
+        &cpu_model,
         uptime_seconds,
         boot_time,
-    };
+    );
 
     if let Err(e) = sender.post("/api/identity", &payload).await {
         tracing::error!(error = %e, "failed to send identity");
+    }
+}
+
+/// Build an [`IdentityPayload`] from collected system values.
+#[allow(clippy::too_many_arguments)]
+fn build_identity_payload(
+    host_id: &str,
+    hostname: &str,
+    os: &str,
+    kernel: &str,
+    arch: &str,
+    cpu_model: &str,
+    uptime_seconds: u64,
+    boot_time: u64,
+) -> IdentityPayload {
+    IdentityPayload {
+        host_id: host_id.to_string(),
+        hostname: hostname.to_string(),
+        os: os.to_string(),
+        kernel: kernel.to_string(),
+        arch: arch.to_string(),
+        cpu_model: cpu_model.to_string(),
+        uptime_seconds,
+        boot_time,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn build_identity_payload_normal() {
+        let p = build_identity_payload(
+            "host-1",
+            "myserver",
+            "Ubuntu 22.04",
+            "5.15.0",
+            "x86_64",
+            "Intel Xeon",
+            86400,
+            1_700_000_000,
+        );
+        assert_eq!(p.host_id, "host-1");
+        assert_eq!(p.hostname, "myserver");
+        assert_eq!(p.os, "Ubuntu 22.04");
+        assert_eq!(p.kernel, "5.15.0");
+        assert_eq!(p.arch, "x86_64");
+        assert_eq!(p.cpu_model, "Intel Xeon");
+        assert_eq!(p.uptime_seconds, 86400);
+        assert_eq!(p.boot_time, 1_700_000_000);
+    }
+
+    #[test]
+    fn build_identity_payload_empty_fields() {
+        let p = build_identity_payload("", "", "", "", "", "", 0, 0);
+        assert_eq!(p.host_id, "");
+        assert_eq!(p.hostname, "");
+        assert_eq!(p.uptime_seconds, 0);
+        assert_eq!(p.boot_time, 0);
     }
 }
