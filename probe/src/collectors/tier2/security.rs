@@ -64,16 +64,13 @@ pub fn parse_root_login(content: &str) -> Option<String> {
 /// Resolve `sshd_config` by merging main config with include directory.
 ///
 /// OpenSSH uses first-match semantics: the first occurrence of a directive wins.
-/// Include directives are processed at the point they appear.
+/// Include directives are processed at the point they appear in the main config.
+/// If no Include directive is present, include contents are ignored — they only
+/// take effect when explicitly included.
 pub fn resolve_sshd_config(
     main_content: &str,
     include_contents: &[String],
 ) -> (Option<bool>, Option<String>) {
-    // Concatenate: include_contents first (since includes typically come early),
-    // but we need to follow the actual Include order in the main config.
-    // For simplicity, process main config and when we hit an Include,
-    // inject the include contents at that point.
-
     let mut combined = String::new();
 
     for line in main_content.lines() {
@@ -87,15 +84,6 @@ pub fn resolve_sshd_config(
             }
         } else {
             combined.push_str(line);
-            combined.push('\n');
-        }
-    }
-
-    // If no Include directive found, append includes at the end
-    // (they won't affect first-match if main config already has the directive)
-    if !main_content.to_lowercase().contains("include") {
-        for include_content in include_contents {
-            combined.push_str(include_content);
             combined.push('\n');
         }
     }
@@ -583,13 +571,13 @@ target     prot opt source               destination
     }
 
     #[test]
-    fn resolve_sshd_config_no_include_appends() {
-        // When main has no Include directive, includes are appended at end
+    fn resolve_sshd_config_no_include_ignores_extras() {
+        // When main has no Include directive, include contents are ignored
         let main = "PermitRootLogin prohibit-password\n";
         let includes = vec!["PasswordAuthentication no\n".to_string()];
         let (pa, rl) = resolve_sshd_config(main, &includes);
-        // Main has no PasswordAuthentication, so include's "no" wins
-        assert_eq!(pa, Some(false));
+        // No Include → include file's PasswordAuthentication is not injected
+        assert_eq!(pa, None);
         assert_eq!(rl, Some("prohibit-password".into()));
     }
 
