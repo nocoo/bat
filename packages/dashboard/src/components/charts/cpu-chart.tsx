@@ -1,7 +1,7 @@
 "use client";
 
 import { chart, chartAxis } from "@/lib/palette";
-import { formatTime, transformCpuData } from "@/lib/transforms";
+import { getTimeFormatter, transformCpuData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { Cpu } from "lucide-react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
@@ -14,8 +14,12 @@ const SERIES = [
 	{ key: "steal", label: "Steal", color: chart.teal, width: 1.5 },
 ] as const;
 
-export function CpuChart({ data }: { data: MetricsDataPoint[] }) {
+export function CpuChart({
+	data,
+	rangeSeconds = 3600,
+}: { data: MetricsDataPoint[]; rangeSeconds?: number }) {
 	const chartData = transformCpuData(data);
+	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
 		return (
@@ -53,7 +57,7 @@ export function CpuChart({ data }: { data: MetricsDataPoint[] }) {
 					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
-						tickFormatter={formatTime}
+						tickFormatter={tickFormatter}
 						axisLine={false}
 						tickLine={false}
 						tick={{ fill: chartAxis, fontSize: 11 }}

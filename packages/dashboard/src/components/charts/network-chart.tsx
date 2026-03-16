@@ -1,7 +1,7 @@
 "use client";
 
 import { chart, chartAxis } from "@/lib/palette";
-import { formatBytesRate, formatTime, transformNetData } from "@/lib/transforms";
+import { formatBytesRate, getTimeFormatter, transformNetData } from "@/lib/transforms";
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Globe } from "lucide-react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
@@ -16,8 +16,10 @@ const SERIES = [
 export function NetworkChart({
 	data,
 	resolution,
-}: { data: MetricsDataPoint[]; resolution: MetricsResolution }) {
+	rangeSeconds = 3600,
+}: { data: MetricsDataPoint[]; resolution: MetricsResolution; rangeSeconds?: number }) {
 	const chartData = transformNetData(data, resolution);
+	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
 		return (
@@ -55,7 +57,7 @@ export function NetworkChart({
 					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
-						tickFormatter={formatTime}
+						tickFormatter={tickFormatter}
 						axisLine={false}
 						tickLine={false}
 						tick={{ fill: chartAxis, fontSize: 11 }}

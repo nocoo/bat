@@ -127,9 +127,13 @@ export default function HostDetailPage() {
 							</span>
 						</div>
 						<div className="grid gap-4 lg:grid-cols-2">
-							<CpuChart data={metricsResponse.data} />
-							<MemoryChart data={metricsResponse.data} />
-							<NetworkChart data={metricsResponse.data} resolution={metricsResponse.resolution} />
+							<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<NetworkChart
+								data={metricsResponse.data}
+								resolution={metricsResponse.resolution}
+								rangeSeconds={rangeSeconds}
+							/>
 							<DiskBars data={metricsResponse.data} />
 						</div>
 					</div>

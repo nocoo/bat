@@ -1,7 +1,7 @@
 "use client";
 
 import { chart, chartAxis } from "@/lib/palette";
-import { formatTime, transformMemData } from "@/lib/transforms";
+import { getTimeFormatter, transformMemData } from "@/lib/transforms";
 import { ALERT_THRESHOLDS } from "@bat/shared";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
@@ -11,8 +11,12 @@ import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
 const GRADIENT_ID = "memoryGradient";
 
-export function MemoryChart({ data }: { data: MetricsDataPoint[] }) {
+export function MemoryChart({
+	data,
+	rangeSeconds = 3600,
+}: { data: MetricsDataPoint[]; rangeSeconds?: number }) {
 	const chartData = transformMemData(data);
+	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
 		return (
@@ -61,7 +65,7 @@ export function MemoryChart({ data }: { data: MetricsDataPoint[] }) {
 					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
-						tickFormatter={formatTime}
+						tickFormatter={tickFormatter}
 						axisLine={false}
 						tickLine={false}
 						tick={{ fill: chartAxis, fontSize: 11 }}

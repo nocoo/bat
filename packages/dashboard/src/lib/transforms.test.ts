@@ -5,6 +5,7 @@ import {
 	formatBytesRate,
 	formatDateTime,
 	formatTime,
+	getTimeFormatter,
 	transformCpuData,
 	transformDiskData,
 	transformMemData,
@@ -142,6 +143,18 @@ describe("formatDateTime", () => {
 		const d = new Date(2024, 0, 15, 14, 30);
 		const ts = Math.floor(d.getTime() / 1000);
 		expect(formatDateTime(ts)).toBe("01/15 14:30");
+	});
+});
+
+describe("getTimeFormatter", () => {
+	test("returns formatTime for ranges under 7 days", () => {
+		expect(getTimeFormatter(3600)).toBe(formatTime); // 1h
+		expect(getTimeFormatter(86400)).toBe(formatTime); // 24h
+	});
+
+	test("returns formatDateTime for ranges >= 7 days", () => {
+		expect(getTimeFormatter(604800)).toBe(formatDateTime); // 7d
+		expect(getTimeFormatter(2592000)).toBe(formatDateTime); // 30d
 	});
 });
 
