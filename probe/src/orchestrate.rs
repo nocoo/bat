@@ -616,6 +616,183 @@ mod tests {
         assert!(metrics.is_empty());
     }
 
+    // --- Tier 2 conversion tests ---
+
+    #[test]
+    fn convert_ports_normal() {
+        let ports = vec![ListeningPort {
+            port: 22,
+            bind: "0.0.0.0".into(),
+            protocol: "tcp".into(),
+            pid: Some(1234),
+            process: Some("sshd".into()),
+        }];
+        let result = convert_ports(ports);
+        assert_eq!(result.listening.len(), 1);
+        assert_eq!(result.listening[0].port, 22);
+        assert_eq!(result.listening[0].bind, "0.0.0.0");
+        assert_eq!(result.listening[0].process, Some("sshd".into()));
+    }
+
+    #[test]
+    fn convert_ports_empty() {
+        let result = convert_ports(vec![]);
+        assert!(result.listening.is_empty());
+    }
+
+    #[test]
+    fn convert_updates_normal() {
+        use collectors::tier2::updates::PackageUpdate;
+        let info = PackageUpdatesInfo {
+            total_count: 2,
+            security_count: 1,
+            list: vec![PackageUpdate {
+                name: "openssl".into(),
+                current_version: "3.0.0".into(),
+                new_version: "3.0.1".into(),
+                is_security: true,
+            }],
+            reboot_required: false,
+            cache_age_seconds: Some(3600),
+        };
+        let result = convert_updates(info);
+        assert_eq!(result.total_count, 2);
+        assert_eq!(result.security_count, 1);
+        assert_eq!(result.list.len(), 1);
+        assert_eq!(result.list[0].name, "openssl");
+        assert!(result.list[0].is_security);
+        assert!(!result.reboot_required);
+        assert_eq!(result.cache_age_seconds, Some(3600));
+    }
+
+    #[test]
+    fn convert_systemd_normal() {
+        use collectors::tier2::systemd::FailedService;
+        let info = SystemdServicesInfo {
+            failed_count: 1,
+            failed: vec![FailedService {
+                unit: "nginx.service".into(),
+                load_state: "loaded".into(),
+                active_state: "failed".into(),
+                sub_state: "failed".into(),
+                description: "The nginx HTTP server".into(),
+            }],
+        };
+        let result = convert_systemd(info);
+        assert_eq!(result.failed_count, 1);
+        assert_eq!(result.failed.len(), 1);
+        assert_eq!(result.failed[0].unit, "nginx.service");
+        assert_eq!(result.failed[0].description, "The nginx HTTP server");
+    }
+
+    #[test]
+    fn convert_security_normal() {
+        let info = SecurityPostureInfo {
+            ssh_password_auth: Some(false),
+            ssh_root_login: Some("no".into()),
+            ssh_failed_logins_7d: Some(42),
+            firewall_active: Some(true),
+            firewall_default_policy: Some("deny".into()),
+            fail2ban_active: Some(true),
+            fail2ban_banned_count: Some(3),
+            unattended_upgrades_active: Some(true),
+        };
+        let result = convert_security(info);
+        assert_eq!(result.ssh_password_auth, Some(false));
+        assert_eq!(result.ssh_root_login, Some("no".into()));
+        assert_eq!(result.ssh_failed_logins_7d, Some(42));
+        assert_eq!(result.firewall_active, Some(true));
+        assert_eq!(result.fail2ban_banned_count, Some(3));
+    }
+
+    #[test]
+    fn convert_docker_normal() {
+        use collectors::tier2::docker::{DockerContainer, DockerImagesInfo};
+        let info = DockerStatusInfo {
+            installed: true,
+            version: Some("24.0.5".into()),
+            containers: vec![DockerContainer {
+                id: "abc123".into(),
+                name: "web".into(),
+                image: "nginx:latest".into(),
+                status: "Up 2 hours".into(),
+                state: "running".into(),
+                cpu_pct: Some(1.5),
+                mem_bytes: Some(50_000_000),
+                restart_count: 0,
+                started_at: Some(1_700_000_000),
+            }],
+            images: Some(DockerImagesInfo {
+                total_count: 5,
+                total_bytes: 1_000_000_000,
+                reclaimable_bytes: 200_000_000,
+            }),
+        };
+        let result = convert_docker(info);
+        assert!(result.installed);
+        assert_eq!(result.version, Some("24.0.5".into()));
+        assert_eq!(result.containers.len(), 1);
+        assert_eq!(result.containers[0].name, "web");
+        assert_eq!(result.containers[0].restart_count, 0);
+        let imgs = result.images.unwrap();
+        assert_eq!(imgs.total_count, 5);
+        assert_eq!(imgs.reclaimable_bytes, 200_000_000);
+    }
+
+    #[test]
+    fn convert_docker_no_images() {
+        let info = DockerStatusInfo {
+            installed: true,
+            version: None,
+            containers: vec![],
+            images: None,
+        };
+        let result = convert_docker(info);
+        assert!(result.images.is_none());
+    }
+
+    #[test]
+    fn convert_disk_deep_normal() {
+        use collectors::tier2::disk_deep::{LargeFile, TopDir};
+        let info = DiskDeepScanInfo {
+            top_dirs: vec![TopDir {
+                path: "/var/log".into(),
+                size_bytes: 500_000_000,
+            }],
+            journal_bytes: Some(100_000_000),
+            large_files: vec![LargeFile {
+                path: "/var/log/syslog".into(),
+                size_bytes: 50_000_000,
+            }],
+        };
+        let result = convert_disk_deep(info);
+        assert_eq!(result.top_dirs.len(), 1);
+        assert_eq!(result.top_dirs[0].path, "/var/log");
+        assert_eq!(result.journal_bytes, Some(100_000_000));
+        assert_eq!(result.large_files.len(), 1);
+        assert_eq!(result.large_files[0].size_bytes, 50_000_000);
+    }
+
+    #[test]
+    fn build_tier2_payload_normal() {
+        let payload = build_tier2_payload(
+            "0.2.0",
+            "host-1",
+            1_700_000_000,
+            Some(convert_ports(vec![])),
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        assert_eq!(payload.probe_version, "0.2.0");
+        assert_eq!(payload.host_id, "host-1");
+        assert_eq!(payload.timestamp, 1_700_000_000);
+        assert!(payload.ports.is_some());
+        assert!(payload.updates.is_none());
+    }
+
     #[test]
     fn net_delta_different_elapsed_produces_different_rates() {
         use collectors::network::NetCounters;
