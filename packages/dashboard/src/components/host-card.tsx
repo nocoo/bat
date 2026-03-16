@@ -43,7 +43,7 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 	return (
 		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
 			<Card
-				className="hover:bg-secondary/80 transition-colors cursor-pointer"
+				className="transition-all cursor-pointer hover:ring-1 hover:ring-border"
 				data-testid="host-card"
 			>
 				<CardHeader>
