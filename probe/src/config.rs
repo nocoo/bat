@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 const DEFAULT_CONFIG_PATH: &str = "/etc/bat/config.toml";
 const DEFAULT_INTERVAL: u32 = 30;
+const MIN_INTERVAL: u32 = 10;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -81,8 +82,11 @@ fn validate_worker_url(raw: &str) -> Result<(), String> {
 /// Parse config from a TOML string.
 pub fn parse_config(content: &str) -> Result<Config, String> {
     let config: Config = toml::from_str(content).map_err(|e| format!("invalid config: {e}"))?;
-    if config.interval == 0 {
-        return Err("invalid config: interval must be > 0".to_string());
+    if config.interval < MIN_INTERVAL {
+        return Err(format!(
+            "invalid config: interval must be >= {MIN_INTERVAL} (got {})",
+            config.interval
+        ));
     }
     validate_worker_url(&config.worker_url)?;
     Ok(config)
@@ -200,18 +204,37 @@ interval = 0
 "#;
         let result = parse_config(content);
         assert!(result.is_err());
-        assert!(result.unwrap_err().contains("interval must be > 0"));
+        assert!(result.unwrap_err().contains(">= 10"));
     }
 
     #[test]
-    fn accept_interval_one() {
+    fn reject_interval_below_minimum() {
+        for interval in [1, 5, 9] {
+            let content = format!(
+                r#"
+worker_url = "https://bat-worker.example.workers.dev"
+write_key = "secret-key"
+interval = {interval}
+"#
+            );
+            let result = parse_config(&content);
+            assert!(result.is_err(), "interval={interval} should be rejected");
+            assert!(
+                result.unwrap_err().contains(">= 10"),
+                "interval={interval} error should mention >= 10"
+            );
+        }
+    }
+
+    #[test]
+    fn accept_interval_minimum() {
         let content = r#"
 worker_url = "https://bat-worker.example.workers.dev"
 write_key = "secret-key"
-interval = 1
+interval = 10
 "#;
         let cfg = parse_config(content).unwrap();
-        assert_eq!(cfg.interval, 1);
+        assert_eq!(cfg.interval, 10);
     }
 
     #[test]
