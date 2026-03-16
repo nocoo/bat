@@ -124,11 +124,6 @@ function LoginContent() {
 							</svg>
 							Sign in with Google
 						</button>
-
-						{/* Terms */}
-						<p className="mt-3 text-center text-[10px] leading-relaxed text-muted-foreground/60">
-							By signing in, you agree to our terms of service and privacy policy
-						</p>
 					</div>
 
 					{/* Footer strip */}
