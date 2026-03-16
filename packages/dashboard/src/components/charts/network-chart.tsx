@@ -1,17 +1,17 @@
 "use client";
 
+import { chart, chartAxis } from "@/lib/palette";
 import { formatBytesRate, formatTime, transformNetData } from "@/lib/transforms";
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
-import {
-	CartesianGrid,
-	Legend,
-	Line,
-	LineChart,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts";
+import { Globe } from "lucide-react";
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltip } from "./chart-tooltip";
+import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
+
+const SERIES = [
+	{ key: "rx_rate", label: "Download", color: chart.lime },
+	{ key: "tx_rate", label: "Upload", color: chart.amber },
+] as const;
 
 export function NetworkChart({
 	data,
@@ -21,40 +21,65 @@ export function NetworkChart({
 
 	if (chartData.length === 0) {
 		return (
-			<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-				No network data
+			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+				<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+					No network data
+				</div>
 			</div>
 		);
 	}
 
 	return (
-		<ResponsiveContainer width="100%" height={256}>
-			<LineChart data={chartData}>
-				<CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-				<XAxis dataKey="ts" tickFormatter={formatTime} className="text-xs" />
-				<YAxis tickFormatter={formatBytesRate} className="text-xs" />
-				<Tooltip
-					labelFormatter={(label) => new Date(Number(label) * 1000).toLocaleString()}
-					formatter={(value) => [formatBytesRate(Number(value))]}
-				/>
-				<Legend />
-				<Line
-					type="monotone"
-					dataKey="rx_rate"
-					name="Download"
-					stroke="var(--chart-5)"
-					dot={false}
-					strokeWidth={2}
-				/>
-				<Line
-					type="monotone"
-					dataKey="tx_rate"
-					name="Upload"
-					stroke="var(--chart-6)"
-					dot={false}
-					strokeWidth={2}
-				/>
-			</LineChart>
-		</ResponsiveContainer>
+		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+			{/* Header: icon + title + legend */}
+			<div className="mb-3 flex items-center justify-between">
+				<div className="flex items-center gap-2 text-base font-semibold">
+					<Globe className="h-4 w-4" />
+					Network
+				</div>
+				<div className="flex items-center gap-3">
+					{SERIES.map((s) => (
+						<span key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+							<span
+								className="inline-block h-2 w-2 rounded-full"
+								style={{ backgroundColor: s.color }}
+							/>
+							{s.label}
+						</span>
+					))}
+				</div>
+			</div>
+
+			<DashboardResponsiveContainer width="100%" height={256}>
+				<LineChart data={chartData}>
+					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
+					<XAxis
+						dataKey="ts"
+						tickFormatter={formatTime}
+						axisLine={false}
+						tickLine={false}
+						tick={{ fill: chartAxis, fontSize: 11 }}
+					/>
+					<YAxis
+						tickFormatter={formatBytesRate}
+						axisLine={false}
+						tickLine={false}
+						tick={{ fill: chartAxis, fontSize: 11 }}
+					/>
+					<Tooltip content={<ChartTooltip valueFormatter={(v) => formatBytesRate(v)} />} />
+					{SERIES.map((s) => (
+						<Line
+							key={s.key}
+							type="monotone"
+							dataKey={s.key}
+							name={s.label}
+							stroke={s.color}
+							dot={false}
+							strokeWidth={2}
+						/>
+					))}
+				</LineChart>
+			</DashboardResponsiveContainer>
+		</div>
 	);
 }
