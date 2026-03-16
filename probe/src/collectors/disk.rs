@@ -54,6 +54,20 @@ pub fn parse_mounts(
         .collect()
 }
 
+/// Compute used bytes and usage percentage from total and available bytes.
+///
+/// Returns `(used_bytes, used_pct)`. Handles `total=0` (returns 0%)
+/// and `avail > total` (clamps to 0 used via saturating subtraction).
+pub fn compute_disk_usage(total_bytes: u64, avail_bytes: u64) -> (u64, f64) {
+    let used = total_bytes.saturating_sub(avail_bytes);
+    let pct = if total_bytes > 0 {
+        used as f64 / total_bytes as f64 * 100.0
+    } else {
+        0.0
+    };
+    (used, pct)
+}
+
 /// Collect disk metrics for a list of mount entries using `statvfs()`.
 ///
 /// This function calls the real `statvfs` syscall and cannot be unit tested
@@ -69,11 +83,7 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
             let block_size = stat.block_size();
             let total = u64::from(stat.blocks()) * block_size;
             let avail = u64::from(stat.blocks_available()) * block_size;
-            let used_pct = if total > 0 {
-                (total - avail) as f64 / total as f64 * 100.0
-            } else {
-                0.0
-            };
+            let (_used, used_pct) = compute_disk_usage(total, avail);
 
             results.push(DiskInfo {
                 mount: mount.mount_point.clone(),
