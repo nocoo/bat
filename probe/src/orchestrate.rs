@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::collectors;
 use crate::collectors::cpu::CpuJiffies;
@@ -19,14 +20,12 @@ pub fn compute_cpu_delta(prev: Option<&CpuJiffies>, curr: Option<&CpuJiffies>) -
 pub fn compute_net_delta(
     prev: Option<&HashMap<String, NetCounters>>,
     curr: Option<&HashMap<String, NetCounters>>,
-    interval: u32,
+    elapsed: Duration,
 ) -> Vec<NetMetric> {
     match (prev, curr) {
-        (Some(p), Some(c)) => convert_net_infos(collectors::network::compute_net_metrics(
-            p,
-            c,
-            u64::from(interval),
-        )),
+        (Some(p), Some(c)) => {
+            convert_net_infos(collectors::network::compute_net_metrics(p, c, elapsed))
+        }
         _ => vec![],
     }
 }
@@ -432,7 +431,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let metrics = compute_net_delta(Some(&prev), Some(&curr), 30);
+        let metrics = compute_net_delta(Some(&prev), Some(&curr), Duration::from_secs(30));
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].iface, "eth0");
     }
@@ -442,13 +441,13 @@ mod tests {
         use collectors::network::NetCounters;
         let mut curr = HashMap::new();
         curr.insert("eth0".to_string(), NetCounters::default());
-        let metrics = compute_net_delta(None, Some(&curr), 30);
+        let metrics = compute_net_delta(None, Some(&curr), Duration::from_secs(30));
         assert!(metrics.is_empty());
     }
 
     #[test]
     fn compute_net_delta_both_none() {
-        let metrics = compute_net_delta(None, None, 30);
+        let metrics = compute_net_delta(None, None, Duration::from_secs(30));
         assert!(metrics.is_empty());
     }
 }

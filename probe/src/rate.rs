@@ -1,13 +1,16 @@
+use std::time::Duration;
+
 /// Compute rate in bytes/sec from two counter samples.
 ///
 /// Handles u64 wrap: if `curr < prev`, treats it as
 /// `curr + (u64::MAX - prev) + 1` (counter wrapped).
-pub fn compute_rate(prev: u64, curr: u64, interval_secs: u64) -> f64 {
-    if interval_secs == 0 {
+pub fn compute_rate(prev: u64, curr: u64, elapsed: Duration) -> f64 {
+    let secs = elapsed.as_secs_f64();
+    if secs <= 0.0 {
         return 0.0;
     }
     let delta = compute_delta(prev, curr);
-    delta as f64 / interval_secs as f64
+    delta as f64 / secs
 }
 
 /// Compute counter delta, handling u64 wrap.
@@ -30,17 +33,24 @@ mod tests {
     #[test]
     fn rate_normal() {
         // 3000 bytes in 30 seconds = 100 bytes/sec
-        assert!((compute_rate(1000, 4000, 30) - 100.0).abs() < f64::EPSILON);
+        assert!((compute_rate(1000, 4000, Duration::from_secs(30)) - 100.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn rate_zero_interval() {
-        assert_eq!(compute_rate(0, 1000, 0), 0.0);
+    fn rate_zero_duration_returns_zero() {
+        assert_eq!(compute_rate(0, 1000, Duration::ZERO), 0.0);
     }
 
     #[test]
     fn rate_no_change() {
-        assert_eq!(compute_rate(5000, 5000, 30), 0.0);
+        assert_eq!(compute_rate(5000, 5000, Duration::from_secs(30)), 0.0);
+    }
+
+    #[test]
+    fn rate_sub_second_precision() {
+        // 1500 bytes in 1.5 seconds = 1000 bytes/sec
+        let rate = compute_rate(0, 1500, Duration::from_millis(1500));
+        assert!((rate - 1000.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -74,6 +84,6 @@ mod tests {
         let prev = u64::MAX - 999;
         let curr = 0;
         // delta = 1000
-        assert!((compute_rate(prev, curr, 10) - 100.0).abs() < f64::EPSILON);
+        assert!((compute_rate(prev, curr, Duration::from_secs(10)) - 100.0).abs() < f64::EPSILON);
     }
 }

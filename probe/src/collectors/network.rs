@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 /// Raw counters read from `/sys/class/net/{iface}/statistics/`.
 #[derive(Debug, Clone, Default)]
@@ -59,7 +60,7 @@ fn read_sysfs_u64(path: &str) -> std::io::Result<u64> {
 pub fn compute_net_metrics(
     prev: &HashMap<String, NetCounters>,
     curr: &HashMap<String, NetCounters>,
-    interval_secs: u64,
+    elapsed: Duration,
 ) -> Vec<NetInfo> {
     use crate::rate::{compute_delta, compute_rate};
 
@@ -71,12 +72,12 @@ pub fn compute_net_metrics(
                 rx_bytes_rate: compute_rate(
                     prev_counters.rx_bytes,
                     curr_counters.rx_bytes,
-                    interval_secs,
+                    elapsed,
                 ),
                 tx_bytes_rate: compute_rate(
                     prev_counters.tx_bytes,
                     curr_counters.tx_bytes,
-                    interval_secs,
+                    elapsed,
                 ),
                 rx_errors: compute_delta(prev_counters.rx_errors, curr_counters.rx_errors),
                 tx_errors: compute_delta(prev_counters.tx_errors, curr_counters.tx_errors),
@@ -180,7 +181,7 @@ mod tests {
             },
         );
 
-        let metrics = compute_net_metrics(&prev, &curr, 30);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::from_secs(30));
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].iface, "eth0");
         assert!((metrics[0].rx_bytes_rate - 100.0).abs() < f64::EPSILON); // 3000/30
@@ -196,7 +197,7 @@ mod tests {
         let mut curr = HashMap::new();
         curr.insert("eth0".to_string(), NetCounters::default());
 
-        let metrics = compute_net_metrics(&prev, &curr, 30);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::from_secs(30));
         assert!(metrics.is_empty());
     }
 
@@ -238,7 +239,7 @@ mod tests {
             },
         );
 
-        let metrics = compute_net_metrics(&prev, &curr, 30);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::from_secs(30));
         assert_eq!(metrics.len(), 2);
         // Sorted by iface name
         assert_eq!(metrics[0].iface, "eth0");
@@ -269,7 +270,7 @@ mod tests {
             },
         );
 
-        let metrics = compute_net_metrics(&prev, &curr, 10);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::from_secs(10));
         assert_eq!(metrics.len(), 1);
         // rx_bytes delta = 500 + (u64::MAX - (u64::MAX - 500)) = 1000
         assert!((metrics[0].rx_bytes_rate - 100.0).abs() < f64::EPSILON);
@@ -338,7 +339,7 @@ mod tests {
     fn compute_net_metrics_empty_input() {
         let prev = HashMap::new();
         let curr = HashMap::new();
-        let metrics = compute_net_metrics(&prev, &curr, 30);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::from_secs(30));
         assert!(metrics.is_empty());
     }
 
@@ -362,7 +363,7 @@ mod tests {
                 ..Default::default()
             },
         );
-        let metrics = compute_net_metrics(&prev, &curr, 0);
+        let metrics = compute_net_metrics(&prev, &curr, Duration::ZERO);
         assert_eq!(metrics.len(), 1);
         // rate should be 0 when interval is 0
         assert_eq!(metrics[0].rx_bytes_rate, 0.0);
