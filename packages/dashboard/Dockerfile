@@ -51,7 +51,8 @@ COPY --from=builder /app/packages/dashboard/.next/standalone ./
 COPY --from=builder /app/packages/dashboard/.next/static ./packages/dashboard/.next/static
 
 # Copy probe install script (served via /api/probe/install.sh)
-COPY probe/install.sh ./probe-assets/install.sh
+# standalone server.js does process.chdir(__dirname) → cwd becomes /app/packages/dashboard
+COPY probe/install.sh ./packages/dashboard/probe-assets/install.sh
 
 EXPOSE 7041
 
