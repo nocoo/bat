@@ -450,4 +450,43 @@ mod tests {
         let metrics = compute_net_delta(None, None, Duration::from_secs(30));
         assert!(metrics.is_empty());
     }
+
+    #[test]
+    fn net_delta_different_elapsed_produces_different_rates() {
+        use collectors::network::NetCounters;
+
+        let mut prev = HashMap::new();
+        prev.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 1000,
+                tx_bytes: 2000,
+                ..Default::default()
+            },
+        );
+        let mut curr = HashMap::new();
+        curr.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 4000,
+                tx_bytes: 5000,
+                ..Default::default()
+            },
+        );
+
+        // Same delta (3000 bytes), different elapsed → different rates
+        let m30 = compute_net_delta(Some(&prev), Some(&curr), Duration::from_secs(30));
+        let m60 = compute_net_delta(Some(&prev), Some(&curr), Duration::from_secs(60));
+        let m90 = compute_net_delta(Some(&prev), Some(&curr), Duration::from_secs(90));
+
+        assert_eq!(m30.len(), 1);
+        assert_eq!(m60.len(), 1);
+        assert_eq!(m90.len(), 1);
+
+        // 3000/30 = 100, 3000/60 = 50, 3000/90 ≈ 33.3
+        assert!(m30[0].rx_bytes_rate > m60[0].rx_bytes_rate);
+        assert!(m60[0].rx_bytes_rate > m90[0].rx_bytes_rate);
+        assert!((m30[0].rx_bytes_rate - 100.0).abs() < f64::EPSILON);
+        assert!((m60[0].rx_bytes_rate - 50.0).abs() < f64::EPSILON);
+    }
 }
