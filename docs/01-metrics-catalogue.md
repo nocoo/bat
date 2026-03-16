@@ -199,7 +199,7 @@ The probe reports raw numbers. The Worker derives alerts. 6 rules use Tier 1 dat
 | 10 | No firewall | `firewall.active == false` | critical | 2 | Deferred |
 | 11 | Public port | port on `0.0.0.0`, not in allowlist | warning | 2 | Deferred |
 | 12 | Security updates | `updates.security_count > 0` for 7d | warning | 2 | Deferred |
-| 13 | Container restart loop | `restart_count > 5` in 1h | critical | 2 | Deferred |
+| 13 | Container restart loop | `restart_count > 5` (cumulative) | critical | 2 | Deferred |
 | 14 | Systemd unit failed | `services.failed_count > 0` | warning | 2 | Deferred |
 | 15 | Reboot required | `reboot_required == true` for 7d | info | 2 | Deferred |
 
