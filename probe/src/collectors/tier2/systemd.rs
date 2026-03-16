@@ -19,11 +19,14 @@ pub struct SystemdServicesInfo {
 
 /// Parse `systemctl list-units --state=failed --no-legend --plain` output.
 ///
-/// Example output (--no-legend --plain):
+/// Example output (--no-legend --plain, columns are space-padded for alignment):
 /// ```text
-/// nginx.service loaded failed failed The nginx HTTP and reverse proxy server
-/// foo.service loaded failed failed Foo Service
+/// nginx.service               loaded failed failed The nginx HTTP and reverse proxy server
+/// foo.service                  loaded failed failed Foo Service
 /// ```
+///
+/// Uses `split_whitespace()` to handle multi-space column alignment.
+/// Only includes `.service` units (skips .timer, .socket, .mount, etc.).
 pub fn parse_failed_units(output: &str) -> Vec<FailedService> {
     let mut services = Vec::new();
 
@@ -33,18 +36,33 @@ pub fn parse_failed_units(output: &str) -> Vec<FailedService> {
             continue;
         }
 
-        let fields: Vec<&str> = trimmed.splitn(5, char::is_whitespace).collect();
-        if fields.len() < 5 {
+        let mut iter = trimmed.split_whitespace();
+        let Some(unit) = iter.next() else { continue };
+        let Some(load_state) = iter.next() else {
+            continue;
+        };
+        let Some(active_state) = iter.next() else {
+            continue;
+        };
+        let Some(sub_state) = iter.next() else {
+            continue;
+        };
+        let description: String = iter.collect::<Vec<_>>().join(" ");
+        if description.is_empty() {
             continue;
         }
 
-        // Filter to only actual .service units (skip .timer, .socket, etc. if any)
+        // Only include .service units — skip .timer, .socket, .mount, .scope, etc.
+        if !unit.ends_with(".service") {
+            continue;
+        }
+
         services.push(FailedService {
-            unit: fields[0].to_string(),
-            load_state: fields[1].to_string(),
-            active_state: fields[2].to_string(),
-            sub_state: fields[3].to_string(),
-            description: fields[4].to_string(),
+            unit: unit.to_string(),
+            load_state: load_state.to_string(),
+            active_state: active_state.to_string(),
+            sub_state: sub_state.to_string(),
+            description,
         });
     }
 
@@ -112,6 +130,40 @@ foo.service loaded failed failed Foo Service
         );
         assert_eq!(services[1].unit, "foo.service");
         assert_eq!(services[1].description, "Foo Service");
+    }
+
+    #[test]
+    fn parse_failed_units_multi_space_alignment() {
+        // Real systemctl output uses multi-space column alignment
+        let output = "\
+nginx.service               loaded failed failed The nginx HTTP and reverse proxy server
+foo.service                  loaded failed failed Foo Service
+";
+        let services = parse_failed_units(output);
+        assert_eq!(services.len(), 2);
+        assert_eq!(services[0].unit, "nginx.service");
+        assert_eq!(services[0].load_state, "loaded");
+        assert_eq!(services[0].active_state, "failed");
+        assert_eq!(services[0].sub_state, "failed");
+        assert_eq!(
+            services[0].description,
+            "The nginx HTTP and reverse proxy server"
+        );
+        assert_eq!(services[1].unit, "foo.service");
+        assert_eq!(services[1].load_state, "loaded");
+        assert_eq!(services[1].description, "Foo Service");
+    }
+
+    #[test]
+    fn parse_failed_units_filters_non_service_units() {
+        let output = "\
+nginx.service loaded failed failed The nginx HTTP and reverse proxy server
+certbot.timer loaded failed failed Run certbot twice daily
+dbus.socket loaded failed failed D-Bus System Message Bus Socket
+";
+        let services = parse_failed_units(output);
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].unit, "nginx.service");
     }
 
     #[test]
