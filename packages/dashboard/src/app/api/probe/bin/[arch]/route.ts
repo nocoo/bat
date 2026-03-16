@@ -30,6 +30,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ arc
 			},
 		});
 	} catch {
-		return Response.json({ error: `Binary not available for ${arch}` }, { status: 404 });
+		return Response.json(
+			{
+				error: `Binary not available for ${arch}`,
+				hint: `Place bat-probe-linux-${arch} in PROBE_BIN_DIR (${BIN_DIR}). See README for cross-compilation instructions.`,
+			},
+			{ status: 404 },
+		);
 	}
 }
