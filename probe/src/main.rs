@@ -1,5 +1,4 @@
 mod collectors;
-#[allow(dead_code)]
 mod command;
 mod config;
 mod orchestrate;
@@ -87,6 +86,28 @@ async fn main() {
     let mut identity_timer = tokio::time::Instant::now();
     let identity_interval = Duration::from_secs(6 * 3600); // 6 hours
 
+    // Tier 2: collect on startup + every 6 hours (same cadence as identity)
+    let mut tier2_timer = tokio::time::Instant::now();
+    let tier2_interval = Duration::from_secs(6 * 3600); // 6 hours
+
+    // Send initial tier2 (cancellable by shutdown)
+    let tier2_payload = collect_tier2(&host_id).await;
+    tokio::select! {
+        result = sender.post("/api/tier2", &tier2_payload) => {
+            if let Err(e) = result {
+                tracing::error!(error = %e, "failed to send tier2");
+            }
+        }
+        _ = &mut ctrl_c => {
+            tracing::info!("received shutdown signal during tier2 send, exiting");
+            return;
+        }
+        _ = sigterm.recv(), if cfg!(unix) => {
+            tracing::info!("received shutdown signal during tier2 send, exiting");
+            return;
+        }
+    }
+
     loop {
         tokio::select! {
             _ = ticker.tick() => {
@@ -136,6 +157,27 @@ async fn main() {
                         }
                     }
                     identity_timer = tokio::time::Instant::now();
+                }
+
+                // Periodic tier2 re-send
+                if tier2_timer.elapsed() >= tier2_interval {
+                    let t2_payload = collect_tier2(&host_id).await;
+                    tokio::select! {
+                        result = sender.post("/api/tier2", &t2_payload) => {
+                            if let Err(e) = result {
+                                tracing::error!(error = %e, "failed to send tier2");
+                            }
+                        }
+                        _ = &mut ctrl_c => {
+                            tracing::info!("received shutdown signal during tier2 send, exiting");
+                            break;
+                        }
+                        _ = sigterm.recv(), if cfg!(unix) => {
+                            tracing::info!("received shutdown signal during tier2 send, exiting");
+                            break;
+                        }
+                    }
+                    tier2_timer = tokio::time::Instant::now();
                 }
             }
             _ = &mut ctrl_c => {
@@ -235,6 +277,38 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
         &cpu_model,
         uptime_seconds,
         boot_time,
+    )
+}
+
+async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    // Ports: synchronous (procfs reads), run in blocking context
+    let ports = collectors::tier2::ports::read_listening_ports();
+    let ports_payload = Some(orchestrate::convert_ports(ports));
+
+    // Run all async collectors concurrently
+    let (updates, systemd, security, docker, disk_deep) = tokio::join!(
+        collectors::tier2::updates::collect_package_updates(),
+        collectors::tier2::systemd::collect_failed_services(),
+        collectors::tier2::security::collect_security_posture(),
+        collectors::tier2::docker::collect_docker_status(),
+        collectors::tier2::disk_deep::collect_disk_deep_scan(),
+    );
+
+    orchestrate::build_tier2_payload(
+        PROBE_VERSION,
+        host_id,
+        timestamp,
+        ports_payload,
+        updates.map(orchestrate::convert_updates),
+        systemd.map(orchestrate::convert_systemd),
+        Some(orchestrate::convert_security(security)),
+        docker.map(orchestrate::convert_docker),
+        Some(orchestrate::convert_disk_deep(disk_deep)),
     )
 }
 

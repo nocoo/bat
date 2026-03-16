@@ -8,6 +8,7 @@ pub struct TcpEntry {
     pub local_port: u16,
     pub state: u8,
     pub inode: u64,
+    #[allow(dead_code)]
     pub is_ipv6: bool,
 }
 
