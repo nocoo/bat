@@ -8,7 +8,7 @@ describe("fetchAPI", () => {
 	const originalWindow = globalThis.window;
 	beforeEach(() => {
 		// @ts-expect-error: partial mock
-		globalThis.window = { location: { origin: "http://localhost:7020" } };
+		globalThis.window = { location: { origin: "http://localhost:7041" } };
 	});
 
 	afterEach(() => {
@@ -28,7 +28,7 @@ describe("fetchAPI", () => {
 		}) as typeof fetch;
 
 		const data = await fetchAPI<Array<{ host_id: string }>>("/api/hosts");
-		expect(capturedUrl).toBe("http://localhost:7020/api/hosts");
+		expect(capturedUrl).toBe("http://localhost:7041/api/hosts");
 		expect(data).toEqual([{ host_id: "h1" }]);
 	});
 
@@ -40,7 +40,7 @@ describe("fetchAPI", () => {
 		}) as typeof fetch;
 
 		await fetchAPI("/api/hosts/h1/metrics", { from: "1000", to: "2000" });
-		expect(capturedUrl).toBe("http://localhost:7020/api/hosts/h1/metrics?from=1000&to=2000");
+		expect(capturedUrl).toBe("http://localhost:7041/api/hosts/h1/metrics?from=1000&to=2000");
 	});
 
 	test("throws ApiError on non-ok response", async () => {

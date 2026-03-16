@@ -3,9 +3,9 @@
 	"version": "0.2.1",
 	"private": true,
 	"scripts": {
-		"dev": "next dev --port 7020",
+		"dev": "next dev --port 7041",
 		"build": "next build",
-		"start": "next start --port 7020",
+		"start": "next start --port 7041",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test src/",
 		"test:e2e": "npx playwright test",
