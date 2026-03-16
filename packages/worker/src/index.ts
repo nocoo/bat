@@ -6,6 +6,8 @@ import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
 import { liveRoute } from "./routes/live.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
+import { tier2IngestRoute } from "./routes/tier2-ingest.js";
+import { hostTier2Route } from "./routes/tier2-read.js";
 import { aggregateHour, purgeOldData } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
 
@@ -23,10 +25,12 @@ app.get("/api/live", liveRoute);
 // Write routes (probe → worker)
 app.post("/api/identity", identityRoute);
 app.post("/api/ingest", ingestRoute);
+app.post("/api/tier2", tier2IngestRoute);
 
 // Read routes (dashboard → worker)
 app.get("/api/hosts", hostsListRoute);
 app.get("/api/hosts/:id/metrics", hostMetricsRoute);
+app.get("/api/hosts/:id/tier2", hostTier2Route);
 app.get("/api/alerts", alertsListRoute);
 
 export default {

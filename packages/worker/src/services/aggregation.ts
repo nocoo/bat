@@ -210,6 +210,7 @@ function aggregateNetwork(rows: RawRow[]): NetAggResult {
  * Purge old data beyond retention windows.
  * - metrics_raw: older than 7 days
  * - metrics_hourly: older than 90 days
+ * - tier2_snapshots: older than 90 days
  */
 export async function purgeOldData(db: D1Database, nowSeconds: number): Promise<void> {
 	const rawCutoff = nowSeconds - RETENTION.RAW_DAYS * 86400;
@@ -218,6 +219,8 @@ export async function purgeOldData(db: D1Database, nowSeconds: number): Promise<
 	await db.prepare("DELETE FROM metrics_raw WHERE ts < ?").bind(rawCutoff).run();
 
 	await db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(hourlyCutoff).run();
+
+	await db.prepare("DELETE FROM tier2_snapshots WHERE ts < ?").bind(hourlyCutoff).run();
 }
 
 // --- Helpers ---
