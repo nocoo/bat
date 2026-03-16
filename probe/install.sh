@@ -10,6 +10,7 @@ CONFIG_FILE="${CONFIG_DIR}/config.toml"
 SERVICE_NAME="bat-probe"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 BIN_NAME="bat-probe"
+BIN_BASE_URL="https://s.zhe.to/apps/bat/latest"
 
 # Injected by dashboard API at serve time (replaced from placeholder)
 DASHBOARD_URL="__DASHBOARD_URL__"
@@ -154,8 +155,8 @@ do_install() {
     arch="$(detect_arch)"
     info "Detected architecture: ${arch}"
 
-    # Download binary
-    local download_url="${DASHBOARD_URL}/api/probe/bin/${arch}"
+    # Download binary from R2 (latest)
+    local download_url="${BIN_BASE_URL}/bat-probe-linux-${arch}"
     local tmp_bin="/tmp/${BIN_NAME}"
     info "Downloading ${BIN_NAME} from ${download_url}..."
     if ! curl -fsSL "${download_url}" -o "${tmp_bin}"; then
