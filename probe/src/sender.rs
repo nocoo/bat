@@ -251,10 +251,8 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    #[ignore = "slow: 31s backoff across retries"]
+    #[tokio::test(start_paused = true)]
     async fn post_connection_refused_returns_transient() {
-        // Use wiremock to get a port, then drop server → connection refused
         use wiremock::MockServer;
 
         let mock_server = MockServer::start().await;
@@ -273,5 +271,31 @@ mod tests {
         let body = serde_json::json!({"host_id": "test"});
         let result = sender.post("/api/ingest", &body).await;
         assert!(matches!(result, Err(SendError::Transient { .. })));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn post_all_retries_exhausted() {
+        // Use a dropped server → connection refused for all attempts
+        use wiremock::MockServer;
+
+        let mock_server = MockServer::start().await;
+        let uri = mock_server.uri();
+        drop(mock_server);
+
+        let client = Client::builder()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let sender = Sender {
+            client,
+            worker_url: uri,
+            write_key: "test-key".to_string(),
+        };
+        let body = serde_json::json!({"host_id": "test"});
+        let result = sender.post("/api/ingest", &body).await;
+        assert!(
+            matches!(result, Err(SendError::Transient { .. })),
+            "expected Transient error, got {result:?}"
+        );
     }
 }
