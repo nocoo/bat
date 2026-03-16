@@ -18,6 +18,12 @@ pub struct MetricsPayload {
     /// Tier 3: Disk I/O per device — delta counters from `/proc/diskstats`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk_io: Option<Vec<DiskIoMetric>>,
+    /// Tier 3: TCP connection state from `/proc/net/sockstat`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp: Option<TcpMetrics>,
+    /// Tier 3: System-wide file descriptor usage from `/proc/sys/fs/file-nr`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fd: Option<FdMetrics>,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,6 +95,20 @@ pub struct DiskIoMetric {
     pub read_bytes_sec: f64,
     pub write_bytes_sec: f64,
     pub io_util_pct: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TcpMetrics {
+    pub established: u32,
+    pub time_wait: u32,
+    pub orphan: u32,
+    pub allocated: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FdMetrics {
+    pub allocated: u64,
+    pub max: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -293,6 +313,8 @@ mod tests {
             uptime_seconds: 86400,
             psi: None,
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -393,6 +415,8 @@ mod tests {
             uptime_seconds: 0,
             psi: None,
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -687,6 +711,8 @@ mod tests {
             uptime_seconds: 86400,
             psi: None,
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -733,6 +759,8 @@ mod tests {
             uptime_seconds: u64::MAX,
             psi: None,
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         // Should serialize without panic
@@ -813,6 +841,8 @@ mod tests {
             uptime_seconds: 0,
             psi: None,
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -867,6 +897,8 @@ mod tests {
                 io_full_avg300: 0.0,
             }),
             disk_io: None,
+            tcp: None,
+            fd: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
