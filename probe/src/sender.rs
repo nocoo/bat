@@ -176,4 +176,95 @@ mod tests {
         let s = Sender::new("https://example.com/", "key");
         assert_eq!(s.worker_url, "https://example.com");
     }
+
+    #[tokio::test]
+    async fn post_200_returns_ok() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/ingest"))
+            .respond_with(ResponseTemplate::new(200))
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let sender = Sender::new(&mock_server.uri(), "test-key");
+        let body = serde_json::json!({"host_id": "test"});
+        let result = sender.post("/api/ingest", &body).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn post_400_returns_permanent_error() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/ingest"))
+            .respond_with(ResponseTemplate::new(400).set_body_string("bad request"))
+            .expect(1) // permanent errors should NOT be retried
+            .mount(&mock_server)
+            .await;
+
+        let sender = Sender::new(&mock_server.uri(), "test-key");
+        let body = serde_json::json!({"host_id": "test"});
+        let result = sender.post("/api/ingest", &body).await;
+        assert!(matches!(result, Err(SendError::Permanent { status: 400, .. })));
+    }
+
+    #[tokio::test]
+    async fn post_500_retries_then_succeeds() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+        // First 2 requests → 500, third → 200
+        Mock::given(method("POST"))
+            .and(path("/api/ingest"))
+            .respond_with(ResponseTemplate::new(500))
+            .up_to_n_times(2)
+            .mount(&mock_server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/api/ingest"))
+            .respond_with(ResponseTemplate::new(200))
+            .mount(&mock_server)
+            .await;
+
+        let sender = Sender::new(&mock_server.uri(), "test-key");
+        let body = serde_json::json!({"host_id": "test"});
+        let result = sender.post("/api/ingest", &body).await;
+        assert!(result.is_ok(), "expected Ok, got {result:?}");
+
+        // Verify at least 3 requests were made
+        let received = mock_server.received_requests().await.unwrap();
+        assert!(received.len() >= 3, "expected at least 3 requests, got {}", received.len());
+    }
+
+    #[tokio::test]
+    #[ignore = "slow: 31s backoff across retries"]
+    async fn post_connection_refused_returns_transient() {
+        // Use wiremock to get a port, then drop server → connection refused
+        use wiremock::MockServer;
+
+        let mock_server = MockServer::start().await;
+        let uri = mock_server.uri();
+        drop(mock_server); // server is now gone → connection refused
+
+        let client = Client::builder()
+            .timeout(Duration::from_millis(200))
+            .build()
+            .unwrap();
+        let sender = Sender {
+            client,
+            worker_url: uri,
+            write_key: "test-key".to_string(),
+        };
+        let body = serde_json::json!({"host_id": "test"});
+        let result = sender.post("/api/ingest", &body).await;
+        assert!(matches!(result, Err(SendError::Transient { .. })));
+    }
 }
