@@ -13,7 +13,7 @@ pub struct MemInfo {
 
 /// Parse `/proc/meminfo` content.
 ///
-/// Extracts MemTotal, MemAvailable, SwapTotal, SwapFree.
+/// Extracts `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree`.
 /// Values in `/proc/meminfo` are in kB — multiply by 1024 for bytes.
 pub fn parse_meminfo(content: &str) -> Option<MemInfo> {
     let mut mem_total: Option<u64> = None;
@@ -78,6 +78,7 @@ pub fn read_meminfo() -> Result<MemInfo, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -104,15 +105,15 @@ SwapFree:              0 kB
     fn parse_meminfo_normal() {
         let info = parse_meminfo(PROC_MEMINFO).unwrap();
 
-        assert_eq!(info.mem_total, 1946360 * 1024);
-        assert_eq!(info.mem_available, 562176 * 1024);
+        assert_eq!(info.mem_total, 1_946_360 * 1024);
+        assert_eq!(info.mem_available, 562_176 * 1024);
 
         // used_pct = (1946360 - 562176) / 1946360 * 100 = 71.11...
         assert!((info.mem_used_pct - 71.11).abs() < 0.01);
 
-        assert_eq!(info.swap_total, 1638380 * 1024);
-        assert_eq!(info.swap_free, 1606640 * 1024);
-        assert_eq!(info.swap_used, (1638380 - 1606640) * 1024);
+        assert_eq!(info.swap_total, 1_638_380 * 1024);
+        assert_eq!(info.swap_free, 1_606_640 * 1024);
+        assert_eq!(info.swap_used, (1_638_380 - 1_606_640) * 1024);
 
         // swap_used_pct = (1638380 - 1606640) / 1638380 * 100 = 1.937...
         assert!((info.swap_used_pct - 1.937).abs() < 0.01);

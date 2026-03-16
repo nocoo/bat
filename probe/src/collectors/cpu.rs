@@ -151,6 +151,7 @@ pub fn read_cpu_model() -> Result<String, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -191,10 +192,10 @@ cpu MHz\t\t: 2400.000
     #[test]
     fn parse_stat_aggregate_line() {
         let jiffies = parse_stat(PROC_STAT).unwrap();
-        assert_eq!(jiffies.user, 10132153);
-        assert_eq!(jiffies.nice, 290696);
-        assert_eq!(jiffies.system, 3084719);
-        assert_eq!(jiffies.idle, 46828483);
+        assert_eq!(jiffies.user, 10_132_153);
+        assert_eq!(jiffies.nice, 290_696);
+        assert_eq!(jiffies.system, 3_084_719);
+        assert_eq!(jiffies.idle, 46_828_483);
         assert_eq!(jiffies.iowait, 16683);
         assert_eq!(jiffies.irq, 0);
         assert_eq!(jiffies.softirq, 25195);
