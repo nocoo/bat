@@ -46,6 +46,9 @@ COPY --from=builder /app/packages/dashboard/.next/standalone ./
 COPY --from=builder /app/packages/dashboard/.next/static ./packages/dashboard/.next/static
 COPY --from=builder /app/packages/dashboard/public ./packages/dashboard/public
 
+# Copy probe install script (served via /api/probe/install.sh)
+COPY probe/install.sh ./probe-assets/install.sh
+
 EXPOSE 7020
 
 CMD ["bun", "packages/dashboard/server.js"]

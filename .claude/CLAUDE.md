@@ -35,3 +35,11 @@
 - Probe: `cargo test`
 - Pre-commit hook runs: typecheck → lint → unit tests → rust checks (clippy + test)
 - Coverage thresholds enforced by `scripts/check-coverage.sh`
+
+## Probe Installation
+
+- Install script: `probe/install.sh`, served via `GET /api/probe/install.sh`
+- Binaries served via `GET /api/probe/bin/:arch` (x86_64 | aarch64)
+- Both public (no auth), excluded from proxy.ts matcher
+- Setup page (`/setup`): auth-protected, shows pre-filled install command
+- Dashboard env vars: `BAT_WRITE_KEY` (for setup page), `PROBE_BIN_DIR` (binary storage path, default `/app/probe-bin`)
