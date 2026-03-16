@@ -9,7 +9,7 @@ import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
 const SERIES = [
-	{ key: "usage", label: "CPU Usage", color: chart.vermilion, width: 2 },
+	{ key: "usage", label: "CPU Usage", color: chart.pink, width: 2 },
 	{ key: "iowait", label: "IO Wait", color: chart.sky, width: 1.5 },
 	{ key: "steal", label: "Steal", color: chart.teal, width: 1.5 },
 ] as const;
