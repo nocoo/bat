@@ -36,7 +36,7 @@ Netdata on jp.nocoo.cloud exposes ~700 charts consuming 237 MB RSS. 490 of those
 1. **procfs-only** — Every signal reads a virtual file. No `fork()`, no external commands, no root required.
 2. **Delta-compatible** — Counters use the same delta/rate pattern as existing CPU jiffies and network bytes.
 3. **Additive payload** — New fields are `Option<T>` with `skip_serializing_if`. Older workers ignore unknown fields. Older probes omit them.
-4. **Budget-neutral** — Total added cost: ~5 extra file reads per 30s tick, <0.1ms combined.
+4. **Low overhead** — Total added cost: 7 extra file reads per 30s tick (psi×3, diskstats×1, sockstat×1, vmstat×1, file-nr×1), <0.1ms combined. Context switches/forks extracted from existing `/proc/stat` read at zero additional I/O.
 
 ---
 
@@ -302,13 +302,154 @@ pub struct FdMetrics {
 
 ---
 
+## MetricsPayload Integration
+
+All T3 signals are added as optional fields on the existing `MetricsPayload`. This section is the authoritative reference for how the Rust structs defined above map into the top-level payload and their TypeScript equivalents in `@bat/shared`.
+
+### Rust (`probe/src/payload.rs`)
+
+```rust
+#[derive(Debug, Serialize)]
+pub struct MetricsPayload {
+    // ... existing fields (probe_version, host_id, timestamp, interval, cpu, mem, swap, disk, net, uptime_seconds) ...
+
+    /// Tier 3: PSI pressure — None if kernel < 4.20 or CONFIG_PSI=n
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub psi: Option<PsiMetrics>,
+
+    /// Tier 3: Disk I/O per device — delta counters from /proc/diskstats
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disk_io: Option<Vec<DiskIoMetric>>,
+
+    /// Tier 3: TCP connection state summary from /proc/net/sockstat
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp: Option<TcpMetrics>,
+
+    /// Tier 3: System-wide file descriptor usage from /proc/sys/fs/file-nr
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fd: Option<FdMetrics>,
+}
+
+// CpuMetrics gains 4 optional fields (§3.4):
+//   context_switches_sec, forks_sec, procs_running, procs_blocked
+
+// MemMetrics gains 1 optional field (§3.5):
+//   oom_kills_delta
+```
+
+### TypeScript (`packages/shared/src/metrics.ts`)
+
+```typescript
+// New interfaces
+export interface PsiMetrics {
+  cpu_some_avg10: number;
+  cpu_some_avg60: number;
+  cpu_some_avg300: number;
+  mem_some_avg10: number;
+  mem_some_avg60: number;
+  mem_some_avg300: number;
+  mem_full_avg10: number;
+  mem_full_avg60: number;
+  mem_full_avg300: number;
+  io_some_avg10: number;
+  io_some_avg60: number;
+  io_some_avg300: number;
+  io_full_avg10: number;
+  io_full_avg60: number;
+  io_full_avg300: number;
+}
+
+export interface DiskIoMetric {
+  device: string;
+  read_iops: number;
+  write_iops: number;
+  read_bytes_sec: number;
+  write_bytes_sec: number;
+  io_util_pct: number;
+}
+
+export interface TcpMetrics {
+  established: number;
+  time_wait: number;
+  orphan: number;
+  allocated: number;
+}
+
+export interface FdMetrics {
+  allocated: number;
+  max: number;
+}
+
+// Extended existing interfaces
+export interface CpuMetrics {
+  // ... existing fields ...
+  context_switches_sec?: number;
+  forks_sec?: number;
+  procs_running?: number;
+  procs_blocked?: number;
+}
+
+export interface MemMetrics {
+  // ... existing fields ...
+  oom_kills_delta?: number;
+}
+
+// Top-level payload additions
+export interface MetricsPayload {
+  // ... existing fields ...
+  psi?: PsiMetrics;
+  disk_io?: DiskIoMetric[];
+  tcp?: TcpMetrics;
+  fd?: FdMetrics;
+}
+```
+
+### Wire format example (JSON)
+
+```json
+{
+  "probe_version": "0.3.0",
+  "host_id": "jp.nocoo.cloud",
+  "timestamp": 1773699670,
+  "interval": 30,
+  "cpu": {
+    "load1": 0.5, "load5": 0.3, "load15": 0.2,
+    "usage_pct": 2.0, "iowait_pct": 0.0, "steal_pct": 0.0, "count": 1,
+    "context_switches_sec": 889.9, "forks_sec": 7.1,
+    "procs_running": 1, "procs_blocked": 0
+  },
+  "mem": {
+    "total_bytes": 1085284352, "available_bytes": 113967104, "used_pct": 89.5,
+    "oom_kills_delta": 0
+  },
+  "swap": { "total_bytes": 1677709312, "used_bytes": 29360128, "used_pct": 1.7 },
+  "disk": [{ "mount": "/", "total_bytes": 21474836480, "avail_bytes": 15032385536, "used_pct": 30.0 }],
+  "net": [{ "iface": "eth0", "rx_bytes_rate": 1024.5, "tx_bytes_rate": 512.3, "rx_errors": 0, "tx_errors": 0 }],
+  "uptime_seconds": 2764800,
+  "psi": {
+    "cpu_some_avg10": 2.40, "cpu_some_avg60": 2.13, "cpu_some_avg300": 1.40,
+    "mem_some_avg10": 0.0, "mem_some_avg60": 0.0, "mem_some_avg300": 0.0,
+    "mem_full_avg10": 0.0, "mem_full_avg60": 0.0, "mem_full_avg300": 0.0,
+    "io_some_avg10": 0.0, "io_some_avg60": 0.01, "io_some_avg300": 0.0,
+    "io_full_avg10": 0.0, "io_full_avg60": 0.0, "io_full_avg300": 0.0
+  },
+  "disk_io": [
+    { "device": "sda", "read_iops": 0.0, "write_iops": 12.0, "read_bytes_sec": 0.0, "write_bytes_sec": 49152.0, "io_util_pct": 3.2 }
+  ],
+  "tcp": { "established": 6, "time_wait": 26, "orphan": 0, "allocated": 19 },
+  "fd": { "allocated": 1344, "max": 9223372036854775807 }
+}
+```
+
+---
+
 ## Implementation Plan
 
 ### Resource Budget Impact
 
 | Resource | Before T3 | After T3 | Delta |
 |----------|----------|---------|-------|
-| File reads/tick | ~15 | ~21 | +6 (psi×3, diskstats×1, sockstat×1, file-nr×1) |
+| File reads/tick | ~15 | ~22 | +7 (psi×3, diskstats×1, sockstat×1, vmstat×1, file-nr×1; ctxt/forks from existing /proc/stat) |
 | Payload size | ~800 bytes | ~1100 bytes | +300 bytes |
 | State (prev counters) | cpu_jiffies + net_counters | + disk_io_counters + oom_counter | ~200 bytes |
 | Code | ~4800 lines | ~5025 lines | +225 lines |
@@ -331,33 +472,89 @@ pub struct FdMetrics {
 
 ### D1 Schema Additions
 
-New columns in `metrics_raw` (all nullable for backward compatibility):
+New columns in `metrics_raw` (all nullable for backward compatibility). Every column listed here maps 1:1 to a payload field or is required by an alert rule. No field from the payload structs or alert conditions is omitted.
 
 ```sql
--- PSI
+-- PSI (all 6 avg60 values stored for alerting; avg10/avg300 for dashboard charts)
+-- Alert #16 depends on psi_cpu_some_avg60
+-- Alert #17 depends on psi_mem_some_avg60
+-- Alert #18 depends on psi_io_some_avg60
 ALTER TABLE metrics_raw ADD COLUMN psi_cpu_some_avg10 REAL;
 ALTER TABLE metrics_raw ADD COLUMN psi_cpu_some_avg60 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_cpu_some_avg300 REAL;
 ALTER TABLE metrics_raw ADD COLUMN psi_mem_some_avg10 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_mem_some_avg60 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_mem_some_avg300 REAL;
 ALTER TABLE metrics_raw ADD COLUMN psi_mem_full_avg10 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_mem_full_avg60 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_mem_full_avg300 REAL;
 ALTER TABLE metrics_raw ADD COLUMN psi_io_some_avg10 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_io_some_avg60 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_io_some_avg300 REAL;
 ALTER TABLE metrics_raw ADD COLUMN psi_io_full_avg10 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_io_full_avg60 REAL;
+ALTER TABLE metrics_raw ADD COLUMN psi_io_full_avg300 REAL;
 
 -- Disk I/O (JSON array, same pattern as disk/net)
-ALTER TABLE metrics_raw ADD COLUMN disk_io TEXT;  -- JSON: [{device, read_iops, write_iops, ...}]
+-- Alert #19 evaluates io_util_pct from within the JSON
+ALTER TABLE metrics_raw ADD COLUMN disk_io TEXT;  -- JSON: [{device, read_iops, write_iops, read_bytes_sec, write_bytes_sec, io_util_pct}]
 
--- TCP
+-- TCP (all 4 fields from TcpMetrics)
+-- Alert #20 depends on tcp_time_wait
 ALTER TABLE metrics_raw ADD COLUMN tcp_established INTEGER;
 ALTER TABLE metrics_raw ADD COLUMN tcp_time_wait INTEGER;
+ALTER TABLE metrics_raw ADD COLUMN tcp_orphan INTEGER;
+ALTER TABLE metrics_raw ADD COLUMN tcp_allocated INTEGER;
 
--- System
+-- CPU extensions (from CpuMetrics, §3.4)
 ALTER TABLE metrics_raw ADD COLUMN context_switches_sec REAL;
+ALTER TABLE metrics_raw ADD COLUMN forks_sec REAL;
+ALTER TABLE metrics_raw ADD COLUMN procs_running INTEGER;
+ALTER TABLE metrics_raw ADD COLUMN procs_blocked INTEGER;
+
+-- Memory extensions (from MemMetrics, §3.5)
+-- Alert #21 depends on oom_kills
 ALTER TABLE metrics_raw ADD COLUMN oom_kills INTEGER;
+
+-- File descriptors (from FdMetrics, §3.6)
 ALTER TABLE metrics_raw ADD COLUMN fd_allocated INTEGER;
+ALTER TABLE metrics_raw ADD COLUMN fd_max INTEGER;
 ```
+
+**Cross-reference checklist** (payload field → D1 column → alert dependency):
+
+| Payload field | D1 column | Alert |
+|---------------|-----------|-------|
+| `psi.cpu_some_avg60` | `psi_cpu_some_avg60` | #16 |
+| `psi.mem_some_avg60` | `psi_mem_some_avg60` | #17 |
+| `psi.io_some_avg60` | `psi_io_some_avg60` | #18 |
+| `disk_io[].io_util_pct` | `disk_io` (JSON) | #19 |
+| `tcp.time_wait` | `tcp_time_wait` | #20 |
+| `mem.oom_kills_delta` | `oom_kills` | #21 |
+| `psi.*` (all 15 fields) | 15 `psi_*` columns | dashboard charts |
+| `tcp.established` | `tcp_established` | dashboard |
+| `tcp.orphan` | `tcp_orphan` | dashboard |
+| `tcp.allocated` | `tcp_allocated` | dashboard |
+| `cpu.context_switches_sec` | `context_switches_sec` | diagnostic |
+| `cpu.forks_sec` | `forks_sec` | diagnostic |
+| `cpu.procs_running` | `procs_running` | diagnostic |
+| `cpu.procs_blocked` | `procs_blocked` | diagnostic |
+| `fd.allocated` | `fd_allocated` | dashboard |
+| `fd.max` | `fd_max` | dashboard |
 
 ### Worker Aggregation
 
-PSI, TCP, and fd metrics aggregate with `AVG()` + `MAX()` in hourly rollup. Disk I/O aggregates same as network metrics (`AVG` for rates). OOM kills aggregate with `SUM()` (count of kills per hour).
+Hourly rollup strategy for each new column family:
+
+| Columns | Aggregation | Rationale |
+|---------|-------------|-----------|
+| `psi_*` (15 cols) | `AVG()` + `MAX()` | Pressure is a percentage; avg shows sustained load, max shows spikes |
+| `disk_io` (JSON) | `AVG()` per device per field | Same as existing network rate aggregation |
+| `tcp_established`, `tcp_time_wait`, `tcp_orphan`, `tcp_allocated` | `AVG()` + `MAX()` | Gauge values; max catches connection spikes |
+| `context_switches_sec`, `forks_sec` | `AVG()` + `MAX()` | Rate values; max catches burst activity |
+| `procs_running`, `procs_blocked` | `AVG()` + `MAX()` | Gauge values |
+| `oom_kills` | `SUM()` | Counter delta; total kills per hour |
+| `fd_allocated`, `fd_max` | `AVG(fd_allocated)`, `MAX(fd_allocated)`, `LAST(fd_max)` | fd_max is static, only latest value needed |
 
 ---
 
