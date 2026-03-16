@@ -6,10 +6,11 @@ import { formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
 import { hashHostId } from "@bat/shared";
-import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
+import { AlertTriangle, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -87,29 +88,6 @@ export default function HostDetailPage() {
 					<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />
 				</div>
 
-				{/* System Info */}
-				{host && (
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2 text-base">
-								<Info className="h-4 w-4" />
-								System Info
-							</CardTitle>
-						</CardHeader>
-						<CardContent>
-							<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-								<InfoRow label="OS" value={host.os} />
-								<InfoRow label="Kernel" value={host.kernel} />
-								<InfoRow label="Architecture" value={host.arch} />
-								<InfoRow label="CPU" value={host.cpu_model} />
-								<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
-								<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
-								<InfoRow label="Alerts" value={String(host.alert_count)} />
-							</div>
-						</CardContent>
-					</Card>
-				)}
-
 				{/* Per-host Active Alerts */}
 				{hostAlerts.length > 0 && (
 					<Card>
@@ -125,6 +103,7 @@ export default function HostDetailPage() {
 					</Card>
 				)}
 
+				{/* Metrics — primary content, shown first */}
 				{metricsLoading ? (
 					<div className="space-y-3">
 						<h2 className="text-lg font-semibold">Metrics</h2>
@@ -159,6 +138,36 @@ export default function HostDetailPage() {
 						<AlertTriangle className="h-12 w-12 mb-4" strokeWidth={1} />
 						<p className="text-sm">No metrics data available</p>
 					</div>
+				)}
+
+				{/* System Info — collapsible, secondary reference data */}
+				{host && (
+					<Collapsible>
+						<Card>
+							<CollapsibleTrigger asChild>
+								<CardHeader className="cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-[var(--radius-card)]">
+									<CardTitle className="flex items-center gap-2 text-base">
+										<ChevronRight className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-90" />
+										<Info className="h-4 w-4" />
+										System Info
+									</CardTitle>
+								</CardHeader>
+							</CollapsibleTrigger>
+							<CollapsibleContent>
+								<CardContent>
+									<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+										<InfoRow label="OS" value={host.os} />
+										<InfoRow label="Kernel" value={host.kernel} />
+										<InfoRow label="Architecture" value={host.arch} />
+										<InfoRow label="CPU" value={host.cpu_model} />
+										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
+										<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
+										<InfoRow label="Alerts" value={String(host.alert_count)} />
+									</div>
+								</CardContent>
+							</CollapsibleContent>
+						</Card>
+					</Collapsible>
 				)}
 			</div>
 		</AppShell>
