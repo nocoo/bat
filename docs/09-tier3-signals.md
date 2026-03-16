@@ -141,7 +141,7 @@ pub struct DiskIoMetric {
 
 | # | Alert | Condition | Severity |
 |---|-------|-----------|----------|
-| 19 | Disk I/O saturated | `io_util_pct > 80` for 5 min | warning |
+| 19 | Disk I/O saturated | ANY device `io_util_pct > 80` for 5 min | warning |
 
 **File**: `probe/src/collectors/disk_io.rs`
 **Estimated lines**: ~80
@@ -556,17 +556,109 @@ Hourly rollup strategy for each new column family:
 | `oom_kills` | `SUM()` | Counter delta; total kills per hour |
 | `fd_allocated`, `fd_max` | `AVG(fd_allocated)`, `MAX(fd_allocated)`, `LAST(fd_max)` | fd_max is static, only latest value needed |
 
+### metrics_hourly Schema Additions
+
+New columns in `metrics_hourly` (all nullable). This is the authoritative list for what the hourly aggregation cron must write. Column naming follows the existing pattern: `{metric}_{agg}` where agg is `avg`, `max`, `min`, or `sum`.
+
+```sql
+-- PSI: store avg + max for each of the 6 alert-relevant fields
+-- Dashboard uses avg for trend lines, max for spike detection
+ALTER TABLE metrics_hourly ADD COLUMN psi_cpu_some_avg10_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_cpu_some_avg10_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_cpu_some_avg60_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_cpu_some_avg60_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_mem_some_avg60_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_mem_some_avg60_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_mem_full_avg60_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_mem_full_avg60_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_io_some_avg60_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_io_some_avg60_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_io_full_avg60_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN psi_io_full_avg60_max REAL;
+-- NOTE: avg300 values are omitted from hourly — they are 5-min kernel averages
+-- that don't aggregate meaningfully over 1 hour. avg10 is kept for UI sparklines.
+-- Full 15-field PSI data is always available in metrics_raw (24h retention).
+
+-- Disk I/O: JSON array with per-device avg values (same pattern as net_* scalars)
+ALTER TABLE metrics_hourly ADD COLUMN disk_io_json TEXT;
+-- JSON: [{device, read_iops_avg, write_iops_avg, read_bytes_sec_avg, write_bytes_sec_avg, io_util_pct_avg, io_util_pct_max}]
+
+-- TCP: avg + max for each gauge
+ALTER TABLE metrics_hourly ADD COLUMN tcp_established_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_established_max INTEGER;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_time_wait_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_time_wait_max INTEGER;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_orphan_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_orphan_max INTEGER;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_allocated_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN tcp_allocated_max INTEGER;
+
+-- CPU extensions: avg + max for rates, avg + max for gauges
+ALTER TABLE metrics_hourly ADD COLUMN context_switches_sec_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN context_switches_sec_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN forks_sec_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN forks_sec_max REAL;
+ALTER TABLE metrics_hourly ADD COLUMN procs_running_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN procs_running_max INTEGER;
+ALTER TABLE metrics_hourly ADD COLUMN procs_blocked_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN procs_blocked_max INTEGER;
+
+-- OOM kills: sum of deltas in the hour
+ALTER TABLE metrics_hourly ADD COLUMN oom_kills_sum INTEGER;
+
+-- File descriptors: avg + max for allocated, last for max (static)
+ALTER TABLE metrics_hourly ADD COLUMN fd_allocated_avg REAL;
+ALTER TABLE metrics_hourly ADD COLUMN fd_allocated_max INTEGER;
+ALTER TABLE metrics_hourly ADD COLUMN fd_max INTEGER;  -- last sample (static value)
+```
+
+**Column count**: +35 columns in `metrics_hourly` (12 PSI + 1 disk_io JSON + 8 TCP + 8 CPU ext + 1 OOM + 5 FD).
+
+**Cross-reference** — hourly columns needed by long-range alert evaluation:
+
+| Alert | metrics_hourly column used | Query |
+|-------|--------------------------|-------|
+| #16 CPU pressure | `psi_cpu_some_avg60_max` | `MAX > 25` in sliding window |
+| #17 Memory pressure | `psi_mem_some_avg60_max` | `MAX > 10` in sliding window |
+| #18 I/O pressure | `psi_io_some_avg60_max` | `MAX > 10` in sliding window |
+| #19 Disk I/O saturated | `disk_io_json` → `io_util_pct_max` | per-device MAX > 80 |
+| #20 TCP connection leak | `tcp_time_wait_max` | `MAX > 500` in sliding window |
+| #21 OOM kill detected | `oom_kills_sum` | `SUM > 0` in any hour |
+
 ---
 
 ## New Alert Rules Summary
 
-| # | Alert | Condition | Severity | Source |
-|---|-------|-----------|----------|--------|
-| 16 | CPU pressure | `psi.cpu_some_avg60 > 25` for 5 min | warning | `/proc/pressure/cpu` |
-| 17 | Memory pressure | `psi.mem_some_avg60 > 10` for 5 min | warning | `/proc/pressure/memory` |
-| 18 | I/O pressure | `psi.io_some_avg60 > 20` for 5 min | warning | `/proc/pressure/io` |
-| 19 | Disk I/O saturated | `disk_io.io_util_pct > 80` for 5 min | warning | `/proc/diskstats` |
-| 20 | TCP connection leak | `tcp.time_wait > 500` for 5 min | warning | `/proc/net/sockstat` |
-| 21 | OOM kill detected | `oom_kills_delta > 0` (instant) | critical | `/proc/vmstat` |
+| # | Alert | Condition | Severity | Semantics | Source |
+|---|-------|-----------|----------|-----------|--------|
+| 16 | CPU pressure | `psi.cpu_some_avg60 > 25` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/cpu` |
+| 17 | Memory pressure | `psi.mem_some_avg60 > 10` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/memory` |
+| 18 | I/O pressure | `psi.io_some_avg60 > 20` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/io` |
+| 19 | Disk I/O saturated | **ANY** `disk_io[].io_util_pct > 80` for 5 min | warning | Array — iterate devices, fire on first match (same pattern as `disk_full` rule #3) | `/proc/diskstats` |
+| 20 | TCP connection leak | `tcp.time_wait > 500` for 5 min | warning | Scalar — single value per sample | `/proc/net/sockstat` |
+| 21 | OOM kill detected | `mem.oom_kills_delta > 0` (instant) | critical | Scalar — single value per sample | `/proc/vmstat` |
+
+### Alert #19 array semantics (detail)
+
+`disk_io` is a `DiskIoMetric[]` — one entry per block device. The alert iterates the array and fires if **any** device exceeds the threshold. This is identical to how existing alert #3 (`disk_full`) handles the `disk: DiskMetric[]` array:
+
+```typescript
+// Worker implementation pattern (same as disk_full):
+for (const device of payload.disk_io ?? []) {
+    if (device.io_util_pct > ALERT_THRESHOLDS.DISK_IO_UTIL_PCT) {
+        results.push({
+            ruleId: "disk_io_saturated",
+            fired: true,
+            severity: "warning",
+            value: device.io_util_pct,
+            message: `Disk ${device.device} I/O utilization at ${device.io_util_pct.toFixed(1)}%`,
+            durationSeconds: 300,
+        });
+        break; // One alert per host, report worst device
+    }
+}
+```
+
+The message includes the specific device name (e.g. "Disk sda I/O utilization at 85.3%") so the operator knows which device to investigate.
 
 All T3 alert rules use Tier 1 data (30s cadence). Total alert count: 15 (existing) + 6 = **21 rules**.
