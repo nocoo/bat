@@ -120,6 +120,7 @@ pub fn read_disk_metrics(
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -211,5 +212,43 @@ btrfs-pool /mnt/storage btrfs rw,relatime 0 0
         let root = mounts.iter().find(|m| m.mount_point == "/").unwrap();
         assert_eq!(root.device, "/dev/vda1");
         assert_eq!(root.fs_type, "ext4");
+    }
+
+    #[test]
+    fn compute_disk_usage_normal() {
+        let (used, pct) = compute_disk_usage(1000, 400);
+        assert_eq!(used, 600);
+        assert!((pct - 60.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_disk_usage_zero_total() {
+        let (used, pct) = compute_disk_usage(0, 0);
+        assert_eq!(used, 0);
+        assert_eq!(pct, 0.0);
+    }
+
+    #[test]
+    fn compute_disk_usage_avail_exceeds_total() {
+        // saturating_sub clamps to 0
+        let (used, pct) = compute_disk_usage(100, 200);
+        assert_eq!(used, 0);
+        assert_eq!(pct, 0.0);
+    }
+
+    #[test]
+    fn compute_disk_usage_full() {
+        let (used, pct) = compute_disk_usage(1000, 0);
+        assert_eq!(used, 1000);
+        assert!((pct - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn parse_mounts_malformed_line_skipped() {
+        // Line with fewer than 3 fields should be skipped
+        let content = "/dev/vda1 /\n/dev/vda2 /data ext4 rw 0 0\n";
+        let mounts = parse_mounts(content, &[], &[]);
+        assert_eq!(mounts.len(), 1);
+        assert_eq!(mounts[0].mount_point, "/data");
     }
 }
