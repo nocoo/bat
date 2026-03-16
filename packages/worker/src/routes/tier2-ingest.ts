@@ -2,6 +2,7 @@
 import type { Tier2Payload } from "@bat/shared";
 import type { Context } from "hono";
 import { ensureHostExists, updateHostLastSeen } from "../services/metrics.js";
+import { evaluateTier2Alerts } from "../services/tier2-alerts.js";
 import { insertTier2Snapshot } from "../services/tier2-metrics.js";
 import type { AppEnv } from "../types.js";
 
@@ -65,9 +66,10 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 	// Insert tier2 snapshot — returns false if duplicate (same host_id + ts)
 	const inserted = await insertTier2Snapshot(db, body.host_id, body);
 
-	// Only update last_seen for genuinely new data
+	// Only update last_seen and evaluate alerts for genuinely new data
 	if (inserted) {
 		await updateHostLastSeen(db, body.host_id, workerNow);
+		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
 	}
 
 	return c.body(null, 204);

@@ -2,10 +2,10 @@
 // Source of truth: docs/03-data-structures.md § Alert Rules
 // Source of truth: docs/05-worker.md § Alert Evaluation
 
-import { ALERT_THRESHOLDS } from "@bat/shared";
+import { ALERT_THRESHOLDS, TIER2_THRESHOLDS } from "@bat/shared";
 import type { MetricsPayload } from "@bat/shared";
 
-type AlertSeverity = "warning" | "critical";
+type AlertSeverity = "info" | "warning" | "critical";
 
 interface AlertEvalResult {
 	ruleId: string;
@@ -91,6 +91,19 @@ function evaluateRules(payload: MetricsPayload): AlertEvalResult[] {
 		value: payload.cpu.steal_pct,
 		message: `CPU steal at ${payload.cpu.steal_pct.toFixed(1)}%`,
 		durationSeconds: ALERT_THRESHOLDS.STEAL_DURATION_SECONDS,
+	});
+
+	// uptime_anomaly: uptime < 300s → info, instant (detects unexpected reboots)
+	results.push({
+		ruleId: "uptime_anomaly",
+		fired: payload.uptime_seconds < TIER2_THRESHOLDS.UPTIME_ANOMALY_SECONDS,
+		severity: "info",
+		value: payload.uptime_seconds,
+		message:
+			payload.uptime_seconds < TIER2_THRESHOLDS.UPTIME_ANOMALY_SECONDS
+				? `Host recently rebooted (uptime ${payload.uptime_seconds}s)`
+				: "",
+		durationSeconds: 0,
 	});
 
 	return results;
