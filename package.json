@@ -4,6 +4,7 @@
 	"private": true,
 	"packageManager": "pnpm@10.28.1",
 	"scripts": {
+		"dev": "turbo dev",
 		"build": "turbo build",
 		"typecheck": "turbo typecheck",
 		"lint": "biome check .",
