@@ -45,6 +45,7 @@ impl fmt::Display for SendError {
 }
 
 /// HTTP client that posts JSON to the bat worker with retry/backoff.
+#[derive(Clone)]
 pub struct Sender {
     client: Client,
     worker_url: String,
