@@ -24,8 +24,10 @@ export function hashHostId(hostId: string): string {
 export const API_ROUTES = {
 	INGEST: "/api/ingest",
 	IDENTITY: "/api/identity",
+	TIER2_INGEST: "/api/tier2",
 	HOSTS: "/api/hosts",
 	HOST_METRICS: "/api/hosts/:id/metrics",
+	HOST_TIER2: "/api/hosts/:id/tier2",
 	ALERTS: "/api/alerts",
 	LIVE: "/api/live",
 } as const;

@@ -3,7 +3,7 @@
 
 import { ALERT_THRESHOLDS } from "./constants.js";
 
-export type AlertSeverity = "warning" | "critical";
+export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface AlertRule {
 	id: string;
@@ -71,7 +71,65 @@ export const TIER1_ALERT_RULES: readonly AlertRule[] = [
 	},
 ] as const;
 
-/** Lookup a rule by ID */
+/**
+ * 9 Tier-2 alert rules for post-MVP.
+ * Evaluated during /api/tier2 ingest.
+ */
+export const TIER2_ALERT_RULES: readonly AlertRule[] = [
+	{
+		id: "uptime_anomaly",
+		severity: "info",
+		duration_seconds: 0,
+	},
+	{
+		id: "ssh_password_auth",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "ssh_root_login",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "no_firewall",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "public_port",
+		severity: "warning",
+		duration_seconds: 0,
+	},
+	{
+		id: "security_updates",
+		severity: "warning",
+		duration_seconds: 604800, // 7 days
+	},
+	{
+		id: "container_restart",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "systemd_failed",
+		severity: "warning",
+		duration_seconds: 0,
+	},
+	{
+		id: "reboot_required",
+		severity: "info",
+		duration_seconds: 604800, // 7 days
+	},
+] as const;
+
+/** All alert rules (Tier 1 + Tier 2) */
+export const ALL_ALERT_RULES: readonly AlertRule[] = [
+	...TIER1_ALERT_RULES,
+	...TIER2_ALERT_RULES,
+] as const;
+
+/** Lookup a rule by ID across all tiers */
 export function getAlertRule(ruleId: string): AlertRule | undefined {
-	return TIER1_ALERT_RULES.find((r) => r.id === ruleId);
+	return ALL_ALERT_RULES.find((r) => r.id === ruleId);
 }

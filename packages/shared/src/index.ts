@@ -24,14 +24,16 @@ export type {
 	HealthResponse,
 	HealthStatus,
 } from "./alerts.js";
-export { getAlertRule, TIER1_ALERT_RULES } from "./alerts.js";
+export { ALL_ALERT_RULES, getAlertRule, TIER1_ALERT_RULES, TIER2_ALERT_RULES } from "./alerts.js";
 
 // Constants
 export {
 	ALERT_THRESHOLDS,
 	AUTO_RESOLUTION_THRESHOLD_SECONDS,
+	DEFAULT_PUBLIC_PORT_ALLOWLIST,
 	INTERVALS,
 	RETENTION,
+	TIER2_THRESHOLDS,
 } from "./constants.js";
 
 // API route types and constants
@@ -44,3 +46,22 @@ export type {
 	MetricsResolution,
 } from "./api.js";
 export { API_ROUTES, hashHostId } from "./api.js";
+
+// Tier 2 payload types
+export type {
+	DiskDeepScanData,
+	DockerContainer,
+	DockerImagesInfo,
+	DockerStatusData,
+	FailedService,
+	LargeFile,
+	ListeningPort,
+	PackageUpdate,
+	PackageUpdatesData,
+	SecurityPostureData,
+	ServicePortsData,
+	SystemdServicesData,
+	Tier2Payload,
+	Tier2Snapshot,
+	TopDir,
+} from "./tier2.js";

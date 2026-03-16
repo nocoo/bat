@@ -26,3 +26,12 @@ export const INTERVALS = {
 
 /** Auto-resolution threshold: ranges > 24h use hourly data */
 export const AUTO_RESOLUTION_THRESHOLD_SECONDS = 86400;
+
+export const TIER2_THRESHOLDS = {
+	UPTIME_ANOMALY_SECONDS: 300,
+	CONTAINER_RESTART_COUNT: 5,
+	SECURITY_UPDATES_DURATION: 604800, // 7 days
+	REBOOT_REQUIRED_DURATION: 604800, // 7 days
+} as const;
+
+export const DEFAULT_PUBLIC_PORT_ALLOWLIST: readonly number[] = [22, 80, 443] as const;
