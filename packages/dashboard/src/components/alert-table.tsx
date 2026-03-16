@@ -8,6 +8,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import type { AlertItem } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import Link from "next/link";
 
 function formatTriggeredAt(unixSeconds: number): string {
@@ -46,7 +47,10 @@ export function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 				{alerts.map((alert) => (
 					<TableRow key={`${alert.host_id}-${alert.rule_id}`}>
 						<TableCell>
-							<Link href={`/hosts/${alert.hid}`} className="text-primary hover:underline">
+							<Link
+								href={`/hosts/${hashHostId(alert.host_id)}`}
+								className="text-primary hover:underline"
+							>
 								{alert.hostname}
 							</Link>
 						</TableCell>

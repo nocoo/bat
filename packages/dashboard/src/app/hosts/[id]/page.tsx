@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
+import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
@@ -71,8 +72,8 @@ export default function HostDetailPage() {
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: allAlerts } = useAlerts();
 
-	const host = hosts?.find((h) => h.hid === hid);
-	const hostAlerts = allAlerts?.filter((a) => a.hid === hid) ?? [];
+	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
+	const hostAlerts = allAlerts?.filter((a) => hashHostId(a.host_id) === hid) ?? [];
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
