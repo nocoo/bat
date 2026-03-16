@@ -360,4 +360,226 @@ mod tests {
         assert!(json["disk"].as_array().unwrap().is_empty());
         assert!(json["net"].as_array().unwrap().is_empty());
     }
+
+    #[test]
+    fn tier2_payload_full_serializes_all_fields() {
+        let payload = Tier2Payload {
+            probe_version: "0.2.1".into(),
+            host_id: "host-42".into(),
+            timestamp: 1_710_000_000,
+            ports: Some(Tier2Ports {
+                listening: vec![Tier2ListeningPort {
+                    port: 22,
+                    bind: "0.0.0.0".into(),
+                    protocol: "tcp".into(),
+                    pid: Some(1234),
+                    process: Some("sshd".into()),
+                }],
+            }),
+            updates: Some(Tier2Updates {
+                total_count: 3,
+                security_count: 1,
+                list: vec![Tier2PackageUpdate {
+                    name: "openssl".into(),
+                    current_version: "3.0.0".into(),
+                    new_version: "3.0.1".into(),
+                    is_security: true,
+                }],
+                reboot_required: false,
+                cache_age_seconds: Some(7200),
+            }),
+            systemd: Some(Tier2Systemd {
+                failed_count: 1,
+                failed: vec![Tier2FailedService {
+                    unit: "nginx.service".into(),
+                    load_state: "loaded".into(),
+                    active_state: "failed".into(),
+                    sub_state: "failed".into(),
+                    description: "The nginx HTTP server".into(),
+                }],
+            }),
+            security: Some(Tier2Security {
+                ssh_password_auth: Some(false),
+                ssh_root_login: Some("no".into()),
+                ssh_failed_logins_7d: Some(42),
+                firewall_active: Some(true),
+                firewall_default_policy: Some("deny".into()),
+                fail2ban_active: Some(true),
+                fail2ban_banned_count: Some(5),
+                unattended_upgrades_active: Some(true),
+            }),
+            docker: Some(Tier2Docker {
+                installed: true,
+                version: Some("24.0.5".into()),
+                containers: vec![Tier2DockerContainer {
+                    id: "abc123".into(),
+                    name: "web".into(),
+                    image: "nginx:latest".into(),
+                    status: "Up 2 hours".into(),
+                    state: "running".into(),
+                    cpu_pct: Some(1.5),
+                    mem_bytes: Some(50_000_000),
+                    restart_count: 0,
+                    started_at: Some(1_700_000_000),
+                }],
+                images: Some(Tier2DockerImages {
+                    total_count: 5,
+                    total_bytes: 1_000_000_000,
+                    reclaimable_bytes: 200_000_000,
+                }),
+            }),
+            disk_deep: Some(Tier2DiskDeep {
+                top_dirs: vec![Tier2TopDir {
+                    path: "/var".into(),
+                    size_bytes: 500_000_000,
+                }],
+                journal_bytes: Some(100_000_000),
+                large_files: vec![Tier2LargeFile {
+                    path: "/var/log/syslog".into(),
+                    size_bytes: 150_000_000,
+                }],
+            }),
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+
+        // Top-level fields
+        assert_eq!(json["probe_version"], "0.2.1");
+        assert_eq!(json["host_id"], "host-42");
+        assert_eq!(json["timestamp"], 1_710_000_000_u64);
+
+        // Ports
+        assert_eq!(json["ports"]["listening"][0]["port"], 22);
+        assert_eq!(json["ports"]["listening"][0]["bind"], "0.0.0.0");
+        assert_eq!(json["ports"]["listening"][0]["pid"], 1234);
+        assert_eq!(json["ports"]["listening"][0]["process"], "sshd");
+
+        // Updates
+        assert_eq!(json["updates"]["total_count"], 3);
+        assert_eq!(json["updates"]["security_count"], 1);
+        assert_eq!(json["updates"]["list"][0]["name"], "openssl");
+        assert!(json["updates"]["list"][0]["is_security"].as_bool().unwrap());
+        assert_eq!(json["updates"]["cache_age_seconds"], 7200);
+
+        // Systemd
+        assert_eq!(json["systemd"]["failed_count"], 1);
+        assert_eq!(json["systemd"]["failed"][0]["unit"], "nginx.service");
+
+        // Security
+        assert_eq!(json["security"]["ssh_password_auth"], false);
+        assert_eq!(json["security"]["ssh_root_login"], "no");
+        assert_eq!(json["security"]["ssh_failed_logins_7d"], 42);
+        assert_eq!(json["security"]["fail2ban_banned_count"], 5);
+
+        // Docker
+        assert!(json["docker"]["installed"].as_bool().unwrap());
+        assert_eq!(json["docker"]["version"], "24.0.5");
+        assert_eq!(json["docker"]["containers"][0]["name"], "web");
+        assert_eq!(json["docker"]["images"]["total_count"], 5);
+
+        // Disk deep
+        assert_eq!(json["disk_deep"]["top_dirs"][0]["path"], "/var");
+        assert_eq!(json["disk_deep"]["journal_bytes"], 100_000_000);
+        assert_eq!(
+            json["disk_deep"]["large_files"][0]["size_bytes"],
+            150_000_000_u64
+        );
+    }
+
+    #[test]
+    fn tier2_payload_sparse_skips_none_fields() {
+        let payload = Tier2Payload {
+            probe_version: "0.2.1".into(),
+            host_id: "host-1".into(),
+            timestamp: 1_710_000_000,
+            ports: None,
+            updates: None,
+            systemd: None,
+            security: None,
+            docker: None,
+            disk_deep: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+
+        // Required fields present
+        assert_eq!(json["probe_version"], "0.2.1");
+        assert_eq!(json["host_id"], "host-1");
+        assert_eq!(json["timestamp"], 1_710_000_000_u64);
+
+        // Optional fields must be absent (skip_serializing_if = "Option::is_none")
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("ports"));
+        assert!(!obj.contains_key("updates"));
+        assert!(!obj.contains_key("systemd"));
+        assert!(!obj.contains_key("security"));
+        assert!(!obj.contains_key("docker"));
+        assert!(!obj.contains_key("disk_deep"));
+    }
+
+    #[test]
+    fn tier2_security_sparse_skips_none_fields() {
+        let security = Tier2Security {
+            ssh_password_auth: None,
+            ssh_root_login: None,
+            ssh_failed_logins_7d: None,
+            firewall_active: Some(true),
+            firewall_default_policy: None,
+            fail2ban_active: None,
+            fail2ban_banned_count: None,
+            unattended_upgrades_active: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&security).unwrap();
+        let obj = json.as_object().unwrap();
+
+        // Only firewall_active should be present
+        assert_eq!(obj.len(), 1);
+        assert_eq!(json["firewall_active"], true);
+    }
+
+    #[test]
+    fn tier2_docker_container_sparse_skips_none_fields() {
+        let container = Tier2DockerContainer {
+            id: "abc".into(),
+            name: "web".into(),
+            image: "nginx".into(),
+            status: "Exited (0) 2 hours ago".into(),
+            state: "exited".into(),
+            cpu_pct: None,
+            mem_bytes: None,
+            restart_count: 3,
+            started_at: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&container).unwrap();
+        let obj = json.as_object().unwrap();
+
+        // Required fields present
+        assert_eq!(json["id"], "abc");
+        assert_eq!(json["restart_count"], 3);
+        // Optional fields absent
+        assert!(!obj.contains_key("cpu_pct"));
+        assert!(!obj.contains_key("mem_bytes"));
+        assert!(!obj.contains_key("started_at"));
+    }
+
+    #[test]
+    fn tier2_listening_port_sparse_skips_none_fields() {
+        let port = Tier2ListeningPort {
+            port: 80,
+            bind: "::".into(),
+            protocol: "tcp6".into(),
+            pid: None,
+            process: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&port).unwrap();
+        let obj = json.as_object().unwrap();
+
+        assert_eq!(json["port"], 80);
+        assert_eq!(json["bind"], "::");
+        assert!(!obj.contains_key("pid"));
+        assert!(!obj.contains_key("process"));
+    }
 }
