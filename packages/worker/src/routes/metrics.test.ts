@@ -51,12 +51,34 @@ async function insertRawMetrics(
 		.run();
 }
 
+interface HourlyT3Options {
+	psi_cpu_some_avg10_avg?: number | null;
+	psi_cpu_some_avg60_avg?: number | null;
+	psi_mem_some_avg60_avg?: number | null;
+	psi_mem_full_avg60_avg?: number | null;
+	psi_io_some_avg60_avg?: number | null;
+	psi_io_full_avg60_avg?: number | null;
+	disk_io_json?: string | null;
+	tcp_established_avg?: number | null;
+	tcp_time_wait_avg?: number | null;
+	tcp_orphan_avg?: number | null;
+	tcp_allocated_avg?: number | null;
+	context_switches_sec_avg?: number | null;
+	forks_sec_avg?: number | null;
+	procs_running_avg?: number | null;
+	procs_blocked_avg?: number | null;
+	oom_kills_sum?: number | null;
+	fd_allocated_avg?: number | null;
+	fd_max?: number | null;
+}
+
 async function insertHourlyMetrics(
 	db: D1Database,
 	hostId: string,
 	hourTs: number,
 	cpuAvg: number,
 	memAvg: number,
+	t3?: HourlyT3Options,
 ) {
 	await db
 		.prepare(
@@ -65,13 +87,46 @@ async function insertHourlyMetrics(
        mem_total, mem_available_min, mem_used_pct_avg, mem_used_pct_max,
        swap_total, swap_used_max, swap_used_pct_avg, swap_used_pct_max,
        uptime_min, disk_json, net_rx_bytes_avg, net_rx_bytes_max, net_tx_bytes_avg, net_tx_bytes_max,
-       net_rx_errors, net_tx_errors)
+       net_rx_errors, net_tx_errors,
+       psi_cpu_some_avg10_avg, psi_cpu_some_avg60_avg,
+       psi_mem_some_avg60_avg, psi_mem_full_avg60_avg,
+       psi_io_some_avg60_avg, psi_io_full_avg60_avg,
+       disk_io_json,
+       tcp_established_avg, tcp_time_wait_avg, tcp_orphan_avg, tcp_allocated_avg,
+       context_switches_sec_avg, forks_sec_avg, procs_running_avg, procs_blocked_avg,
+       oom_kills_sum, fd_allocated_avg, fd_max)
      VALUES (?, ?, 120, ?, ?, 1.0, 0.0, 0.5, 0.3, 0.2,
        8000000000, 3500000000, ?, ?,
        2000000000, 100000000, 5.0, 8.0,
-       86000, '[]', 1000, 5000, 500, 2000, 0, 0)`,
+       86000, '[]', 1000, 5000, 500, 2000, 0, 0,
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
-		.bind(hostId, hourTs, cpuAvg, cpuAvg + 10, memAvg, memAvg + 5)
+		.bind(
+			hostId,
+			hourTs,
+			cpuAvg,
+			cpuAvg + 10,
+			memAvg,
+			memAvg + 5,
+			t3?.psi_cpu_some_avg10_avg ?? null,
+			t3?.psi_cpu_some_avg60_avg ?? null,
+			t3?.psi_mem_some_avg60_avg ?? null,
+			t3?.psi_mem_full_avg60_avg ?? null,
+			t3?.psi_io_some_avg60_avg ?? null,
+			t3?.psi_io_full_avg60_avg ?? null,
+			t3?.disk_io_json ?? null,
+			t3?.tcp_established_avg ?? null,
+			t3?.tcp_time_wait_avg ?? null,
+			t3?.tcp_orphan_avg ?? null,
+			t3?.tcp_allocated_avg ?? null,
+			t3?.context_switches_sec_avg ?? null,
+			t3?.forks_sec_avg ?? null,
+			t3?.procs_running_avg ?? null,
+			t3?.procs_blocked_avg ?? null,
+			t3?.oom_kills_sum ?? null,
+			t3?.fd_allocated_avg ?? null,
+			t3?.fd_max ?? null,
+		)
 		.run();
 }
 
@@ -118,6 +173,93 @@ describe("GET /api/hosts/:id/metrics", () => {
 		expect(body.data[0].ts).toBe(hourTs);
 		expect(body.data[0].cpu_usage_pct).toBe(20.0);
 		expect(body.data[0].sample_count).toBe(120);
+	});
+
+	test("hourly query returns T3 fields from metrics_hourly", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const from = now - 172800; // 48h ago
+		const hourTs = now - 3600;
+		await insertHost(db, "host-001", now);
+		await insertHourlyMetrics(db, "host-001", hourTs, 20.0, 45.0, {
+			psi_cpu_some_avg10_avg: 5.5,
+			psi_cpu_some_avg60_avg: 8.2,
+			psi_mem_some_avg60_avg: 12.0,
+			psi_mem_full_avg60_avg: 3.1,
+			psi_io_some_avg60_avg: 7.7,
+			psi_io_full_avg60_avg: 2.5,
+			disk_io_json: '[{"device":"sda","read_bytes_sec":1000,"write_bytes_sec":2000,"io_pct":15.0}]',
+			tcp_established_avg: 150,
+			tcp_time_wait_avg: 25,
+			tcp_orphan_avg: 2,
+			tcp_allocated_avg: 200,
+			context_switches_sec_avg: 5000,
+			forks_sec_avg: 120,
+			procs_running_avg: 3,
+			procs_blocked_avg: 1,
+			oom_kills_sum: 2,
+			fd_allocated_avg: 8000,
+			fd_max: 65535,
+		});
+
+		const res = await get(app, "host-001", from, now);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as MetricsQueryResponse;
+		expect(body.resolution).toBe("hourly");
+		expect(body.data).toHaveLength(1);
+		const d = body.data[0];
+
+		// PSI fields
+		expect(d.psi_cpu_some_avg10).toBe(5.5);
+		expect(d.psi_cpu_some_avg60).toBe(8.2);
+		expect(d.psi_cpu_some_avg300).toBeNull(); // not stored in hourly
+		expect(d.psi_mem_some_avg60).toBe(12.0);
+		expect(d.psi_mem_full_avg60).toBe(3.1);
+		expect(d.psi_io_some_avg60).toBe(7.7);
+		expect(d.psi_io_full_avg60).toBe(2.5);
+
+		// Disk I/O
+		expect(d.disk_io_json).toBe(
+			'[{"device":"sda","read_bytes_sec":1000,"write_bytes_sec":2000,"io_pct":15.0}]',
+		);
+
+		// TCP
+		expect(d.tcp_established).toBe(150);
+		expect(d.tcp_time_wait).toBe(25);
+		expect(d.tcp_orphan).toBe(2);
+		expect(d.tcp_allocated).toBe(200);
+
+		// CPU extensions
+		expect(d.context_switches_sec).toBe(5000);
+		expect(d.forks_sec).toBe(120);
+		expect(d.procs_running).toBe(3);
+		expect(d.procs_blocked).toBe(1);
+
+		// OOM + FD
+		expect(d.oom_kills).toBe(2);
+		expect(d.fd_allocated).toBe(8000);
+		expect(d.fd_max).toBe(65535);
+	});
+
+	test("hourly query returns null T3 fields when not populated", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const from = now - 172800;
+		const hourTs = now - 3600;
+		await insertHost(db, "host-001", now);
+		// Insert without T3 options — all T3 columns default to null
+		await insertHourlyMetrics(db, "host-001", hourTs, 20.0, 45.0);
+
+		const res = await get(app, "host-001", from, now);
+		const body = (await res.json()) as MetricsQueryResponse;
+		const d = body.data[0];
+
+		expect(d.psi_cpu_some_avg10).toBeNull();
+		expect(d.psi_cpu_some_avg60).toBeNull();
+		expect(d.tcp_established).toBeNull();
+		expect(d.context_switches_sec).toBeNull();
+		expect(d.oom_kills).toBeNull();
+		expect(d.fd_allocated).toBeNull();
+		expect(d.fd_max).toBeNull();
+		expect(d.disk_io_json).toBeNull();
 	});
 
 	test("returns correct resolution field", async () => {

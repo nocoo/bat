@@ -27,6 +27,25 @@ async function insertRawMetrics(
 		swapUsedPct?: number;
 		uptime?: number;
 		netJson?: string;
+		// T3 fields
+		psiCpuAvg10?: number | null;
+		psiCpuAvg60?: number | null;
+		psiMemAvg60?: number | null;
+		psiMemFullAvg60?: number | null;
+		psiIoAvg60?: number | null;
+		psiIoFullAvg60?: number | null;
+		diskIoJson?: string | null;
+		tcpEstablished?: number | null;
+		tcpTimeWait?: number | null;
+		tcpOrphan?: number | null;
+		tcpAllocated?: number | null;
+		ctxSwitchesSec?: number | null;
+		forksSec?: number | null;
+		procsRunning?: number | null;
+		procsBlocked?: number | null;
+		oomKills?: number | null;
+		fdAllocated?: number | null;
+		fdMax?: number | null;
 	} = {},
 ) {
 	const {
@@ -42,6 +61,24 @@ async function insertRawMetrics(
 		swapUsedPct = 5,
 		uptime = 86400,
 		netJson = '[{"iface":"eth0","rx_bytes_rate":1000,"tx_bytes_rate":500,"rx_errors":0,"tx_errors":0}]',
+		psiCpuAvg10 = null,
+		psiCpuAvg60 = null,
+		psiMemAvg60 = null,
+		psiMemFullAvg60 = null,
+		psiIoAvg60 = null,
+		psiIoFullAvg60 = null,
+		diskIoJson = null,
+		tcpEstablished = null,
+		tcpTimeWait = null,
+		tcpOrphan = null,
+		tcpAllocated = null,
+		ctxSwitchesSec = null,
+		forksSec = null,
+		procsRunning = null,
+		procsBlocked = null,
+		oomKills = null,
+		fdAllocated = null,
+		fdMax = null,
 	} = opts;
 
 	await db
@@ -50,8 +87,16 @@ async function insertRawMetrics(
        cpu_load1, cpu_load5, cpu_load15, cpu_count,
        mem_total, mem_available, mem_used_pct,
        swap_total, swap_used, swap_used_pct,
-       disk_json, net_json, uptime_seconds)
-     VALUES (?, ?, ?, ?, ?, ?, 0.3, 0.2, 4, ?, ?, ?, ?, ?, ?, '[]', ?, ?)`,
+       disk_json, net_json, uptime_seconds,
+       psi_cpu_some_avg10, psi_cpu_some_avg60,
+       psi_mem_some_avg60, psi_mem_full_avg60,
+       psi_io_some_avg60, psi_io_full_avg60,
+       disk_io_json,
+       tcp_established, tcp_time_wait, tcp_orphan, tcp_allocated,
+       context_switches_sec, forks_sec, procs_running, procs_blocked,
+       oom_kills, fd_allocated, fd_max)
+     VALUES (?, ?, ?, ?, ?, ?, 0.3, 0.2, 4, ?, ?, ?, ?, ?, ?, '[]', ?, ?,
+             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -68,6 +113,24 @@ async function insertRawMetrics(
 			swapUsedPct,
 			netJson,
 			uptime,
+			psiCpuAvg10,
+			psiCpuAvg60,
+			psiMemAvg60,
+			psiMemFullAvg60,
+			psiIoAvg60,
+			psiIoFullAvg60,
+			diskIoJson,
+			tcpEstablished,
+			tcpTimeWait,
+			tcpOrphan,
+			tcpAllocated,
+			ctxSwitchesSec,
+			forksSec,
+			procsRunning,
+			procsBlocked,
+			oomKills,
+			fdAllocated,
+			fdMax,
 		)
 		.run();
 }
@@ -260,6 +323,150 @@ describe("aggregateHour", () => {
 		expect(results.results[0].cpu_usage_avg).toBe(10);
 		expect(results.results[1].host_id).toBe("host-002");
 		expect(results.results[1].cpu_usage_avg).toBe(40);
+	});
+
+	test("T3 PSI fields aggregated as avg/max", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			psiCpuAvg60: 10,
+			psiIoAvg60: 5,
+			psiMemAvg60: 2,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			psiCpuAvg60: 30,
+			psiIoAvg60: 15,
+			psiMemAvg60: 8,
+		});
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<Record<string, unknown>>();
+
+		expect(row?.psi_cpu_some_avg60_avg).toBe(20); // avg(10, 30)
+		expect(row?.psi_cpu_some_avg60_max).toBe(30); // max(10, 30)
+		expect(row?.psi_io_some_avg60_avg).toBe(10); // avg(5, 15)
+		expect(row?.psi_io_some_avg60_max).toBe(15);
+		expect(row?.psi_mem_some_avg60_avg).toBe(5); // avg(2, 8)
+		expect(row?.psi_mem_some_avg60_max).toBe(8);
+	});
+
+	test("T3 TCP fields aggregated as avg/max", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			tcpEstablished: 10,
+			tcpTimeWait: 50,
+			tcpOrphan: 0,
+			tcpAllocated: 20,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			tcpEstablished: 20,
+			tcpTimeWait: 100,
+			tcpOrphan: 2,
+			tcpAllocated: 30,
+		});
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<Record<string, unknown>>();
+
+		expect(row?.tcp_established_avg).toBe(15);
+		expect(row?.tcp_established_max).toBe(20);
+		expect(row?.tcp_time_wait_avg).toBe(75);
+		expect(row?.tcp_time_wait_max).toBe(100);
+		expect(row?.tcp_orphan_avg).toBe(1);
+		expect(row?.tcp_orphan_max).toBe(2);
+	});
+
+	test("T3 CPU extensions and OOM aggregated correctly", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			ctxSwitchesSec: 500,
+			forksSec: 5,
+			procsRunning: 1,
+			procsBlocked: 0,
+			oomKills: 0,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			ctxSwitchesSec: 1000,
+			forksSec: 15,
+			procsRunning: 3,
+			procsBlocked: 1,
+			oomKills: 2,
+		});
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<Record<string, unknown>>();
+
+		expect(row?.context_switches_sec_avg).toBe(750);
+		expect(row?.context_switches_sec_max).toBe(1000);
+		expect(row?.forks_sec_avg).toBe(10);
+		expect(row?.forks_sec_max).toBe(15);
+		expect(row?.procs_running_avg).toBe(2);
+		expect(row?.procs_running_max).toBe(3);
+		expect(row?.oom_kills_sum).toBe(2); // sum(0, 2)
+	});
+
+	test("T3 FD fields aggregated as avg/max/last", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			fdAllocated: 1000,
+			fdMax: 1048576,
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			fdAllocated: 1200,
+			fdMax: 1048576,
+		});
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<Record<string, unknown>>();
+
+		expect(row?.fd_allocated_avg).toBe(1100);
+		expect(row?.fd_allocated_max).toBe(1200);
+		expect(row?.fd_max).toBe(1048576); // last value
+	});
+
+	test("T3 fields null when absent (backward compat)", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		// Insert without T3 fields
+		await insertRawMetrics(db, "host-001", hourTs + 100);
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<Record<string, unknown>>();
+
+		expect(row?.psi_cpu_some_avg60_avg).toBeNull();
+		expect(row?.psi_cpu_some_avg60_max).toBeNull();
+		expect(row?.tcp_established_avg).toBeNull();
+		expect(row?.context_switches_sec_avg).toBeNull();
+		expect(row?.oom_kills_sum).toBeNull();
+		expect(row?.fd_allocated_avg).toBeNull();
 	});
 });
 
