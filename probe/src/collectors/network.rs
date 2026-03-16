@@ -93,7 +93,7 @@ pub fn filter_interfaces(interfaces: &[&str], exclude: &[String]) -> Vec<String>
     interfaces
         .iter()
         .filter(|iface| !exclude.iter().any(|e| e == *iface))
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect()
 }
 

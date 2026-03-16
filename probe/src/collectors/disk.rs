@@ -83,7 +83,7 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
                     used_pct,
                 });
             }
-            Err(_) => continue,
+            Err(_) => {}
         }
     }
 
