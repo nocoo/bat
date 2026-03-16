@@ -2,7 +2,7 @@
 
 import { formatBytes, transformDiskData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
-import { Clock } from "lucide-react";
+import { HardDrive } from "lucide-react";
 
 export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	const disks = transformDiskData(data);
@@ -20,7 +20,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	return (
 		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
 			<div className="mb-3 flex items-center gap-2 text-base font-semibold">
-				<Clock className="h-4 w-4" />
+				<HardDrive className="h-4 w-4" />
 				Disk Usage
 			</div>
 			<div className="space-y-3">
