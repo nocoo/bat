@@ -120,6 +120,7 @@ pub fn read_all_counters(exclude: &[String]) -> Result<HashMap<String, NetCounte
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -266,5 +267,97 @@ mod tests {
         assert!((metrics[0].rx_bytes_rate - 100.0).abs() < f64::EPSILON);
         // rx_errors delta = 2 + (u64::MAX - (u64::MAX - 2)) = 4
         assert_eq!(metrics[0].rx_errors, 4);
+    }
+
+    #[test]
+    fn list_interfaces_with_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("eth0")).unwrap();
+        std::fs::create_dir(dir.path().join("lo")).unwrap();
+        std::fs::create_dir(dir.path().join("wlan0")).unwrap();
+
+        let exclude = vec!["lo".to_string()];
+        let ifaces = list_interfaces(dir.path().to_str().unwrap(), &exclude).unwrap();
+        assert!(ifaces.contains(&"eth0".to_string()));
+        assert!(ifaces.contains(&"wlan0".to_string()));
+        assert!(!ifaces.contains(&"lo".to_string()));
+    }
+
+    #[test]
+    fn read_counters_from_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let stats = dir.path().join("eth0/statistics");
+        std::fs::create_dir_all(&stats).unwrap();
+        std::fs::write(stats.join("rx_bytes"), "12345\n").unwrap();
+        std::fs::write(stats.join("tx_bytes"), "67890\n").unwrap();
+        std::fs::write(stats.join("rx_errors"), "1\n").unwrap();
+        std::fs::write(stats.join("tx_errors"), "0\n").unwrap();
+
+        let c = read_counters(dir.path().to_str().unwrap(), "eth0").unwrap();
+        assert_eq!(c.rx_bytes, 12345);
+        assert_eq!(c.tx_bytes, 67890);
+        assert_eq!(c.rx_errors, 1);
+        assert_eq!(c.tx_errors, 0);
+    }
+
+    #[test]
+    fn read_sysfs_u64_non_numeric_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let stats = dir.path().join("eth0/statistics");
+        std::fs::create_dir_all(&stats).unwrap();
+        std::fs::write(stats.join("rx_bytes"), "not_a_number\n").unwrap();
+        std::fs::write(stats.join("tx_bytes"), "0\n").unwrap();
+        std::fs::write(stats.join("rx_errors"), "0\n").unwrap();
+        std::fs::write(stats.join("tx_errors"), "0\n").unwrap();
+
+        let result = read_counters(dir.path().to_str().unwrap(), "eth0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn read_counters_missing_file_returns_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let stats = dir.path().join("eth0/statistics");
+        std::fs::create_dir_all(&stats).unwrap();
+        // Only create some files, leave rx_bytes missing
+        std::fs::write(stats.join("tx_bytes"), "0\n").unwrap();
+
+        let result = read_counters(dir.path().to_str().unwrap(), "eth0");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn compute_net_metrics_empty_input() {
+        let prev = HashMap::new();
+        let curr = HashMap::new();
+        let metrics = compute_net_metrics(&prev, &curr, 30);
+        assert!(metrics.is_empty());
+    }
+
+    #[test]
+    fn compute_net_metrics_zero_interval() {
+        let mut prev = HashMap::new();
+        prev.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 100,
+                tx_bytes: 200,
+                ..Default::default()
+            },
+        );
+        let mut curr = HashMap::new();
+        curr.insert(
+            "eth0".to_string(),
+            NetCounters {
+                rx_bytes: 400,
+                tx_bytes: 500,
+                ..Default::default()
+            },
+        );
+        let metrics = compute_net_metrics(&prev, &curr, 0);
+        assert_eq!(metrics.len(), 1);
+        // rate should be 0 when interval is 0
+        assert_eq!(metrics[0].rx_bytes_rate, 0.0);
+        assert_eq!(metrics[0].tx_bytes_rate, 0.0);
     }
 }
