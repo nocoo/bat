@@ -15,6 +15,9 @@ pub struct MetricsPayload {
     /// Tier 3: PSI pressure — None if kernel < 4.20 or `CONFIG_PSI=n`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub psi: Option<PsiMetrics>,
+    /// Tier 3: Disk I/O per device — delta counters from `/proc/diskstats`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disk_io: Option<Vec<DiskIoMetric>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -76,6 +79,16 @@ pub struct PsiMetrics {
     pub io_full_avg10: f64,
     pub io_full_avg60: f64,
     pub io_full_avg300: f64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DiskIoMetric {
+    pub device: String,
+    pub read_iops: f64,
+    pub write_iops: f64,
+    pub read_bytes_sec: f64,
+    pub write_bytes_sec: f64,
+    pub io_util_pct: f64,
 }
 
 #[derive(Debug, Serialize)]
@@ -279,6 +292,7 @@ mod tests {
             }],
             uptime_seconds: 86400,
             psi: None,
+            disk_io: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -378,6 +392,7 @@ mod tests {
             net: vec![],
             uptime_seconds: 0,
             psi: None,
+            disk_io: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -671,6 +686,7 @@ mod tests {
             ],
             uptime_seconds: 86400,
             psi: None,
+            disk_io: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -716,6 +732,7 @@ mod tests {
             net: vec![],
             uptime_seconds: u64::MAX,
             psi: None,
+            disk_io: None,
         };
 
         // Should serialize without panic
@@ -795,6 +812,7 @@ mod tests {
             net: vec![],
             uptime_seconds: 0,
             psi: None,
+            disk_io: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -848,6 +866,7 @@ mod tests {
                 io_full_avg60: 0.0,
                 io_full_avg300: 0.0,
             }),
+            disk_io: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
