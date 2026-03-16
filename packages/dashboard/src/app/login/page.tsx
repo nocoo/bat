@@ -2,7 +2,6 @@
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import LoadingScreen from "@/components/loading-screen";
-import { Activity } from "lucide-react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -59,7 +58,13 @@ function LoginContent() {
 					<div className="bg-primary px-5 py-4">
 						<div className="flex items-center justify-between">
 							<div className="flex items-center gap-2">
-								<Activity className="h-4 w-4 text-primary-foreground" strokeWidth={1.5} />
+								<Image
+									src="/logo-24.png"
+									alt="bat"
+									width={16}
+									height={16}
+									className="rounded-sm brightness-0 invert"
+								/>
 								<span className="text-sm font-semibold text-primary-foreground">bat</span>
 							</div>
 							<span className="text-[10px] font-medium uppercase tracking-widest text-primary-foreground/60">
