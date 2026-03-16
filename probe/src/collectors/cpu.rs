@@ -327,4 +327,52 @@ cpu MHz\t\t: 2400.000
     fn parse_cpu_model_missing() {
         assert_eq!(parse_cpu_model("processor\t: 0\n"), "unknown");
     }
+
+    #[test]
+    fn parse_stat_empty_input() {
+        assert!(parse_stat("").is_none());
+    }
+
+    #[test]
+    fn parse_stat_malformed_line() {
+        // "cpu " prefix present but no numeric fields
+        assert!(parse_stat("cpu  not numbers here\n").is_none());
+    }
+
+    #[test]
+    fn parse_stat_fewer_than_8_fields() {
+        // Only 7 numeric fields — should return None
+        assert!(parse_stat("cpu  1 2 3 4 5 6 7\n").is_none());
+    }
+
+    #[test]
+    fn compute_usage_saturating_sub_wrapround() {
+        // curr values smaller than prev (e.g. counter reset)
+        // saturating_sub should clamp to 0, not panic
+        let prev = CpuJiffies {
+            user: 5000,
+            nice: 200,
+            system: 3000,
+            idle: 40000,
+            iowait: 500,
+            irq: 100,
+            softirq: 50,
+            steal: 150,
+        };
+        let curr = CpuJiffies {
+            user: 1000,
+            nice: 100,
+            system: 500,
+            idle: 10000,
+            iowait: 100,
+            irq: 0,
+            softirq: 0,
+            steal: 0,
+        };
+        // total_delta saturates to 0 → returns (0.0, 0.0, 0.0)
+        let (usage, iowait, steal) = compute_cpu_usage(&prev, &curr);
+        assert_eq!(usage, 0.0);
+        assert_eq!(iowait, 0.0);
+        assert_eq!(steal, 0.0);
+    }
 }

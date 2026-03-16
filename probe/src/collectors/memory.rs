@@ -148,4 +148,47 @@ SwapFree:         500 kB
         assert_eq!(info.swap_used, 0);
         assert_eq!(info.swap_used_pct, 0.0);
     }
+
+    #[test]
+    fn parse_meminfo_zero_total_no_divide_by_zero() {
+        let content = "\
+MemTotal:        0 kB
+MemAvailable:    0 kB
+SwapTotal:       0 kB
+SwapFree:        0 kB
+";
+        let info = parse_meminfo(content).unwrap();
+        assert_eq!(info.mem_total, 0);
+        assert_eq!(info.mem_used_pct, 0.0);
+        assert_eq!(info.swap_used_pct, 0.0);
+    }
+
+    #[test]
+    fn parse_meminfo_fields_out_of_order() {
+        let content = "\
+SwapFree:        200 kB
+MemAvailable:    500 kB
+SwapTotal:       1000 kB
+MemTotal:        2000 kB
+";
+        let info = parse_meminfo(content).unwrap();
+        assert_eq!(info.mem_total, 2000 * 1024);
+        assert_eq!(info.mem_available, 500 * 1024);
+        assert_eq!(info.swap_total, 1000 * 1024);
+        assert_eq!(info.swap_free, 200 * 1024);
+    }
+
+    #[test]
+    fn parse_meminfo_malformed_line_ignored() {
+        // Malformed line mixed in; required fields still present
+        let content = "\
+MemTotal:        1000 kB
+MemAvailable:    500 kB
+Malformed line without colon
+SwapTotal:       0 kB
+SwapFree:        0 kB
+";
+        let info = parse_meminfo(content).unwrap();
+        assert_eq!(info.mem_total, 1000 * 1024);
+    }
 }

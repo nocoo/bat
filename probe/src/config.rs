@@ -189,4 +189,21 @@ interval = 1
         let cfg = parse_config(content).unwrap();
         assert_eq!(cfg.interval, 1);
     }
+
+    #[test]
+    fn reject_invalid_toml_syntax() {
+        let result = parse_config("not valid toml {{{}");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn accept_empty_host_id() {
+        let content = r#"
+worker_url = "https://bat-worker.example.workers.dev"
+write_key = "secret-key"
+host_id = ""
+"#;
+        let cfg = parse_config(content).unwrap();
+        assert_eq!(cfg.host_id.as_deref(), Some(""));
+    }
 }
