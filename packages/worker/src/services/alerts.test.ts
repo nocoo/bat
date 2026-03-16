@@ -11,6 +11,7 @@ function makePayload(
 		disk_used_pct: number;
 		iowait_pct: number;
 		steal_pct: number;
+		uptime_seconds: number;
 	}>,
 ): MetricsPayload {
 	return {
@@ -53,7 +54,7 @@ function makePayload(
 				tx_errors: 0,
 			},
 		],
-		uptime_seconds: 86400,
+		uptime_seconds: overrides?.uptime_seconds ?? 86400,
 	};
 }
 
@@ -122,6 +123,20 @@ describe("evaluateRules (pure function)", () => {
 		const results = evaluateRules(makePayload({ iowait_pct: 20 }));
 		const iowait = results.find((r) => r.ruleId === "iowait_high");
 		expect(iowait?.fired).toBe(false);
+	});
+
+	test("uptime_anomaly fires when uptime < 300s", () => {
+		const results = evaluateRules(makePayload({ uptime_seconds: 120 }));
+		const uptime = results.find((r) => r.ruleId === "uptime_anomaly");
+		expect(uptime?.fired).toBe(true);
+		expect(uptime?.severity).toBe("info");
+		expect(uptime?.value).toBe(120);
+	});
+
+	test("uptime_anomaly clears when uptime >= 300s", () => {
+		const results = evaluateRules(makePayload({ uptime_seconds: 86400 }));
+		const uptime = results.find((r) => r.ruleId === "uptime_anomaly");
+		expect(uptime?.fired).toBe(false);
 	});
 });
 
