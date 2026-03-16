@@ -128,34 +128,7 @@ async fn collect_and_send(
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
-    let (mem, swap) = mem_info.as_ref().map_or(
-        (
-            MemMetrics {
-                total_bytes: 0,
-                available_bytes: 0,
-                used_pct: 0.0,
-            },
-            SwapMetrics {
-                total_bytes: 0,
-                used_bytes: 0,
-                used_pct: 0.0,
-            },
-        ),
-        |info| {
-            (
-                MemMetrics {
-                    total_bytes: info.mem_total,
-                    available_bytes: info.mem_available,
-                    used_pct: info.mem_used_pct,
-                },
-                SwapMetrics {
-                    total_bytes: info.swap_total,
-                    used_bytes: info.swap_used,
-                    used_pct: info.swap_used_pct,
-                },
-            )
-        },
-    );
+    let (mem, swap) = build_mem_swap_metrics(mem_info.as_ref());
 
     // Disk
     let disk: Vec<DiskMetric> =
@@ -248,6 +221,40 @@ async fn send_identity(sender: &Sender, host_id: &str) {
     }
 }
 
+/// Build memory and swap metrics from an optional [`MemInfo`], defaulting to zero.
+fn build_mem_swap_metrics(
+    mem_info: Option<&collectors::memory::MemInfo>,
+) -> (MemMetrics, SwapMetrics) {
+    mem_info.map_or(
+        (
+            MemMetrics {
+                total_bytes: 0,
+                available_bytes: 0,
+                used_pct: 0.0,
+            },
+            SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+        ),
+        |info| {
+            (
+                MemMetrics {
+                    total_bytes: info.mem_total,
+                    available_bytes: info.mem_available,
+                    used_pct: info.mem_used_pct,
+                },
+                SwapMetrics {
+                    total_bytes: info.swap_total,
+                    used_bytes: info.swap_used,
+                    used_pct: info.swap_used_pct,
+                },
+            )
+        },
+    )
+}
+
 /// Build an [`IdentityPayload`] from collected system values.
 #[allow(clippy::too_many_arguments)]
 fn build_identity_payload(
@@ -305,5 +312,34 @@ mod tests {
         assert_eq!(p.hostname, "");
         assert_eq!(p.uptime_seconds, 0);
         assert_eq!(p.boot_time, 0);
+    }
+
+    #[test]
+    fn build_mem_swap_metrics_with_some() {
+        use collectors::memory::MemInfo;
+
+        let info = MemInfo {
+            mem_total: 4_000_000,
+            mem_available: 2_000_000,
+            mem_used_pct: 50.0,
+            swap_total: 1_000_000,
+            swap_free: 500_000,
+            swap_used: 500_000,
+            swap_used_pct: 50.0,
+        };
+        let (mem, swap) = build_mem_swap_metrics(Some(&info));
+        assert_eq!(mem.total_bytes, 4_000_000);
+        assert_eq!(mem.available_bytes, 2_000_000);
+        assert_eq!(swap.total_bytes, 1_000_000);
+        assert_eq!(swap.used_bytes, 500_000);
+    }
+
+    #[test]
+    fn build_mem_swap_metrics_with_none() {
+        let (mem, swap) = build_mem_swap_metrics(None);
+        assert_eq!(mem.total_bytes, 0);
+        assert_eq!(mem.available_bytes, 0);
+        assert_eq!(swap.total_bytes, 0);
+        assert_eq!(swap.used_bytes, 0);
     }
 }
