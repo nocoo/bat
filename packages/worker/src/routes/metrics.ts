@@ -1,11 +1,31 @@
 // GET /api/hosts/:id/metrics — query metrics with auto resolution
+// :id accepts either raw host_id or opaque hid (8-char hash)
 import type { MetricsDataPoint, MetricsQueryResponse } from "@bat/shared";
-import { AUTO_RESOLUTION_THRESHOLD_SECONDS } from "@bat/shared";
+import { AUTO_RESOLUTION_THRESHOLD_SECONDS, hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
+/**
+ * Resolve the route param to a real host_id.
+ * If `id` is an 8-char hex hid, scan active hosts to find the match.
+ * Otherwise assume it's a raw host_id.
+ */
+async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
+	const isHid = /^[0-9a-f]{8}$/.test(id);
+	if (!isHid) return id;
+
+	// Scan active hosts and match by hash
+	const result = await db
+		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
+		.all<{ host_id: string }>();
+	for (const row of result.results) {
+		if (hashHostId(row.host_id) === id) return row.host_id;
+	}
+	return null;
+}
+
 export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metrics">) {
-	const hostId = c.req.param("id");
+	const idParam = c.req.param("id");
 	const fromStr = c.req.query("from");
 	const toStr = c.req.query("to");
 
@@ -21,6 +41,12 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 	}
 
 	const db = c.env.DB;
+
+	const hostId = await resolveHostId(db, idParam);
+	if (!hostId) {
+		return c.json({ error: "Host not found" }, 404);
+	}
+
 	const range = to - from;
 	const useHourly = range > AUTO_RESOLUTION_THRESHOLD_SECONDS;
 

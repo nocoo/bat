@@ -61,28 +61,26 @@ export function formatBootTime(unixSeconds: number | null | undefined): string |
 
 export default function HostDetailPage() {
 	const params = useParams<{ id: string }>();
-	const hostId = params.id;
+	const hid = params.id;
 
 	const [rangeSeconds, setRangeSeconds] = useState(3600);
 	const now = Math.floor(Date.now() / 1000);
 	const from = now - rangeSeconds;
 
 	const { data: hosts } = useHosts();
-	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hostId, from, now);
+	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: allAlerts } = useAlerts();
 
-	const host = hosts?.find((h) => h.host_id === hostId);
-	const hostAlerts = allAlerts?.filter((a) => a.host_id === hostId) ?? [];
+	const host = hosts?.find((h) => h.hid === hid);
+	const hostAlerts = allAlerts?.filter((a) => a.hid === hid) ?? [];
 
 	return (
-		<AppShell
-			breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hostId }]}
-		>
+		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
 			<div className="space-y-6">
 				{/* Header */}
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<div className="flex items-center gap-3">
-						<h1 className="text-2xl font-bold">{host?.hostname ?? hostId}</h1>
+						<h1 className="text-2xl font-bold">{host?.hostname ?? hid}</h1>
 						{host && <StatusBadge status={host.status} />}
 					</div>
 					<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />

@@ -46,7 +46,7 @@ export function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 				{alerts.map((alert) => (
 					<TableRow key={`${alert.host_id}-${alert.rule_id}`}>
 						<TableCell>
-							<Link href={`/hosts/${alert.host_id}`} className="text-primary hover:underline">
+							<Link href={`/hosts/${alert.hid}`} className="text-primary hover:underline">
 								{alert.hostname}
 							</Link>
 						</TableCell>

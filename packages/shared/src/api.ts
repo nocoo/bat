@@ -3,6 +3,22 @@
 
 import type { AlertSeverity } from "./alerts.js";
 
+// --- Host ID hashing ---
+
+/**
+ * FNV-1a 32-bit hash → 8-char hex string.
+ * Used to derive an opaque `hid` from raw `host_id` so that hostnames /
+ * domain names are not exposed in dashboard URLs or browser history.
+ */
+export function hashHostId(hostId: string): string {
+	let h = 0x811c9dc5; // FNV offset basis
+	for (let i = 0; i < hostId.length; i++) {
+		h ^= hostId.charCodeAt(i);
+		h = Math.imul(h, 0x01000193); // FNV prime
+	}
+	return (h >>> 0).toString(16).padStart(8, "0");
+}
+
 // --- Route constants ---
 
 export const API_ROUTES = {
@@ -20,6 +36,7 @@ export type HostStatus = "healthy" | "warning" | "critical" | "offline";
 
 /** GET /api/hosts → HostOverviewItem[] */
 export interface HostOverviewItem {
+	hid: string; // opaque hash of host_id for URL routing
 	host_id: string;
 	hostname: string;
 	os: string | null;
@@ -76,6 +93,7 @@ export interface MetricsDataPoint {
 
 /** GET /api/alerts → AlertItem[] */
 export interface AlertItem {
+	hid: string; // opaque hash of host_id for URL routing
 	host_id: string;
 	hostname: string;
 	rule_id: string;
