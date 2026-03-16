@@ -102,6 +102,45 @@ CREATE TABLE metrics_hourly (
   net_tx_bytes_max REAL,             -- max tx bytes/sec peak
   net_rx_errors    INTEGER,          -- sum of per-interval deltas in the hour
   net_tx_errors    INTEGER,          -- sum of per-interval deltas in the hour
+  -- Tier 3: PSI pressure (avg + max for alert-relevant avg60 fields)
+  psi_cpu_some_avg10_avg  REAL,
+  psi_cpu_some_avg10_max  REAL,
+  psi_cpu_some_avg60_avg  REAL,
+  psi_cpu_some_avg60_max  REAL,      -- alert #16 threshold check
+  psi_mem_some_avg60_avg  REAL,
+  psi_mem_some_avg60_max  REAL,      -- alert #17 threshold check
+  psi_mem_full_avg60_avg  REAL,
+  psi_mem_full_avg60_max  REAL,
+  psi_io_some_avg60_avg   REAL,
+  psi_io_some_avg60_max   REAL,      -- alert #18 threshold check
+  psi_io_full_avg60_avg   REAL,
+  psi_io_full_avg60_max   REAL,
+  -- Tier 3: Disk I/O (JSON per-device averages)
+  disk_io_json     TEXT,             -- [{device, read_iops_avg, write_iops_avg, ..., io_util_pct_avg, io_util_pct_max}]
+  -- Tier 3: TCP connection state
+  tcp_established_avg  REAL,
+  tcp_established_max  INTEGER,
+  tcp_time_wait_avg    REAL,
+  tcp_time_wait_max    INTEGER,      -- alert #20 threshold check
+  tcp_orphan_avg       REAL,
+  tcp_orphan_max       INTEGER,
+  tcp_allocated_avg    REAL,
+  tcp_allocated_max    INTEGER,
+  -- Tier 3: CPU extensions
+  context_switches_sec_avg REAL,
+  context_switches_sec_max REAL,
+  forks_sec_avg        REAL,
+  forks_sec_max        REAL,
+  procs_running_avg    REAL,
+  procs_running_max    INTEGER,
+  procs_blocked_avg    REAL,
+  procs_blocked_max    INTEGER,
+  -- Tier 3: OOM kills (sum of deltas in the hour)
+  oom_kills_sum        INTEGER,      -- alert #21 check
+  -- Tier 3: File descriptors
+  fd_allocated_avg     REAL,
+  fd_allocated_max     INTEGER,
+  fd_max               INTEGER,      -- last sample (static)
   PRIMARY KEY (host_id, hour_ts),
   FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
@@ -226,6 +265,7 @@ Sent every 30s via `POST /api/ingest`. Full metric definitions in [01-metrics-ca
 ```typescript
 // @bat/shared — packages/shared/src/metrics.ts
 interface MetricsPayload {
+  probe_version?: string;
   host_id: string;
   timestamp: number;        // Unix seconds, Probe clock
   interval: number;         // 30
@@ -237,11 +277,18 @@ interface MetricsPayload {
     iowait_pct: number;
     steal_pct: number;
     count: number;
+    // Tier 3 extensions (optional — omitted by probes < v0.4.0)
+    context_switches_sec?: number;  // ctxt delta / elapsed
+    forks_sec?: number;             // processes delta / elapsed
+    procs_running?: number;
+    procs_blocked?: number;
   };
   mem: {
     total_bytes: number;
     available_bytes: number;
     used_pct: number;
+    // Tier 3 extension
+    oom_kills_delta?: number;  // delta since last sample
   };
   swap: {
     total_bytes: number;
@@ -251,6 +298,11 @@ interface MetricsPayload {
   disk: DiskMetric[];
   net: NetMetric[];
   uptime_seconds: number;
+  // Tier 3 additions (optional — omitted by probes < v0.4.0)
+  psi?: PsiMetrics;        // /proc/pressure/{cpu,memory,io}
+  disk_io?: DiskIoMetric[]; // /proc/diskstats
+  tcp?: TcpMetrics;         // /proc/net/sockstat
+  fd?: FdMetrics;           // /proc/sys/fs/file-nr
 }
 
 interface DiskMetric {
@@ -270,6 +322,47 @@ interface NetMetric {
   // excluded from the MVP payload. Packet rates add payload size without
   // actionable alerting value. Bytes + errors are sufficient for MVP.
   // Add in post-MVP if per-packet analysis is needed.
+}
+
+// --- Tier 3 types (added in v0.4.0, design in 09-tier3-signals.md) ---
+
+interface PsiMetrics {
+  cpu_some_avg10: number;
+  cpu_some_avg60: number;
+  cpu_some_avg300: number;
+  mem_some_avg10: number;
+  mem_some_avg60: number;
+  mem_some_avg300: number;
+  mem_full_avg10: number;
+  mem_full_avg60: number;
+  mem_full_avg300: number;
+  io_some_avg10: number;
+  io_some_avg60: number;
+  io_some_avg300: number;
+  io_full_avg10: number;
+  io_full_avg60: number;
+  io_full_avg300: number;
+}
+
+interface DiskIoMetric {
+  device: string;
+  read_iops: number;
+  write_iops: number;
+  read_bytes_sec: number;
+  write_bytes_sec: number;
+  io_util_pct: number;
+}
+
+interface TcpMetrics {
+  established: number;  // TCP inuse (ESTABLISHED + CLOSE_WAIT)
+  time_wait: number;
+  orphan: number;
+  allocated: number;    // total TCP sockets including all states
+}
+
+interface FdMetrics {
+  allocated: number;
+  max: number;
 }
 ```
 
