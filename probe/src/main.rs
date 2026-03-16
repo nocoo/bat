@@ -13,6 +13,8 @@ use collectors::network::NetCounters;
 use sender::Sender;
 use tokio::time::MissedTickBehavior;
 
+const PROBE_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[tokio::main(flavor = "current_thread")]
 #[allow(clippy::too_many_lines)]
 async fn main() {
@@ -191,6 +193,7 @@ fn collect_metrics(
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
     orchestrate::build_metrics_payload(
+        PROBE_VERSION,
         host_id,
         timestamp,
         cfg.interval,
@@ -221,6 +224,7 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
     let boot_time = orchestrate::compute_boot_time(now_secs, uptime_seconds);
 
     orchestrate::build_identity_payload(
+        PROBE_VERSION,
         host_id,
         &hostname,
         &os,

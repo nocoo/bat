@@ -33,6 +33,7 @@ pub fn compute_net_delta(
 /// Build a [`MetricsPayload`] from collected system values.
 #[allow(clippy::too_many_arguments)]
 pub fn build_metrics_payload(
+    probe_version: &str,
     host_id: &str,
     timestamp: u64,
     interval: u32,
@@ -46,6 +47,7 @@ pub fn build_metrics_payload(
     uptime_seconds: u64,
 ) -> MetricsPayload {
     MetricsPayload {
+        probe_version: probe_version.to_string(),
         host_id: host_id.to_string(),
         timestamp,
         interval,
@@ -135,6 +137,7 @@ pub fn build_mem_swap_metrics(
 /// Build an [`IdentityPayload`] from collected system values.
 #[allow(clippy::too_many_arguments)]
 pub fn build_identity_payload(
+    probe_version: &str,
     host_id: &str,
     hostname: &str,
     os: &str,
@@ -145,6 +148,7 @@ pub fn build_identity_payload(
     boot_time: u64,
 ) -> IdentityPayload {
     IdentityPayload {
+        probe_version: probe_version.to_string(),
         host_id: host_id.to_string(),
         hostname: hostname.to_string(),
         os: os.to_string(),
@@ -164,6 +168,7 @@ mod tests {
     #[test]
     fn build_identity_payload_normal() {
         let p = build_identity_payload(
+            "0.2.0",
             "host-1",
             "myserver",
             "Ubuntu 22.04",
@@ -173,6 +178,7 @@ mod tests {
             86400,
             1_700_000_000,
         );
+        assert_eq!(p.probe_version, "0.2.0");
         assert_eq!(p.host_id, "host-1");
         assert_eq!(p.hostname, "myserver");
         assert_eq!(p.os, "Ubuntu 22.04");
@@ -185,7 +191,7 @@ mod tests {
 
     #[test]
     fn build_identity_payload_empty_fields() {
-        let p = build_identity_payload("", "", "", "", "", "", 0, 0);
+        let p = build_identity_payload("", "", "", "", "", "", "", 0, 0);
         assert_eq!(p.host_id, "");
         assert_eq!(p.hostname, "");
         assert_eq!(p.uptime_seconds, 0);
@@ -247,6 +253,7 @@ mod tests {
             tx_errors: 0,
         }];
         let p = build_metrics_payload(
+            "0.2.0",
             "host-1",
             1_700_000_000,
             30,
@@ -283,6 +290,7 @@ mod tests {
             used_pct: 0.0,
         };
         let p = build_metrics_payload(
+            "0.2.0",
             "h",
             0,
             30,

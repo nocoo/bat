@@ -17,7 +17,9 @@ function validateIdentityPayload(body: unknown): body is IdentityPayload {
 		typeof b.arch === "string" &&
 		typeof b.cpu_model === "string" &&
 		typeof b.uptime_seconds === "number" &&
-		typeof b.boot_time === "number"
+		typeof b.boot_time === "number" &&
+		// probe_version is optional for backward compatibility
+		(b.probe_version === undefined || typeof b.probe_version === "string")
 	);
 }
 

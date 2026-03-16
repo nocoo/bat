@@ -47,6 +47,9 @@ function validateMetricsPayload(body: unknown): body is MetricsPayload {
 	if (!Array.isArray(b.disk)) return false;
 	if (!Array.isArray(b.net)) return false;
 
+	// probe_version is optional for backward compatibility
+	if (b.probe_version !== undefined && typeof b.probe_version !== "string") return false;
+
 	return true;
 }
 
