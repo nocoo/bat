@@ -133,8 +133,11 @@ async fn collect_and_send(
 
     // Network (delta from previous counters)
     let curr_net = collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
-    let net =
-        orchestrate::compute_net_delta(prev_net_counters.as_ref(), curr_net.as_ref(), cfg.interval);
+    let net = orchestrate::compute_net_delta(
+        prev_net_counters.as_ref(),
+        curr_net.as_ref(),
+        Duration::from_secs(u64::from(cfg.interval)),
+    );
     *prev_net_counters = curr_net;
 
     // Uptime
