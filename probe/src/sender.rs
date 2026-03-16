@@ -212,7 +212,10 @@ mod tests {
         let sender = Sender::new(&mock_server.uri(), "test-key");
         let body = serde_json::json!({"host_id": "test"});
         let result = sender.post("/api/ingest", &body).await;
-        assert!(matches!(result, Err(SendError::Permanent { status: 400, .. })));
+        assert!(matches!(
+            result,
+            Err(SendError::Permanent { status: 400, .. })
+        ));
     }
 
     #[tokio::test]
@@ -241,7 +244,11 @@ mod tests {
 
         // Verify at least 3 requests were made
         let received = mock_server.received_requests().await.unwrap();
-        assert!(received.len() >= 3, "expected at least 3 requests, got {}", received.len());
+        assert!(
+            received.len() >= 3,
+            "expected at least 3 requests, got {}",
+            received.len()
+        );
     }
 
     #[tokio::test]
