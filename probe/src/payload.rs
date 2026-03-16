@@ -582,4 +582,160 @@ mod tests {
         assert!(!obj.contains_key("pid"));
         assert!(!obj.contains_key("process"));
     }
+
+    #[test]
+    fn metrics_payload_multiple_disks_and_nets() {
+        let payload = MetricsPayload {
+            probe_version: "0.2.1".into(),
+            host_id: "multi".into(),
+            timestamp: 1_710_000_000,
+            interval: 30,
+            cpu: CpuMetrics {
+                load1: 0.0,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 0.0,
+                iowait_pct: 0.0,
+                steal_pct: 0.0,
+                count: 1,
+            },
+            mem: MemMetrics {
+                total_bytes: 0,
+                available_bytes: 0,
+                used_pct: 0.0,
+            },
+            swap: SwapMetrics {
+                total_bytes: 0,
+                used_bytes: 0,
+                used_pct: 0.0,
+            },
+            disk: vec![
+                DiskMetric {
+                    mount: "/".into(),
+                    total_bytes: 100_000_000_000,
+                    avail_bytes: 50_000_000_000,
+                    used_pct: 50.0,
+                },
+                DiskMetric {
+                    mount: "/data".into(),
+                    total_bytes: 500_000_000_000,
+                    avail_bytes: 200_000_000_000,
+                    used_pct: 60.0,
+                },
+                DiskMetric {
+                    mount: "/boot".into(),
+                    total_bytes: 1_000_000_000,
+                    avail_bytes: 500_000_000,
+                    used_pct: 50.0,
+                },
+            ],
+            net: vec![
+                NetMetric {
+                    iface: "eth0".into(),
+                    rx_bytes_rate: 1024.0,
+                    tx_bytes_rate: 512.0,
+                    rx_errors: 0,
+                    tx_errors: 0,
+                },
+                NetMetric {
+                    iface: "wlan0".into(),
+                    rx_bytes_rate: 256.5,
+                    tx_bytes_rate: 128.25,
+                    rx_errors: 3,
+                    tx_errors: 1,
+                },
+            ],
+            uptime_seconds: 86400,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+
+        assert_eq!(json["disk"].as_array().unwrap().len(), 3);
+        assert_eq!(json["disk"][0]["mount"], "/");
+        assert_eq!(json["disk"][1]["mount"], "/data");
+        assert_eq!(json["disk"][2]["mount"], "/boot");
+
+        assert_eq!(json["net"].as_array().unwrap().len(), 2);
+        assert_eq!(json["net"][0]["iface"], "eth0");
+        assert_eq!(json["net"][1]["iface"], "wlan0");
+        assert_eq!(json["net"][1]["rx_errors"], 3);
+    }
+
+    #[test]
+    fn metrics_payload_extreme_values() {
+        let payload = MetricsPayload {
+            probe_version: "0.2.1".into(),
+            host_id: "extreme".into(),
+            timestamp: u64::MAX,
+            interval: u32::MAX,
+            cpu: CpuMetrics {
+                load1: f64::MAX,
+                load5: 0.0,
+                load15: 0.0,
+                usage_pct: 100.0,
+                iowait_pct: 100.0,
+                steal_pct: 100.0,
+                count: u32::MAX,
+            },
+            mem: MemMetrics {
+                total_bytes: u64::MAX,
+                available_bytes: 0,
+                used_pct: 100.0,
+            },
+            swap: SwapMetrics {
+                total_bytes: u64::MAX,
+                used_bytes: u64::MAX,
+                used_pct: 100.0,
+            },
+            disk: vec![],
+            net: vec![],
+            uptime_seconds: u64::MAX,
+        };
+
+        // Should serialize without panic
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json["timestamp"], u64::MAX);
+        assert_eq!(json["cpu"]["count"], u32::MAX);
+        assert_eq!(json["mem"]["total_bytes"], u64::MAX);
+        assert_eq!(json["uptime_seconds"], u64::MAX);
+    }
+
+    #[test]
+    fn identity_payload_unicode_fields() {
+        let payload = IdentityPayload {
+            probe_version: "0.2.1".into(),
+            host_id: "host-日本語".into(),
+            hostname: "服务器-01".into(),
+            os: "Ubuntu 22.04 中文版".into(),
+            kernel: "5.15.0".into(),
+            arch: "aarch64".into(),
+            cpu_model: "Apple M1 — Pro™".into(),
+            uptime_seconds: 0,
+            boot_time: 0,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        assert_eq!(json["host_id"], "host-日本語");
+        assert_eq!(json["hostname"], "服务器-01");
+        assert_eq!(json["os"], "Ubuntu 22.04 中文版");
+        assert_eq!(json["cpu_model"], "Apple M1 — Pro™");
+    }
+
+    #[test]
+    fn tier2_updates_no_cache_age() {
+        let updates = Tier2Updates {
+            total_count: 0,
+            security_count: 0,
+            list: vec![],
+            reboot_required: true,
+            cache_age_seconds: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&updates).unwrap();
+        let obj = json.as_object().unwrap();
+        assert_eq!(json["total_count"], 0);
+        assert!(json["reboot_required"].as_bool().unwrap());
+        assert!(!obj.contains_key("cache_age_seconds"));
+        assert!(json["list"].as_array().unwrap().is_empty());
+    }
 }
