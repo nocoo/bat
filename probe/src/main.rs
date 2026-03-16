@@ -1,3 +1,5 @@
+#![cfg_attr(coverage_nightly, feature(coverage_attribute))]
+
 mod collectors;
 mod command;
 mod config;
@@ -18,6 +20,7 @@ const PROBE_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[tokio::main(flavor = "current_thread")]
 #[allow(clippy::too_many_lines)]
+#[cfg_attr(coverage_nightly, coverage(off))]
 async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -192,6 +195,7 @@ async fn main() {
     }
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn collect_metrics(
     host_id: &str,
     cfg: &config::Config,
@@ -252,6 +256,7 @@ fn collect_metrics(
     )
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
     let hostname = collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".into());
     let os = collectors::identity::read_os_release().unwrap_or_else(|_| "unknown".into());
@@ -280,6 +285,7 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
     )
 }
 
+#[cfg_attr(coverage_nightly, coverage(off))]
 async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
