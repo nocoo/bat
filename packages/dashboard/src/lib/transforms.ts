@@ -162,3 +162,87 @@ export function formatBytes(bytes: number): string {
 	if (bytes < 1024 * 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 	return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
 }
+
+// --- PSI Pressure Chart ---
+export interface PsiChartPoint {
+	ts: number;
+	cpu: number;
+	memory: number;
+	io: number;
+}
+
+/** Transform PSI avg60 values for chart display. Returns empty if no PSI data present. */
+export function transformPsiData(data: MetricsDataPoint[]): PsiChartPoint[] {
+	const hasAny = data.some((d) => d.psi_cpu_some_avg60 != null);
+	if (!hasAny) return [];
+
+	return data.map((d) => ({
+		ts: d.ts,
+		cpu: d.psi_cpu_some_avg60 ?? 0,
+		memory: d.psi_mem_some_avg60 ?? 0,
+		io: d.psi_io_some_avg60 ?? 0,
+	}));
+}
+
+// --- Disk I/O Chart ---
+export interface DiskIoChartPoint {
+	ts: number;
+	read_iops: number;
+	write_iops: number;
+	io_util_pct: number;
+}
+
+interface DiskIoJsonEntry {
+	device: string;
+	read_iops: number;
+	write_iops: number;
+	read_bytes_sec: number;
+	write_bytes_sec: number;
+	io_util_pct: number;
+}
+
+/** Transform disk I/O data. Aggregates across all devices (max io_util, sum IOPS). */
+export function transformDiskIoData(data: MetricsDataPoint[]): DiskIoChartPoint[] {
+	const hasAny = data.some((d) => d.disk_io_json != null);
+	if (!hasAny) return [];
+
+	return data.map((d) => {
+		let readIops = 0;
+		let writeIops = 0;
+		let ioUtil = 0;
+		if (d.disk_io_json) {
+			try {
+				const entries = JSON.parse(d.disk_io_json) as DiskIoJsonEntry[];
+				for (const e of entries) {
+					readIops += e.read_iops ?? 0;
+					writeIops += e.write_iops ?? 0;
+					ioUtil = Math.max(ioUtil, e.io_util_pct ?? 0);
+				}
+			} catch {
+				// invalid JSON — return zeros
+			}
+		}
+		return { ts: d.ts, read_iops: readIops, write_iops: writeIops, io_util_pct: ioUtil };
+	});
+}
+
+// --- TCP Chart ---
+export interface TcpChartPoint {
+	ts: number;
+	established: number;
+	time_wait: number;
+	orphan: number;
+}
+
+/** Transform TCP connection state data. Returns empty if no TCP data present. */
+export function transformTcpData(data: MetricsDataPoint[]): TcpChartPoint[] {
+	const hasAny = data.some((d) => d.tcp_established != null);
+	if (!hasAny) return [];
+
+	return data.map((d) => ({
+		ts: d.ts,
+		established: d.tcp_established ?? 0,
+		time_wait: d.tcp_time_wait ?? 0,
+		orphan: d.tcp_orphan ?? 0,
+	}));
+}
