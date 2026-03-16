@@ -36,10 +36,41 @@
 - Pre-commit hook runs: typecheck → lint → unit tests → rust checks (clippy + test)
 - Coverage thresholds enforced by `scripts/check-coverage.sh`
 
-## Probe Installation
+## Probe Build & Release
+
+### Cross-compile (macOS → Linux)
+
+Dev machine is macOS ARM; probes run on Linux x86_64/aarch64. Use Docker to cross-compile:
+
+```bash
+# Build x86_64 binary (outputs to probe/out/)
+docker build --platform linux/amd64 -f probe/Dockerfile.build -o probe/out .
+
+# Build aarch64 binary (outputs to probe/out/)
+docker build --platform linux/arm64 -f probe/Dockerfile.build -o probe/out .
+```
+
+- Dockerfile: `probe/Dockerfile.build` (rust:1-slim, opt-level=z + LTO + strip)
+- Output: `probe/out/bat-probe-linux-{x86_64,aarch64}` (~300KB, statically stripped ELF)
+- `probe/out/` is gitignored — binaries are build artifacts, not committed
+
+### Release checklist
+
+1. Bump version in root `package.json`, run `scripts/sync-version.sh`
+2. Build probe binaries for both architectures (see above)
+3. Upload binaries to Dashboard's `PROBE_BIN_DIR` (default `/app/probe-bin/`)
+   - Filenames must be `bat-probe-linux-x86_64` and `bat-probe-linux-aarch64`
+4. Deploy Worker (Cloudflare) and Dashboard (Railway)
+5. Verify: `curl https://<dashboard>/api/probe/bin/x86_64 -o /dev/null -w '%{http_code}'` → 200
+
+### Installation
 
 - Install script: `probe/install.sh`, served via `GET /api/probe/install.sh`
 - Binaries served via `GET /api/probe/bin/:arch` (x86_64 | aarch64)
 - Both public (no auth), excluded from proxy.ts matcher
 - Setup page (`/setup`): auth-protected, shows pre-filled install command
 - Dashboard env vars: `BAT_WRITE_KEY` (for setup page), `PROBE_BIN_DIR` (binary storage path, default `/app/probe-bin`)
+
+### Known pitfall: standalone server cwd
+
+Next.js standalone `server.js` calls `process.chdir(__dirname)`, so runtime `cwd` is `/app/packages/dashboard`, NOT `/app`. Any file assets (e.g. `probe-assets/install.sh`) must be placed relative to that path in the Dockerfile.
