@@ -32,6 +32,11 @@ RUN cd packages/shared && bun run build
 
 # Copy dashboard source
 COPY packages/dashboard ./packages/dashboard
+
+# Dummy secret to allow NextAuth module to load during Next.js build
+# (real secret is injected at runtime via environment variables)
+ENV AUTH_SECRET=build-placeholder
+
 RUN cd packages/dashboard && bun run build
 
 # --- Stage 3: Runtime ---
