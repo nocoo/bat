@@ -21,6 +21,7 @@ dist/
 
 # Rust
 probe/target/
+probe/out/
 
 # OS
 .DS_Store
