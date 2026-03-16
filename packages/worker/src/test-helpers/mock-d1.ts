@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 
 const MIGRATION_PATH = resolve(import.meta.dir, "../../migrations/0001_initial.sql");
 const MIGRATION_TIER2_PATH = resolve(import.meta.dir, "../../migrations/0003_tier2_tables.sql");
+const MIGRATION_TIER3_PATH = resolve(import.meta.dir, "../../migrations/0004_tier3_columns.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -100,6 +101,15 @@ export function createMockD1(): D1Database {
 	const tier2Schema = readFileSync(MIGRATION_TIER2_PATH, "utf-8");
 	// Execute statements one by one (bun:sqlite doesn't support multi-statement exec)
 	for (const stmt of tier2Schema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply Tier 3 migration
+	const tier3Schema = readFileSync(MIGRATION_TIER3_PATH, "utf-8");
+	for (const stmt of tier3Schema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
