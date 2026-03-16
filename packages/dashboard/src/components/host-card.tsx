@@ -1,6 +1,7 @@
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { HostOverviewItem } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import { Clock, Cpu, HardDrive } from "lucide-react";
 import Link from "next/link";
 
@@ -40,7 +41,7 @@ function MetricRow({
 
 export function HostCard({ host }: { host: HostOverviewItem }) {
 	return (
-		<Link href={`/hosts/${host.hid}`}>
+		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
 			<Card
 				className="hover:border-primary/50 transition-colors cursor-pointer"
 				data-testid="host-card"
