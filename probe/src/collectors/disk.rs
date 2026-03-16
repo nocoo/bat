@@ -63,10 +63,7 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
 
     for mount in mounts {
         let path = std::ffi::CString::new(mount.mount_point.as_bytes()).ok();
-        let path = match path {
-            Some(p) => p,
-            None => continue,
-        };
+        let Some(path) = path else { continue };
 
         match nix::sys::statvfs::statvfs(&*path) {
             Ok(stat) => {
