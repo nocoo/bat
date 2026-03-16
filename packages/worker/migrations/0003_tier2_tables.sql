@@ -20,11 +20,11 @@ CREATE TABLE IF NOT EXISTS tier2_snapshots (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tier2_host_ts ON tier2_snapshots(host_id, ts);
 
--- Recreate alert_states to support 'info' severity
--- SQLite doesn't support ALTER TABLE ... MODIFY CHECK, so we drop and recreate
-DROP TABLE IF EXISTS alert_states;
+-- Expand alert_states severity CHECK to include 'info'
+-- SQLite doesn't support ALTER TABLE ... MODIFY CHECK, so we use the
+-- standard rename-and-copy pattern to preserve existing alert data.
 
-CREATE TABLE IF NOT EXISTS alert_states (
+CREATE TABLE IF NOT EXISTS alert_states_new (
   host_id      TEXT NOT NULL,
   rule_id      TEXT NOT NULL,
   severity     TEXT NOT NULL CHECK(severity IN ('info', 'warning', 'critical')),
@@ -34,3 +34,10 @@ CREATE TABLE IF NOT EXISTS alert_states (
   PRIMARY KEY (host_id, rule_id),
   FOREIGN KEY (host_id) REFERENCES hosts(host_id)
 );
+
+INSERT OR IGNORE INTO alert_states_new (host_id, rule_id, severity, value, triggered_at, message)
+  SELECT host_id, rule_id, severity, value, triggered_at, message FROM alert_states;
+
+DROP TABLE IF EXISTS alert_states;
+
+ALTER TABLE alert_states_new RENAME TO alert_states;
