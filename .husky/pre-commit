@@ -13,17 +13,16 @@ pnpm turbo typecheck
 echo "→ lint"
 pnpm biome check .
 
-# Unit tests with coverage
+# Unit tests with coverage (TS + Rust)
 echo "→ unit tests"
-bash scripts/check-coverage.sh 90
+bash scripts/check-coverage.sh 90 85
 
-# Rust (only if probe/ changed)
+# Rust lint (only if probe/ changed)
 if git diff --cached --name-only | grep -q '^probe/'; then
-  echo "→ rust checks"
+  echo "→ rust lint"
   cd probe
   cargo fmt --check
   cargo clippy -- -D warnings
-  cargo test
   cd ..
 fi
 

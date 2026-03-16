@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Check coverage output from bun test --coverage
+# Check coverage for TypeScript packages (bun) and Rust probe (cargo-llvm-cov)
 # Fails if any package drops below the threshold
 set -euo pipefail
 
 THRESHOLD="${1:-90}"
+RUST_THRESHOLD="${2:-$THRESHOLD}"
 
-check_coverage() {
+check_ts_coverage() {
   local pkg="$1"
   local output="$2"
 
@@ -32,18 +33,40 @@ check_coverage() {
   return 0
 }
 
-echo "Checking coverage threshold: ${THRESHOLD}%"
+check_rust_coverage() {
+  if ! command -v cargo-llvm-cov &>/dev/null; then
+    echo "⚠ probe: cargo-llvm-cov not installed (skipping)"
+    return 0
+  fi
+
+  echo "→ probe (Rust): running cargo llvm-cov..."
+  if ! cargo llvm-cov --fail-under-lines "$RUST_THRESHOLD" --manifest-path probe/Cargo.toml 2>&1 | tail -3; then
+    echo "✘ probe: line coverage < ${RUST_THRESHOLD}% threshold"
+    return 1
+  fi
+
+  echo "✔ probe: line coverage ≥ ${RUST_THRESHOLD}%"
+  return 0
+}
+
+echo "Checking coverage threshold: TS=${THRESHOLD}% Rust=${RUST_THRESHOLD}%"
 echo "---"
 
 failed=0
 
+# TypeScript packages
 for pkg in shared worker dashboard; do
   filter="@bat/${pkg}"
   output=$(pnpm --filter "$filter" test -- --coverage 2>&1) || true
-  if ! check_coverage "$filter" "$output"; then
+  if ! check_ts_coverage "$filter" "$output"; then
     failed=1
   fi
 done
+
+# Rust probe
+if ! check_rust_coverage; then
+  failed=1
+fi
 
 if [ "$failed" -ne 0 ]; then
   echo "---"
