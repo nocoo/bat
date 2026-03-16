@@ -1,4 +1,6 @@
 mod collectors;
+#[allow(dead_code)]
+mod command;
 mod config;
 mod orchestrate;
 mod payload;

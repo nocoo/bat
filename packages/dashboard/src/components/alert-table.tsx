@@ -7,7 +7,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
-import type { AlertItem } from "@bat/shared";
+import type { AlertItem, AlertSeverity } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import Link from "next/link";
 
@@ -15,12 +15,14 @@ function formatTriggeredAt(unixSeconds: number): string {
 	return new Date(unixSeconds * 1000).toLocaleString();
 }
 
-function SeverityBadge({ severity }: { severity: "warning" | "critical" }) {
-	return (
-		<Badge variant={severity === "critical" ? "destructive" : "warning"}>
-			{severity === "critical" ? "Critical" : "Warning"}
-		</Badge>
-	);
+function SeverityBadge({ severity }: { severity: AlertSeverity }) {
+	if (severity === "critical") {
+		return <Badge variant="destructive">Critical</Badge>;
+	}
+	if (severity === "warning") {
+		return <Badge variant="warning">Warning</Badge>;
+	}
+	return <Badge variant="secondary">Info</Badge>;
 }
 
 export function AlertTable({ alerts }: { alerts: AlertItem[] }) {
