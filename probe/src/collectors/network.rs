@@ -101,13 +101,16 @@ pub fn filter_interfaces(interfaces: &[&str], exclude: &[String]) -> Vec<String>
 
 const SYSFS_NET: &str = "/sys/class/net";
 
-/// Read counters for all non-excluded interfaces from sysfs.
-pub fn read_all_counters(exclude: &[String]) -> Result<HashMap<String, NetCounters>, String> {
+/// Read counters for all non-excluded interfaces from a sysfs path (parameterized for testing).
+pub fn read_all_counters_from(
+    sysfs_path: &str,
+    exclude: &[String],
+) -> Result<HashMap<String, NetCounters>, String> {
     let interfaces =
-        list_interfaces(SYSFS_NET, exclude).map_err(|e| format!("list interfaces: {e}"))?;
+        list_interfaces(sysfs_path, exclude).map_err(|e| format!("list interfaces: {e}"))?;
     let mut map = HashMap::new();
     for iface in &interfaces {
-        match read_counters(SYSFS_NET, iface) {
+        match read_counters(sysfs_path, iface) {
             Ok(c) => {
                 map.insert(iface.clone(), c);
             }
@@ -117,6 +120,11 @@ pub fn read_all_counters(exclude: &[String]) -> Result<HashMap<String, NetCounte
         }
     }
     Ok(map)
+}
+
+/// Read counters for all non-excluded interfaces from sysfs.
+pub fn read_all_counters(exclude: &[String]) -> Result<HashMap<String, NetCounters>, String> {
+    read_all_counters_from(SYSFS_NET, exclude)
 }
 
 #[cfg(test)]
@@ -359,5 +367,47 @@ mod tests {
         // rate should be 0 when interval is 0
         assert_eq!(metrics[0].rx_bytes_rate, 0.0);
         assert_eq!(metrics[0].tx_bytes_rate, 0.0);
+    }
+
+    #[test]
+    fn read_all_counters_from_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let eth0_stats = dir.path().join("eth0/statistics");
+        std::fs::create_dir_all(&eth0_stats).unwrap();
+        std::fs::write(eth0_stats.join("rx_bytes"), "1000\n").unwrap();
+        std::fs::write(eth0_stats.join("tx_bytes"), "2000\n").unwrap();
+        std::fs::write(eth0_stats.join("rx_errors"), "0\n").unwrap();
+        std::fs::write(eth0_stats.join("tx_errors"), "0\n").unwrap();
+
+        let counters = read_all_counters_from(dir.path().to_str().unwrap(), &[]).unwrap();
+        assert_eq!(counters.len(), 1);
+        assert_eq!(counters["eth0"].rx_bytes, 1000);
+        assert_eq!(counters["eth0"].tx_bytes, 2000);
+    }
+
+    #[test]
+    fn read_all_counters_from_corrupted_interface() {
+        let dir = tempfile::tempdir().unwrap();
+        // eth0: valid counters
+        let eth0_stats = dir.path().join("eth0/statistics");
+        std::fs::create_dir_all(&eth0_stats).unwrap();
+        std::fs::write(eth0_stats.join("rx_bytes"), "1000\n").unwrap();
+        std::fs::write(eth0_stats.join("tx_bytes"), "2000\n").unwrap();
+        std::fs::write(eth0_stats.join("rx_errors"), "0\n").unwrap();
+        std::fs::write(eth0_stats.join("tx_errors"), "0\n").unwrap();
+        // broken0: missing statistics files (triggers warn branch)
+        std::fs::create_dir_all(dir.path().join("broken0/statistics")).unwrap();
+
+        let counters = read_all_counters_from(dir.path().to_str().unwrap(), &[]).unwrap();
+        // broken0 skipped, only eth0 collected
+        assert_eq!(counters.len(), 1);
+        assert!(counters.contains_key("eth0"));
+    }
+
+    #[test]
+    fn read_all_counters_from_empty_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let counters = read_all_counters_from(dir.path().to_str().unwrap(), &[]).unwrap();
+        assert!(counters.is_empty());
     }
 }
