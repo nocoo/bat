@@ -2,7 +2,15 @@ import * as React from "react";
 
 const MOBILE_BREAKPOINT = 768;
 
-export function useIsMobile() {
+/**
+ * Returns whether the viewport is below the mobile breakpoint.
+ *
+ * Returns `undefined` during SSR / before the first client-side effect,
+ * so consumers can distinguish "not yet known" from "definitely desktop".
+ * The AppShell uses CSS media queries to hide/show sidebar during that
+ * brief window, avoiding a layout flash.
+ */
+export function useIsMobile(): boolean | undefined {
 	const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined);
 
 	React.useEffect(() => {
@@ -15,5 +23,5 @@ export function useIsMobile() {
 		return () => mql.removeEventListener("change", onChange);
 	}, []);
 
-	return !!isMobile;
+	return isMobile;
 }
