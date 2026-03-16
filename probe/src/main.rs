@@ -281,8 +281,11 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         .unwrap_or_default()
         .as_secs();
 
-    // Ports: synchronous (procfs reads), run in blocking context
-    let ports = collectors::tier2::ports::read_listening_ports();
+    // Ports: synchronous procfs scan (/proc/*/fd), offload to blocking
+    // thread pool so the executor can yield back to T1 immediately.
+    let ports = tokio::task::spawn_blocking(collectors::tier2::ports::read_listening_ports)
+        .await
+        .unwrap_or_default();
     let ports_payload = Some(orchestrate::convert_ports(ports));
 
     // Run all async collectors concurrently
