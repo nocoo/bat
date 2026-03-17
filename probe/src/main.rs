@@ -370,6 +370,13 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         collectors::tier2::disk_deep::collect_disk_deep_scan(),
     );
 
+    // Tier 2 inventory: timezone + DNS (fast synchronous reads)
+    let tz = collectors::inventory::read_timezone();
+    let timezone = if tz.is_empty() { None } else { Some(tz) };
+    let dns = collectors::inventory::read_dns_config();
+    let dns_resolvers = Some(dns.resolvers);
+    let dns_search = Some(dns.search);
+
     orchestrate::build_tier2_payload(
         PROBE_VERSION,
         host_id,
@@ -380,6 +387,9 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         Some(orchestrate::convert_security(security)),
         docker.map(orchestrate::convert_docker),
         Some(orchestrate::convert_disk_deep(disk_deep)),
+        timezone,
+        dns_resolvers,
+        dns_search,
     )
 }
 

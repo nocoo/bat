@@ -477,6 +477,9 @@ pub fn build_tier2_payload(
     security: Option<Tier2Security>,
     docker: Option<Tier2Docker>,
     disk_deep: Option<Tier2DiskDeep>,
+    timezone: Option<String>,
+    dns_resolvers: Option<Vec<String>>,
+    dns_search: Option<Vec<String>>,
 ) -> Tier2Payload {
     Tier2Payload {
         probe_version: probe_version.to_string(),
@@ -488,6 +491,9 @@ pub fn build_tier2_payload(
         security,
         docker,
         disk_deep,
+        timezone,
+        dns_resolvers,
+        dns_search,
     }
 }
 
@@ -998,12 +1004,18 @@ mod tests {
             None,
             None,
             None,
+            Some("UTC".to_string()),
+            Some(vec!["1.1.1.1".to_string()]),
+            Some(vec![]),
         );
         assert_eq!(payload.probe_version, "0.2.0");
         assert_eq!(payload.host_id, "host-1");
         assert_eq!(payload.timestamp, 1_700_000_000);
         assert!(payload.ports.is_some());
         assert!(payload.updates.is_none());
+        assert_eq!(payload.timezone, Some("UTC".to_string()));
+        assert_eq!(payload.dns_resolvers, Some(vec!["1.1.1.1".to_string()]));
+        assert_eq!(payload.dns_search, Some(vec![]));
     }
 
     #[test]

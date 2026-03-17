@@ -333,6 +333,92 @@ pub fn detect_boot_mode() -> String {
     detect_boot_mode_from("/sys/firmware/efi")
 }
 
+// ── Timezone (Tier 2: slow-drift) ────────────────────────────────────
+
+/// Parse timezone from `/etc/timezone` content.
+pub fn parse_timezone(content: &str) -> String {
+    content.trim().to_string()
+}
+
+/// Extract timezone from a `/etc/localtime` symlink target.
+/// The symlink typically points to `/usr/share/zoneinfo/America/New_York`.
+pub fn parse_localtime_link(target: &str) -> String {
+    target
+        .find("zoneinfo/")
+        .map_or_else(String::new, |pos| target[pos + 9..].to_string())
+}
+
+/// Read timezone with fallback: `/etc/timezone` → `readlink /etc/localtime`.
+pub fn read_timezone_from(timezone_path: &str, localtime_path: &str) -> String {
+    // Try /etc/timezone first
+    if let Ok(content) = std::fs::read_to_string(timezone_path) {
+        let tz = parse_timezone(&content);
+        if !tz.is_empty() {
+            return tz;
+        }
+    }
+
+    // Fallback: readlink /etc/localtime
+    if let Ok(target) = std::fs::read_link(localtime_path) {
+        let tz = parse_localtime_link(&target.to_string_lossy());
+        if !tz.is_empty() {
+            return tz;
+        }
+    }
+
+    String::new()
+}
+
+/// Read timezone from real system paths.
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn read_timezone() -> String {
+    read_timezone_from("/etc/timezone", "/etc/localtime")
+}
+
+// ── DNS configuration (Tier 2: slow-drift) ───────────────────────────
+
+/// Parsed DNS configuration from `/etc/resolv.conf`.
+#[derive(Debug, Default)]
+pub struct DnsConfig {
+    pub resolvers: Vec<String>,
+    pub search: Vec<String>,
+}
+
+/// Parse `/etc/resolv.conf` for nameserver and search entries.
+pub fn parse_resolv_conf(content: &str) -> DnsConfig {
+    let mut config = DnsConfig::default();
+
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with('#') || line.is_empty() {
+            continue;
+        }
+
+        if let Some(rest) = line.strip_prefix("nameserver") {
+            if let Some(addr) = rest.split_whitespace().next() {
+                config.resolvers.push(addr.to_string());
+            }
+        } else if let Some(rest) = line.strip_prefix("search") {
+            config.search = rest.split_whitespace().map(String::from).collect();
+        }
+    }
+
+    config
+}
+
+/// Read DNS configuration from a file (parameterized path for testing).
+pub fn read_dns_config_from(path: &str) -> DnsConfig {
+    std::fs::read_to_string(path)
+        .map(|c| parse_resolv_conf(&c))
+        .unwrap_or_default()
+}
+
+/// Read DNS configuration from `/etc/resolv.conf`.
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn read_dns_config() -> DnsConfig {
+    read_dns_config_from("/etc/resolv.conf")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -678,5 +764,131 @@ mod tests {
     #[test]
     fn detect_boot_mode_bios() {
         assert_eq!(detect_boot_mode_from("/nonexistent/efi"), "bios");
+    }
+
+    // ── Timezone tests ───────────────────────────────────────────────
+
+    #[test]
+    fn parse_timezone_normal() {
+        assert_eq!(parse_timezone("America/New_York\n"), "America/New_York");
+    }
+
+    #[test]
+    fn parse_timezone_utc() {
+        assert_eq!(parse_timezone("UTC\n"), "UTC");
+    }
+
+    #[test]
+    fn parse_timezone_empty() {
+        assert_eq!(parse_timezone(""), "");
+    }
+
+    #[test]
+    fn parse_localtime_link_normal() {
+        assert_eq!(
+            parse_localtime_link("/usr/share/zoneinfo/America/New_York"),
+            "America/New_York"
+        );
+    }
+
+    #[test]
+    fn parse_localtime_link_utc() {
+        assert_eq!(parse_localtime_link("/usr/share/zoneinfo/UTC"), "UTC");
+    }
+
+    #[test]
+    fn parse_localtime_link_no_zoneinfo() {
+        assert_eq!(parse_localtime_link("/some/other/path"), "");
+    }
+
+    #[test]
+    fn read_timezone_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let tz_path = dir.path().join("timezone");
+        std::fs::write(&tz_path, "Europe/Berlin\n").unwrap();
+        let lt_path = dir.path().join("localtime");
+
+        assert_eq!(
+            read_timezone_from(tz_path.to_str().unwrap(), lt_path.to_str().unwrap()),
+            "Europe/Berlin"
+        );
+    }
+
+    #[test]
+    fn read_timezone_fallback_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let tz_path = dir.path().join("timezone_missing");
+        let lt_path = dir.path().join("localtime");
+        // Create symlink to a zoneinfo-like path
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink("/usr/share/zoneinfo/Asia/Tokyo", &lt_path).unwrap();
+            assert_eq!(
+                read_timezone_from(tz_path.to_str().unwrap(), lt_path.to_str().unwrap()),
+                "Asia/Tokyo"
+            );
+        }
+    }
+
+    #[test]
+    fn read_timezone_both_missing() {
+        assert_eq!(
+            read_timezone_from("/nonexistent/timezone", "/nonexistent/localtime"),
+            ""
+        );
+    }
+
+    // ── DNS tests ────────────────────────────────────────────────────
+
+    #[test]
+    fn parse_resolv_conf_normal() {
+        let content = "\
+# Generated by NetworkManager
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+search example.com internal.corp
+";
+        let config = parse_resolv_conf(content);
+        assert_eq!(config.resolvers, vec!["1.1.1.1", "8.8.8.8"]);
+        assert_eq!(config.search, vec!["example.com", "internal.corp"]);
+    }
+
+    #[test]
+    fn parse_resolv_conf_no_search() {
+        let content = "nameserver 1.1.1.1\n";
+        let config = parse_resolv_conf(content);
+        assert_eq!(config.resolvers, vec!["1.1.1.1"]);
+        assert!(config.search.is_empty());
+    }
+
+    #[test]
+    fn parse_resolv_conf_empty() {
+        let config = parse_resolv_conf("");
+        assert!(config.resolvers.is_empty());
+        assert!(config.search.is_empty());
+    }
+
+    #[test]
+    fn parse_resolv_conf_comments_only() {
+        let content = "# comment\n# another comment\n";
+        let config = parse_resolv_conf(content);
+        assert!(config.resolvers.is_empty());
+    }
+
+    #[test]
+    fn read_dns_config_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("resolv.conf");
+        std::fs::write(&path, "nameserver 8.8.4.4\nsearch test.local\n").unwrap();
+        let config = read_dns_config_from(path.to_str().unwrap());
+        assert_eq!(config.resolvers, vec!["8.8.4.4"]);
+        assert_eq!(config.search, vec!["test.local"]);
+    }
+
+    #[test]
+    fn read_dns_config_from_missing_file() {
+        let config = read_dns_config_from("/nonexistent/resolv.conf");
+        assert!(config.resolvers.is_empty());
+        assert!(config.search.is_empty());
     }
 }
