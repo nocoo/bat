@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.1 (2026-03-17)
+
+### Fixes
+
+- **Virtualization detection** — Add DMI `product_name` fallback for KVM detection; Red Hat vendor + KVM product was misidentified as bare-metal
+- **Public IP race condition** — Await initial echo service fetch (15s timeout) before sending first identity, ensuring `public_ip` is included from startup
+
 ## v0.5.0 (2026-03-17)
 
 ### Features
