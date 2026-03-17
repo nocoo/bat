@@ -80,6 +80,7 @@ beforeAll(async () => {
 		"migrations/0004_tier3_columns.sql",
 		"migrations/0005_host_inventory.sql",
 		"migrations/0006_public_ip.sql",
+		"migrations/0007_probe_version.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(

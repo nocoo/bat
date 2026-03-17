@@ -64,6 +64,7 @@ export interface HostOverviewItem {
 
 /** GET /api/hosts/:id → HostDetailItem */
 export interface HostDetailItem extends HostOverviewItem {
+	probe_version: string | null;
 	swap_total_bytes: number | null;
 	boot_mode: string | null;
 	timezone: string | null;

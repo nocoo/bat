@@ -66,4 +66,5 @@ export interface HostRow {
 	dns_resolvers: string | null; // JSON text
 	dns_search: string | null; // JSON text
 	public_ip: string | null;
+	probe_version: string | null;
 }
