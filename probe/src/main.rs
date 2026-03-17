@@ -296,6 +296,13 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
         .as_secs();
     let boot_time = orchestrate::compute_boot_time(now_secs, uptime_seconds);
 
+    // Host inventory: CPU topology + memory totals
+    let cpu_logical = collectors::cpu::read_cpu_count().ok();
+    let cpu_physical = collectors::cpu::read_cpu_physical().ok();
+    let mem_info = collectors::memory::read_meminfo().ok();
+    let mem_total_bytes = mem_info.as_ref().map(|m| m.mem_total);
+    let swap_total_bytes = mem_info.as_ref().map(|m| m.swap_total);
+
     orchestrate::build_identity_payload(
         PROBE_VERSION,
         host_id,
@@ -306,6 +313,10 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
         &cpu_model,
         uptime_seconds,
         boot_time,
+        cpu_logical,
+        cpu_physical,
+        mem_total_bytes,
+        swap_total_bytes,
     )
 }
 

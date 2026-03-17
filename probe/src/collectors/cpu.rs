@@ -118,13 +118,87 @@ pub fn parse_loadavg(content: &str) -> Option<(f64, f64, f64)> {
     }
 }
 
-/// Count CPU cores from `/proc/cpuinfo` by counting `^processor` lines.
+/// Count logical CPUs from `/proc/cpuinfo` by counting `^processor` lines.
+///
+/// Logical CPUs = hardware threads visible to the OS scheduler.
+/// On a 4-core/8-thread system, this returns 8.
 #[allow(clippy::cast_possible_truncation)] // cpu_count fits in u32
-pub fn parse_cpu_count(content: &str) -> u32 {
+pub fn parse_cpu_logical(content: &str) -> u32 {
     content
         .lines()
         .filter(|line| line.starts_with("processor"))
         .count() as u32
+}
+
+/// Count physical CPU cores from `/proc/cpuinfo`.
+///
+/// Physical cores exclude hyper-threading siblings.
+/// Fallback chain:
+/// 1. Count unique (`physical id`, `core id`) pairs (multi-socket aware)
+/// 2. `cpu cores` × distinct `physical id` count (VMs that omit `core id`)
+/// 3. Assume `physical == logical` (no HT)
+#[allow(clippy::cast_possible_truncation)]
+pub fn parse_cpu_physical(content: &str) -> u32 {
+    use std::collections::HashSet;
+
+    let mut core_pairs: HashSet<(u32, u32)> = HashSet::new();
+    let mut physical_ids: HashSet<u32> = HashSet::new();
+    let mut cpu_cores_val: Option<u32> = None;
+
+    let mut current_physical_id: Option<u32> = None;
+    let mut current_core_id: Option<u32> = None;
+
+    for line in content.lines() {
+        if line.starts_with("processor") {
+            // Emit previous block's pair if both fields were present
+            if let (Some(pid), Some(cid)) = (current_physical_id, current_core_id) {
+                core_pairs.insert((pid, cid));
+                physical_ids.insert(pid);
+            }
+            current_physical_id = None;
+            current_core_id = None;
+        } else if let Some(rest) = line.strip_prefix("physical id") {
+            if let Some(val) = rest.trim().strip_prefix(':') {
+                current_physical_id = val.trim().parse().ok();
+                if let Some(pid) = current_physical_id {
+                    physical_ids.insert(pid);
+                }
+            }
+        } else if let Some(rest) = line.strip_prefix("core id") {
+            if let Some(val) = rest.trim().strip_prefix(':') {
+                current_core_id = val.trim().parse().ok();
+            }
+        } else if cpu_cores_val.is_none()
+            && let Some(rest) = line.strip_prefix("cpu cores")
+            && let Some(val) = rest.trim().strip_prefix(':')
+        {
+            cpu_cores_val = val.trim().parse().ok();
+        }
+    }
+
+    // Emit last block
+    if let (Some(pid), Some(cid)) = (current_physical_id, current_core_id) {
+        core_pairs.insert((pid, cid));
+        physical_ids.insert(pid);
+    }
+
+    // Method 1: unique (physical_id, core_id) pairs
+    if !core_pairs.is_empty() {
+        return core_pairs.len() as u32;
+    }
+
+    // Method 2: cpu_cores × socket_count
+    if let Some(cores) = cpu_cores_val {
+        let sockets = if physical_ids.is_empty() {
+            1
+        } else {
+            physical_ids.len() as u32
+        };
+        return cores * sockets;
+    }
+
+    // Method 3: no HT info available, assume physical == logical
+    parse_cpu_logical(content)
 }
 
 /// Parse the first `model name` from `/proc/cpuinfo`.
@@ -165,10 +239,10 @@ pub fn read_loadavg() -> Result<(f64, f64, f64), String> {
     read_loadavg_from("/proc/loadavg")
 }
 
-/// Read CPU core count from a file (parameterized path for testing).
+/// Read logical CPU count from a file (parameterized path for testing).
 pub fn read_cpu_count_from(path: &str) -> Result<u32, String> {
     let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
-    let count = parse_cpu_count(&content);
+    let count = parse_cpu_logical(&content);
     if count == 0 {
         Err(format!("no processors found in {path}"))
     } else {
@@ -176,10 +250,27 @@ pub fn read_cpu_count_from(path: &str) -> Result<u32, String> {
     }
 }
 
-/// Read CPU core count from `/proc/cpuinfo`.
+/// Read logical CPU count from `/proc/cpuinfo`.
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_cpu_count() -> Result<u32, String> {
     read_cpu_count_from("/proc/cpuinfo")
+}
+
+/// Read physical CPU core count from a file (parameterized path for testing).
+pub fn read_cpu_physical_from(path: &str) -> Result<u32, String> {
+    let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
+    let count = parse_cpu_physical(&content);
+    if count == 0 {
+        Err(format!("no processors found in {path}"))
+    } else {
+        Ok(count)
+    }
+}
+
+/// Read physical CPU core count from `/proc/cpuinfo`.
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn read_cpu_physical() -> Result<u32, String> {
+    read_cpu_physical_from("/proc/cpuinfo")
 }
 
 /// Read CPU model from a file (parameterized path for testing).
@@ -219,21 +310,33 @@ cpu  10000 200 3000 40000 500 100 150 250 0 0
 processor\t: 0
 vendor_id\t: GenuineIntel
 model name\t: Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+physical id\t: 0
+core id\t\t: 0
+cpu cores\t: 2
 cpu MHz\t\t: 2400.000
 
 processor\t: 1
 vendor_id\t: GenuineIntel
 model name\t: Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+physical id\t: 0
+core id\t\t: 1
+cpu cores\t: 2
 cpu MHz\t\t: 2400.000
 
 processor\t: 2
 vendor_id\t: GenuineIntel
 model name\t: Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+physical id\t: 0
+core id\t\t: 0
+cpu cores\t: 2
 cpu MHz\t\t: 2400.000
 
 processor\t: 3
 vendor_id\t: GenuineIntel
 model name\t: Intel(R) Xeon(R) CPU E5-2680 v4 @ 2.40GHz
+physical id\t: 0
+core id\t\t: 1
+cpu cores\t: 2
 cpu MHz\t\t: 2400.000
 ";
 
@@ -356,13 +459,83 @@ cpu MHz\t\t: 2400.000
     }
 
     #[test]
-    fn parse_cpu_count_normal() {
-        assert_eq!(parse_cpu_count(PROC_CPUINFO), 4);
+    fn parse_cpu_logical_normal() {
+        assert_eq!(parse_cpu_logical(PROC_CPUINFO), 4);
     }
 
     #[test]
-    fn parse_cpu_count_empty() {
-        assert_eq!(parse_cpu_count(""), 0);
+    fn parse_cpu_logical_empty() {
+        assert_eq!(parse_cpu_logical(""), 0);
+    }
+
+    #[test]
+    fn parse_cpu_physical_with_ht() {
+        // 4 logical CPUs, 2 unique (physical_id, core_id) pairs → 2 physical cores
+        assert_eq!(parse_cpu_physical(PROC_CPUINFO), 2);
+    }
+
+    #[test]
+    fn parse_cpu_physical_multi_socket() {
+        let content = "\
+processor\t: 0
+physical id\t: 0
+core id\t\t: 0
+
+processor\t: 1
+physical id\t: 0
+core id\t\t: 1
+
+processor\t: 2
+physical id\t: 1
+core id\t\t: 0
+
+processor\t: 3
+physical id\t: 1
+core id\t\t: 1
+";
+        // 2 sockets × 2 cores = 4 unique pairs
+        assert_eq!(parse_cpu_physical(content), 4);
+    }
+
+    #[test]
+    fn parse_cpu_physical_vm_fallback_cpu_cores() {
+        // VM without core id — fallback to cpu_cores × socket_count
+        let content = "\
+processor\t: 0
+physical id\t: 0
+cpu cores\t: 4
+
+processor\t: 1
+physical id\t: 0
+cpu cores\t: 4
+
+processor\t: 2
+physical id\t: 0
+cpu cores\t: 4
+
+processor\t: 3
+physical id\t: 0
+cpu cores\t: 4
+";
+        assert_eq!(parse_cpu_physical(content), 4);
+    }
+
+    #[test]
+    fn parse_cpu_physical_no_topology_info() {
+        // No physical id, no core id, no cpu cores → fallback to logical count
+        let content = "\
+processor\t: 0
+model name\t: Some CPU
+
+processor\t: 1
+model name\t: Some CPU
+";
+        assert_eq!(parse_cpu_physical(content), 2);
+    }
+
+    #[test]
+    fn parse_cpu_physical_empty() {
+        assert_eq!(parse_cpu_physical(""), 0);
     }
 
     #[test]
@@ -438,6 +611,23 @@ cpu MHz\t\t: 2400.000
         let result = read_cpu_count_from(path.to_str().unwrap());
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("no processors"));
+    }
+
+    #[test]
+    fn read_cpu_physical_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpuinfo");
+        std::fs::write(&path, PROC_CPUINFO).unwrap();
+        assert_eq!(read_cpu_physical_from(path.to_str().unwrap()).unwrap(), 2);
+    }
+
+    #[test]
+    fn read_cpu_physical_from_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cpuinfo");
+        std::fs::write(&path, "").unwrap();
+        let result = read_cpu_physical_from(path.to_str().unwrap());
+        assert!(result.is_err());
     }
 
     #[test]

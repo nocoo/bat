@@ -305,6 +305,10 @@ pub fn build_identity_payload(
     cpu_model: &str,
     uptime_seconds: u64,
     boot_time: u64,
+    cpu_logical: Option<u32>,
+    cpu_physical: Option<u32>,
+    mem_total_bytes: Option<u64>,
+    swap_total_bytes: Option<u64>,
 ) -> IdentityPayload {
     IdentityPayload {
         probe_version: probe_version.to_string(),
@@ -316,6 +320,10 @@ pub fn build_identity_payload(
         cpu_model: cpu_model.to_string(),
         uptime_seconds,
         boot_time,
+        cpu_logical,
+        cpu_physical,
+        mem_total_bytes,
+        swap_total_bytes,
     }
 }
 
@@ -490,6 +498,10 @@ mod tests {
             "Intel Xeon",
             86400,
             1_700_000_000,
+            Some(8),
+            Some(4),
+            Some(8_388_608_000),
+            Some(2_147_483_648),
         );
         assert_eq!(p.probe_version, "0.2.0");
         assert_eq!(p.host_id, "host-1");
@@ -500,15 +512,23 @@ mod tests {
         assert_eq!(p.cpu_model, "Intel Xeon");
         assert_eq!(p.uptime_seconds, 86400);
         assert_eq!(p.boot_time, 1_700_000_000);
+        assert_eq!(p.cpu_logical, Some(8));
+        assert_eq!(p.cpu_physical, Some(4));
+        assert_eq!(p.mem_total_bytes, Some(8_388_608_000));
+        assert_eq!(p.swap_total_bytes, Some(2_147_483_648));
     }
 
     #[test]
     fn build_identity_payload_empty_fields() {
-        let p = build_identity_payload("", "", "", "", "", "", "", 0, 0);
+        let p = build_identity_payload("", "", "", "", "", "", "", 0, 0, None, None, None, None);
         assert_eq!(p.host_id, "");
         assert_eq!(p.hostname, "");
         assert_eq!(p.uptime_seconds, 0);
         assert_eq!(p.boot_time, 0);
+        assert_eq!(p.cpu_logical, None);
+        assert_eq!(p.cpu_physical, None);
+        assert_eq!(p.mem_total_bytes, None);
+        assert_eq!(p.swap_total_bytes, None);
     }
 
     #[test]

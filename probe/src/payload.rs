@@ -137,6 +137,15 @@ pub struct IdentityPayload {
     pub cpu_model: String,
     pub uptime_seconds: u64,
     pub boot_time: u64,
+    // --- Host inventory fields (optional for backward compat) ---
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_logical: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_physical: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mem_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swap_total_bytes: Option<u64>,
 }
 
 // --- Tier 2 payload types ---
@@ -389,6 +398,10 @@ mod tests {
             cpu_model: "Intel Xeon E5-2680".into(),
             uptime_seconds: 86400,
             boot_time: 1_699_913_600,
+            cpu_logical: Some(8),
+            cpu_physical: Some(4),
+            mem_total_bytes: Some(8_388_608_000),
+            swap_total_bytes: Some(2_147_483_648),
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -402,6 +415,36 @@ mod tests {
         assert_eq!(json["cpu_model"], "Intel Xeon E5-2680");
         assert_eq!(json["uptime_seconds"], 86400);
         assert_eq!(json["boot_time"], 1_699_913_600_u64);
+        assert_eq!(json["cpu_logical"], 8);
+        assert_eq!(json["cpu_physical"], 4);
+        assert_eq!(json["mem_total_bytes"], 8_388_608_000_u64);
+        assert_eq!(json["swap_total_bytes"], 2_147_483_648_u64);
+    }
+
+    #[test]
+    fn identity_payload_omits_none_inventory_fields() {
+        let payload = IdentityPayload {
+            probe_version: "0.2.0".into(),
+            host_id: "test-host".into(),
+            hostname: "myserver".into(),
+            os: "Ubuntu 22.04.3 LTS".into(),
+            kernel: "5.15.0-91-generic".into(),
+            arch: "x86_64".into(),
+            cpu_model: "Intel Xeon E5-2680".into(),
+            uptime_seconds: 86400,
+            boot_time: 1_699_913_600,
+            cpu_logical: None,
+            cpu_physical: None,
+            mem_total_bytes: None,
+            swap_total_bytes: None,
+        };
+
+        let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("cpu_logical"));
+        assert!(!obj.contains_key("cpu_physical"));
+        assert!(!obj.contains_key("mem_total_bytes"));
+        assert!(!obj.contains_key("swap_total_bytes"));
     }
 
     #[test]
@@ -818,6 +861,10 @@ mod tests {
             cpu_model: "Apple M1 — Pro™".into(),
             uptime_seconds: 0,
             boot_time: 0,
+            cpu_logical: None,
+            cpu_physical: None,
+            mem_total_bytes: None,
+            swap_total_bytes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
