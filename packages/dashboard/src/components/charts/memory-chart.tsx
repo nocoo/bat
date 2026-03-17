@@ -5,6 +5,7 @@ import { getTimeFormatter, transformMemData } from "@/lib/transforms";
 import { ALERT_THRESHOLDS } from "@bat/shared";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
+import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
@@ -15,7 +16,7 @@ export function MemoryChart({
 	data,
 	rangeSeconds = 3600,
 }: { data: MetricsDataPoint[]; rangeSeconds?: number }) {
-	const chartData = transformMemData(data);
+	const chartData = useMemo(() => transformMemData(data), [data]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
@@ -91,6 +92,7 @@ export function MemoryChart({
 						stroke={chart.green}
 						fill={`url(#${GRADIENT_ID})`}
 						strokeWidth={2}
+						isAnimationActive={false}
 					/>
 				</AreaChart>
 			</DashboardResponsiveContainer>

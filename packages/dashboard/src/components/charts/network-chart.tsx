@@ -4,6 +4,7 @@ import { chart, chartAxis } from "@/lib/palette";
 import { formatBytesRate, getTimeFormatter, transformNetData } from "@/lib/transforms";
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Globe } from "lucide-react";
+import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
@@ -18,7 +19,7 @@ export function NetworkChart({
 	resolution,
 	rangeSeconds = 3600,
 }: { data: MetricsDataPoint[]; resolution: MetricsResolution; rangeSeconds?: number }) {
-	const chartData = transformNetData(data, resolution);
+	const chartData = useMemo(() => transformNetData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
@@ -78,6 +79,7 @@ export function NetworkChart({
 							stroke={s.color}
 							dot={false}
 							strokeWidth={2}
+							isAnimationActive={false}
 						/>
 					))}
 				</LineChart>
