@@ -34,7 +34,7 @@ function MetricRow({
 				{icon}
 				{label}
 			</span>
-			<span className="font-mono font-medium">{value}</span>
+			<span className="text-base font-semibold font-display tracking-tight">{value}</span>
 		</div>
 	);
 }
@@ -42,29 +42,26 @@ function MetricRow({
 export function HostCard({ host }: { host: HostOverviewItem }) {
 	return (
 		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
-			<Card
-				className="transition-all cursor-pointer hover:ring-1 hover:ring-border"
-				data-testid="host-card"
-			>
+			<Card className="transition-colors cursor-pointer hover:bg-accent/50" data-testid="host-card">
 				<CardHeader>
 					<div className="flex items-center justify-between">
 						<CardTitle className="text-base">{host.hostname}</CardTitle>
 						<StatusBadge status={host.status} />
 					</div>
 				</CardHeader>
-				<CardContent className="space-y-3">
+				<CardContent className="space-y-2">
 					<MetricRow
-						icon={<Cpu className="h-4 w-4" />}
+						icon={<Cpu className="h-4 w-4" strokeWidth={1.5} />}
 						label="CPU"
 						value={host.cpu_usage_pct !== null ? `${host.cpu_usage_pct.toFixed(1)}%` : "—"}
 					/>
 					<MetricRow
-						icon={<HardDrive className="h-4 w-4" />}
+						icon={<HardDrive className="h-4 w-4" strokeWidth={1.5} />}
 						label="Memory"
 						value={host.mem_used_pct !== null ? `${host.mem_used_pct.toFixed(1)}%` : "—"}
 					/>
 					<MetricRow
-						icon={<Clock className="h-4 w-4" />}
+						icon={<Clock className="h-4 w-4" strokeWidth={1.5} />}
 						label="Uptime"
 						value={formatUptime(host.uptime_seconds)}
 					/>
