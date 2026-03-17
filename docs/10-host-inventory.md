@@ -250,6 +250,7 @@ Fields S1–S4 reuse existing procfs reads:
 
 - S5 `virtualization` — read 2 sysfs files, map known vendor strings ✅
 - S6 `net_interfaces` — `getifaddrs()` + 2 sysfs files per interface ✅ (IPv6 via `/proc/net/if_inet6`, IPv4 skipped — no clean procfs source)
+- S6b `public_ip` — fetch from `echo.nocoo.cloud/api/ip` every 1h, stored in identity payload ✅
 - S7 `disks` — iterate `/sys/block/`, read 2 files per device ✅
 - S8 `boot_mode` — 1 path existence check ✅
 
