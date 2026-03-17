@@ -63,7 +63,7 @@ export default function HostsPage() {
 			) : !hosts || hosts.length === 0 ? (
 				<HostsEmpty />
 			) : (
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				<div className="grid gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3">
 					{hosts.map((host) => (
 						<HostCard key={host.host_id} host={host} />
 					))}
