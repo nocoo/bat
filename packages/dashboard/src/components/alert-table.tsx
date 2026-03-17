@@ -8,11 +8,16 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import type { AlertItem, AlertSeverity } from "@bat/shared";
-import { hashHostId } from "@bat/shared";
+import { getAlertRuleLabel, hashHostId } from "@bat/shared";
 import Link from "next/link";
 
 function formatTriggeredAt(unixSeconds: number): string {
-	return new Date(unixSeconds * 1000).toLocaleString();
+	const now = Math.floor(Date.now() / 1000);
+	const delta = now - unixSeconds;
+	if (delta < 60) return "just now";
+	if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
+	if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+	return `${Math.floor(delta / 86400)}d ago`;
 }
 
 function SeverityBadge({ severity }: { severity: AlertSeverity }) {
@@ -25,7 +30,12 @@ function SeverityBadge({ severity }: { severity: AlertSeverity }) {
 	return <Badge variant="secondary">Info</Badge>;
 }
 
-export function AlertTable({ alerts }: { alerts: AlertItem[] }) {
+interface AlertTableProps {
+	alerts: AlertItem[];
+	showHost?: boolean;
+}
+
+export function AlertTable({ alerts, showHost = true }: AlertTableProps) {
 	if (alerts.length === 0) {
 		return (
 			<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -38,32 +48,32 @@ export function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 		<Table>
 			<TableHeader>
 				<TableRow>
-					<TableHead>Host</TableHead>
-					<TableHead>Rule</TableHead>
+					{showHost && <TableHead>Host</TableHead>}
 					<TableHead>Severity</TableHead>
-					<TableHead>Value</TableHead>
+					<TableHead>Rule</TableHead>
+					<TableHead>Message</TableHead>
 					<TableHead>Triggered</TableHead>
 				</TableRow>
 			</TableHeader>
 			<TableBody>
 				{alerts.map((alert) => (
 					<TableRow key={`${alert.host_id}-${alert.rule_id}`}>
-						<TableCell>
-							<Link
-								href={`/hosts/${hashHostId(alert.host_id)}`}
-								className="text-primary hover:underline"
-							>
-								{alert.hostname}
-							</Link>
-						</TableCell>
-						<TableCell className="font-mono text-xs">{alert.rule_id}</TableCell>
+						{showHost && (
+							<TableCell>
+								<Link
+									href={`/hosts/${hashHostId(alert.host_id)}`}
+									className="text-primary hover:underline"
+								>
+									{alert.hostname}
+								</Link>
+							</TableCell>
+						)}
 						<TableCell>
 							<SeverityBadge severity={alert.severity} />
 						</TableCell>
-						<TableCell className="font-mono">
-							{alert.value !== null ? alert.value.toFixed(1) : "—"}
-						</TableCell>
-						<TableCell className="text-muted-foreground text-xs">
+						<TableCell>{getAlertRuleLabel(alert.rule_id)}</TableCell>
+						<TableCell className="text-sm text-muted-foreground">{alert.message ?? "—"}</TableCell>
+						<TableCell className="text-muted-foreground text-xs whitespace-nowrap">
 							{formatTriggeredAt(alert.triggered_at)}
 						</TableCell>
 					</TableRow>

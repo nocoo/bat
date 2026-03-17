@@ -1,5 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { type AlertSeverity, TIER1_ALERT_RULES, getAlertRule } from "../alerts";
+import {
+	ALL_ALERT_RULES,
+	type AlertSeverity,
+	TIER1_ALERT_RULES,
+	getAlertRule,
+	getAlertRuleLabel,
+} from "../alerts";
 import { ALERT_THRESHOLDS } from "../constants";
 
 describe("TIER1_ALERT_RULES", () => {
@@ -81,6 +87,24 @@ describe("getAlertRule", () => {
 		for (const expected of TIER1_ALERT_RULES) {
 			const rule = getAlertRule(expected.id);
 			expect(rule).toEqual(expected);
+		}
+	});
+});
+
+describe("getAlertRuleLabel", () => {
+	test("returns human-readable label for known rule", () => {
+		expect(getAlertRuleLabel("mem_high")).toBe("High Memory Usage");
+		expect(getAlertRuleLabel("public_port")).toBe("Unexpected Public Port");
+		expect(getAlertRuleLabel("oom_kill")).toBe("OOM Kill");
+	});
+
+	test("falls back to raw rule_id for unknown rule", () => {
+		expect(getAlertRuleLabel("nonexistent")).toBe("nonexistent");
+	});
+
+	test("all rules have a non-empty label", () => {
+		for (const rule of ALL_ALERT_RULES) {
+			expect(rule.label.length).toBeGreaterThan(0);
 		}
 	});
 });

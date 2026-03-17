@@ -31,6 +31,7 @@ export type {
 export {
 	ALL_ALERT_RULES,
 	getAlertRule,
+	getAlertRuleLabel,
 	TIER1_ALERT_RULES,
 	TIER2_ALERT_RULES,
 	TIER3_ALERT_RULES,

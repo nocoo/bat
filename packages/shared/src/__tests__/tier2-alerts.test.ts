@@ -1,6 +1,12 @@
 // @bat/shared — Tier 2 alert rules verification
 import { describe, expect, test } from "bun:test";
-import { ALL_ALERT_RULES, TIER1_ALERT_RULES, TIER2_ALERT_RULES, getAlertRule } from "../alerts";
+import {
+	ALL_ALERT_RULES,
+	TIER1_ALERT_RULES,
+	TIER2_ALERT_RULES,
+	TIER3_ALERT_RULES,
+	getAlertRule,
+} from "../alerts";
 
 describe("TIER2_ALERT_RULES", () => {
 	test("has 9 rules", () => {
@@ -85,8 +91,10 @@ describe("TIER2_ALERT_RULES", () => {
 });
 
 describe("ALL_ALERT_RULES", () => {
-	test("contains all Tier 1 + Tier 2 rules", () => {
-		expect(ALL_ALERT_RULES.length).toBe(TIER1_ALERT_RULES.length + TIER2_ALERT_RULES.length);
+	test("contains all Tier 1 + Tier 2 + Tier 3 rules", () => {
+		expect(ALL_ALERT_RULES.length).toBe(
+			TIER1_ALERT_RULES.length + TIER2_ALERT_RULES.length + TIER3_ALERT_RULES.length,
+		);
 	});
 
 	test("all IDs are unique across tiers", () => {
@@ -94,8 +102,8 @@ describe("ALL_ALERT_RULES", () => {
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 
-	test("has exactly 15 rules total", () => {
-		expect(ALL_ALERT_RULES.length).toBe(15);
+	test("has exactly 21 rules total", () => {
+		expect(ALL_ALERT_RULES.length).toBe(21);
 	});
 });
 
