@@ -118,6 +118,10 @@ export interface Tier2Payload {
 	security?: SecurityPostureData;
 	docker?: DockerStatusData;
 	disk_deep?: DiskDeepScanData;
+	// Host inventory slow-drift fields
+	timezone?: string;
+	dns_resolvers?: string[];
+	dns_search?: string[];
 }
 
 // --- Tier 2 Snapshot (Worker → Dashboard) ---
@@ -131,4 +135,8 @@ export interface Tier2Snapshot {
 	security: SecurityPostureData | null;
 	docker: DockerStatusData | null;
 	disk_deep: DiskDeepScanData | null;
+	// Host inventory slow-drift fields
+	timezone: string | null;
+	dns_resolvers: string[] | null;
+	dns_search: string[] | null;
 }

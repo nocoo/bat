@@ -57,6 +57,9 @@ LIMIT 1`,
 		security: safeParse(row.security_json),
 		docker: safeParse(row.docker_json),
 		disk_deep: safeParse(row.disk_deep_json),
+		timezone: null, // served from hosts table, not tier2_snapshots
+		dns_resolvers: null,
+		dns_search: null,
 	};
 }
 

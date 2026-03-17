@@ -2,6 +2,7 @@
 // Source of truth: docs/03-data-structures.md § Response DTOs + API Route Constants
 
 import type { AlertSeverity } from "./alerts.js";
+import type { BlockDeviceDTO, NetInterfaceDTO } from "./identity.js";
 
 // --- Host ID hashing ---
 
@@ -27,6 +28,7 @@ export const API_ROUTES = {
 	TIER2_INGEST: "/api/tier2",
 	HOSTS: "/api/hosts",
 	HOST_METRICS: "/api/hosts/:id/metrics",
+	HOST_DETAIL: "/api/hosts/:id",
 	HOST_TIER2: "/api/hosts/:id/tier2",
 	ALERTS: "/api/alerts",
 	LIVE: "/api/live",
@@ -52,6 +54,22 @@ export interface HostOverviewItem {
 	uptime_seconds: number | null;
 	last_seen: number; // unix seconds (Worker time)
 	alert_count: number;
+	// Host inventory scalar fields (for list-page subtitle)
+	cpu_logical: number | null;
+	cpu_physical: number | null;
+	mem_total_bytes: number | null;
+	virtualization: string | null;
+}
+
+/** GET /api/hosts/:id → HostDetailItem */
+export interface HostDetailItem extends HostOverviewItem {
+	swap_total_bytes: number | null;
+	boot_mode: string | null;
+	timezone: string | null;
+	dns_resolvers: string[] | null;
+	dns_search: string[] | null;
+	net_interfaces: NetInterfaceDTO[] | null;
+	disks: BlockDeviceDTO[] | null;
 }
 
 export type MetricsResolution = "raw" | "hourly";
