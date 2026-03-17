@@ -97,48 +97,10 @@ export default function HostDetailPage() {
 					<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />
 				</div>
 
-				{/* System Info + Active Alerts — side by side */}
-				{host && (
-					<div className="grid gap-4 lg:grid-cols-2">
-						<Card>
-							<CardHeader>
-								<CardTitle className="flex items-center gap-2 text-base">
-									<Info className="h-4 w-4" />
-									System Info
-								</CardTitle>
-							</CardHeader>
-							<CardContent>
-								<div className="grid gap-3 sm:grid-cols-2">
-									<InfoRow label="OS" value={host.os} />
-									<InfoRow label="Kernel" value={host.kernel} />
-									<InfoRow label="Architecture" value={host.arch} />
-									<InfoRow label="CPU" value={host.cpu_model} />
-									<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
-									<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
-								</div>
-							</CardContent>
-						</Card>
-						{hostAlerts.length > 0 && (
-							<Card>
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2 text-base">
-										<ShieldAlert className="h-4 w-4" />
-										Active Alerts ({hostAlerts.length})
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<AlertTable alerts={hostAlerts} />
-								</CardContent>
-							</Card>
-						)}
-					</div>
-				)}
-
-				{/* Metrics — primary content, shown first */}
+				{/* Metrics — 6:4 two-column layout */}
 				{metricsLoading ? (
-					<div className="space-y-3">
-						<h2 className="text-base font-semibold">Metrics</h2>
-						<div className="grid gap-4 lg:grid-cols-2">
+					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+						<div className="space-y-4">
 							{Array.from({ length: 4 }, (_, i) => (
 								<div
 									key={`chart-skeleton-${i.toString()}`}
@@ -148,16 +110,22 @@ export default function HostDetailPage() {
 								</div>
 							))}
 						</div>
+						<div className="space-y-4">
+							<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+								<Skeleton className="h-32 w-full" />
+							</div>
+						</div>
 					</div>
 				) : metricsResponse ? (
-					<div className="space-y-3">
-						<div className="flex items-baseline justify-between">
-							<h2 className="text-base font-semibold">Metrics</h2>
-							<span className="text-xs text-muted-foreground">
-								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
-							</span>
-						</div>
-						<div className="grid gap-4 lg:grid-cols-2">
+					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+						{/* Left column — time-series charts (shared X axis) */}
+						<div className="space-y-4">
+							<div className="flex items-baseline justify-between">
+								<h2 className="text-base font-semibold">Metrics</h2>
+								<span className="text-xs text-muted-foreground">
+									Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
+								</span>
+							</div>
 							<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 							<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 							<NetworkChart
@@ -165,11 +133,6 @@ export default function HostDetailPage() {
 								resolution={metricsResponse.resolution}
 								rangeSeconds={rangeSeconds}
 							/>
-							<DiskBars data={metricsResponse.data} />
-						</div>
-
-						{/* Advanced Metrics (T3) */}
-						<div className="grid gap-4 lg:grid-cols-2 mt-1">
 							<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 							<DiskIoChart
 								data={metricsResponse.data}
@@ -177,6 +140,44 @@ export default function HostDetailPage() {
 								rangeSeconds={rangeSeconds}
 							/>
 							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+						</div>
+
+						{/* Right column — snapshot / non-time-series */}
+						<div className="space-y-4">
+							<DiskBars data={metricsResponse.data} />
+							{host && (
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2 text-base">
+											<Info className="h-4 w-4" />
+											System Info
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<div className="grid gap-3">
+											<InfoRow label="OS" value={host.os} />
+											<InfoRow label="Kernel" value={host.kernel} />
+											<InfoRow label="Architecture" value={host.arch} />
+											<InfoRow label="CPU" value={host.cpu_model} />
+											<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
+											<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
+										</div>
+									</CardContent>
+								</Card>
+							)}
+							{hostAlerts.length > 0 && (
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2 text-base">
+											<ShieldAlert className="h-4 w-4" />
+											Active Alerts ({hostAlerts.length})
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<AlertTable alerts={hostAlerts} />
+									</CardContent>
+								</Card>
+							)}
 						</div>
 					</div>
 				) : (
