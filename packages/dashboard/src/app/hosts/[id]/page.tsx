@@ -160,7 +160,11 @@ export default function HostDetailPage() {
 							<CollapsibleContent>
 								<div className="grid gap-4 lg:grid-cols-2 mt-3">
 									<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-									<DiskIoChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+									<DiskIoChart
+										data={metricsResponse.data}
+										resolution={metricsResponse.resolution}
+										rangeSeconds={rangeSeconds}
+									/>
 									<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 								</div>
 							</CollapsibleContent>

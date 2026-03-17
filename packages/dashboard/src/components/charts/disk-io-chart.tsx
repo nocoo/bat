@@ -16,9 +16,10 @@ const SERIES = [
 
 export function DiskIoChart({
 	data,
+	resolution = "raw",
 	rangeSeconds = 3600,
-}: { data: MetricsDataPoint[]; rangeSeconds?: number }) {
-	const chartData = transformDiskIoData(data);
+}: { data: MetricsDataPoint[]; resolution?: "raw" | "hourly"; rangeSeconds?: number }) {
+	const chartData = transformDiskIoData(data, resolution);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {

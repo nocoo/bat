@@ -192,7 +192,8 @@ export interface DiskIoChartPoint {
 	io_util_pct: number;
 }
 
-interface DiskIoJsonEntry {
+/** Raw disk_io_json entry (from probe, ≤24h) */
+interface DiskIoRawEntry {
 	device: string;
 	read_iops: number;
 	write_iops: number;
@@ -201,8 +202,27 @@ interface DiskIoJsonEntry {
 	io_util_pct: number;
 }
 
-/** Transform disk I/O data. Aggregates across all devices (max io_util, sum IOPS). */
-export function transformDiskIoData(data: MetricsDataPoint[]): DiskIoChartPoint[] {
+/** Hourly aggregated disk_io_json entry (>24h) */
+interface DiskIoHourlyEntry {
+	device: string;
+	read_iops_avg: number;
+	write_iops_avg: number;
+	read_bytes_sec_avg: number;
+	write_bytes_sec_avg: number;
+	io_util_pct_avg: number;
+	io_util_pct_max: number;
+}
+
+/**
+ * Resolution-aware disk I/O data transform.
+ * - Raw (≤ 24h): Uses raw field names (read_iops, write_iops, io_util_pct).
+ * - Hourly (> 24h): Uses aggregated field names (read_iops_avg, write_iops_avg, io_util_pct_avg).
+ * Aggregates across all devices (max io_util, sum IOPS).
+ */
+export function transformDiskIoData(
+	data: MetricsDataPoint[],
+	resolution: "raw" | "hourly" = "raw",
+): DiskIoChartPoint[] {
 	const hasAny = data.some((d) => d.disk_io_json != null);
 	if (!hasAny) return [];
 
@@ -212,11 +232,20 @@ export function transformDiskIoData(data: MetricsDataPoint[]): DiskIoChartPoint[
 		let ioUtil = 0;
 		if (d.disk_io_json) {
 			try {
-				const entries = JSON.parse(d.disk_io_json) as DiskIoJsonEntry[];
-				for (const e of entries) {
-					readIops += e.read_iops ?? 0;
-					writeIops += e.write_iops ?? 0;
-					ioUtil = Math.max(ioUtil, e.io_util_pct ?? 0);
+				if (resolution === "hourly") {
+					const entries = JSON.parse(d.disk_io_json) as DiskIoHourlyEntry[];
+					for (const e of entries) {
+						readIops += e.read_iops_avg ?? 0;
+						writeIops += e.write_iops_avg ?? 0;
+						ioUtil = Math.max(ioUtil, e.io_util_pct_avg ?? 0);
+					}
+				} else {
+					const entries = JSON.parse(d.disk_io_json) as DiskIoRawEntry[];
+					for (const e of entries) {
+						readIops += e.read_iops ?? 0;
+						writeIops += e.write_iops ?? 0;
+						ioUtil = Math.max(ioUtil, e.io_util_pct ?? 0);
+					}
 				}
 			} catch {
 				// invalid JSON — return zeros

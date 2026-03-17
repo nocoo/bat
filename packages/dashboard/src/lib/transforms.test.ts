@@ -234,7 +234,7 @@ describe("transformPsiData", () => {
 });
 
 describe("transformDiskIoData", () => {
-	test("parses disk_io_json and aggregates", () => {
+	test("parses raw disk_io_json and aggregates", () => {
 		const diskIoJson = JSON.stringify([
 			{
 				device: "sda",
@@ -253,8 +253,51 @@ describe("transformDiskIoData", () => {
 				io_util_pct: 50,
 			},
 		]);
-		const result = transformDiskIoData([makePoint({ ts: 100, disk_io_json: diskIoJson })]);
+		const result = transformDiskIoData([makePoint({ ts: 100, disk_io_json: diskIoJson })], "raw");
 		expect(result).toEqual([{ ts: 100, read_iops: 15, write_iops: 35, io_util_pct: 50 }]);
+	});
+
+	test("parses hourly disk_io_json with aggregated field names", () => {
+		const diskIoJson = JSON.stringify([
+			{
+				device: "sda",
+				read_iops_avg: 100,
+				write_iops_avg: 200,
+				read_bytes_sec_avg: 50000,
+				write_bytes_sec_avg: 80000,
+				io_util_pct_avg: 25.5,
+				io_util_pct_max: 40,
+			},
+			{
+				device: "sdb",
+				read_iops_avg: 50,
+				write_iops_avg: 75,
+				read_bytes_sec_avg: 10000,
+				write_bytes_sec_avg: 20000,
+				io_util_pct_avg: 10.0,
+				io_util_pct_max: 15,
+			},
+		]);
+		const result = transformDiskIoData(
+			[makePoint({ ts: 100, disk_io_json: diskIoJson })],
+			"hourly",
+		);
+		expect(result).toEqual([{ ts: 100, read_iops: 150, write_iops: 275, io_util_pct: 25.5 }]);
+	});
+
+	test("defaults to raw resolution", () => {
+		const diskIoJson = JSON.stringify([
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 30,
+			},
+		]);
+		const result = transformDiskIoData([makePoint({ ts: 100, disk_io_json: diskIoJson })]);
+		expect(result).toEqual([{ ts: 100, read_iops: 10, write_iops: 20, io_util_pct: 30 }]);
 	});
 
 	test("returns empty when no disk_io data", () => {

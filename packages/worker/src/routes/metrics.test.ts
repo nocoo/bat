@@ -187,7 +187,8 @@ describe("GET /api/hosts/:id/metrics", () => {
 			psi_mem_full_avg60_avg: 3.1,
 			psi_io_some_avg60_avg: 7.7,
 			psi_io_full_avg60_avg: 2.5,
-			disk_io_json: '[{"device":"sda","read_bytes_sec":1000,"write_bytes_sec":2000,"io_pct":15.0}]',
+			disk_io_json:
+				'[{"device":"sda","read_iops_avg":100,"write_iops_avg":200,"read_bytes_sec_avg":1000,"write_bytes_sec_avg":2000,"io_util_pct_avg":15.0,"io_util_pct_max":22.0}]',
 			tcp_established_avg: 150,
 			tcp_time_wait_avg: 25,
 			tcp_orphan_avg: 2,
@@ -217,9 +218,9 @@ describe("GET /api/hosts/:id/metrics", () => {
 		expect(d.psi_io_some_avg60).toBe(7.7);
 		expect(d.psi_io_full_avg60).toBe(2.5);
 
-		// Disk I/O
+		// Disk I/O (hourly uses aggregated field names)
 		expect(d.disk_io_json).toBe(
-			'[{"device":"sda","read_bytes_sec":1000,"write_bytes_sec":2000,"io_pct":15.0}]',
+			'[{"device":"sda","read_iops_avg":100,"write_iops_avg":200,"read_bytes_sec_avg":1000,"write_bytes_sec_avg":2000,"io_util_pct_avg":15.0,"io_util_pct_max":22.0}]',
 		);
 
 		// TCP
