@@ -14,9 +14,9 @@ import { formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
+import { cn } from "@/lib/utils";
 import { hashHostId } from "@bat/shared";
 import { Activity, AlertTriangle, ChevronRight, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -74,6 +74,8 @@ export default function HostDetailPage() {
 	const hid = params.id;
 
 	const [rangeSeconds, setRangeSeconds] = useState(3600);
+	const [advancedOpen, setAdvancedOpen] = useState(false);
+	const [sysInfoOpen, setSysInfoOpen] = useState(false);
 	const now = Math.floor(Date.now() / 1000);
 	const from = now - rangeSeconds;
 
@@ -114,7 +116,7 @@ export default function HostDetailPage() {
 				{/* Metrics — primary content, shown first */}
 				{metricsLoading ? (
 					<div className="space-y-3">
-						<h2 className="text-lg font-semibold">Metrics</h2>
+						<h2 className="text-base font-semibold">Metrics</h2>
 						<div className="grid gap-4 lg:grid-cols-2">
 							{Array.from({ length: 4 }, (_, i) => (
 								<div
@@ -129,7 +131,7 @@ export default function HostDetailPage() {
 				) : metricsResponse ? (
 					<div className="space-y-3">
 						<div className="flex items-baseline justify-between">
-							<h2 className="text-lg font-semibold">Metrics</h2>
+							<h2 className="text-base font-semibold">Metrics</h2>
 							<span className="text-xs text-muted-foreground">
 								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
 							</span>
@@ -146,18 +148,28 @@ export default function HostDetailPage() {
 						</div>
 
 						{/* Advanced Metrics (T3) — shown when data is available */}
-						<Collapsible>
-							<CollapsibleTrigger asChild>
-								<button
-									type="button"
-									className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-2"
-								>
-									<ChevronRight className="h-3.5 w-3.5 transition-transform [[data-state=open]>&]:rotate-90" />
-									<Activity className="h-3.5 w-3.5" />
-									Advanced Metrics
-								</button>
-							</CollapsibleTrigger>
-							<CollapsibleContent>
+						<button
+							type="button"
+							onClick={() => setAdvancedOpen((prev) => !prev)}
+							className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mt-2"
+						>
+							<ChevronRight
+								className={cn(
+									"h-3.5 w-3.5 transition-transform duration-200",
+									advancedOpen && "rotate-90",
+								)}
+							/>
+							<Activity className="h-3.5 w-3.5" />
+							Advanced Metrics
+						</button>
+						<div
+							className="grid overflow-hidden"
+							style={{
+								gridTemplateRows: advancedOpen ? "1fr" : "0fr",
+								transition: "grid-template-rows 200ms ease-out",
+							}}
+						>
+							<div className="min-h-0 overflow-hidden">
 								<div className="grid gap-4 lg:grid-cols-2 mt-3">
 									<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 									<DiskIoChart
@@ -167,8 +179,8 @@ export default function HostDetailPage() {
 									/>
 									<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 								</div>
-							</CollapsibleContent>
-						</Collapsible>
+							</div>
+						</div>
 					</div>
 				) : (
 					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -179,18 +191,33 @@ export default function HostDetailPage() {
 
 				{/* System Info — collapsible, secondary reference data */}
 				{host && (
-					<Collapsible>
-						<Card>
-							<CollapsibleTrigger asChild>
-								<CardHeader className="cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-[var(--radius-card)]">
-									<CardTitle className="flex items-center gap-2 text-base">
-										<ChevronRight className="h-4 w-4 transition-transform [[data-state=open]>&]:rotate-90" />
-										<Info className="h-4 w-4" />
-										System Info
-									</CardTitle>
-								</CardHeader>
-							</CollapsibleTrigger>
-							<CollapsibleContent>
+					<Card>
+						<CardHeader
+							className={cn(
+								"cursor-pointer select-none hover:bg-accent transition-colors",
+								sysInfoOpen ? "rounded-t-[var(--radius-card)]" : "rounded-[var(--radius-card)]",
+							)}
+							onClick={() => setSysInfoOpen((prev) => !prev)}
+						>
+							<CardTitle className="flex items-center gap-2 text-base">
+								<ChevronRight
+									className={cn(
+										"h-4 w-4 transition-transform duration-200",
+										sysInfoOpen && "rotate-90",
+									)}
+								/>
+								<Info className="h-4 w-4" />
+								System Info
+							</CardTitle>
+						</CardHeader>
+						<div
+							className="grid overflow-hidden"
+							style={{
+								gridTemplateRows: sysInfoOpen ? "1fr" : "0fr",
+								transition: "grid-template-rows 200ms ease-out",
+							}}
+						>
+							<div className="min-h-0 overflow-hidden">
 								<CardContent>
 									<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 										<InfoRow label="OS" value={host.os} />
@@ -202,9 +229,9 @@ export default function HostDetailPage() {
 										<InfoRow label="Alerts" value={String(host.alert_count)} />
 									</div>
 								</CardContent>
-							</CollapsibleContent>
-						</Card>
-					</Collapsible>
+							</div>
+						</div>
+					</Card>
 				)}
 			</div>
 		</AppShell>
