@@ -237,34 +237,34 @@ Add rows for the new fields:
 
 ## Implementation Phases
 
-### Phase 1 — CPU & Memory (probe + full stack)
+### Phase 1 — CPU & Memory (probe + full stack) ✅
 
 Fields S1–S4 reuse existing procfs reads:
 
-- **`cpu_logical`**: Rename existing `parse_cpu_count()` to `parse_cpu_logical()` (fix misleading "cores" comment). Already works correctly — counts `^processor` lines.
-- **`cpu_physical`**: New `parse_cpu_physical()` — parse (`physical id`, `core id`) pairs from `/proc/cpuinfo`, count unique. Multi-socket aware. Fallback chain as described in CPU Topology section.
-- **`mem_total_bytes`**: Already parsed by `memory::parse_meminfo()` → `.mem_total`.
-- **`swap_total_bytes`**: Same → `.swap_total`.
+- **`cpu_logical`**: Rename existing `parse_cpu_count()` to `parse_cpu_logical()` (fix misleading "cores" comment). Already works correctly — counts `^processor` lines. ✅
+- **`cpu_physical`**: New `parse_cpu_physical()` — parse (`physical id`, `core id`) pairs from `/proc/cpuinfo`, count unique. Multi-socket aware. Fallback chain as described in CPU Topology section. ✅
+- **`mem_total_bytes`**: Already parsed by `memory::parse_meminfo()` → `.mem_total`. ✅
+- **`swap_total_bytes`**: Same → `.swap_total`. ✅
 
-### Phase 2 — New Collectors
+### Phase 2 — New Collectors ✅
 
-- S5 `virtualization` — read 2 sysfs files, map known vendor strings
-- S6 `net_interfaces` — `getifaddrs()` + 2 sysfs files per interface
-- S7 `disks` — iterate `/sys/block/`, read 2 files per device
-- S8 `boot_mode` — 1 path existence check
+- S5 `virtualization` — read 2 sysfs files, map known vendor strings ✅
+- S6 `net_interfaces` — `getifaddrs()` + 2 sysfs files per interface ✅ (IPv6 via `/proc/net/if_inet6`, IPv4 skipped — no clean procfs source)
+- S7 `disks` — iterate `/sys/block/`, read 2 files per device ✅
+- S8 `boot_mode` — 1 path existence check ✅
 
-### Phase 3 — Tier 2 Additions
+### Phase 3 — Tier 2 Additions ✅
 
-- D1 `timezone` — read 1 file with fallback
-- D2–D3 `dns_resolvers`, `dns_search` — parse `/etc/resolv.conf`
-- Worker: add conditional `UPDATE hosts` in tier2 ingest route (merge semantics)
+- D1 `timezone` — read 1 file with fallback ✅
+- D2–D3 `dns_resolvers`, `dns_search` — parse `/etc/resolv.conf` ✅
+- Worker: add conditional `UPDATE hosts` in tier2 ingest route (merge semantics) ✅
 
-### Phase 4 — Dashboard
+### Phase 4 — Dashboard ✅
 
-- Add scalar fields to `HostOverviewItem`, update hosts list query
-- New `GET /api/hosts/:id` detail endpoint with full inventory
-- Enhance host card subtitle
-- Enhance host detail System Info section (fetch from detail endpoint)
+- Add scalar fields to `HostOverviewItem`, update hosts list query ✅
+- New `GET /api/hosts/:id` detail endpoint with full inventory ✅
+- Enhance host card subtitle ✅
+- Enhance host detail System Info section (fetch from detail endpoint) ✅
 
 ## Virtualization Detection Logic
 
