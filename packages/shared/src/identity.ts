@@ -21,6 +21,7 @@ export interface IdentityPayload {
 	net_interfaces?: NetInterfaceDTO[];
 	disks?: BlockDeviceDTO[];
 	boot_mode?: string;
+	public_ip?: string;
 }
 
 /** Network interface identity (from probe identity payload) */
@@ -64,4 +65,5 @@ export interface HostRow {
 	timezone: string | null;
 	dns_resolvers: string | null; // JSON text
 	dns_search: string | null; // JSON text
+	public_ip: string | null;
 }

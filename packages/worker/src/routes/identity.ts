@@ -66,6 +66,10 @@ function buildInventoryUpdate(body: Record<string, unknown>): {
 		clauses.push("boot_mode = ?");
 		values.push(body.boot_mode);
 	}
+	if ("public_ip" in body) {
+		clauses.push("public_ip = ?");
+		values.push(body.public_ip);
+	}
 
 	return { clauses, values };
 }
