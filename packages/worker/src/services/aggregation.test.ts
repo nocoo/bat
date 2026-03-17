@@ -355,6 +355,92 @@ describe("aggregateHour", () => {
 		expect(row?.psi_mem_some_avg60_max).toBe(8);
 	});
 
+	test("T3 disk_io_json aggregated per device with avg/max", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100, {
+			diskIoJson: JSON.stringify([
+				{
+					device: "sda",
+					read_iops: 100,
+					write_iops: 200,
+					read_bytes_sec: 50000,
+					write_bytes_sec: 100000,
+					io_util_pct: 20,
+				},
+				{
+					device: "sdb",
+					read_iops: 10,
+					write_iops: 20,
+					read_bytes_sec: 5000,
+					write_bytes_sec: 10000,
+					io_util_pct: 5,
+				},
+			]),
+		});
+		await insertRawMetrics(db, "host-001", hourTs + 200, {
+			diskIoJson: JSON.stringify([
+				{
+					device: "sda",
+					read_iops: 200,
+					write_iops: 400,
+					read_bytes_sec: 70000,
+					write_bytes_sec: 140000,
+					io_util_pct: 40,
+				},
+				{
+					device: "sdb",
+					read_iops: 30,
+					write_iops: 60,
+					read_bytes_sec: 15000,
+					write_bytes_sec: 30000,
+					io_util_pct: 15,
+				},
+			]),
+		});
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT disk_io_json FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<{ disk_io_json: string }>();
+
+		expect(row).not.toBeNull();
+		const diskIo = JSON.parse(row?.disk_io_json);
+		expect(diskIo).toHaveLength(2);
+
+		const sda = diskIo.find((d: { device: string }) => d.device === "sda");
+		expect(sda.read_iops_avg).toBe(150); // avg(100, 200)
+		expect(sda.write_iops_avg).toBe(300); // avg(200, 400)
+		expect(sda.read_bytes_sec_avg).toBe(60000); // avg(50000, 70000)
+		expect(sda.write_bytes_sec_avg).toBe(120000); // avg(100000, 140000)
+		expect(sda.io_util_pct_avg).toBe(30); // avg(20, 40)
+		expect(sda.io_util_pct_max).toBe(40); // max(20, 40)
+
+		const sdb = diskIo.find((d: { device: string }) => d.device === "sdb");
+		expect(sdb.read_iops_avg).toBe(20); // avg(10, 30)
+		expect(sdb.io_util_pct_max).toBe(15); // max(5, 15)
+	});
+
+	test("T3 disk_io_json null when all samples lack disk I/O", async () => {
+		const hourTs = 1700000000;
+		await insertHost(db, "host-001", hourTs + 1800);
+
+		await insertRawMetrics(db, "host-001", hourTs + 100);
+		await insertRawMetrics(db, "host-001", hourTs + 200);
+
+		await aggregateHour(db, hourTs);
+
+		const row = await db
+			.prepare("SELECT disk_io_json FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
+			.bind("host-001", hourTs)
+			.first<{ disk_io_json: string | null }>();
+
+		expect(row?.disk_io_json).toBeNull();
+	});
+
 	test("T3 TCP fields aggregated as avg/max", async () => {
 		const hourTs = 1700000000;
 		await insertHost(db, "host-001", hourTs + 1800);

@@ -102,8 +102,8 @@ async function aggregateHostHour(
 	const psiIoFullAvg60 = avgNullable(rows.map((r) => r.psi_io_full_avg60));
 	const psiIoFullMax60 = maxNullable(rows.map((r) => r.psi_io_full_avg60));
 
-	// Disk I/O: use last sample's disk_io_json (same pattern as disk_json)
-	const diskIoJson = rows[rows.length - 1].disk_io_json;
+	// Disk I/O: per-device aggregation (AVG for rates, AVG+MAX for io_util_pct)
+	const diskIoJson = aggregateDiskIo(rows);
 
 	// TCP: avg + max
 	const tcpEstablishedAvg = avgNullable(rows.map((r) => r.tcp_established));
@@ -342,6 +342,76 @@ function aggregateNetwork(rows: RawRow[]): NetAggResult {
 		rxErrors: totalRxErrors,
 		txErrors: totalTxErrors,
 	};
+}
+
+/** Raw disk_io_json entry (from probe) */
+interface DiskIoRawEntry {
+	device: string;
+	read_iops: number;
+	write_iops: number;
+	read_bytes_sec: number;
+	write_bytes_sec: number;
+	io_util_pct: number;
+}
+
+/** Hourly aggregated disk_io_json entry (per doc §582) */
+interface DiskIoHourlyEntry {
+	device: string;
+	read_iops_avg: number;
+	write_iops_avg: number;
+	read_bytes_sec_avg: number;
+	write_bytes_sec_avg: number;
+	io_util_pct_avg: number;
+	io_util_pct_max: number;
+}
+
+/**
+ * Aggregate disk I/O metrics across samples.
+ * Groups by device, computes AVG for rate fields and AVG+MAX for io_util_pct.
+ * Returns null if all rows have null disk_io_json.
+ */
+function aggregateDiskIo(rows: RawRow[]): string | null {
+	// Collect per-device samples: device → array of raw entries
+	const deviceSamples = new Map<string, DiskIoRawEntry[]>();
+	let hasAny = false;
+
+	for (const row of rows) {
+		if (row.disk_io_json == null) continue;
+		let entries: DiskIoRawEntry[] = [];
+		try {
+			entries = JSON.parse(row.disk_io_json) as DiskIoRawEntry[];
+		} catch {
+			continue;
+		}
+		if (entries.length === 0) continue;
+		hasAny = true;
+		for (const e of entries) {
+			let arr = deviceSamples.get(e.device);
+			if (!arr) {
+				arr = [];
+				deviceSamples.set(e.device, arr);
+			}
+			arr.push(e);
+		}
+	}
+
+	if (!hasAny) return null;
+
+	// Aggregate per device
+	const result: DiskIoHourlyEntry[] = [];
+	for (const [device, samples] of deviceSamples) {
+		result.push({
+			device,
+			read_iops_avg: avg(samples.map((s) => s.read_iops)),
+			write_iops_avg: avg(samples.map((s) => s.write_iops)),
+			read_bytes_sec_avg: avg(samples.map((s) => s.read_bytes_sec)),
+			write_bytes_sec_avg: avg(samples.map((s) => s.write_bytes_sec)),
+			io_util_pct_avg: avg(samples.map((s) => s.io_util_pct)),
+			io_util_pct_max: max(samples.map((s) => s.io_util_pct)),
+		});
+	}
+
+	return JSON.stringify(result);
 }
 
 /**
