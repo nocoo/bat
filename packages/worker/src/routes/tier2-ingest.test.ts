@@ -298,4 +298,52 @@ describe("POST /api/tier2", () => {
 		expect(docker.containers.length).toBe(1);
 		expect(docker.containers[0].name).toBe("web");
 	});
+
+	test("timezone and dns merged into hosts table", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const payload = {
+			host_id: "host-dns",
+			timestamp: now,
+			timezone: "America/New_York",
+			dns_resolvers: ["1.1.1.1", "8.8.8.8"],
+			dns_search: ["example.com"],
+		};
+
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const host = await db
+			.prepare("SELECT timezone, dns_resolvers, dns_search FROM hosts WHERE host_id = ?")
+			.bind("host-dns")
+			.first<Record<string, unknown>>();
+
+		expect(host?.timezone).toBe("America/New_York");
+		expect(JSON.parse(host?.dns_resolvers as string)).toEqual(["1.1.1.1", "8.8.8.8"]);
+		expect(JSON.parse(host?.dns_search as string)).toEqual(["example.com"]);
+	});
+
+	test("dns fields not touched when absent from payload", async () => {
+		const now = Math.floor(Date.now() / 1000);
+
+		// First: send with timezone
+		await post(app, {
+			host_id: "host-retain",
+			timestamp: now,
+			timezone: "UTC",
+		});
+
+		// Second: send without timezone (different timestamp to avoid dedup)
+		await post(app, {
+			host_id: "host-retain",
+			timestamp: now + 1,
+		});
+
+		const host = await db
+			.prepare("SELECT timezone FROM hosts WHERE host_id = ?")
+			.bind("host-retain")
+			.first<Record<string, unknown>>();
+
+		// Should retain timezone from first send
+		expect(host?.timezone).toBe("UTC");
+	});
 });
