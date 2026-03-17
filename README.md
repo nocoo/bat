@@ -88,7 +88,7 @@ bat/
 │   ├── src/collectors/     # CPU/memory/disk/network 采集器
 │   ├── dist/               # systemd unit 文件
 │   └── install.sh          # 安装脚本
-├── docs/                   # 设计文档（8 篇）
+├── docs/                   # 设计文档（10 篇）
 └── scripts/                # 版本同步、覆盖率检查、logo 生成
 ```
 
@@ -153,20 +153,49 @@ cd probe && cargo test  # Rust 测试
 
 ## 告警规则
 
-| 规则 | 类型 | 阈值 | 严重度 |
-|------|------|------|--------|
-| `mem_high` | 即时 | > 85% | Warning |
-| `no_swap` | 即时 | 0 swap + > 70% mem | Critical |
-| `disk_full` | 即时 | > 90% | Critical |
-| `iowait_high` | 持续 5m | > 30% | Warning |
-| `steal_high` | 持续 5m | > 10% | Warning |
-| `host_offline` | 查询时 | > 120s 未上报 | Critical |
+21 条告警规则，全部已实现。Probe 上报原始数据，Worker 服务端评估告警。
+
+### Tier 1（每次 ingest 评估）
+
+| 规则 | 条件 | 严重度 |
+|------|------|--------|
+| `mem_high` | mem > 85% AND swap > 50% | Critical |
+| `no_swap` | swap = 0 AND mem > 70% | Critical |
+| `disk_full` | 任一挂载点 > 85% | Critical |
+| `iowait_high` | iowait > 20% 持续 5min | Warning |
+| `steal_high` | steal > 10% 持续 5min | Warning |
+| `host_offline` | 超过 120s 未上报 | Critical |
+| `uptime_anomaly` | uptime < 300s | Info |
+
+### Tier 2（每次 tier2 上报评估）
+
+| 规则 | 条件 | 严重度 |
+|------|------|--------|
+| `ssh_password_auth` | SSH 密码认证开启 | Critical |
+| `ssh_root_login` | SSH root 登录=yes | Critical |
+| `no_firewall` | 防火墙未启用 | Critical |
+| `public_port` | 非白名单端口暴露在 0.0.0.0 | Warning |
+| `security_updates` | 安全更新待安装 > 7d | Warning |
+| `container_restart` | 容器重启次数 > 5 | Critical |
+| `systemd_failed` | 有 failed systemd 单元 | Warning |
+| `reboot_required` | 需要重启 > 7d | Info |
+
+### Tier 3（每次 ingest 评估，可选字段）
+
+| 规则 | 条件 | 严重度 |
+|------|------|--------|
+| `cpu_pressure` | PSI cpu avg60 > 25% 持续 5min | Warning |
+| `mem_pressure` | PSI mem avg60 > 10% 持续 5min | Warning |
+| `io_pressure` | PSI io avg60 > 20% 持续 5min | Warning |
+| `disk_io_saturated` | 任一设备利用率 > 80% 持续 5min | Warning |
+| `tcp_conn_leak` | TIME_WAIT > 500 持续 5min | Warning |
+| `oom_kill` | OOM kill 次数 > 0 | Critical |
 
 ## 文档
 
 | 文档 | 内容 |
 |------|------|
-| [01-metrics-catalogue](./docs/01-metrics-catalogue.md) | 指标目录：Tier 1 + Tier 2、procfs 数据源、告警规则 |
+| [01-metrics-catalogue](./docs/01-metrics-catalogue.md) | 信号目录：T1/T2/T3/Identity 全量信号、procfs 数据源、21 条告警规则 |
 | [02-architecture](./docs/02-architecture.md) | 系统架构、关键决策、MVP 范围、部署方案 |
 | [03-data-structures](./docs/03-data-structures.md) | D1 Schema、Migration 策略、Payload 类型 |
 | [04-probe](./docs/04-probe.md) | Rust Probe：采集器、主循环、配置、systemd |
@@ -174,6 +203,8 @@ cd probe && cargo test  # Rust 测试
 | [06-dashboard](./docs/06-dashboard.md) | Next.js 仪表盘：OAuth、代理架构、图表 |
 | [07-testing](./docs/07-testing.md) | 四层测试策略、Husky hooks |
 | [08-commits](./docs/08-commits.md) | 原子化提交计划（Phase 0–5，46 commits） |
+| [09-tier3-signals](./docs/09-tier3-signals.md) | Tier 3 设计：PSI 压力、磁盘 I/O、TCP 状态、OOM kills |
+| [10-host-inventory](./docs/10-host-inventory.md) | 主机清单设计：CPU 拓扑、虚拟化、网络接口、块设备 |
 
 ## License
 
