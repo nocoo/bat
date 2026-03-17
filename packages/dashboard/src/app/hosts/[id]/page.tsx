@@ -254,6 +254,7 @@ export default function HostDetailPage() {
 											{detail?.boot_mode && (
 												<InfoRow label="Boot Mode" value={detail.boot_mode.toUpperCase()} />
 											)}
+											{detail?.public_ip && <InfoRow label="Public IP" value={detail.public_ip} />}
 											<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
 											<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
 											{detail?.net_interfaces && detail.net_interfaces.length > 0 && (

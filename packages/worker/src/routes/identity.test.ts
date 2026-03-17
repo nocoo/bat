@@ -252,4 +252,37 @@ describe("POST /api/identity", () => {
 		expect(row?.virtualization).toBe("bare-metal"); // updated
 		expect(row?.boot_mode).toBe("uefi"); // retained
 	});
+
+	test("public_ip merged when present in payload", async () => {
+		const res = await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.42",
+		});
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.public_ip).toBe("203.0.113.42");
+	});
+
+	test("public_ip retained when absent from subsequent payload", async () => {
+		// First send with public_ip
+		await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.42",
+		});
+
+		// Second send without public_ip
+		await post(app, makePayload());
+
+		const row = await db
+			.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.public_ip).toBe("203.0.113.42"); // retained
+	});
 });

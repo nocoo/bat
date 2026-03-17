@@ -19,6 +19,7 @@ interface HostRow {
 	cpu_physical: number | null;
 	mem_total_bytes: number | null;
 	virtualization: string | null;
+	public_ip: string | null;
 }
 
 interface LatestMetrics {
@@ -45,7 +46,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	// 1. Get all active hosts
 	const hostsResult = await db
 		.prepare(
-			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization FROM hosts WHERE is_active = 1",
+			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip FROM hosts WHERE is_active = 1",
 		)
 		.all<HostRow>();
 	const hosts = hostsResult.results;
@@ -127,6 +128,7 @@ FROM (
 			cpu_physical: host.cpu_physical,
 			mem_total_bytes: host.mem_total_bytes,
 			virtualization: host.virtualization,
+			public_ip: host.public_ip,
 		};
 	});
 

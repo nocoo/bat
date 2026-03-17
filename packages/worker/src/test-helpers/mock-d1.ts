@@ -10,6 +10,7 @@ const MIGRATION_INVENTORY_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0005_host_inventory.sql",
 );
+const MIGRATION_PUBLIC_IP_PATH = resolve(import.meta.dir, "../../migrations/0006_public_ip.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -123,6 +124,15 @@ export function createMockD1(): D1Database {
 	// Apply host inventory migration
 	const inventorySchema = readFileSync(MIGRATION_INVENTORY_PATH, "utf-8");
 	for (const stmt of inventorySchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply public_ip migration
+	const publicIpSchema = readFileSync(MIGRATION_PUBLIC_IP_PATH, "utf-8");
+	for (const stmt of publicIpSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

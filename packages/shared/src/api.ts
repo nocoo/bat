@@ -59,6 +59,7 @@ export interface HostOverviewItem {
 	cpu_physical: number | null;
 	mem_total_bytes: number | null;
 	virtualization: string | null;
+	public_ip: string | null;
 }
 
 /** GET /api/hosts/:id → HostDetailItem */

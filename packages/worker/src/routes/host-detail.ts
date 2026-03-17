@@ -25,6 +25,7 @@ interface DetailRow {
 	timezone: string | null;
 	dns_resolvers: string | null;
 	dns_search: string | null;
+	public_ip: string | null;
 }
 
 interface LatestMetrics {
@@ -77,7 +78,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 			`SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen,
        cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
        virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search
+       timezone, dns_resolvers, dns_search, public_ip
 FROM hosts WHERE host_id = ? AND is_active = 1`,
 		)
 		.bind(hostId)
@@ -125,6 +126,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		cpu_physical: host.cpu_physical,
 		mem_total_bytes: host.mem_total_bytes,
 		virtualization: host.virtualization,
+		public_ip: host.public_ip,
 		swap_total_bytes: host.swap_total_bytes,
 		boot_mode: host.boot_mode,
 		timezone: host.timezone,
