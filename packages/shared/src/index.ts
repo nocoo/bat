@@ -18,7 +18,12 @@ export type {
 } from "./metrics.js";
 
 // Identity payload types
-export type { HostRow, IdentityPayload } from "./identity.js";
+export type {
+	BlockDeviceDTO,
+	HostRow,
+	IdentityPayload,
+	NetInterfaceDTO,
+} from "./identity.js";
 
 // Alert types and rules
 export type {
@@ -51,6 +56,7 @@ export {
 // API route types and constants
 export type {
 	AlertItem,
+	HostDetailItem,
 	HostOverviewItem,
 	HostStatus,
 	MetricsDataPoint,

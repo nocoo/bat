@@ -6,6 +6,10 @@ import { resolve } from "node:path";
 const MIGRATION_PATH = resolve(import.meta.dir, "../../migrations/0001_initial.sql");
 const MIGRATION_TIER2_PATH = resolve(import.meta.dir, "../../migrations/0003_tier2_tables.sql");
 const MIGRATION_TIER3_PATH = resolve(import.meta.dir, "../../migrations/0004_tier3_columns.sql");
+const MIGRATION_INVENTORY_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0005_host_inventory.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -110,6 +114,15 @@ export function createMockD1(): D1Database {
 	// Apply Tier 3 migration
 	const tier3Schema = readFileSync(MIGRATION_TIER3_PATH, "utf-8");
 	for (const stmt of tier3Schema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply host inventory migration
+	const inventorySchema = readFileSync(MIGRATION_INVENTORY_PATH, "utf-8");
+	for (const stmt of inventorySchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

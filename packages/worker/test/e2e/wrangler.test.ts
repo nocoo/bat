@@ -72,6 +72,7 @@ beforeAll(async () => {
 		"migrations/0002_dedup_constraint.sql",
 		"migrations/0003_tier2_tables.sql",
 		"migrations/0004_tier3_columns.sql",
+		"migrations/0005_host_inventory.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(
