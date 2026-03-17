@@ -42,11 +42,42 @@ fn detect_virt_from_vendor(vendor: &str) -> &'static str {
     ""
 }
 
-/// Detect virtualization type from DMI `sys_vendor`.
+/// Known `product_name` → virtualization type mappings (fallback when vendor is not recognized).
+fn detect_virt_from_product(product: &str) -> &'static str {
+    let p = product.trim();
+    if p == "KVM" || p == "KVM Virtual Machine" {
+        return "kvm";
+    }
+    if p.starts_with("VMware") {
+        return "vmware";
+    }
+    if p == "VirtualBox" {
+        return "virtualbox";
+    }
+    if p.starts_with("Standard PC") || p.starts_with("RHEV") {
+        return "kvm";
+    }
+    ""
+}
+
+/// Detect virtualization type from DMI `sys_vendor` and `product_name`.
 /// Falls back to checking `/proc/1/cgroup` for container indicators.
-pub fn parse_virtualization(sys_vendor: Option<&str>, cgroup_content: Option<&str>) -> String {
+pub fn parse_virtualization(
+    sys_vendor: Option<&str>,
+    product_name: Option<&str>,
+    cgroup_content: Option<&str>,
+) -> String {
+    // First try vendor mapping
     if let Some(vendor) = sys_vendor {
         let result = detect_virt_from_vendor(vendor);
+        if !result.is_empty() {
+            return result.to_string();
+        }
+    }
+
+    // Fallback: try product_name mapping (e.g. Red Hat vendor + KVM product)
+    if let Some(product) = product_name {
+        let result = detect_virt_from_product(product);
         if !result.is_empty() {
             return result.to_string();
         }
@@ -59,7 +90,7 @@ pub fn parse_virtualization(sys_vendor: Option<&str>, cgroup_content: Option<&st
         return "container".to_string();
     }
 
-    // sys_vendor was readable but not a known VM vendor → bare metal
+    // DMI was readable but not a known VM → bare metal
     if sys_vendor.is_some() {
         return "bare-metal".to_string();
     }
@@ -69,16 +100,25 @@ pub fn parse_virtualization(sys_vendor: Option<&str>, cgroup_content: Option<&st
 }
 
 /// Read virtualization type from sysfs/procfs.
-pub fn read_virtualization_from(sys_vendor_path: &str, cgroup_path: &str) -> String {
+pub fn read_virtualization_from(
+    sys_vendor_path: &str,
+    product_name_path: &str,
+    cgroup_path: &str,
+) -> String {
     let vendor = std::fs::read_to_string(sys_vendor_path).ok();
+    let product = std::fs::read_to_string(product_name_path).ok();
     let cgroup = std::fs::read_to_string(cgroup_path).ok();
-    parse_virtualization(vendor.as_deref(), cgroup.as_deref())
+    parse_virtualization(vendor.as_deref(), product.as_deref(), cgroup.as_deref())
 }
 
 /// Read virtualization type from real system paths.
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_virtualization() -> String {
-    read_virtualization_from("/sys/class/dmi/id/sys_vendor", "/proc/1/cgroup")
+    read_virtualization_from(
+        "/sys/class/dmi/id/sys_vendor",
+        "/sys/class/dmi/id/product_name",
+        "/proc/1/cgroup",
+    )
 }
 
 // ── Network interfaces ───────────────────────────────────────────────
@@ -427,67 +467,73 @@ mod tests {
 
     #[test]
     fn detect_virt_qemu() {
-        assert_eq!(parse_virtualization(Some("QEMU\n"), None), "kvm");
+        assert_eq!(parse_virtualization(Some("QEMU\n"), None, None), "kvm");
     }
 
     #[test]
     fn detect_virt_aws() {
-        assert_eq!(parse_virtualization(Some("Amazon EC2"), None), "aws");
+        assert_eq!(parse_virtualization(Some("Amazon EC2"), None, None), "aws");
     }
 
     #[test]
     fn detect_virt_hyperv() {
         assert_eq!(
-            parse_virtualization(Some("Microsoft Corporation"), None),
+            parse_virtualization(Some("Microsoft Corporation"), None, None),
             "hyperv"
         );
     }
 
     #[test]
     fn detect_virt_gce() {
-        assert_eq!(parse_virtualization(Some("Google"), None), "gce");
+        assert_eq!(parse_virtualization(Some("Google"), None, None), "gce");
     }
 
     #[test]
     fn detect_virt_digitalocean() {
         assert_eq!(
-            parse_virtualization(Some("DigitalOcean"), None),
+            parse_virtualization(Some("DigitalOcean"), None, None),
             "digitalocean"
         );
     }
 
     #[test]
     fn detect_virt_hetzner() {
-        assert_eq!(parse_virtualization(Some("Hetzner"), None), "hetzner");
+        assert_eq!(parse_virtualization(Some("Hetzner"), None, None), "hetzner");
     }
 
     #[test]
     fn detect_virt_vmware() {
-        assert_eq!(parse_virtualization(Some("VMware, Inc."), None), "vmware");
+        assert_eq!(
+            parse_virtualization(Some("VMware, Inc."), None, None),
+            "vmware"
+        );
     }
 
     #[test]
     fn detect_virt_xen() {
-        assert_eq!(parse_virtualization(Some("Xen"), None), "xen");
+        assert_eq!(parse_virtualization(Some("Xen"), None, None), "xen");
     }
 
     #[test]
     fn detect_virt_virtualbox() {
         assert_eq!(
-            parse_virtualization(Some("innotek GmbH"), None),
+            parse_virtualization(Some("innotek GmbH"), None, None),
             "virtualbox"
         );
     }
 
     #[test]
     fn detect_virt_bare_metal() {
-        assert_eq!(parse_virtualization(Some("Dell Inc."), None), "bare-metal");
+        assert_eq!(
+            parse_virtualization(Some("Dell Inc."), None, None),
+            "bare-metal"
+        );
     }
 
     #[test]
     fn detect_virt_container_docker() {
         assert_eq!(
-            parse_virtualization(None, Some("12:blkio:/docker/abc123\n")),
+            parse_virtualization(None, None, Some("12:blkio:/docker/abc123\n")),
             "container"
         );
     }
@@ -495,19 +541,85 @@ mod tests {
     #[test]
     fn detect_virt_container_lxc() {
         assert_eq!(
-            parse_virtualization(None, Some("12:blkio:/lxc/mycontainer\n")),
+            parse_virtualization(None, None, Some("12:blkio:/lxc/mycontainer\n")),
             "container"
         );
     }
 
     #[test]
     fn detect_virt_unknown() {
-        assert_eq!(parse_virtualization(None, None), "");
+        assert_eq!(parse_virtualization(None, None, None), "");
     }
 
     #[test]
     fn detect_virt_no_container_no_dmi() {
-        assert_eq!(parse_virtualization(None, Some("0::/init.scope\n")), "");
+        assert_eq!(
+            parse_virtualization(None, None, Some("0::/init.scope\n")),
+            ""
+        );
+    }
+
+    #[test]
+    fn detect_virt_product_kvm() {
+        // Red Hat vendor + KVM product → should detect as kvm
+        assert_eq!(
+            parse_virtualization(Some("Red Hat"), Some("KVM"), None),
+            "kvm"
+        );
+    }
+
+    #[test]
+    fn detect_virt_product_kvm_virtual_machine() {
+        assert_eq!(
+            parse_virtualization(Some("Red Hat"), Some("KVM Virtual Machine"), None),
+            "kvm"
+        );
+    }
+
+    #[test]
+    fn detect_virt_product_standard_pc() {
+        assert_eq!(
+            parse_virtualization(
+                Some("Red Hat"),
+                Some("Standard PC (Q35 + ICH9, 2009)"),
+                None
+            ),
+            "kvm"
+        );
+    }
+
+    #[test]
+    fn detect_virt_product_vmware() {
+        assert_eq!(
+            parse_virtualization(Some("Red Hat"), Some("VMware Virtual Platform"), None),
+            "vmware"
+        );
+    }
+
+    #[test]
+    fn detect_virt_product_virtualbox() {
+        assert_eq!(
+            parse_virtualization(Some("Red Hat"), Some("VirtualBox"), None),
+            "virtualbox"
+        );
+    }
+
+    #[test]
+    fn detect_virt_vendor_takes_priority_over_product() {
+        // When vendor matches, product_name is not checked
+        assert_eq!(
+            parse_virtualization(Some("QEMU"), Some("VirtualBox"), None),
+            "kvm"
+        );
+    }
+
+    #[test]
+    fn detect_virt_unknown_vendor_unknown_product_bare_metal() {
+        // Unknown vendor + unknown product → bare-metal (vendor was readable)
+        assert_eq!(
+            parse_virtualization(Some("Dell Inc."), Some("PowerEdge R640"), None),
+            "bare-metal"
+        );
     }
 
     #[test]
@@ -515,11 +627,34 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let vendor_path = dir.path().join("sys_vendor");
         std::fs::write(&vendor_path, "QEMU\n").unwrap();
+        let product_path = dir.path().join("product_name");
+        std::fs::write(&product_path, "Standard PC\n").unwrap();
         let cgroup_path = dir.path().join("cgroup");
         std::fs::write(&cgroup_path, "").unwrap();
 
-        let result =
-            read_virtualization_from(vendor_path.to_str().unwrap(), cgroup_path.to_str().unwrap());
+        let result = read_virtualization_from(
+            vendor_path.to_str().unwrap(),
+            product_path.to_str().unwrap(),
+            cgroup_path.to_str().unwrap(),
+        );
+        assert_eq!(result, "kvm");
+    }
+
+    #[test]
+    fn read_virtualization_product_fallback_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let vendor_path = dir.path().join("sys_vendor");
+        std::fs::write(&vendor_path, "Red Hat\n").unwrap();
+        let product_path = dir.path().join("product_name");
+        std::fs::write(&product_path, "KVM\n").unwrap();
+        let cgroup_path = dir.path().join("cgroup");
+        std::fs::write(&cgroup_path, "").unwrap();
+
+        let result = read_virtualization_from(
+            vendor_path.to_str().unwrap(),
+            product_path.to_str().unwrap(),
+            cgroup_path.to_str().unwrap(),
+        );
         assert_eq!(result, "kvm");
     }
 
