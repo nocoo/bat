@@ -15,9 +15,11 @@ use std::time::Duration;
 use collectors::cpu::CpuJiffies;
 use collectors::network::NetCounters;
 use sender::Sender;
+use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
 
 const PROBE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const ECHO_URL: &str = "https://echo.nocoo.cloud/api/ip";
 
 #[tokio::main(flavor = "current_thread")]
 #[allow(clippy::too_many_lines)]
@@ -48,6 +50,18 @@ async fn main() {
 
     let cpu_count = collectors::cpu::read_cpu_count().unwrap_or(1);
 
+    // Public IP via echo service — shared state updated every 1h
+    let public_ip: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    // Fetch initial public IP in background (non-blocking)
+    {
+        let pip = Arc::clone(&public_ip);
+        tokio::spawn(async move {
+            if let Some(ip) = fetch_public_ip().await {
+                *pip.lock().await = Some(ip);
+            }
+        });
+    }
+
     tracing::info!(
         %host_id,
         cpu_count,
@@ -63,7 +77,7 @@ async fn main() {
     let mut sigterm =
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).unwrap();
 
-    let identity_payload = build_identity_payload(&host_id);
+    let identity_payload = build_identity_payload(&host_id, &public_ip).await;
     tokio::select! {
         result = sender.post("/api/identity", &identity_payload) => {
             if let Err(e) = result {
@@ -99,6 +113,10 @@ async fn main() {
     // Tier 2: collect on startup + every 6 hours (same cadence as identity)
     let mut tier2_timer = tokio::time::Instant::now();
     let tier2_interval = Duration::from_secs(6 * 3600); // 6 hours
+
+    // Public IP echo fetch: every 1 hour
+    let mut echo_timer = tokio::time::Instant::now();
+    let echo_interval = Duration::from_secs(3600); // 1 hour
 
     // Send initial tier2 in background (does not block T1 seed)
     spawn_tier2_task(sender.clone(), Arc::clone(&host_id));
@@ -137,7 +155,7 @@ async fn main() {
 
                 // Periodic identity re-send
                 if identity_timer.elapsed() >= identity_interval {
-                    let id_payload = build_identity_payload(&host_id);
+                    let id_payload = build_identity_payload(&host_id, &public_ip).await;
                     tokio::select! {
                         result = sender.post("/api/identity", &id_payload) => {
                             if let Err(e) = result {
@@ -160,6 +178,17 @@ async fn main() {
                 if tier2_timer.elapsed() >= tier2_interval {
                     spawn_tier2_task(sender.clone(), Arc::clone(&host_id));
                     tier2_timer = tokio::time::Instant::now();
+                }
+
+                // Periodic public IP refresh via echo service (1h)
+                if echo_timer.elapsed() >= echo_interval {
+                    let pip = Arc::clone(&public_ip);
+                    tokio::spawn(async move {
+                        if let Some(ip) = fetch_public_ip().await {
+                            *pip.lock().await = Some(ip);
+                        }
+                    });
+                    echo_timer = tokio::time::Instant::now();
                 }
             }
             _ = &mut ctrl_c => {
@@ -281,7 +310,10 @@ fn collect_metrics(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
+async fn build_identity_payload(
+    host_id: &str,
+    public_ip: &Arc<Mutex<Option<String>>>,
+) -> payload::IdentityPayload {
     let hostname = collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".into());
     let os = collectors::identity::read_os_release().unwrap_or_else(|_| "unknown".into());
     let kernel = collectors::identity::read_kernel_version().unwrap_or_else(|_| "unknown".into());
@@ -326,6 +358,8 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
 
     let boot_mode = Some(collectors::inventory::detect_boot_mode());
 
+    let pip = public_ip.lock().await.clone();
+
     orchestrate::build_identity_payload(
         PROBE_VERSION,
         host_id,
@@ -344,6 +378,7 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
         net_interfaces,
         disks,
         boot_mode,
+        pip,
     )
 }
 
@@ -391,6 +426,34 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         dns_resolvers,
         dns_search,
     )
+}
+
+/// Fetch public IP from the echo service.
+/// Returns `None` on any error (timeout, parse failure, network issue).
+#[cfg_attr(coverage_nightly, coverage(off))]
+async fn fetch_public_ip() -> Option<String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok()?;
+
+    let resp = match client.get(ECHO_URL).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to fetch public IP from echo service");
+            return None;
+        }
+    };
+
+    let json: serde_json::Value = match resp.json().await {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to parse echo service response");
+            return None;
+        }
+    };
+
+    json["ip"].as_str().map(ToString::to_string)
 }
 
 #[cfg(test)]

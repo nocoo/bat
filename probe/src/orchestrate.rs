@@ -315,6 +315,7 @@ pub fn build_identity_payload(
     net_interfaces: Option<Vec<NetInterface>>,
     disks: Option<Vec<BlockDevice>>,
     boot_mode: Option<String>,
+    public_ip: Option<String>,
 ) -> IdentityPayload {
     IdentityPayload {
         probe_version: probe_version.to_string(),
@@ -334,6 +335,7 @@ pub fn build_identity_payload(
         net_interfaces,
         disks,
         boot_mode,
+        public_ip,
     }
 }
 
@@ -522,6 +524,7 @@ mod tests {
             Some(vec![]),
             Some(vec![]),
             Some("uefi".to_string()),
+            Some("203.0.113.1".to_string()),
         );
         assert_eq!(p.probe_version, "0.2.0");
         assert_eq!(p.host_id, "host-1");
@@ -540,12 +543,13 @@ mod tests {
         assert!(p.net_interfaces.unwrap().is_empty());
         assert!(p.disks.unwrap().is_empty());
         assert_eq!(p.boot_mode, Some("uefi".to_string()));
+        assert_eq!(p.public_ip, Some("203.0.113.1".to_string()));
     }
 
     #[test]
     fn build_identity_payload_empty_fields() {
         let p = build_identity_payload(
-            "", "", "", "", "", "", "", 0, 0, None, None, None, None, None, None, None, None,
+            "", "", "", "", "", "", "", 0, 0, None, None, None, None, None, None, None, None, None,
         );
         assert_eq!(p.host_id, "");
         assert_eq!(p.hostname, "");
@@ -559,6 +563,7 @@ mod tests {
         assert_eq!(p.net_interfaces, None);
         assert_eq!(p.disks, None);
         assert_eq!(p.boot_mode, None);
+        assert_eq!(p.public_ip, None);
     }
 
     #[test]

@@ -156,6 +156,8 @@ pub struct IdentityPayload {
     pub disks: Option<Vec<BlockDevice>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_ip: Option<String>,
 }
 
 // --- Tier 2 payload types ---
@@ -423,6 +425,7 @@ mod tests {
             net_interfaces: Some(vec![]),
             disks: Some(vec![]),
             boot_mode: Some("uefi".into()),
+            public_ip: Some("203.0.113.1".into()),
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -444,6 +447,7 @@ mod tests {
         assert!(json["net_interfaces"].as_array().unwrap().is_empty());
         assert!(json["disks"].as_array().unwrap().is_empty());
         assert_eq!(json["boot_mode"], "uefi");
+        assert_eq!(json["public_ip"], "203.0.113.1");
     }
 
     #[test]
@@ -466,6 +470,7 @@ mod tests {
             net_interfaces: None,
             disks: None,
             boot_mode: None,
+            public_ip: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -478,6 +483,7 @@ mod tests {
         assert!(!obj.contains_key("net_interfaces"));
         assert!(!obj.contains_key("disks"));
         assert!(!obj.contains_key("boot_mode"));
+        assert!(!obj.contains_key("public_ip"));
     }
 
     #[test]
@@ -917,6 +923,7 @@ mod tests {
             net_interfaces: None,
             disks: None,
             boot_mode: None,
+            public_ip: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
