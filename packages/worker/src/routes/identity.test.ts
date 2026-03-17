@@ -161,4 +161,95 @@ describe("POST /api/identity", () => {
 		expect(row?.identity_updated_at).toBeGreaterThanOrEqual(beforeTs);
 		expect(row?.identity_updated_at).toBeLessThanOrEqual(afterTs);
 	});
+
+	test("inventory fields merged when present in payload", async () => {
+		const payload = {
+			...makePayload(),
+			cpu_logical: 8,
+			cpu_physical: 4,
+			mem_total_bytes: 8589934592,
+			swap_total_bytes: 2147483648,
+			virtualization: "kvm",
+			net_interfaces: [
+				{
+					iface: "eth0",
+					mac: "aa:bb:cc:dd:ee:ff",
+					ipv4: ["10.0.1.5"],
+					ipv6: [],
+					speed_mbps: 1000,
+				},
+			],
+			disks: [{ device: "sda", size_bytes: 500107862016, rotational: false }],
+			boot_mode: "uefi",
+		};
+
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare(
+				"SELECT cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode FROM hosts WHERE host_id = ?",
+			)
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.cpu_logical).toBe(8);
+		expect(row?.cpu_physical).toBe(4);
+		expect(row?.mem_total_bytes).toBe(8589934592);
+		expect(row?.swap_total_bytes).toBe(2147483648);
+		expect(row?.virtualization).toBe("kvm");
+		expect(JSON.parse(row?.net_interfaces as string)).toEqual(payload.net_interfaces);
+		expect(JSON.parse(row?.disks as string)).toEqual(payload.disks);
+		expect(row?.boot_mode).toBe("uefi");
+	});
+
+	test("inventory fields not touched when absent from payload", async () => {
+		// First send with inventory
+		await post(app, {
+			...makePayload(),
+			cpu_logical: 8,
+			virtualization: "kvm",
+		});
+
+		// Second send without inventory fields
+		await post(app, makePayload());
+
+		const row = await db
+			.prepare("SELECT cpu_logical, virtualization FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		// Should retain values from first send
+		expect(row?.cpu_logical).toBe(8);
+		expect(row?.virtualization).toBe("kvm");
+	});
+
+	test("inventory fields update partially (only present keys)", async () => {
+		// First: full inventory
+		await post(app, {
+			...makePayload(),
+			cpu_logical: 8,
+			cpu_physical: 4,
+			virtualization: "kvm",
+			boot_mode: "uefi",
+		});
+
+		// Second: only update virtualization
+		await post(app, {
+			...makePayload(),
+			virtualization: "bare-metal",
+		});
+
+		const row = await db
+			.prepare(
+				"SELECT cpu_logical, cpu_physical, virtualization, boot_mode FROM hosts WHERE host_id = ?",
+			)
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.cpu_logical).toBe(8); // retained
+		expect(row?.cpu_physical).toBe(4); // retained
+		expect(row?.virtualization).toBe("bare-metal"); // updated
+		expect(row?.boot_mode).toBe("uefi"); // retained
+	});
 });

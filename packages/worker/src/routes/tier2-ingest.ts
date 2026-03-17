@@ -70,6 +70,31 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 	if (inserted) {
 		await updateHostLastSeen(db, body.host_id, workerNow);
 		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
+
+		// Merge slow-drift inventory fields into hosts table (2-state wire semantics)
+		const raw = body as unknown as Record<string, unknown>;
+		const clauses: string[] = [];
+		const values: unknown[] = [];
+
+		if ("timezone" in raw) {
+			clauses.push("timezone = ?");
+			values.push(raw.timezone);
+		}
+		if ("dns_resolvers" in raw) {
+			clauses.push("dns_resolvers = ?");
+			values.push(JSON.stringify(raw.dns_resolvers));
+		}
+		if ("dns_search" in raw) {
+			clauses.push("dns_search = ?");
+			values.push(JSON.stringify(raw.dns_search));
+		}
+
+		if (clauses.length > 0) {
+			await db
+				.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
+				.bind(...values, body.host_id)
+				.run();
+		}
 	}
 
 	return c.body(null, 204);

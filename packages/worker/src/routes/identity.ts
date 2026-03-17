@@ -23,6 +23,53 @@ function validateIdentityPayload(body: unknown): body is IdentityPayload {
 	);
 }
 
+/**
+ * Build a conditional UPDATE that only sets inventory fields actually present
+ * in the payload (2-state wire semantics: present = update, absent = no-op).
+ */
+function buildInventoryUpdate(body: Record<string, unknown>): {
+	clauses: string[];
+	values: unknown[];
+} {
+	const clauses: string[] = [];
+	const values: unknown[] = [];
+
+	if ("cpu_logical" in body) {
+		clauses.push("cpu_logical = ?");
+		values.push(body.cpu_logical);
+	}
+	if ("cpu_physical" in body) {
+		clauses.push("cpu_physical = ?");
+		values.push(body.cpu_physical);
+	}
+	if ("mem_total_bytes" in body) {
+		clauses.push("mem_total_bytes = ?");
+		values.push(body.mem_total_bytes);
+	}
+	if ("swap_total_bytes" in body) {
+		clauses.push("swap_total_bytes = ?");
+		values.push(body.swap_total_bytes);
+	}
+	if ("virtualization" in body) {
+		clauses.push("virtualization = ?");
+		values.push(body.virtualization);
+	}
+	if ("net_interfaces" in body) {
+		clauses.push("net_interfaces = ?");
+		values.push(JSON.stringify(body.net_interfaces));
+	}
+	if ("disks" in body) {
+		clauses.push("disks = ?");
+		values.push(JSON.stringify(body.disks));
+	}
+	if ("boot_mode" in body) {
+		clauses.push("boot_mode = ?");
+		values.push(body.boot_mode);
+	}
+
+	return { clauses, values };
+}
+
 export async function identityRoute(c: Context<AppEnv>) {
 	let body: unknown;
 	try {
@@ -76,6 +123,16 @@ ON CONFLICT(host_id) DO UPDATE SET
 			now,
 		)
 		.run();
+
+	// Conditionally merge inventory fields (2-state wire semantics)
+	const raw = body as unknown as Record<string, unknown>;
+	const { clauses, values } = buildInventoryUpdate(raw);
+	if (clauses.length > 0) {
+		await db
+			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
+			.bind(...values, body.host_id)
+			.run();
+	}
 
 	return c.body(null, 204);
 }
