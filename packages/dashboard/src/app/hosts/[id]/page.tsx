@@ -10,12 +10,12 @@ import {
 	PsiChart,
 	TcpChart,
 } from "@/components/charts";
-import { formatUptime } from "@/components/host-card";
+import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
+import { useAlerts, useHostDetail, useHostMetrics, useHosts } from "@/lib/hooks";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
@@ -68,6 +68,64 @@ export function formatBootTime(unixSeconds: number | null | undefined): string |
 	return new Date(unixSeconds * 1000).toLocaleString();
 }
 
+/** Format CPU label — "AMD EPYC 7763 (4 cores, 8 threads)" */
+function formatCpuLabel(
+	model: string | null | undefined,
+	physical: number | null | undefined,
+	logical: number | null | undefined,
+): string | null {
+	const topology = formatCpuTopology(physical ?? null, logical ?? null);
+	if (!model && !topology) return null;
+	if (!topology) return model ?? null;
+	const suffix =
+		physical != null && logical != null && physical !== logical
+			? `(${physical} cores, ${logical} threads)`
+			: `(${physical ?? logical} cores)`;
+	return model ? `${model} ${suffix}` : suffix;
+}
+
+/** Capitalize virtualization label — "kvm" → "KVM", "bare-metal" → "Bare-Metal" */
+function capitalizeVirt(v: string): string {
+	const map: Record<string, string> = {
+		kvm: "KVM",
+		vmware: "VMware",
+		hyperv: "Hyper-V",
+		aws: "AWS",
+		gce: "GCE",
+		virtualbox: "VirtualBox",
+		xen: "Xen",
+		"bare-metal": "Bare Metal",
+		container: "Container",
+		digitalocean: "DigitalOcean",
+		hetzner: "Hetzner",
+	};
+	return map[v] ?? v;
+}
+
+/** Format net interfaces for display — "eth0: 10.0.1.5" */
+function formatNetInterfaces(
+	interfaces: { iface: string; ipv4: string[]; ipv6: string[] }[],
+): string {
+	return interfaces
+		.map((ni) => {
+			const ips = [...ni.ipv4, ...ni.ipv6.filter((ip) => !ip.startsWith("fe80"))];
+			return ips.length > 0 ? `${ni.iface}: ${ips.join(", ")}` : null;
+		})
+		.filter(Boolean)
+		.join(" | ");
+}
+
+/** Format disks for display — "sda: 500 GB SSD" */
+function formatDisks(disks: { device: string; size_bytes: number; rotational: boolean }[]): string {
+	return disks
+		.map((d) => {
+			const gb = Math.round(d.size_bytes / (1024 * 1024 * 1024));
+			const type = d.rotational ? "HDD" : "SSD";
+			return `${d.device}: ${gb} GB ${type}`;
+		})
+		.join(", ");
+}
+
 export default function HostDetailPage() {
 	const params = useParams<{ id: string }>();
 	const hid = params.id;
@@ -79,6 +137,7 @@ export default function HostDetailPage() {
 	const from = now - rangeSeconds;
 
 	const { data: hosts } = useHosts();
+	const { data: detail } = useHostDetail(hid);
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: allAlerts } = useAlerts();
 
@@ -171,9 +230,45 @@ export default function HostDetailPage() {
 											<InfoRow label="OS" value={host.os} />
 											<InfoRow label="Kernel" value={host.kernel} />
 											<InfoRow label="Architecture" value={host.arch} />
-											<InfoRow label="CPU" value={host.cpu_model} />
+											<InfoRow
+												label="CPU"
+												value={formatCpuLabel(
+													host.cpu_model,
+													detail?.cpu_physical,
+													detail?.cpu_logical,
+												)}
+											/>
+											<InfoRow
+												label="Memory"
+												value={formatMemory(detail?.mem_total_bytes ?? null)}
+											/>
+											{detail?.swap_total_bytes != null && (
+												<InfoRow label="Swap" value={formatMemory(detail.swap_total_bytes)} />
+											)}
+											{detail?.virtualization && (
+												<InfoRow
+													label="Virtualization"
+													value={capitalizeVirt(detail.virtualization)}
+												/>
+											)}
+											{detail?.boot_mode && (
+												<InfoRow label="Boot Mode" value={detail.boot_mode.toUpperCase()} />
+											)}
 											<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
 											<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
+											{detail?.net_interfaces && detail.net_interfaces.length > 0 && (
+												<InfoRow
+													label="IP Addresses"
+													value={formatNetInterfaces(detail.net_interfaces)}
+												/>
+											)}
+											{detail?.dns_resolvers && detail.dns_resolvers.length > 0 && (
+												<InfoRow label="DNS" value={detail.dns_resolvers.join(", ")} />
+											)}
+											{detail?.timezone && <InfoRow label="Timezone" value={detail.timezone} />}
+											{detail?.disks && detail.disks.length > 0 && (
+												<InfoRow label="Disks" value={formatDisks(detail.disks)} />
+											)}
 										</div>
 									</CardContent>
 								</Card>
