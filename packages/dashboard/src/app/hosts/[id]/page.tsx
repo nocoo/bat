@@ -154,7 +154,7 @@ export default function HostDetailPage() {
 										</CardTitle>
 									</CardHeader>
 									<CardContent>
-										<AlertTable alerts={hostAlerts} />
+										<AlertTable alerts={hostAlerts} showHost={false} />
 									</CardContent>
 								</Card>
 							)}

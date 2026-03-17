@@ -130,10 +130,10 @@ describe("Integration — formatters", () => {
 		expect(result2).toBe("2m ago");
 	});
 
-	test("formatTriggeredAt converts unix seconds to locale string", () => {
-		const result = formatTriggeredAt(1700000000);
-		expect(typeof result).toBe("string");
-		expect(result.length).toBeGreaterThan(0);
+	test("formatTriggeredAt returns relative time string", () => {
+		const now = Math.floor(Date.now() / 1000);
+		expect(formatTriggeredAt(now)).toBe("just now");
+		expect(formatTriggeredAt(now - 3600)).toBe("1h ago");
 	});
 
 	test("formatBootTime converts unix seconds to locale string", () => {

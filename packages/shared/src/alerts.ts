@@ -7,6 +7,7 @@ export type AlertSeverity = "info" | "warning" | "critical";
 
 export interface AlertRule {
 	id: string;
+	label: string;
 	severity: AlertSeverity;
 	duration_seconds: number; // 0 = instant, 300 = 5 min
 }
@@ -41,31 +42,37 @@ export interface HealthResponse {
 export const TIER1_ALERT_RULES: readonly AlertRule[] = [
 	{
 		id: "mem_high",
+		label: "High Memory Usage",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "no_swap",
+		label: "No Swap Available",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "disk_full",
+		label: "Disk Full",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "iowait_high",
+		label: "High IO Wait",
 		severity: "warning",
 		duration_seconds: ALERT_THRESHOLDS.IOWAIT_DURATION_SECONDS,
 	},
 	{
 		id: "steal_high",
+		label: "CPU Steal",
 		severity: "warning",
 		duration_seconds: ALERT_THRESHOLDS.STEAL_DURATION_SECONDS,
 	},
 	{
 		id: "host_offline",
+		label: "Host Offline",
 		severity: "critical",
 		duration_seconds: 0, // evaluated at query time
 	},
@@ -78,46 +85,55 @@ export const TIER1_ALERT_RULES: readonly AlertRule[] = [
 export const TIER2_ALERT_RULES: readonly AlertRule[] = [
 	{
 		id: "uptime_anomaly",
+		label: "Recent Reboot",
 		severity: "info",
 		duration_seconds: 0,
 	},
 	{
 		id: "ssh_password_auth",
+		label: "SSH Password Auth",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "ssh_root_login",
+		label: "SSH Root Login",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "no_firewall",
+		label: "No Firewall",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "public_port",
+		label: "Unexpected Public Port",
 		severity: "warning",
 		duration_seconds: 0,
 	},
 	{
 		id: "security_updates",
+		label: "Security Updates Pending",
 		severity: "warning",
 		duration_seconds: 604800, // 7 days
 	},
 	{
 		id: "container_restart",
+		label: "Container Restarting",
 		severity: "critical",
 		duration_seconds: 0,
 	},
 	{
 		id: "systemd_failed",
+		label: "Systemd Unit Failed",
 		severity: "warning",
 		duration_seconds: 0,
 	},
 	{
 		id: "reboot_required",
+		label: "Reboot Required",
 		severity: "info",
 		duration_seconds: 604800, // 7 days
 	},
@@ -130,31 +146,37 @@ export const TIER2_ALERT_RULES: readonly AlertRule[] = [
 export const TIER3_ALERT_RULES: readonly AlertRule[] = [
 	{
 		id: "cpu_pressure",
+		label: "CPU Pressure",
 		severity: "warning",
 		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
 	},
 	{
 		id: "mem_pressure",
+		label: "Memory Pressure",
 		severity: "warning",
 		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
 	},
 	{
 		id: "io_pressure",
+		label: "I/O Pressure",
 		severity: "warning",
 		duration_seconds: TIER3_THRESHOLDS.PSI_DURATION_SECONDS,
 	},
 	{
 		id: "disk_io_saturated",
+		label: "Disk I/O Saturated",
 		severity: "warning",
 		duration_seconds: TIER3_THRESHOLDS.DISK_IO_DURATION_SECONDS,
 	},
 	{
 		id: "tcp_conn_leak",
+		label: "TCP Connection Leak",
 		severity: "warning",
 		duration_seconds: TIER3_THRESHOLDS.TCP_DURATION_SECONDS,
 	},
 	{
 		id: "oom_kill",
+		label: "OOM Kill",
 		severity: "critical",
 		duration_seconds: 0, // instant
 	},
@@ -170,4 +192,9 @@ export const ALL_ALERT_RULES: readonly AlertRule[] = [
 /** Lookup a rule by ID across all tiers */
 export function getAlertRule(ruleId: string): AlertRule | undefined {
 	return ALL_ALERT_RULES.find((r) => r.id === ruleId);
+}
+
+/** Get human-readable label for a rule ID, falls back to raw rule_id */
+export function getAlertRuleLabel(ruleId: string): string {
+	return getAlertRule(ruleId)?.label ?? ruleId;
 }
