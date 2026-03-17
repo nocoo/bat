@@ -8,7 +8,7 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Menu } from "lucide-react";
+import { Github, Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { Breadcrumbs } from "./breadcrumbs";
@@ -96,6 +96,15 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 						<Breadcrumbs items={[{ label: "Home", href: "/" }, ...breadcrumbs]} />
 					</div>
 					<div className="flex items-center gap-1">
+						<a
+							href="https://github.com/nocoo/bat"
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-label="GitHub repository"
+							className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+						>
+							<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
+						</a>
 						<ThemeToggle />
 					</div>
 				</header>
