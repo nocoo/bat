@@ -1,6 +1,52 @@
 # Changelog
 
-## v0.3.0 (2026-03-17)
+## v0.5.0 (2026-03-17)
+
+### Features
+
+- **Host inventory** — Comprehensive identity collection: CPU topology (logical/physical), memory/swap totals, virtualization detection (KVM/VMware/AWS/Hetzner/bare-metal), network interfaces (MAC, IPv6, link speed), block devices (size, rotational), boot mode (UEFI/BIOS), timezone, DNS resolvers/search domains
+- **Public IP** — Probe fetches public IP from `echo.nocoo.cloud/api/ip` every 1 hour, enabling "find host by IP" use case
+- **Host detail endpoint** — New `GET /api/hosts/:id` returning full inventory (JSON arrays for interfaces/disks/DNS), separate from lightweight overview polling
+- **Host card subtitle** — Show "Ubuntu 22.04 · x86_64 · 4C/8T · 8 GB" below hostname in list view
+- **System Info card** — Enhanced detail page with CPU topology, memory, swap, virtualization, boot mode, public IP, IP addresses, DNS, timezone, disks
+- **2-state wire semantics** — Key present = update value, key absent = retain old value; backward compatible with older probes
+
+### Database
+
+- Migration `0005_host_inventory.sql` — 11 new columns on hosts table (cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search)
+- Migration `0006_public_ip.sql` — Add public_ip column to hosts table
+
+### Tests
+
+- 4 new E2E tests: identity inventory merge, host detail endpoint, tier2 DNS merge, 404 handling
+- Unit tests for all new formatters (shortenOs, formatMemory, formatCpuTopology, buildSubtitle)
+- Identity merge tests: public_ip present/retained, inventory partial update
+- Host detail tests: full inventory, null fields, public_ip, metrics + alert status
+
+## v0.4.0 (2026-03-17)
+
+### Features
+
+- **Tier 3 signals** — PSI pressure (CPU/memory/IO), disk I/O (per-device IOPS/throughput/utilization), TCP state (established/time_wait/orphan), OOM kill counter, CPU extensions (ctxt switches, forks, procs running/blocked), file descriptor usage
+- **T3 alert rules** — 6 new rules: PSI CPU/memory/IO thresholds, disk I/O utilization, OOM kill, TCP time_wait
+- **T3 dashboard charts** — PSI pressure, disk I/O, TCP connection state charts
+- **Actionable alerts** — Alert table with severity labels, messages, and relative timestamps
+
+### Dashboard
+
+- 6:4 two-column layout for detail page (time-series left, overview right)
+- Improved host card density, typography, and hover states
+- Date-aware time format for chart axes on 7d+ ranges
+- Sidebar nav group structure with GitHub icon
+- Collapsible animations for advanced sections
+
+### Fixes
+
+- Metrics auto-refresh stuck on stale time window
+- Prevent chart full redraw on auto-refresh
+- Proper `disk_io_json` hourly aggregation
+- T3 hourly aggregation pipeline
+- Tier 2/3 migration application in E2E test setup
 
 ### Features
 
