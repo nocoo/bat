@@ -19,7 +19,7 @@ import { useAlerts, useHostMetrics, useHosts } from "@/lib/hooks";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 const TIME_RANGES = [
 	{ label: "1h", seconds: 3600 },
@@ -73,9 +73,9 @@ export default function HostDetailPage() {
 	const hid = params.id;
 
 	const [rangeSeconds, setRangeSeconds] = useState(3600);
-	// Quantize to minute boundary so SWR key stays stable within the same minute
-	// biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-quantize when range changes
-	const now = useMemo(() => Math.floor(Date.now() / 1000 / 60) * 60, [rangeSeconds]);
+	// Quantize to minute boundary so SWR key stays stable within the same minute,
+	// but recompute on every render so auto-refresh picks up new samples each minute.
+	const now = Math.floor(Date.now() / 1000 / 60) * 60;
 	const from = now - rangeSeconds;
 
 	const { data: hosts } = useHosts();
