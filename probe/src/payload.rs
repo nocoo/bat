@@ -126,6 +126,8 @@ pub struct FdMetrics {
     pub max: u64,
 }
 
+use crate::collectors::inventory::{BlockDevice, NetInterface};
+
 #[derive(Debug, Serialize)]
 pub struct IdentityPayload {
     pub probe_version: String,
@@ -146,6 +148,14 @@ pub struct IdentityPayload {
     pub mem_total_bytes: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub swap_total_bytes: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub virtualization: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub net_interfaces: Option<Vec<NetInterface>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub disks: Option<Vec<BlockDevice>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub boot_mode: Option<String>,
 }
 
 // --- Tier 2 payload types ---
@@ -402,6 +412,10 @@ mod tests {
             cpu_physical: Some(4),
             mem_total_bytes: Some(8_388_608_000),
             swap_total_bytes: Some(2_147_483_648),
+            virtualization: Some("kvm".into()),
+            net_interfaces: Some(vec![]),
+            disks: Some(vec![]),
+            boot_mode: Some("uefi".into()),
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -419,6 +433,10 @@ mod tests {
         assert_eq!(json["cpu_physical"], 4);
         assert_eq!(json["mem_total_bytes"], 8_388_608_000_u64);
         assert_eq!(json["swap_total_bytes"], 2_147_483_648_u64);
+        assert_eq!(json["virtualization"], "kvm");
+        assert!(json["net_interfaces"].as_array().unwrap().is_empty());
+        assert!(json["disks"].as_array().unwrap().is_empty());
+        assert_eq!(json["boot_mode"], "uefi");
     }
 
     #[test]
@@ -437,6 +455,10 @@ mod tests {
             cpu_physical: None,
             mem_total_bytes: None,
             swap_total_bytes: None,
+            virtualization: None,
+            net_interfaces: None,
+            disks: None,
+            boot_mode: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -445,6 +467,10 @@ mod tests {
         assert!(!obj.contains_key("cpu_physical"));
         assert!(!obj.contains_key("mem_total_bytes"));
         assert!(!obj.contains_key("swap_total_bytes"));
+        assert!(!obj.contains_key("virtualization"));
+        assert!(!obj.contains_key("net_interfaces"));
+        assert!(!obj.contains_key("disks"));
+        assert!(!obj.contains_key("boot_mode"));
     }
 
     #[test]
@@ -865,6 +891,10 @@ mod tests {
             cpu_physical: None,
             mem_total_bytes: None,
             swap_total_bytes: None,
+            virtualization: None,
+            net_interfaces: None,
+            disks: None,
+            boot_mode: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
