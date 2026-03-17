@@ -52,14 +52,9 @@ async fn main() {
 
     // Public IP via echo service — shared state updated every 1h
     let public_ip: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    // Fetch initial public IP in background (non-blocking)
-    {
-        let pip = Arc::clone(&public_ip);
-        tokio::spawn(async move {
-            if let Some(ip) = fetch_public_ip().await {
-                *pip.lock().await = Some(ip);
-            }
-        });
+    // Fetch initial public IP before first identity send (15s timeout to avoid blocking startup)
+    if let Ok(Some(ip)) = tokio::time::timeout(Duration::from_secs(15), fetch_public_ip()).await {
+        *public_ip.lock().await = Some(ip);
     }
 
     tracing::info!(
