@@ -103,8 +103,8 @@ export async function identityRoute(c: Context<AppEnv>) {
 
 	await db
 		.prepare(
-			`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, probe_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(host_id) DO UPDATE SET
   hostname = excluded.hostname,
   os = excluded.os,
@@ -113,7 +113,8 @@ ON CONFLICT(host_id) DO UPDATE SET
   cpu_model = excluded.cpu_model,
   boot_time = excluded.boot_time,
   last_seen = excluded.last_seen,
-  identity_updated_at = excluded.identity_updated_at`,
+  identity_updated_at = excluded.identity_updated_at,
+  probe_version = excluded.probe_version`,
 		)
 		.bind(
 			body.host_id,
@@ -125,6 +126,7 @@ ON CONFLICT(host_id) DO UPDATE SET
 			body.boot_time,
 			now,
 			now,
+			body.probe_version ?? null,
 		)
 		.run();
 

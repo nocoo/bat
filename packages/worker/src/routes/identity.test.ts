@@ -268,21 +268,42 @@ describe("POST /api/identity", () => {
 		expect(row?.public_ip).toBe("203.0.113.42");
 	});
 
-	test("public_ip retained when absent from subsequent payload", async () => {
-		// First send with public_ip
-		await post(app, {
+	test("probe_version stored in hosts table", async () => {
+		const res = await post(app, {
 			...makePayload(),
-			public_ip: "203.0.113.42",
+			probe_version: "0.5.1",
 		});
-
-		// Second send without public_ip
-		await post(app, makePayload());
+		expect(res.status).toBe(204);
 
 		const row = await db
-			.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+			.prepare("SELECT probe_version FROM hosts WHERE host_id = ?")
 			.bind("host-001")
 			.first<Record<string, unknown>>();
 
-		expect(row?.public_ip).toBe("203.0.113.42"); // retained
+		expect(row?.probe_version).toBe("0.5.1");
+	});
+
+	test("probe_version updated on subsequent identity send", async () => {
+		await post(app, { ...makePayload(), probe_version: "0.5.0" });
+		await post(app, { ...makePayload(), probe_version: "0.5.1" });
+
+		const row = await db
+			.prepare("SELECT probe_version FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.probe_version).toBe("0.5.1");
+	});
+
+	test("probe_version null when not sent (backward compat)", async () => {
+		const res = await post(app, makePayload());
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare("SELECT probe_version FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.probe_version).toBeNull();
 	});
 });

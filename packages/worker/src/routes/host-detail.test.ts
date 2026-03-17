@@ -40,6 +40,7 @@ async function insertHost(
 		dnsResolvers: string;
 		dnsSearch: string;
 		publicIp: string;
+		probeVersion: string;
 	}>,
 ) {
 	const now = Math.floor(Date.now() / 1000);
@@ -48,9 +49,9 @@ async function insertHost(
 			`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, is_active,
        cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
        virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search, public_ip)
+       timezone, dns_resolvers, dns_search, public_ip, probe_version)
 VALUES (?, ?, 'Ubuntu 24.04', '6.8.0', 'x86_64', 'AMD EPYC', ?, ?, 1,
-       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -69,6 +70,7 @@ VALUES (?, ?, 'Ubuntu 24.04', '6.8.0', 'x86_64', 'AMD EPYC', ?, ?, 1,
 			opts?.dnsResolvers ?? null,
 			opts?.dnsSearch ?? null,
 			opts?.publicIp ?? null,
+			opts?.probeVersion ?? null,
 		)
 		.run();
 }
@@ -164,6 +166,7 @@ describe("GET /api/hosts/:id", () => {
 		expect(body.net_interfaces).toBeNull();
 		expect(body.disks).toBeNull();
 		expect(body.public_ip).toBeNull();
+		expect(body.probe_version).toBeNull();
 	});
 
 	test("public_ip returned in detail response", async () => {
@@ -174,6 +177,16 @@ describe("GET /api/hosts/:id", () => {
 
 		const body = (await res.json()) as HostDetailItem;
 		expect(body.public_ip).toBe("203.0.113.42");
+	});
+
+	test("probe_version returned in detail response", async () => {
+		await insertHost(db, "host-ver", { probeVersion: "0.5.1" });
+
+		const res = await get(app, "host-ver");
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as HostDetailItem;
+		expect(body.probe_version).toBe("0.5.1");
 	});
 
 	test("includes latest metrics and status", async () => {
