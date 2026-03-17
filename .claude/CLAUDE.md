@@ -85,6 +85,32 @@ docker build --platform linux/arm64 -f probe/Dockerfile.build -o probe/out .
 
 Next.js standalone `server.js` calls `process.chdir(__dirname)`, so runtime `cwd` is `/app/packages/dashboard`, NOT `/app`. Any file assets (e.g. `probe-assets/install.sh`) must be placed relative to that path in the Dockerfile.
 
+## Deployment
+
+### Infrastructure
+
+- **Worker**: Cloudflare Workers (`bat-worker`), deploy with `npx wrangler deploy --env production`
+- **Database**: Cloudflare D1 (`bat-db`), migrations via `npx wrangler d1 migrations apply bat-db --remote --env production`
+- **Dashboard**: Railway (Docker)
+- **Probe binaries**: R2 bucket `zhe`, public URL prefix `https://s.zhe.to/apps/bat/`
+
+### Test hosts
+
+Probes are deployed on personal VPS fleet. SSH access uses `~/.ssh/id_rsa` key.
+
+| Host | User | Arch | Probe path | Config |
+|------|------|------|-----------|--------|
+| us2.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat-probe/config.toml` |
+
+Upgrade probe on a host:
+```bash
+ssh -i ~/.ssh/id_rsa nocoo@<host> "sudo systemctl stop bat-probe && sudo curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64 && sudo chmod +x /usr/local/bin/bat-probe && sudo systemctl start bat-probe"
+```
+
+### Cross-compile pitfall: Dockerfile.build output naming
+
+`probe/Dockerfile.build` hardcodes output filename as `bat-probe-linux-x86_64` regardless of `--platform`. When building both architectures sequentially to the same output dir, build aarch64 first, rename, then build x86_64. Or build to separate dirs.
+
 ## Retrospective
 
 - **Cargo cache bust in Docker**: When using a dummy `main.rs` to cache deps, Docker `COPY` preserves original file mtime. If the real source has an older mtime than the cached build artifact, `cargo build` skips recompilation and produces the dummy binary. Fix: `touch src/main.rs` before `cargo build`.
