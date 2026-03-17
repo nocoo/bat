@@ -16,7 +16,7 @@ Most of this information is available by reading a single file from procfs/sysfs
 
 1. **Cheap reads only** — single file read or single syscall, no subprocesses
 2. **Categorize by volatility** — static fields in identity (every 6h), slow-changing fields in tier 2 (every 6h), fast-changing fields stay in metrics (every 30s)
-3. **Backward compatible** — new fields are optional (`Option<T>` in Rust, nullable in D1, `?:` in TS) so old probes continue to work
+3. **Backward compatible** — new fields use 2-state wire semantics: present (field exists in JSON) = update, absent (key missing) = retain old value. In Rust: `Option<T>` + `#[serde(skip_serializing_if = "Option::is_none")]`. In D1: nullable columns. In TS: `field?: T`. The probe always sends a concrete value when it has one (including empty arrays `[]` or empty strings `""` to express "nothing found"); it omits the key entirely when collection fails or is unsupported
 4. **Two-tier API** — overview DTO carries only scalar summaries for list-page polling; heavy/structured inventory data (JSON arrays) is served via a separate detail endpoint
 
 ## Field Inventory
@@ -129,21 +129,22 @@ ALTER TABLE hosts ADD COLUMN dns_search       TEXT;  -- JSON array
 
 `net_interfaces`, `disks`, `dns_resolvers`, `dns_search` are stored as JSON text in SQLite (D1). This avoids junction tables and keeps the schema flat.
 
-### Tier 2 → hosts: Merge Semantics
+### Merge Semantics (Identity + Tier 2 → hosts table)
 
-The `timezone`, `dns_resolvers`, `dns_search` fields originate from `POST /api/tier2` but describe the host itself (not a point-in-time snapshot), so they are stored in the `hosts` table.
+All new fields use **2-state wire semantics** that match the existing `#[serde(skip_serializing_if)]` pattern already used throughout the codebase (e.g., `Tier2Payload` optional sections, `MetricsPayload` tier-3 fields):
 
-**Write rules:**
+| Wire state | Meaning | Worker behavior |
+|------------|---------|-----------------|
+| **Key present** in JSON (value is a string, number, array, or object) | Probe collected this field successfully | `UPDATE hosts SET field = ? WHERE host_id = ?` |
+| **Key absent** from JSON | Probe doesn't support this field (old version), or collection failed on this run | **No-op** — retain existing value in D1 |
 
-| Scenario | Behavior |
-|----------|----------|
-| Field present in payload | `UPDATE hosts SET timezone = ? WHERE host_id = ?` |
-| Field absent from payload (`undefined` / key missing) | **No-op** — retain existing value. Absence means "probe didn't collect this" (old probe, collection error, unsupported OS), not "value is empty" |
-| Field explicitly `null` | Write `NULL` — probe actively reports "this has no value" (e.g., no `/etc/timezone` and no `/etc/localtime` symlink) |
+There is no third "explicit null" state. If the probe finds nothing (e.g., no `/etc/timezone` and no `/etc/localtime` symlink), it sends a concrete sentinel value:
+- String fields: `""` (empty string)
+- Array fields: `[]` (empty array)
 
-This means the worker's tier2 ingest handler gains an **additional step** after `insertTier2Snapshot`: a conditional `UPDATE hosts SET ... WHERE host_id = ?` that only includes columns whose values are present in the payload. Implemented as a dynamic SQL builder (only SET clauses for non-undefined fields).
+This avoids the need to distinguish `undefined` from `null` in the wire format, which `serde(skip_serializing_if = "Option::is_none")` cannot express.
 
-The identity route handler uses the same semantics for its new optional fields — if an old probe sends a payload without `cpu_logical`, the column retains its existing value (or stays NULL if never set).
+**Worker implementation**: The identity route and tier2 ingest route both gain a conditional `UPDATE hosts SET ... WHERE host_id = ?` that only includes SET clauses for keys that are actually present in the parsed JSON body. Implemented by checking `key in body` (TS) before adding each clause.
 
 ### Worker → Dashboard: Two-Tier API
 
