@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.5.2 (2026-03-17)
+
+### Features
+
+- **Probe version tracking** — Store `probe_version` from identity payload in D1, display in dashboard host detail System Info card as "Probe Version: v0.5.2"
+
+### Database
+
+- Migration `0007_probe_version.sql` — Add `probe_version` column to hosts table
+
+### Tests
+
+- 4 new unit tests: probe_version storage, update, null backward compat, detail response
+
 ## v0.5.1 (2026-03-17)
 
 ### Fixes
