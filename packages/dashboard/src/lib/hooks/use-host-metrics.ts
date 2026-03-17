@@ -15,6 +15,6 @@ export function useHostMetrics(id: string | null, from: number, to: number) {
 				from: String(from),
 				to: String(to),
 			}),
-		{ refreshInterval: REFRESH_INTERVAL_MS },
+		{ refreshInterval: REFRESH_INTERVAL_MS, keepPreviousData: true },
 	);
 }

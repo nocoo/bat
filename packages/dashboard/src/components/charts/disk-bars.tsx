@@ -3,9 +3,10 @@
 import { formatBytes, transformDiskData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
+import { useMemo } from "react";
 
 export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
-	const disks = transformDiskData(data);
+	const disks = useMemo(() => transformDiskData(data), [data]);
 
 	if (disks.length === 0) {
 		return (

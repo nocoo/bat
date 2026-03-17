@@ -4,6 +4,7 @@ import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformCpuData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { Cpu } from "lucide-react";
+import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
@@ -18,7 +19,7 @@ export function CpuChart({
 	data,
 	rangeSeconds = 3600,
 }: { data: MetricsDataPoint[]; rangeSeconds?: number }) {
-	const chartData = transformCpuData(data);
+	const chartData = useMemo(() => transformCpuData(data), [data]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
@@ -79,6 +80,7 @@ export function CpuChart({
 							stroke={s.color}
 							dot={false}
 							strokeWidth={s.width}
+							isAnimationActive={false}
 						/>
 					))}
 				</LineChart>

@@ -4,6 +4,7 @@ import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformDiskIoData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
+import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
@@ -19,7 +20,7 @@ export function DiskIoChart({
 	resolution = "raw",
 	rangeSeconds = 3600,
 }: { data: MetricsDataPoint[]; resolution?: "raw" | "hourly"; rangeSeconds?: number }) {
-	const chartData = transformDiskIoData(data, resolution);
+	const chartData = useMemo(() => transformDiskIoData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	if (chartData.length === 0) {
@@ -73,6 +74,7 @@ export function DiskIoChart({
 							stroke={s.color}
 							dot={false}
 							strokeWidth={s.width}
+							isAnimationActive={false}
 						/>
 					))}
 				</LineChart>
