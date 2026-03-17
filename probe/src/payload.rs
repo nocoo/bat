@@ -177,6 +177,13 @@ pub struct Tier2Payload {
     pub docker: Option<Tier2Docker>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk_deep: Option<Tier2DiskDeep>,
+    // --- Host inventory tier 2 fields ---
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub timezone: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_resolvers: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dns_search: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -596,6 +603,9 @@ mod tests {
                     size_bytes: 150_000_000,
                 }],
             }),
+            timezone: Some("UTC".into()),
+            dns_resolvers: Some(vec!["1.1.1.1".into(), "8.8.8.8".into()]),
+            dns_search: Some(vec!["example.com".into()]),
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -641,6 +651,12 @@ mod tests {
             json["disk_deep"]["large_files"][0]["size_bytes"],
             150_000_000_u64
         );
+
+        // Tier 2 inventory
+        assert_eq!(json["timezone"], "UTC");
+        assert_eq!(json["dns_resolvers"][0], "1.1.1.1");
+        assert_eq!(json["dns_resolvers"][1], "8.8.8.8");
+        assert_eq!(json["dns_search"][0], "example.com");
     }
 
     #[test]
@@ -655,6 +671,9 @@ mod tests {
             security: None,
             docker: None,
             disk_deep: None,
+            timezone: None,
+            dns_resolvers: None,
+            dns_search: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -672,6 +691,9 @@ mod tests {
         assert!(!obj.contains_key("security"));
         assert!(!obj.contains_key("docker"));
         assert!(!obj.contains_key("disk_deep"));
+        assert!(!obj.contains_key("timezone"));
+        assert!(!obj.contains_key("dns_resolvers"));
+        assert!(!obj.contains_key("dns_search"));
     }
 
     #[test]
