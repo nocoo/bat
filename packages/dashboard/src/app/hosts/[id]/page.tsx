@@ -144,7 +144,20 @@ export default function HostDetailPage() {
 
 						{/* Right column — snapshot / non-time-series */}
 						<div className="space-y-4">
-							<DiskBars data={metricsResponse.data} />
+							<h2 className="text-base font-semibold">Overview</h2>
+							{hostAlerts.length > 0 && (
+								<Card>
+									<CardHeader>
+										<CardTitle className="flex items-center gap-2 text-base">
+											<ShieldAlert className="h-4 w-4" />
+											Active Alerts ({hostAlerts.length})
+										</CardTitle>
+									</CardHeader>
+									<CardContent>
+										<AlertTable alerts={hostAlerts} />
+									</CardContent>
+								</Card>
+							)}
 							{host && (
 								<Card>
 									<CardHeader>
@@ -165,19 +178,7 @@ export default function HostDetailPage() {
 									</CardContent>
 								</Card>
 							)}
-							{hostAlerts.length > 0 && (
-								<Card>
-									<CardHeader>
-										<CardTitle className="flex items-center gap-2 text-base">
-											<ShieldAlert className="h-4 w-4" />
-											Active Alerts ({hostAlerts.length})
-										</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<AlertTable alerts={hostAlerts} />
-									</CardContent>
-								</Card>
-							)}
+							<DiskBars data={metricsResponse.data} />
 						</div>
 					</div>
 				) : (
