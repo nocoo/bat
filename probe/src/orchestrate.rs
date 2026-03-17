@@ -294,6 +294,8 @@ pub fn build_mem_swap_metrics(
 }
 
 /// Build an [`IdentityPayload`] from collected system values.
+use crate::collectors::inventory::{BlockDevice, NetInterface};
+
 #[allow(clippy::too_many_arguments)]
 pub fn build_identity_payload(
     probe_version: &str,
@@ -309,6 +311,10 @@ pub fn build_identity_payload(
     cpu_physical: Option<u32>,
     mem_total_bytes: Option<u64>,
     swap_total_bytes: Option<u64>,
+    virtualization: Option<String>,
+    net_interfaces: Option<Vec<NetInterface>>,
+    disks: Option<Vec<BlockDevice>>,
+    boot_mode: Option<String>,
 ) -> IdentityPayload {
     IdentityPayload {
         probe_version: probe_version.to_string(),
@@ -324,6 +330,10 @@ pub fn build_identity_payload(
         cpu_physical,
         mem_total_bytes,
         swap_total_bytes,
+        virtualization,
+        net_interfaces,
+        disks,
+        boot_mode,
     }
 }
 
@@ -502,6 +512,10 @@ mod tests {
             Some(4),
             Some(8_388_608_000),
             Some(2_147_483_648),
+            Some("kvm".to_string()),
+            Some(vec![]),
+            Some(vec![]),
+            Some("uefi".to_string()),
         );
         assert_eq!(p.probe_version, "0.2.0");
         assert_eq!(p.host_id, "host-1");
@@ -516,11 +530,17 @@ mod tests {
         assert_eq!(p.cpu_physical, Some(4));
         assert_eq!(p.mem_total_bytes, Some(8_388_608_000));
         assert_eq!(p.swap_total_bytes, Some(2_147_483_648));
+        assert_eq!(p.virtualization, Some("kvm".to_string()));
+        assert!(p.net_interfaces.unwrap().is_empty());
+        assert!(p.disks.unwrap().is_empty());
+        assert_eq!(p.boot_mode, Some("uefi".to_string()));
     }
 
     #[test]
     fn build_identity_payload_empty_fields() {
-        let p = build_identity_payload("", "", "", "", "", "", "", 0, 0, None, None, None, None);
+        let p = build_identity_payload(
+            "", "", "", "", "", "", "", 0, 0, None, None, None, None, None, None, None, None,
+        );
         assert_eq!(p.host_id, "");
         assert_eq!(p.hostname, "");
         assert_eq!(p.uptime_seconds, 0);
@@ -529,6 +549,10 @@ mod tests {
         assert_eq!(p.cpu_physical, None);
         assert_eq!(p.mem_total_bytes, None);
         assert_eq!(p.swap_total_bytes, None);
+        assert_eq!(p.virtualization, None);
+        assert_eq!(p.net_interfaces, None);
+        assert_eq!(p.disks, None);
+        assert_eq!(p.boot_mode, None);
     }
 
     #[test]

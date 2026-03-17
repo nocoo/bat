@@ -303,6 +303,29 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
     let mem_total_bytes = mem_info.as_ref().map(|m| m.mem_total);
     let swap_total_bytes = mem_info.as_ref().map(|m| m.swap_total);
 
+    // Host inventory: virtualization, network interfaces, disks, boot mode
+    let virt = collectors::inventory::read_virtualization();
+    let virtualization = if virt.is_empty() { None } else { Some(virt) };
+
+    let ipv6_map = std::fs::read_to_string("/proc/net/if_inet6")
+        .ok()
+        .map(|c| collectors::inventory::parse_if_inet6(&c))
+        .unwrap_or_default();
+    // Build ip_map with empty IPv4 (no clean procfs source) and IPv6 from if_inet6
+    let ip_map: std::collections::HashMap<String, (Vec<String>, Vec<String>)> = ipv6_map
+        .into_iter()
+        .map(|(iface, v6)| (iface, (vec![], v6)))
+        .collect();
+    let net_interfaces = Some(collectors::inventory::read_net_interfaces_from(
+        "/sys/class/net",
+        &ip_map,
+    ));
+
+    let disks_vec = collectors::inventory::read_block_devices();
+    let disks = Some(disks_vec);
+
+    let boot_mode = Some(collectors::inventory::detect_boot_mode());
+
     orchestrate::build_identity_payload(
         PROBE_VERSION,
         host_id,
@@ -317,6 +340,10 @@ fn build_identity_payload(host_id: &str) -> payload::IdentityPayload {
         cpu_physical,
         mem_total_bytes,
         swap_total_bytes,
+        virtualization,
+        net_interfaces,
+        disks,
+        boot_mode,
     )
 }
 
