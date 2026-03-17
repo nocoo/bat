@@ -67,7 +67,12 @@ beforeAll(async () => {
 	}
 
 	// 3. Apply migrations to local D1 using the same persist path
-	const migrations = ["migrations/0001_initial.sql", "migrations/0002_dedup_constraint.sql"];
+	const migrations = [
+		"migrations/0001_initial.sql",
+		"migrations/0002_dedup_constraint.sql",
+		"migrations/0003_tier2_tables.sql",
+		"migrations/0004_tier3_columns.sql",
+	];
 	for (const migration of migrations) {
 		await runCommand(
 			[
