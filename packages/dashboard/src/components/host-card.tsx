@@ -23,6 +23,45 @@ function formatLastSeen(unixSeconds: number): string {
 	return `${Math.floor(delta / 86400)}d ago`;
 }
 
+/** Truncate PRETTY_NAME — "Ubuntu 22.04.3 LTS" → "Ubuntu 22.04" */
+function shortenOs(os: string | null): string | null {
+	if (!os) return null;
+	// Match "Name Major.Minor" and drop patch/suffix
+	const match = os.match(/^(\S+)\s+(\d+\.\d+)/);
+	return match ? `${match[1]} ${match[2]}` : os;
+}
+
+/** Format bytes to human-readable — 8589934592 → "8 GB" */
+function formatMemory(bytes: number | null): string | null {
+	if (bytes === null) return null;
+	const gb = bytes / (1024 * 1024 * 1024);
+	if (gb >= 1) return `${Math.round(gb)} GB`;
+	const mb = bytes / (1024 * 1024);
+	return `${Math.round(mb)} MB`;
+}
+
+/** Format CPU topology — "4C/8T" or "4C" if no HT */
+function formatCpuTopology(physical: number | null, logical: number | null): string | null {
+	if (physical === null && logical === null) return null;
+	if (physical !== null && logical !== null && physical !== logical) {
+		return `${physical}C/${logical}T`;
+	}
+	return `${physical ?? logical}C`;
+}
+
+/** Build subtitle parts: "Ubuntu 22.04 · x86_64 · 4C/8T · 8 GB" */
+function buildSubtitle(host: HostOverviewItem): string | null {
+	const parts: string[] = [];
+	const os = shortenOs(host.os);
+	if (os) parts.push(os);
+	if (host.arch) parts.push(host.arch);
+	const cpu = formatCpuTopology(host.cpu_physical, host.cpu_logical);
+	if (cpu) parts.push(cpu);
+	const mem = formatMemory(host.mem_total_bytes);
+	if (mem) parts.push(mem);
+	return parts.length > 0 ? parts.join(" · ") : null;
+}
+
 function MetricRow({
 	icon,
 	label,
@@ -40,6 +79,7 @@ function MetricRow({
 }
 
 export function HostCard({ host }: { host: HostOverviewItem }) {
+	const subtitle = buildSubtitle(host);
 	return (
 		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
 			<Card className="transition-colors cursor-pointer hover:bg-accent/50" data-testid="host-card">
@@ -48,6 +88,7 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 						<CardTitle className="text-base">{host.hostname}</CardTitle>
 						<StatusBadge status={host.status} />
 					</div>
+					{subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
 				</CardHeader>
 				<CardContent className="space-y-2">
 					<MetricRow
@@ -75,4 +116,4 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 }
 
 // Export formatters for testing
-export { formatUptime, formatLastSeen };
+export { formatUptime, formatLastSeen, shortenOs, formatMemory, formatCpuTopology, buildSubtitle };
