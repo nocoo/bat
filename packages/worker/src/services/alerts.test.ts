@@ -354,10 +354,11 @@ describe("evaluateRules (pure function)", () => {
 		expect(rule?.fired).toBe(false);
 	});
 
-	test("tcp_retrans_high absent when no snmp data", () => {
+	test("tcp_retrans_high clears when no snmp data", () => {
 		const results = evaluateRules(makePayload());
 		const rule = results.find((r) => r.ruleId === "tcp_retrans_high");
-		expect(rule).toBeUndefined();
+		expect(rule).toBeDefined();
+		expect(rule?.fired).toBe(false);
 	});
 
 	test("listen_drops fires when listen_drops_delta > 0", () => {
@@ -412,10 +413,11 @@ describe("evaluateRules (pure function)", () => {
 		expect(rule?.fired).toBe(false);
 	});
 
-	test("inode_full absent when no inode data", () => {
+	test("inode_full clears when no inode data", () => {
 		const results = evaluateRules(makePayload());
 		const rule = results.find((r) => r.ruleId === "inode_full");
-		expect(rule).toBeUndefined();
+		expect(rule).toBeDefined();
+		expect(rule?.fired).toBe(false);
 	});
 
 	test("swap_active fires when swap_in + swap_out > 1", () => {
@@ -553,7 +555,7 @@ describe("evaluateRules (pure function)", () => {
 		expect(rule?.fired).toBe(false);
 	});
 
-	test("disk_latency_high absent when no latency data", () => {
+	test("disk_latency_high clears when no latency data", () => {
 		const disk_io: DiskIoMetric[] = [
 			{
 				device: "sda",
@@ -566,10 +568,11 @@ describe("evaluateRules (pure function)", () => {
 		];
 		const results = evaluateRules(makePayload({ disk_io }));
 		const rule = results.find((r) => r.ruleId === "disk_latency_high");
-		expect(rule).toBeUndefined();
+		expect(rule).toBeDefined();
+		expect(rule?.fired).toBe(false);
 	});
 
-	test("signal expansion rules not evaluated when data absent", () => {
+	test("signal expansion rules always emit (fired: false) when data absent", () => {
 		const results = evaluateRules(makePayload());
 		const seRules = [
 			"tcp_retrans_high",
@@ -583,7 +586,9 @@ describe("evaluateRules (pure function)", () => {
 			"disk_latency_high",
 		];
 		for (const ruleId of seRules) {
-			expect(results.find((r) => r.ruleId === ruleId)).toBeUndefined();
+			const rule = results.find((r) => r.ruleId === ruleId);
+			expect(rule).toBeDefined();
+			expect(rule?.fired).toBe(false);
 		}
 	});
 });
@@ -845,5 +850,24 @@ describe("evaluateAlerts (with D1 mock)", () => {
 				.first();
 			expect(pending).toBeNull();
 		}
+	});
+
+	test("signal expansion stale alert clears when data disappears", async () => {
+		// Fire: listen_drops with netstat data
+		const netstat: NetstatMetrics = { listen_drops_delta: 5 };
+		await evaluateAlerts(db, hostId, makePayload({ netstat }), now);
+		const before = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "listen_drops")
+			.first();
+		expect(before).not.toBeNull();
+
+		// Next ingest: no netstat data at all → should clear the alert
+		await evaluateAlerts(db, hostId, makePayload(), now + 30);
+		const after = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, "listen_drops")
+			.first();
+		expect(after).toBeNull();
 	});
 });
