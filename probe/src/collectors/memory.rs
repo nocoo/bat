@@ -137,7 +137,8 @@ pub fn read_meminfo() -> Result<MemInfo, String> {
 /// Parsed counters from `/proc/vmstat`.
 #[derive(Debug, Clone, Default)]
 pub struct VmstatCounters {
-    pub oom_kill: u64,
+    /// `None` on pre-4.13 kernels where the `oom_kill` line is absent.
+    pub oom_kill: Option<u64>,
     pub pswpin: u64,
     pub pswpout: u64,
     pub pgmajfault: u64,
@@ -149,47 +150,50 @@ pub struct VmstatCounters {
 ///
 /// Looks for the line `oom_kill <N>` and returns the cumulative count.
 /// Returns `None` if the line is not found (pre-4.13 kernels).
+#[cfg(test)]
 pub fn parse_vmstat_oom_kill(content: &str) -> Option<u64> {
-    parse_vmstat(content).map(|v| v.oom_kill)
+    parse_vmstat(content).and_then(|v| v.oom_kill)
 }
 
 /// Parse multiple counters from `/proc/vmstat` content.
 ///
-/// Returns `None` if `oom_kill` line is missing (pre-4.13 kernels).
+/// Returns `Some` if at least one recognized field was found.
+/// `oom_kill` is `None` on pre-4.13 kernels where the line is absent;
+/// the remaining counters are still populated from the file.
 pub fn parse_vmstat(content: &str) -> Option<VmstatCounters> {
     let mut counters = VmstatCounters::default();
-    let mut found_oom = false;
+    let mut found_any = false;
 
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("oom_kill ") {
-            counters.oom_kill = rest.trim().parse().unwrap_or(0);
-            found_oom = true;
+            counters.oom_kill = Some(rest.trim().parse().unwrap_or(0));
+            found_any = true;
         } else if let Some(rest) = line.strip_prefix("pswpin ") {
             counters.pswpin = rest.trim().parse().unwrap_or(0);
+            found_any = true;
         } else if let Some(rest) = line.strip_prefix("pswpout ") {
             counters.pswpout = rest.trim().parse().unwrap_or(0);
+            found_any = true;
         } else if let Some(rest) = line.strip_prefix("pgmajfault ") {
             counters.pgmajfault = rest.trim().parse().unwrap_or(0);
+            found_any = true;
         } else if let Some(rest) = line.strip_prefix("pgpgin ") {
             counters.pgpgin = rest.trim().parse().unwrap_or(0);
+            found_any = true;
         } else if let Some(rest) = line.strip_prefix("pgpgout ") {
             counters.pgpgout = rest.trim().parse().unwrap_or(0);
+            found_any = true;
         }
     }
 
-    if found_oom { Some(counters) } else { None }
+    if found_any { Some(counters) } else { None }
 }
 
 /// Read OOM kill counter from a parameterized path (for testing).
+#[cfg(test)]
 pub fn read_oom_kill_from(path: &str) -> Option<u64> {
     let content = std::fs::read_to_string(path).ok()?;
     parse_vmstat_oom_kill(&content)
-}
-
-/// Read OOM kill counter from `/proc/vmstat`.
-#[cfg_attr(coverage_nightly, coverage(off))]
-pub fn read_oom_kill() -> Option<u64> {
-    read_oom_kill_from("/proc/vmstat")
 }
 
 /// Read vmstat counters from a parameterized path (for testing).
@@ -200,7 +204,6 @@ pub fn read_vmstat_from(path: &str) -> Option<VmstatCounters> {
 
 /// Read vmstat counters from `/proc/vmstat`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_vmstat() -> Option<VmstatCounters> {
     read_vmstat_from("/proc/vmstat")
 }
@@ -423,7 +426,7 @@ pgmajfault 10
     #[test]
     fn parse_vmstat_full_counters() {
         let counters = parse_vmstat(PROC_VMSTAT).unwrap();
-        assert_eq!(counters.oom_kill, 3);
+        assert_eq!(counters.oom_kill, Some(3));
         assert_eq!(counters.pswpin, 500);
         assert_eq!(counters.pswpout, 800);
         assert_eq!(counters.pgpgin, 1_234_567);
@@ -432,8 +435,15 @@ pgmajfault 10
     }
 
     #[test]
-    fn parse_vmstat_no_oom_returns_none() {
-        assert!(parse_vmstat(PROC_VMSTAT_NO_OOM).is_none());
+    fn parse_vmstat_no_oom_still_returns_counters() {
+        // Pre-4.13 kernel: no oom_kill line, but other counters are present
+        let counters = parse_vmstat(PROC_VMSTAT_NO_OOM).unwrap();
+        assert_eq!(counters.oom_kill, None);
+        assert_eq!(counters.pswpin, 100);
+        assert_eq!(counters.pswpout, 200);
+        assert_eq!(counters.pgpgin, 1_234_567);
+        assert_eq!(counters.pgpgout, 2_345_678);
+        assert_eq!(counters.pgmajfault, 10);
     }
 
     #[test]
@@ -446,7 +456,7 @@ pgmajfault 10
         // Only oom_kill present, other fields stay at 0
         let content = "oom_kill 7\npswpin 100\n";
         let counters = parse_vmstat(content).unwrap();
-        assert_eq!(counters.oom_kill, 7);
+        assert_eq!(counters.oom_kill, Some(7));
         assert_eq!(counters.pswpin, 100);
         assert_eq!(counters.pswpout, 0);
         assert_eq!(counters.pgmajfault, 0);
@@ -471,7 +481,7 @@ pgmajfault 10
         let path = dir.path().join("vmstat");
         std::fs::write(&path, PROC_VMSTAT).unwrap();
         let counters = read_vmstat_from(path.to_str().unwrap()).unwrap();
-        assert_eq!(counters.oom_kill, 3);
+        assert_eq!(counters.oom_kill, Some(3));
         assert_eq!(counters.pswpin, 500);
     }
 
