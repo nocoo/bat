@@ -182,10 +182,10 @@ The software collector receives the already-collected `ServicePortsData` to avoi
 - Total typical: ~200ms.
 
 **Version probing** (separate, runs after core detection completes):
-- Runs concurrently for all detected software, with a **global 3s timeout** via `tokio::time::timeout`.
-- Up to 15 concurrent `<binary> --version` subprocesses, each with individual 2s timeout.
-- Version results are best-effort: if the global timeout fires, any still-pending versions are set to `null`.
-- Version probing does NOT block the `DetectedSoftware` list — the list is assembled first (with `version: None`), then versions are filled in asynchronously.
+- Runs **sequentially** for all detected software, under a **global 3s timeout** via `tokio::time::timeout`. Sequential execution avoids adding the `futures` crate dependency while keeping code simple; typical fleet hosts have <10 detected items, so serial probing completes well within the timeout.
+- Each `<binary> --version` subprocess has an individual 2s timeout.
+- Version results are best-effort: if the global timeout fires, any remaining software keeps `version: None`.
+- Version probing does NOT block the `DetectedSoftware` list — the list is assembled first (with `version: None`), then versions are filled in sequentially.
 
 **Total worst case**: ~3.5s (500ms detection + 3s version probing). Acceptable for a 6-hour cycle that already runs `du`, `find`, and `docker inspect` taking 10–30s. The `scan_duration_ms` field in the response separates core detection time from version probing time:
 
