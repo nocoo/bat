@@ -8,16 +8,27 @@ pub struct NetCounters {
     pub tx_bytes: u64,
     pub rx_errors: u64,
     pub tx_errors: u64,
+    // Signal expansion: packet and dropped counters
+    pub rx_packets: u64,
+    pub tx_packets: u64,
+    pub rx_dropped: u64,
+    pub tx_dropped: u64,
 }
 
 /// Computed network metrics for a single interface.
 #[derive(Debug)]
+#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct NetInfo {
     pub iface: String,
     pub rx_bytes_rate: f64,
     pub tx_bytes_rate: f64,
     pub rx_errors: u64,
     pub tx_errors: u64,
+    // Signal expansion
+    pub rx_packets_rate: f64,
+    pub tx_packets_rate: f64,
+    pub rx_dropped_delta: u64,
+    pub tx_dropped_delta: u64,
 }
 
 /// List network interfaces from `/sys/class/net/`, excluding configured ones.
@@ -44,6 +55,10 @@ pub fn read_counters(sysfs_path: &str, iface: &str) -> std::io::Result<NetCounte
         tx_bytes: read_sysfs_u64(&format!("{base}/tx_bytes"))?,
         rx_errors: read_sysfs_u64(&format!("{base}/rx_errors"))?,
         tx_errors: read_sysfs_u64(&format!("{base}/tx_errors"))?,
+        rx_packets: read_sysfs_u64(&format!("{base}/rx_packets")).unwrap_or(0),
+        tx_packets: read_sysfs_u64(&format!("{base}/tx_packets")).unwrap_or(0),
+        rx_dropped: read_sysfs_u64(&format!("{base}/rx_dropped")).unwrap_or(0),
+        tx_dropped: read_sysfs_u64(&format!("{base}/tx_dropped")).unwrap_or(0),
     })
 }
 
@@ -81,6 +96,18 @@ pub fn compute_net_metrics(
                 ),
                 rx_errors: compute_delta(prev_counters.rx_errors, curr_counters.rx_errors),
                 tx_errors: compute_delta(prev_counters.tx_errors, curr_counters.tx_errors),
+                rx_packets_rate: compute_rate(
+                    prev_counters.rx_packets,
+                    curr_counters.rx_packets,
+                    elapsed,
+                ),
+                tx_packets_rate: compute_rate(
+                    prev_counters.tx_packets,
+                    curr_counters.tx_packets,
+                    elapsed,
+                ),
+                rx_dropped_delta: compute_delta(prev_counters.rx_dropped, curr_counters.rx_dropped),
+                tx_dropped_delta: compute_delta(prev_counters.tx_dropped, curr_counters.tx_dropped),
             });
         }
     }
@@ -167,6 +194,7 @@ mod tests {
                 tx_bytes: 2000,
                 rx_errors: 5,
                 tx_errors: 3,
+                ..Default::default()
             },
         );
 
@@ -178,6 +206,7 @@ mod tests {
                 tx_bytes: 5000,
                 rx_errors: 7,
                 tx_errors: 3,
+                ..Default::default()
             },
         );
 
@@ -256,6 +285,7 @@ mod tests {
                 tx_bytes: 0,
                 rx_errors: u64::MAX - 1,
                 tx_errors: 0,
+                ..Default::default()
             },
         );
 
@@ -267,6 +297,7 @@ mod tests {
                 tx_bytes: 3000,
                 rx_errors: 2,
                 tx_errors: 0,
+                ..Default::default()
             },
         );
 
@@ -301,12 +332,20 @@ mod tests {
         std::fs::write(stats.join("tx_bytes"), "67890\n").unwrap();
         std::fs::write(stats.join("rx_errors"), "1\n").unwrap();
         std::fs::write(stats.join("tx_errors"), "0\n").unwrap();
+        std::fs::write(stats.join("rx_packets"), "500\n").unwrap();
+        std::fs::write(stats.join("tx_packets"), "300\n").unwrap();
+        std::fs::write(stats.join("rx_dropped"), "2\n").unwrap();
+        std::fs::write(stats.join("tx_dropped"), "0\n").unwrap();
 
         let c = read_counters(dir.path().to_str().unwrap(), "eth0").unwrap();
         assert_eq!(c.rx_bytes, 12345);
         assert_eq!(c.tx_bytes, 67890);
         assert_eq!(c.rx_errors, 1);
         assert_eq!(c.tx_errors, 0);
+        assert_eq!(c.rx_packets, 500);
+        assert_eq!(c.tx_packets, 300);
+        assert_eq!(c.rx_dropped, 2);
+        assert_eq!(c.tx_dropped, 0);
     }
 
     #[test]
