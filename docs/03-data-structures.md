@@ -569,6 +569,7 @@ interface Tier2Snapshot {
   security: SecurityPostureData | null;
   docker: DockerStatusData | null;
   disk_deep: DiskDeepScanData | null;
+  software: SoftwareDiscoveryData | null;  // see docs/12-software-discovery.md
   timezone: string | null;
   dns_resolvers: string[] | null;
   dns_search: string[] | null;
