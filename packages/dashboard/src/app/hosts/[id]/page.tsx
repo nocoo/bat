@@ -11,6 +11,7 @@ import {
 	TcpChart,
 } from "@/components/charts";
 import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
+import { HostTagsPanel } from "@/components/host-tags-panel";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -378,6 +379,7 @@ export default function HostDetailPage() {
 									</CardContent>
 								</Card>
 							)}
+							{host && <HostTagsPanel hostId={host.host_id} />}
 							{tier2?.software && tier2.software.detected.length > 0 && (
 								<SoftwareCard software={tier2.software.detected} />
 							)}
