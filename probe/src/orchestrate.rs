@@ -578,6 +578,16 @@ mod tests {
             swap_free: 500_000,
             swap_used: 500_000,
             swap_used_pct: 50.0,
+            buffers: None,
+            cached: None,
+            dirty: None,
+            writeback: None,
+            shmem: None,
+            slab_reclaimable: None,
+            slab_unreclaim: None,
+            committed_as: None,
+            commit_limit: None,
+            hw_corrupted: None,
         };
         let (mem, swap) = build_mem_swap_metrics(Some(&info), Some(5));
         assert_eq!(mem.total_bytes, 4_000_000);

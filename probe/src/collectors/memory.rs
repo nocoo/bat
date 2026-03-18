@@ -1,5 +1,6 @@
 /// Parsed memory values from `/proc/meminfo`, converted to bytes.
 #[derive(Debug)]
+#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct MemInfo {
     pub mem_total: u64,
     pub mem_available: u64,
@@ -9,17 +10,39 @@ pub struct MemInfo {
     pub swap_free: u64,
     pub swap_used: u64,
     pub swap_used_pct: f64,
+    // Signal expansion: additional meminfo fields (bytes, None if kernel doesn't expose)
+    pub buffers: Option<u64>,
+    pub cached: Option<u64>,
+    pub dirty: Option<u64>,
+    pub writeback: Option<u64>,
+    pub shmem: Option<u64>,
+    pub slab_reclaimable: Option<u64>,
+    pub slab_unreclaim: Option<u64>,
+    pub committed_as: Option<u64>,
+    pub commit_limit: Option<u64>,
+    pub hw_corrupted: Option<u64>,
 }
 
 /// Parse `/proc/meminfo` content.
 ///
-/// Extracts `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree`.
+/// Extracts `MemTotal`, `MemAvailable`, `SwapTotal`, `SwapFree`, plus
+/// extended fields for signal expansion.
 /// Values in `/proc/meminfo` are in kB — multiply by 1024 for bytes.
 pub fn parse_meminfo(content: &str) -> Option<MemInfo> {
     let mut mem_total: Option<u64> = None;
     let mut mem_available: Option<u64> = None;
     let mut swap_total: Option<u64> = None;
     let mut swap_free: Option<u64> = None;
+    let mut buffers: Option<u64> = None;
+    let mut cached: Option<u64> = None;
+    let mut dirty: Option<u64> = None;
+    let mut writeback: Option<u64> = None;
+    let mut shmem: Option<u64> = None;
+    let mut slab_reclaimable: Option<u64> = None;
+    let mut slab_unreclaim: Option<u64> = None;
+    let mut committed_as: Option<u64> = None;
+    let mut commit_limit: Option<u64> = None;
+    let mut hw_corrupted: Option<u64> = None;
 
     for line in content.lines() {
         if let Some(val) = parse_meminfo_line(line, "MemTotal:") {
@@ -30,6 +53,26 @@ pub fn parse_meminfo(content: &str) -> Option<MemInfo> {
             swap_total = Some(val);
         } else if let Some(val) = parse_meminfo_line(line, "SwapFree:") {
             swap_free = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Buffers:") {
+            buffers = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Cached:") {
+            cached = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Dirty:") {
+            dirty = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Writeback:") {
+            writeback = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Shmem:") {
+            shmem = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "SReclaimable:") {
+            slab_reclaimable = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "SUnreclaim:") {
+            slab_unreclaim = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "Committed_AS:") {
+            committed_as = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "CommitLimit:") {
+            commit_limit = Some(val);
+        } else if let Some(val) = parse_meminfo_line(line, "HardwareCorrupted:") {
+            hw_corrupted = Some(val);
         }
     }
 
@@ -59,6 +102,16 @@ pub fn parse_meminfo(content: &str) -> Option<MemInfo> {
         swap_free,
         swap_used,
         swap_used_pct,
+        buffers: buffers.map(|v| v * 1024),
+        cached: cached.map(|v| v * 1024),
+        dirty: dirty.map(|v| v * 1024),
+        writeback: writeback.map(|v| v * 1024),
+        shmem: shmem.map(|v| v * 1024),
+        slab_reclaimable: slab_reclaimable.map(|v| v * 1024),
+        slab_unreclaim: slab_unreclaim.map(|v| v * 1024),
+        committed_as: committed_as.map(|v| v * 1024),
+        commit_limit: commit_limit.map(|v| v * 1024),
+        hw_corrupted: hw_corrupted.map(|v| v * 1024),
     })
 }
 
@@ -81,17 +134,50 @@ pub fn read_meminfo() -> Result<MemInfo, String> {
     read_meminfo_from("/proc/meminfo")
 }
 
+/// Parsed counters from `/proc/vmstat`.
+#[derive(Debug, Clone, Default)]
+pub struct VmstatCounters {
+    pub oom_kill: u64,
+    pub pswpin: u64,
+    pub pswpout: u64,
+    pub pgmajfault: u64,
+    pub pgpgin: u64,
+    pub pgpgout: u64,
+}
+
 /// Parse the `oom_kill` counter from `/proc/vmstat` content.
 ///
 /// Looks for the line `oom_kill <N>` and returns the cumulative count.
 /// Returns `None` if the line is not found (pre-4.13 kernels).
 pub fn parse_vmstat_oom_kill(content: &str) -> Option<u64> {
+    parse_vmstat(content).map(|v| v.oom_kill)
+}
+
+/// Parse multiple counters from `/proc/vmstat` content.
+///
+/// Returns `None` if `oom_kill` line is missing (pre-4.13 kernels).
+pub fn parse_vmstat(content: &str) -> Option<VmstatCounters> {
+    let mut counters = VmstatCounters::default();
+    let mut found_oom = false;
+
     for line in content.lines() {
         if let Some(rest) = line.strip_prefix("oom_kill ") {
-            return rest.trim().parse().ok();
+            counters.oom_kill = rest.trim().parse().unwrap_or(0);
+            found_oom = true;
+        } else if let Some(rest) = line.strip_prefix("pswpin ") {
+            counters.pswpin = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("pswpout ") {
+            counters.pswpout = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("pgmajfault ") {
+            counters.pgmajfault = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("pgpgin ") {
+            counters.pgpgin = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("pgpgout ") {
+            counters.pgpgout = rest.trim().parse().unwrap_or(0);
         }
     }
-    None
+
+    if found_oom { Some(counters) } else { None }
 }
 
 /// Read OOM kill counter from a parameterized path (for testing).
@@ -104,6 +190,19 @@ pub fn read_oom_kill_from(path: &str) -> Option<u64> {
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_oom_kill() -> Option<u64> {
     read_oom_kill_from("/proc/vmstat")
+}
+
+/// Read vmstat counters from a parameterized path (for testing).
+pub fn read_vmstat_from(path: &str) -> Option<VmstatCounters> {
+    let content = std::fs::read_to_string(path).ok()?;
+    parse_vmstat(&content)
+}
+
+/// Read vmstat counters from `/proc/vmstat`.
+#[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(dead_code)]
+pub fn read_vmstat() -> Option<VmstatCounters> {
+    read_vmstat_from("/proc/vmstat")
 }
 
 #[cfg(test)]
@@ -120,6 +219,14 @@ Cached:           456789 kB
 SwapCached:            0 kB
 SwapTotal:       1638380 kB
 SwapFree:        1606640 kB
+Dirty:              1024 kB
+Writeback:             0 kB
+Shmem:             32768 kB
+SReclaimable:      65536 kB
+SUnreclaim:        16384 kB
+Committed_AS:    1234567 kB
+CommitLimit:     2000000 kB
+HardwareCorrupted:     0 kB
 ";
 
     const PROC_MEMINFO_NO_SWAP: &str = "\
@@ -146,6 +253,18 @@ SwapFree:              0 kB
 
         // swap_used_pct = (1638380 - 1606640) / 1638380 * 100 = 1.937...
         assert!((info.swap_used_pct - 1.937).abs() < 0.01);
+
+        // Extended fields
+        assert_eq!(info.buffers, Some(98_304 * 1024));
+        assert_eq!(info.cached, Some(456_789 * 1024));
+        assert_eq!(info.dirty, Some(1024 * 1024));
+        assert_eq!(info.writeback, Some(0));
+        assert_eq!(info.shmem, Some(32_768 * 1024));
+        assert_eq!(info.slab_reclaimable, Some(65_536 * 1024));
+        assert_eq!(info.slab_unreclaim, Some(16_384 * 1024));
+        assert_eq!(info.committed_as, Some(1_234_567 * 1024));
+        assert_eq!(info.commit_limit, Some(2_000_000 * 1024));
+        assert_eq!(info.hw_corrupted, Some(0));
     }
 
     #[test]
@@ -162,6 +281,29 @@ SwapFree:              0 kB
     fn parse_meminfo_missing_field() {
         let incomplete = "MemTotal:  1946360 kB\n";
         assert!(parse_meminfo(incomplete).is_none());
+    }
+
+    #[test]
+    fn parse_meminfo_minimal_no_extended() {
+        // Old kernel: only core fields, no extended
+        let content = "\
+MemTotal:        1000 kB
+MemAvailable:     500 kB
+SwapTotal:        200 kB
+SwapFree:         100 kB
+";
+        let info = parse_meminfo(content).unwrap();
+        assert_eq!(info.mem_total, 1000 * 1024);
+        assert_eq!(info.buffers, None);
+        assert_eq!(info.cached, None);
+        assert_eq!(info.dirty, None);
+        assert_eq!(info.writeback, None);
+        assert_eq!(info.shmem, None);
+        assert_eq!(info.slab_reclaimable, None);
+        assert_eq!(info.slab_unreclaim, None);
+        assert_eq!(info.committed_as, None);
+        assert_eq!(info.commit_limit, None);
+        assert_eq!(info.hw_corrupted, None);
     }
 
     #[test]
@@ -240,15 +382,21 @@ SwapFree:        0 kB
     const PROC_VMSTAT: &str = "\
 nr_free_pages 12345
 nr_zone_inactive_anon 678
+pswpin 500
+pswpout 800
 pgpgin 1234567
 pgpgout 2345678
+pgmajfault 42
 oom_kill 3
 ";
 
     const PROC_VMSTAT_NO_OOM: &str = "\
 nr_free_pages 12345
+pswpin 100
+pswpout 200
 pgpgin 1234567
 pgpgout 2345678
+pgmajfault 10
 ";
 
     #[test]
@@ -273,6 +421,38 @@ pgpgout 2345678
     }
 
     #[test]
+    fn parse_vmstat_full_counters() {
+        let counters = parse_vmstat(PROC_VMSTAT).unwrap();
+        assert_eq!(counters.oom_kill, 3);
+        assert_eq!(counters.pswpin, 500);
+        assert_eq!(counters.pswpout, 800);
+        assert_eq!(counters.pgpgin, 1_234_567);
+        assert_eq!(counters.pgpgout, 2_345_678);
+        assert_eq!(counters.pgmajfault, 42);
+    }
+
+    #[test]
+    fn parse_vmstat_no_oom_returns_none() {
+        assert!(parse_vmstat(PROC_VMSTAT_NO_OOM).is_none());
+    }
+
+    #[test]
+    fn parse_vmstat_empty_returns_none() {
+        assert!(parse_vmstat("").is_none());
+    }
+
+    #[test]
+    fn parse_vmstat_partial_fields() {
+        // Only oom_kill present, other fields stay at 0
+        let content = "oom_kill 7\npswpin 100\n";
+        let counters = parse_vmstat(content).unwrap();
+        assert_eq!(counters.oom_kill, 7);
+        assert_eq!(counters.pswpin, 100);
+        assert_eq!(counters.pswpout, 0);
+        assert_eq!(counters.pgmajfault, 0);
+    }
+
+    #[test]
     fn read_oom_kill_from_tempfile() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("vmstat");
@@ -283,5 +463,20 @@ pgpgout 2345678
     #[test]
     fn read_oom_kill_from_missing_file() {
         assert!(read_oom_kill_from("/nonexistent/vmstat").is_none());
+    }
+
+    #[test]
+    fn read_vmstat_from_tempfile() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("vmstat");
+        std::fs::write(&path, PROC_VMSTAT).unwrap();
+        let counters = read_vmstat_from(path.to_str().unwrap()).unwrap();
+        assert_eq!(counters.oom_kill, 3);
+        assert_eq!(counters.pswpin, 500);
+    }
+
+    #[test]
+    fn read_vmstat_from_missing_file() {
+        assert!(read_vmstat_from("/nonexistent/vmstat").is_none());
     }
 }
