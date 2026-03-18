@@ -132,7 +132,7 @@ pub struct DetectedSoftware {
     pub id: String,
     pub name: String,
     pub category: String,
-    pub version: Option<String>,       // best-effort: --version / binary
+    pub version: Option<String>,       // best-effort, filled async after core detection
     pub source: String,                // how detected: "port", "process", "systemd", "binary", "package"
     pub running: bool,                 // is it actively running right now?
     pub listening_ports: Vec<u16>,     // associated open ports (from ports scan)
@@ -140,7 +140,8 @@ pub struct DetectedSoftware {
 
 pub struct SoftwareDiscoveryData {
     pub detected: Vec<DetectedSoftware>,
-    pub scan_duration_ms: u64,
+    pub scan_duration_ms: u64,         // core detection time (signals 1-5)
+    pub version_duration_ms: u64,      // version probing time (async, capped at 3s)
 }
 ```
 
@@ -172,14 +173,29 @@ The software collector receives the already-collected `ServicePortsData` to avoi
 
 ### Performance budget
 
-Target: **< 500ms** total scan time (no network I/O, all local).
+**Core detection** (signals 1–5, excluding version probing):
+- Target: **< 500ms** total scan time (no network I/O, all local).
 - `/proc/*/comm` scan: ~10ms (same as ports inode scan)
 - `systemctl list-unit-files`: ~50ms
 - Binary stat() probes: ~5ms (20 stat calls)
-- Version detection (up to 15 binaries × 2s timeout): run concurrently, cap at ~2s worst case
 - dpkg-query: ~100ms
+- Total typical: ~200ms.
 
-Total worst case: ~2.5s. Use `tokio::time::timeout` per subprocess.
+**Version probing** (separate, runs after core detection completes):
+- Runs concurrently for all detected software, with a **global 3s timeout** via `tokio::time::timeout`.
+- Up to 15 concurrent `<binary> --version` subprocesses, each with individual 2s timeout.
+- Version results are best-effort: if the global timeout fires, any still-pending versions are set to `null`.
+- Version probing does NOT block the `DetectedSoftware` list — the list is assembled first (with `version: None`), then versions are filled in asynchronously.
+
+**Total worst case**: ~3.5s (500ms detection + 3s version probing). Acceptable for a 6-hour cycle that already runs `du`, `find`, and `docker inspect` taking 10–30s. The `scan_duration_ms` field in the response separates core detection time from version probing time:
+
+```rust
+pub struct SoftwareDiscoveryData {
+    pub detected: Vec<DetectedSoftware>,
+    pub scan_duration_ms: u64,          // core detection only
+    pub version_duration_ms: u64,       // version probing only
+}
+```
 
 ---
 
@@ -211,7 +227,8 @@ export type SoftwareCategory =
 
 export interface SoftwareDiscoveryData {
   detected: DetectedSoftware[];
-  scan_duration_ms: number;
+  scan_duration_ms: number;          // core detection only
+  version_duration_ms: number;       // version probing only
 }
 ```
 
@@ -247,6 +264,18 @@ Single column, same pattern as other tier2 JSON columns.
 - Parse `software_json` back to `SoftwareDiscoveryData`
 - Include in `Tier2Snapshot` response
 
+### Dashboard read path
+
+The Dashboard reads software data via the **existing** `GET /api/hosts/:id/tier2` route (already registered in the worker, authenticated with `BAT_READ_KEY`). This route returns the latest `Tier2Snapshot` which will now include the `software` field.
+
+Dashboard proxy route already exists or needs to be added:
+
+| Dashboard route file | Method | Proxies to Worker | Status |
+|---------------------|--------|-------------------|--------|
+| `/api/hosts/[id]/tier2/route.ts` | GET | `GET /api/hosts/:id/tier2` | **New** — must be added as a dashboard proxy route |
+
+The host detail page (`/hosts/[id]`) will call this proxy route to fetch tier2 data (including software). Currently the host detail page only renders Tier 1 metrics charts; the tier2 API exists on the worker side but has no corresponding dashboard proxy or UI — both must be added as part of this feature.
+
 ### Hosts list enrichment (optional, Phase 2)
 
 Add `software_summary` to `HostOverviewItem` — array of software IDs from latest tier2 snapshot. Enables host card to show software icons. This is a subsequent commit, not part of the core feature.
@@ -270,13 +299,14 @@ New card: **"Installed Software"**
 
 ---
 
-## Commits (estimated 5)
+## Commits (estimated 6)
 
-1. `feat: add software discovery collector to probe` — registry, process scan, systemd scan, binary probe, version detection
-2. `test: add software discovery unit tests` — mock procfs, systemd output parsing, registry matching
-3. `feat: add software_json column and ingest/read support` — migration + worker routes
-4. `feat: add shared types for software discovery` — TypeScript types in `@bat/shared`
-5. `feat: add software discovery UI to host detail` — dashboard rendering
+1. `feat: add software discovery collector to probe` — registry, process scan, systemd scan, binary probe, two-phase version detection
+2. `test: add software discovery unit tests` — mock procfs, systemd output parsing, registry matching, version timeout behavior
+3. `feat: add software_json column and ingest/read support` — migration + worker tier2 ingest/read changes
+4. `feat: add shared types for software discovery` — TypeScript types in `@bat/shared` (tier2.ts + api.ts)
+5. `feat: add tier2 proxy route and software UI to host detail` — dashboard proxy `/api/hosts/[id]/tier2/route.ts` + "Installed Software" card on host detail page
+6. `feat: add software summary to host cards` — Phase 2: software icons on host overview cards
 
 ---
 
