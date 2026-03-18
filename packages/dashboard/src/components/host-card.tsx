@@ -223,14 +223,14 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 					<ResourceBar
 						value={host.cpu_usage_pct}
 						label="CPU"
-						suffix={host.cpu_load1 !== null ? `Load ${host.cpu_load1.toFixed(1)}` : undefined}
+						suffix={host.cpu_load1 != null ? `Load ${host.cpu_load1.toFixed(1)}` : undefined}
 					/>
 					<ResourceBar value={host.mem_used_pct} label="MEM" suffix={memUsage ?? undefined} />
 					<ResourceBar
 						value={host.swap_used_pct}
 						label="SWAP"
 						suffix={
-							host.disk_root_used_pct !== null
+							host.disk_root_used_pct != null
 								? `Disk / ${formatDiskUsage(host.disk_root_used_pct)}`
 								: undefined
 						}
