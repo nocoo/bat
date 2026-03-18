@@ -24,6 +24,24 @@ pub struct MetricsPayload {
     /// Tier 3: System-wide file descriptor usage from `/proc/sys/fs/file-nr`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fd: Option<FdMetrics>,
+    /// Socket usage from `/proc/net/sockstat`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub socket: Option<SocketMetrics>,
+    /// UDP stats from `/proc/net/sockstat`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp: Option<UdpMetrics>,
+    /// SNMP protocol counters (deltas/rates) from `/proc/net/snmp`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub snmp: Option<SnmpMetrics>,
+    /// Extended TCP stats (deltas) from `/proc/net/netstat`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub netstat: Option<NetstatMetrics>,
+    /// Softnet counters (deltas) from `/proc/net/softnet_stat`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub softnet: Option<SoftnetMetrics>,
+    /// Connection tracking from `/proc/sys/net/netfilter/`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conntrack: Option<ConntrackMetrics>,
 }
 
 #[derive(Debug, Serialize)]
@@ -47,6 +65,21 @@ pub struct CpuMetrics {
     /// Tier 3: number of processes waiting for I/O
     #[serde(skip_serializing_if = "Option::is_none")]
     pub procs_blocked: Option<u32>,
+    /// Interrupts per second (delta from `/proc/stat` intr total)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interrupts_sec: Option<f64>,
+    /// `NET_RX` softirq per second
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub softirq_net_rx_sec: Option<f64>,
+    /// BLOCK softirq per second
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub softirq_block_sec: Option<f64>,
+    /// Number of runnable tasks from `/proc/loadavg`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tasks_running: Option<u32>,
+    /// Total number of tasks from `/proc/loadavg`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tasks_total: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -57,6 +90,38 @@ pub struct MemMetrics {
     /// Tier 3: OOM kills since last sample (delta from `/proc/vmstat` `oom_kill`)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oom_kills_delta: Option<u64>,
+    // --- Extended meminfo fields ---
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub buffers: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dirty: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub writeback: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub shmem: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slab_reclaimable: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub slab_unreclaim: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub committed_as: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commit_limit: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hw_corrupted: Option<u64>,
+    // --- Vmstat rate fields ---
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swap_in_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swap_out_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pgmajfault_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pgpgin_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pgpgout_sec: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -72,6 +137,12 @@ pub struct DiskMetric {
     pub total_bytes: u64,
     pub avail_bytes: u64,
     pub used_pct: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inodes_total: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inodes_avail: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inodes_used_pct: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -81,6 +152,14 @@ pub struct NetMetric {
     pub tx_bytes_rate: f64,
     pub rx_errors: u64,
     pub tx_errors: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rx_packets_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_packets_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rx_dropped: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tx_dropped: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -100,6 +179,17 @@ pub struct PsiMetrics {
     pub io_full_avg10: f64,
     pub io_full_avg60: f64,
     pub io_full_avg300: f64,
+    // --- Total microsecond deltas ---
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_some_total_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mem_some_total_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mem_full_total_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_some_total_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_full_total_delta: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -110,6 +200,12 @@ pub struct DiskIoMetric {
     pub read_bytes_sec: f64,
     pub write_bytes_sec: f64,
     pub io_util_pct: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_await_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub write_await_ms: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_queue_depth: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -118,11 +214,86 @@ pub struct TcpMetrics {
     pub time_wait: u32,
     pub orphan: u32,
     pub allocated: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mem_pages: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct FdMetrics {
     pub allocated: u64,
+    pub max: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SocketMetrics {
+    pub sockets_used: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UdpMetrics {
+    pub inuse: u32,
+    pub mem_pages: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SnmpMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retrans_segs_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_opens_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub passive_opens_sec: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attempt_fails_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estab_resets_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub in_errs_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub out_rsts_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp_rcvbuf_errors_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp_sndbuf_errors_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub udp_in_errors_delta: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[allow(clippy::struct_field_names)]
+pub struct NetstatMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listen_overflows_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub listen_drops_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_timeouts_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_syn_retrans_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_fast_retrans_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_ofo_queue_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tcp_abort_on_memory_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub syncookies_sent_delta: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[allow(clippy::struct_field_names)]
+pub struct SoftnetMetrics {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub processed_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dropped_delta: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_squeeze_delta: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConntrackMetrics {
+    pub count: u64,
     pub max: u64,
 }
 
@@ -333,12 +504,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 4_000_000_000,
                 available_bytes: 2_000_000_000,
                 used_pct: 50.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 2_000_000_000,
@@ -350,6 +541,9 @@ mod tests {
                 total_bytes: 50_000_000_000,
                 avail_bytes: 30_000_000_000,
                 used_pct: 40.0,
+                inodes_total: None,
+                inodes_avail: None,
+                inodes_used_pct: None,
             }],
             net: vec![NetMetric {
                 iface: "eth0".into(),
@@ -357,12 +551,22 @@ mod tests {
                 tx_bytes_rate: 512.3,
                 rx_errors: 0,
                 tx_errors: 0,
+                rx_packets_rate: None,
+                tx_packets_rate: None,
+                rx_dropped: None,
+                tx_dropped: None,
             }],
             uptime_seconds: 86400,
             psi: None,
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -505,12 +709,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -524,6 +748,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -787,12 +1017,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -805,18 +1055,27 @@ mod tests {
                     total_bytes: 100_000_000_000,
                     avail_bytes: 50_000_000_000,
                     used_pct: 50.0,
+                    inodes_total: None,
+                    inodes_avail: None,
+                    inodes_used_pct: None,
                 },
                 DiskMetric {
                     mount: "/data".into(),
                     total_bytes: 500_000_000_000,
                     avail_bytes: 200_000_000_000,
                     used_pct: 60.0,
+                    inodes_total: None,
+                    inodes_avail: None,
+                    inodes_used_pct: None,
                 },
                 DiskMetric {
                     mount: "/boot".into(),
                     total_bytes: 1_000_000_000,
                     avail_bytes: 500_000_000,
                     used_pct: 50.0,
+                    inodes_total: None,
+                    inodes_avail: None,
+                    inodes_used_pct: None,
                 },
             ],
             net: vec![
@@ -826,6 +1085,10 @@ mod tests {
                     tx_bytes_rate: 512.0,
                     rx_errors: 0,
                     tx_errors: 0,
+                    rx_packets_rate: None,
+                    tx_packets_rate: None,
+                    rx_dropped: None,
+                    tx_dropped: None,
                 },
                 NetMetric {
                     iface: "wlan0".into(),
@@ -833,6 +1096,10 @@ mod tests {
                     tx_bytes_rate: 128.25,
                     rx_errors: 3,
                     tx_errors: 1,
+                    rx_packets_rate: None,
+                    tx_packets_rate: None,
+                    rx_dropped: None,
+                    tx_dropped: None,
                 },
             ],
             uptime_seconds: 86400,
@@ -840,6 +1107,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -874,12 +1147,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: u64::MAX,
                 available_bytes: 0,
                 used_pct: 100.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: u64::MAX,
@@ -893,6 +1186,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         // Should serialize without panic
@@ -970,12 +1269,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -989,6 +1308,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1015,12 +1340,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 0,
                 available_bytes: 0,
                 used_pct: 0.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -1046,10 +1391,21 @@ mod tests {
                 io_full_avg10: 0.30,
                 io_full_avg60: 0.0,
                 io_full_avg300: 0.0,
+                cpu_some_total_delta: None,
+                mem_some_total_delta: None,
+                mem_full_total_delta: None,
+                io_some_total_delta: None,
+                io_full_total_delta: None,
             }),
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1079,12 +1435,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 1000,
                 available_bytes: 500,
                 used_pct: 50.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -1098,6 +1474,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1127,12 +1509,32 @@ mod tests {
                 forks_sec: None,
                 procs_running: None,
                 procs_blocked: None,
+                interrupts_sec: None,
+                softirq_net_rx_sec: None,
+                softirq_block_sec: None,
+                tasks_running: None,
+                tasks_total: None,
             },
             mem: MemMetrics {
                 total_bytes: 1000,
                 available_bytes: 500,
                 used_pct: 50.0,
                 oom_kills_delta: Some(2),
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             swap: SwapMetrics {
                 total_bytes: 0,
@@ -1146,6 +1548,12 @@ mod tests {
             disk_io: None,
             tcp: None,
             fd: None,
+            socket: None,
+            udp: None,
+            snmp: None,
+            netstat: None,
+            softnet: None,
+            conntrack: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
