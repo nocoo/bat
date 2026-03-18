@@ -83,6 +83,8 @@ beforeAll(async () => {
 		"migrations/0007_probe_version.sql",
 		"migrations/0008_signal_expansion.sql",
 		"migrations/0009_signal_expansion_hourly.sql",
+		"migrations/0010_tags.sql",
+		"migrations/0011_software_column.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(
