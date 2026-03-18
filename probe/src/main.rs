@@ -240,7 +240,10 @@ fn collect_metrics(
     *prev_jiffies = curr_jiffies;
 
     // Load averages
-    let loadavg = collectors::cpu::read_loadavg().unwrap_or((0.0, 0.0, 0.0));
+    let loadavg_data = collectors::cpu::read_loadavg().ok();
+    let loadavg = loadavg_data
+        .as_ref()
+        .map_or((0.0, 0.0, 0.0), |la| (la.load1, la.load5, la.load15));
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
