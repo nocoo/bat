@@ -260,7 +260,7 @@ Hosts are never auto-deleted. Instead:
 
 ### Metrics payload (Probe → Worker)
 
-Sent every 30s via `POST /api/ingest`. Full metric definitions in [01-metrics-catalogue.md § Tier 1](./01-metrics-catalogue.md).
+Sent every 30s via `POST /api/ingest`. Full metric definitions in [01-metrics-catalogue.md § Real-Time Signals](./01-metrics-catalogue.md).
 
 ```typescript
 // @bat/shared — packages/shared/src/metrics.ts
@@ -368,7 +368,7 @@ interface FdMetrics {
 
 ### Identity payload (Probe → Worker)
 
-Sent on startup + every 6h via `POST /api/identity`. Metric definitions in [01-metrics-catalogue.md § 1.5 System Identity](./01-metrics-catalogue.md).
+Sent on startup + every 6h via `POST /api/identity`. Metric definitions in [01-metrics-catalogue.md § Host Identity](./01-metrics-catalogue.md).
 
 ```typescript
 // @bat/shared — packages/shared/src/identity.ts
