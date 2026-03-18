@@ -23,6 +23,61 @@ Allow users to tag hosts with arbitrary labels (e.g. `production`, `us-east`, `d
 
 ---
 
+## Architecture
+
+### Key decision: Dashboard → D1 direct, no Worker involvement
+
+Tags are **user-initiated state** — only the Dashboard reads and writes them. The Probe and Worker never touch tags. Therefore:
+
+- **Dashboard connects to D1 directly** via [Cloudflare D1 REST API](https://developers.cloudflare.com/d1/platform/client-api/).
+- **No Worker routes** for tags. No new API keys. No proxy layer.
+- All tag CRUD happens in Dashboard Next.js API routes, protected by NextAuth session.
+- The Worker's hosts list query does NOT include tags — the Dashboard enriches the response client-side or in its own API route by querying D1 separately.
+
+This keeps the existing security model untouched:
+- `BAT_WRITE_KEY` stays probe-only.
+- `BAT_READ_KEY` stays read-only.
+- Tag mutations are gated by NextAuth session (Google OAuth), not by API key.
+
+### D1 REST API access
+
+Dashboard env vars (Railway):
+```
+CF_API_TOKEN=<token with D1 read/write permission>
+CF_ACCOUNT_ID=<cloudflare account id>
+CF_D1_DATABASE_ID=<bat-db database id>
+```
+
+D1 client helper (`packages/dashboard/src/lib/d1.ts`):
+```typescript
+interface D1Result<T> {
+  results: T[];
+  success: boolean;
+  meta: { changes: number; last_row_id: number; rows_read: number; rows_written: number };
+}
+
+export async function d1Query<T = Record<string, unknown>>(
+  sql: string,
+  params?: unknown[],
+): Promise<D1Result<T>> {
+  const res = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/d1/database/${CF_D1_DATABASE_ID}/query`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${CF_API_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ sql, params }),
+    },
+  );
+  const json = await res.json();
+  return json.result[0];
+}
+```
+
+---
+
 ## Data Model
 
 ### New table: `tags`
@@ -49,63 +104,66 @@ CREATE INDEX idx_host_tags_tag ON host_tags(tag_id);
 
 ### Migration
 
-`0010_tags.sql` — creates both tables and the index. Non-destructive, additive only.
+`0010_tags.sql` — creates both tables and the index. Non-destructive, additive only. Applied via `wrangler d1 migrations apply` as usual.
 
 ---
 
-## API
+## Dashboard API Routes
 
-### Authentication — new `BAT_ADMIN_KEY`
+All tag operations are Dashboard-side Next.js API routes that query D1 directly. Protected by NextAuth session — unauthenticated requests get 401.
 
-Tags are **user-initiated state changes** (create, rename, delete, assign). The existing two-key model doesn't cover this:
+### Tag CRUD (`/api/tags`)
 
-- `BAT_WRITE_KEY` — probe → worker only; probes should never touch tags.
-- `BAT_READ_KEY` — dashboard → worker, read-only. If this key leaks (e.g. Railway env exposure), an attacker can read host data but cannot mutate state.
+| Method | Route | Body | Response | Description |
+|--------|-------|------|----------|-------------|
+| `GET` | `/api/tags` | — | `TagItem[]` | List all tags with host count |
+| `POST` | `/api/tags` | `{ name, color? }` | `TagItem` | Create tag |
 
-Putting tag mutations behind `BAT_READ_KEY` would violate this invariant. Instead, introduce a **third key**:
+### Tag by ID (`/api/tags/[id]`)
 
-- `BAT_ADMIN_KEY` — dashboard → worker, for state-mutating operations initiated by authenticated users (tag CRUD, tag assignment, future: host retire, alert ack).
-- Stored as a Worker secret alongside the existing two keys.
-- Dashboard holds it in env and proxies it only for mutation requests, after verifying the user's NextAuth session.
+| Method | Route | Body | Response | Description |
+|--------|-------|------|----------|-------------|
+| `PUT` | `/api/tags/:id` | `{ name?, color? }` | `TagItem` | Update tag |
+| `DELETE` | `/api/tags/:id` | — | `204` | Delete tag (cascade removes host_tags) |
 
-**Middleware change** (`middleware/api-key.ts`):
-- Add `ADMIN_ROUTES` array: `["/api/tags", "/api/hosts/*/tags"]` (prefix match for these paths + POST/PUT/DELETE methods).
-- For admin routes: validate against `BAT_ADMIN_KEY`.
-- GET requests to `/api/tags` and `/api/hosts/:id/tags` remain under `BAT_READ_KEY` (read-only access).
-- Route classification order: public → write → admin (method + path check) → read (fallthrough).
+### Host ↔ Tag assignment (`/api/hosts/[id]/tags`)
 
-### Tag CRUD
+| Method | Route | Body | Response | Description |
+|--------|-------|------|----------|-------------|
+| `GET` | `/api/hosts/:id/tags` | — | `HostTag[]` | Tags for a host |
+| `PUT` | `/api/hosts/:id/tags` | `{ tag_ids: number[] }` | `HostTag[]` | Replace host's tags (set semantics) |
+| `POST` | `/api/hosts/:id/tags` | `{ tag_id: number }` | `HostTag` | Add one tag |
 
-| Method | Route | Auth | Body | Response | Description |
-|--------|-------|------|------|----------|-------------|
-| `GET` | `/api/tags` | Read Key | — | `TagItem[]` | List all tags (with host count) |
-| `POST` | `/api/tags` | Admin Key | `{ name, color? }` | `TagItem` | Create tag |
-| `PUT` | `/api/tags/:id` | Admin Key | `{ name?, color? }` | `TagItem` | Update tag |
-| `DELETE` | `/api/tags/:id` | Admin Key | — | `204` | Delete tag + cascade from host_tags |
+### Remove tag from host (`/api/hosts/[id]/tags/[tagId]`)
 
-### Host ↔ Tag assignment
+| Method | Route | Body | Response | Description |
+|--------|-------|------|----------|-------------|
+| `DELETE` | `/api/hosts/:id/tags/:tagId` | — | `204` | Remove one tag from host |
 
-| Method | Route | Auth | Body | Response | Description |
-|--------|-------|------|------|----------|-------------|
-| `GET` | `/api/hosts/:id/tags` | Read Key | — | `HostTag[]` | Tags for a host |
-| `PUT` | `/api/hosts/:id/tags` | Admin Key | `{ tag_ids: number[] }` | `HostTag[]` | Replace host's tags (set semantics) |
-| `POST` | `/api/hosts/:id/tags` | Admin Key | `{ tag_id: number }` | `HostTag` | Add one tag |
-| `DELETE` | `/api/hosts/:id/tags/:tagId` | Admin Key | — | `204` | Remove one tag |
+### Implementation pattern
 
-### Shared types (`packages/shared/src/api.ts`)
+Each route handler:
+1. Verify NextAuth session → 401 if missing
+2. Validate input (name format, tag exists, host exists, limit not exceeded)
+3. Call `d1Query()` with parameterized SQL
+4. Return JSON response
+
+---
+
+## Shared Types (`packages/shared/src/api.ts`)
 
 Two separate interfaces — management context vs host context:
 
 ```typescript
-/** Full tag info — returned by /api/tags (management page). */
+/** Full tag info — returned by GET /api/tags (management page). */
 export interface TagItem {
   id: number;
   name: string;
   color: number;
-  host_count: number;  // only populated for /api/tags list
+  host_count: number;  // only populated for tag list
 }
 
-/** Lightweight tag reference — embedded in HostOverviewItem and host-scoped routes. */
+/** Lightweight tag reference — embedded in host cards. */
 export interface HostTag {
   id: number;
   name: string;
@@ -113,45 +171,25 @@ export interface HostTag {
 }
 ```
 
-Extend `HostOverviewItem`:
-```typescript
-tags: HostTag[];  // populated via JOIN in hosts list query — no host_count needed
-```
-
-### Hosts list query change
-
-Current query fetches hosts + latest metrics. Add tag data via one of two approaches:
-
-**Option A — Separate batch query** (chosen):
-```sql
--- After fetching host list, batch-query all tags:
-SELECT ht.host_id, t.id, t.name, t.color
-FROM host_tags ht JOIN tags t ON t.id = ht.tag_id
-WHERE ht.host_id IN (?, ?, ...)
-ORDER BY t.name ASC
-```
-Group results by `host_id` in the route handler → `HostTag[]` per host.
-
-This avoids GROUP_CONCAT encoding issues entirely. For a fleet of < 50 hosts with < 10 tags each, a second D1 query is negligible. The previous GROUP_CONCAT approach was rejected because delimiter-based encoding breaks when tag names contain the delimiter characters, and D1 SQLite lacks `json_group_array`.
-
-**Option B — GROUP_CONCAT with JSON encoding**: Rejected. D1 doesn't support `json_group_array`, and custom delimiter encoding (`:`, `|`) is fragile against freeform tag names.
-
 ---
 
-## Dashboard Routes (Proxy)
+## Hosts page integration
 
-Add proxy routes in `packages/dashboard/src/app/api/`:
+The hosts page currently fetches host data from Worker via `GET /api/hosts` (proxied through Dashboard). Tags are NOT part of that response — they live in a separate data path.
 
-| Dashboard route file | Methods | Proxies to Worker | Auth key used |
-|---------------------|---------|-------------------|---------------|
-| `/api/tags/route.ts` | GET | `GET /api/tags` | `BAT_READ_KEY` |
-| `/api/tags/route.ts` | POST | `POST /api/tags` | `BAT_ADMIN_KEY` |
-| `/api/tags/[id]/route.ts` | PUT, DELETE | `PUT/DELETE /api/tags/:id` | `BAT_ADMIN_KEY` |
-| `/api/hosts/[id]/tags/route.ts` | GET | `GET /api/hosts/:id/tags` | `BAT_READ_KEY` |
-| `/api/hosts/[id]/tags/route.ts` | PUT, POST | `PUT/POST /api/hosts/:id/tags` | `BAT_ADMIN_KEY` |
-| `/api/hosts/[id]/tags/[tagId]/route.ts` | DELETE | `DELETE /api/hosts/:id/tags/:tagId` | `BAT_ADMIN_KEY` |
+**Approach**: The hosts page makes two parallel requests:
+1. `GET /api/hosts` → Worker (via existing proxy) → host list with metrics
+2. `GET /api/tags/by-hosts` → Dashboard D1 direct → `{ [host_id]: HostTag[] }`
 
-Each proxy route verifies the user's NextAuth session before forwarding. Mutation routes (POST/PUT/DELETE) use `BAT_ADMIN_KEY`; read routes (GET) use `BAT_READ_KEY`.
+New Dashboard route `/api/tags/by-hosts/route.ts`:
+```sql
+SELECT ht.host_id, t.id, t.name, t.color
+FROM host_tags ht JOIN tags t ON t.id = ht.tag_id
+ORDER BY t.name ASC
+```
+Returns a map of `host_id → HostTag[]`. Client merges the two responses.
+
+This keeps the Worker completely unaware of tags.
 
 ---
 
@@ -177,19 +215,20 @@ Each proxy route verifies the user's NextAuth session before forwarding. Mutatio
 
 ---
 
-## Commits (estimated 6)
+## Commits (estimated 5)
 
-1. `feat: add BAT_ADMIN_KEY auth tier to worker middleware` — new key type, ADMIN_ROUTES classification, method-aware routing
-2. `feat: add tags migration (0010)` — SQL migration file
-3. `feat: add tag CRUD routes to worker` — worker routes + shared types (TagItem, HostTag)
-4. `feat: add tag assignment routes to worker` — host↔tag routes
-5. `feat: add tags management page to dashboard` — /tags page + all proxy routes (including [id] and [tagId] variants)
-6. `feat: add tag display and quick-tag to host cards` — host card chips, filter bar
+1. `feat: add tags migration (0010)` — SQL migration file
+2. `feat: add D1 REST API client to dashboard` — `lib/d1.ts` helper, env vars
+3. `feat: add tag CRUD and assignment API routes` — all Dashboard API routes for tags
+4. `feat: add tags management page` — `/tags` page with create/rename/recolor/delete
+5. `feat: add tag display and quick-tag to host cards` — host card chips, filter bar, `/api/tags/by-hosts` route
 
 ---
 
 ## Design Decisions
 
-- **Tag limit per host**: 10 max. Worker validates on assignment; returns 422 if exceeded.
-- **Tag name constraints**: 1–32 characters, lowercase, allowed chars: `a-z`, `0-9`, `-`, `_`. Validated at creation time (worker rejects non-conforming names with 400). This avoids encoding issues and ensures clean URL slugs. Names are stored COLLATE NOCASE but normalized to lowercase on insert.
+- **Tag limit per host**: 10 max. Dashboard validates on assignment; returns 422 if exceeded.
+- **Tag name constraints**: 1–32 characters, lowercase, allowed chars: `a-z`, `0-9`, `-`, `_`. Validated at creation time. This avoids encoding issues and ensures clean display. Names are stored COLLATE NOCASE but normalized to lowercase on insert.
 - **Color assignment**: auto-assign `(SELECT COALESCE(MAX(color), -1) + 1) % 10` on create (round-robin through 10 palette slots). User can override via PUT.
+- **No Worker changes**: Worker is completely unaware of tags. This avoids introducing new auth tiers, keeps the Worker's attack surface unchanged, and simplifies the architecture.
+- **D1 REST API latency**: Dashboard (Railway, US) → D1 REST API (Cloudflare) adds ~50–100ms per query. Acceptable for tag operations which are infrequent user actions, not high-frequency data paths.
