@@ -15,6 +15,10 @@ const MIGRATION_PROBE_VERSION_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0007_probe_version.sql",
 );
+const MIGRATION_SIGNAL_EXPANSION_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0008_signal_expansion.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -146,6 +150,15 @@ export function createMockD1(): D1Database {
 	// Apply probe_version migration
 	const probeVersionSchema = readFileSync(MIGRATION_PROBE_VERSION_PATH, "utf-8");
 	for (const stmt of probeVersionSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply signal expansion migration
+	const signalExpansionSchema = readFileSync(MIGRATION_SIGNAL_EXPANSION_PATH, "utf-8");
+	for (const stmt of signalExpansionSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
