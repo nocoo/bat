@@ -2,11 +2,13 @@
 
 import { HostCard } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
+import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHosts } from "@/lib/hooks";
+import { useHostTags, useHosts, useTags } from "@/lib/hooks";
 import { AlertTriangle, Server } from "lucide-react";
 import Link from "next/link";
+import { useCallback, useMemo, useState } from "react";
 
 function HostsLoading() {
 	return (
@@ -53,6 +55,31 @@ function HostsEmpty() {
 
 export default function HostsPage() {
 	const { data: hosts, error, isLoading } = useHosts();
+	const { data: hostTagsMap } = useHostTags();
+	const { data: allTags } = useTags();
+	const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+
+	const handleToggleTag = useCallback((tagId: number) => {
+		setSelectedTagIds((prev) =>
+			prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId],
+		);
+	}, []);
+
+	// Filter hosts by selected tags (AND logic)
+	const filteredHosts = useMemo(() => {
+		if (!hosts) return [];
+		if (selectedTagIds.length === 0) return hosts;
+		if (!hostTagsMap) return hosts;
+
+		return hosts.filter((host) => {
+			const tags = hostTagsMap[host.host_id] ?? [];
+			const tagIds = new Set(tags.map((t) => t.id));
+			return selectedTagIds.every((id) => tagIds.has(id));
+		});
+	}, [hosts, selectedTagIds, hostTagsMap]);
+
+	// Only show filter bar when there are tags defined
+	const showFilterBar = allTags && allTags.length > 0;
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts" }]}>
@@ -63,10 +90,27 @@ export default function HostsPage() {
 			) : !hosts || hosts.length === 0 ? (
 				<HostsEmpty />
 			) : (
-				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-					{hosts.map((host) => (
-						<HostCard key={host.host_id} host={host} />
-					))}
+				<div className="space-y-3">
+					{showFilterBar && (
+						<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
+					)}
+					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+						{filteredHosts.map((host) => (
+							<HostCard key={host.host_id} host={host} tags={hostTagsMap?.[host.host_id]} />
+						))}
+					</div>
+					{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
+						<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+							<p className="text-sm">No hosts match the selected tags.</p>
+							<button
+								type="button"
+								onClick={() => setSelectedTagIds([])}
+								className="mt-2 text-sm text-primary hover:underline"
+							>
+								Clear filters
+							</button>
+						</div>
+					)}
 				</div>
 			)}
 		</AppShell>
