@@ -15,6 +15,12 @@ export type {
 	PsiMetrics,
 	SwapMetrics,
 	TcpMetrics,
+	SocketMetrics,
+	UdpMetrics,
+	SnmpMetrics,
+	NetstatMetrics,
+	SoftnetMetrics,
+	ConntrackMetrics,
 } from "./metrics.js";
 
 // Identity payload types

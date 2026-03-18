@@ -15,6 +15,12 @@ export interface CpuMetrics {
 	forks_sec?: number;
 	procs_running?: number;
 	procs_blocked?: number;
+	// Signal expansion (optional — omitted by probes < v0.6.0)
+	interrupts_sec?: number;
+	softirq_net_rx_sec?: number;
+	softirq_block_sec?: number;
+	tasks_running?: number;
+	tasks_total?: number;
 }
 
 export interface MemMetrics {
@@ -23,6 +29,23 @@ export interface MemMetrics {
 	used_pct: number;
 	// Tier 3 extension
 	oom_kills_delta?: number;
+	// Extended meminfo fields
+	buffers?: number;
+	cached?: number;
+	dirty?: number;
+	writeback?: number;
+	shmem?: number;
+	slab_reclaimable?: number;
+	slab_unreclaim?: number;
+	committed_as?: number;
+	commit_limit?: number;
+	hw_corrupted?: number;
+	// Vmstat rate fields
+	swap_in_sec?: number;
+	swap_out_sec?: number;
+	pgmajfault_sec?: number;
+	pgpgin_sec?: number;
+	pgpgout_sec?: number;
 }
 
 export interface SwapMetrics {
@@ -36,6 +59,9 @@ export interface DiskMetric {
 	total_bytes: number;
 	avail_bytes: number;
 	used_pct: number;
+	inodes_total?: number;
+	inodes_avail?: number;
+	inodes_used_pct?: number;
 }
 
 export interface NetMetric {
@@ -44,6 +70,10 @@ export interface NetMetric {
 	tx_bytes_rate: number;
 	rx_errors: number;
 	tx_errors: number;
+	rx_packets_rate?: number;
+	tx_packets_rate?: number;
+	rx_dropped?: number;
+	tx_dropped?: number;
 }
 
 // --- Tier 3 types (design: docs/09-tier3-signals.md) ---
@@ -64,6 +94,12 @@ export interface PsiMetrics {
 	io_full_avg10: number;
 	io_full_avg60: number;
 	io_full_avg300: number;
+	// Total microsecond deltas
+	cpu_some_total_delta?: number;
+	mem_some_total_delta?: number;
+	mem_full_total_delta?: number;
+	io_some_total_delta?: number;
+	io_full_total_delta?: number;
 }
 
 export interface DiskIoMetric {
@@ -73,6 +109,9 @@ export interface DiskIoMetric {
 	read_bytes_sec: number;
 	write_bytes_sec: number;
 	io_util_pct: number;
+	read_await_ms?: number;
+	write_await_ms?: number;
+	io_queue_depth?: number;
 }
 
 export interface TcpMetrics {
@@ -80,10 +119,57 @@ export interface TcpMetrics {
 	time_wait: number;
 	orphan: number;
 	allocated: number;
+	mem_pages?: number;
 }
 
 export interface FdMetrics {
 	allocated: number;
+	max: number;
+}
+
+// --- Signal expansion types ---
+
+export interface SocketMetrics {
+	sockets_used: number;
+}
+
+export interface UdpMetrics {
+	inuse: number;
+	mem_pages: number;
+}
+
+export interface SnmpMetrics {
+	retrans_segs_sec?: number;
+	active_opens_sec?: number;
+	passive_opens_sec?: number;
+	attempt_fails_delta?: number;
+	estab_resets_delta?: number;
+	in_errs_delta?: number;
+	out_rsts_delta?: number;
+	udp_rcvbuf_errors_delta?: number;
+	udp_sndbuf_errors_delta?: number;
+	udp_in_errors_delta?: number;
+}
+
+export interface NetstatMetrics {
+	listen_overflows_delta?: number;
+	listen_drops_delta?: number;
+	tcp_timeouts_delta?: number;
+	tcp_syn_retrans_delta?: number;
+	tcp_fast_retrans_delta?: number;
+	tcp_ofo_queue_delta?: number;
+	tcp_abort_on_memory_delta?: number;
+	syncookies_sent_delta?: number;
+}
+
+export interface SoftnetMetrics {
+	processed_delta?: number;
+	dropped_delta?: number;
+	time_squeeze_delta?: number;
+}
+
+export interface ConntrackMetrics {
+	count: number;
 	max: number;
 }
 
@@ -103,4 +189,11 @@ export interface MetricsPayload {
 	disk_io?: DiskIoMetric[];
 	tcp?: TcpMetrics;
 	fd?: FdMetrics;
+	// Signal expansion (optional — omitted by probes < v0.6.0)
+	socket?: SocketMetrics;
+	udp?: UdpMetrics;
+	snmp?: SnmpMetrics;
+	netstat?: NetstatMetrics;
+	softnet?: SoftnetMetrics;
+	conntrack?: ConntrackMetrics;
 }
