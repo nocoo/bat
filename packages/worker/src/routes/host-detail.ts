@@ -171,6 +171,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		net_tx_rate: netRates.tx,
 		cpu_sparkline: null, // detail page uses its own metrics endpoint
 		mem_sparkline: null,
+		net_sparkline: null,
 		swap_total_bytes: host.swap_total_bytes,
 		boot_mode: host.boot_mode,
 		timezone: host.timezone,

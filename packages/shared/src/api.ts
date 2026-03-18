@@ -75,6 +75,7 @@ export interface HostOverviewItem {
 	net_tx_rate: number | null; // bytes/sec aggregate
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
 	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
+	net_sparkline: SparklinePoint[] | null; // 24h hourly Network usage (normalized 0–100)
 }
 
 /** GET /api/hosts/:id → HostDetailItem */
