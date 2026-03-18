@@ -10,6 +10,15 @@ import type { HostTag } from "@bat/shared";
 
 type Params = { params: Promise<{ id: string }> };
 
+/** Verify host exists in hosts table. Returns true if found. */
+async function hostExists(hostId: string): Promise<boolean> {
+	const result = await d1Query<{ host_id: string }>(
+		"SELECT host_id FROM hosts WHERE host_id = ? LIMIT 1",
+		[hostId],
+	);
+	return result.results.length > 0;
+}
+
 export async function GET(_request: Request, { params }: Params) {
 	const session = await auth();
 	if (!session) {
@@ -40,6 +49,11 @@ export async function POST(request: Request, { params }: Params) {
 
 	if (!body.tag_id || typeof body.tag_id !== "number") {
 		return Response.json({ error: "tag_id is required" }, { status: 400 });
+	}
+
+	// Verify host exists
+	if (!(await hostExists(hostId))) {
+		return Response.json({ error: "Host not found" }, { status: 404 });
 	}
 
 	// Check tag limit
@@ -86,7 +100,26 @@ export async function PUT(request: Request, { params }: Params) {
 		return Response.json({ error: `Maximum ${MAX_TAGS_PER_HOST} tags per host` }, { status: 422 });
 	}
 
-	// Delete all existing, then insert new
+	// Verify host exists before any mutations
+	if (!(await hostExists(hostId))) {
+		return Response.json({ error: "Host not found" }, { status: 404 });
+	}
+
+	// Verify all tag_ids exist before any mutations
+	if (body.tag_ids.length > 0) {
+		const placeholders = body.tag_ids.map(() => "?").join(", ");
+		const existingTags = await d1Query<{ id: number }>(
+			`SELECT id FROM tags WHERE id IN (${placeholders})`,
+			body.tag_ids,
+		);
+		if (existingTags.results.length !== body.tag_ids.length) {
+			const found = new Set(existingTags.results.map((t) => t.id));
+			const missing = body.tag_ids.filter((id) => !found.has(id));
+			return Response.json({ error: `Tags not found: ${missing.join(", ")}` }, { status: 404 });
+		}
+	}
+
+	// Safe to mutate — delete all existing, then insert new
 	await d1Query("DELETE FROM host_tags WHERE host_id = ?", [hostId]);
 
 	if (body.tag_ids.length > 0) {
