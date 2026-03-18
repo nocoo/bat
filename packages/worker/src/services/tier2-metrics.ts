@@ -37,11 +37,13 @@ export async function getLatestTier2Snapshot(
 ): Promise<Tier2Snapshot | null> {
 	const row = await db
 		.prepare(
-			`SELECT host_id, ts, ports_json, updates_json, systemd_json,
-       security_json, docker_json, disk_deep_json, software_json
-FROM tier2_snapshots
-WHERE host_id = ?
-ORDER BY ts DESC
+			`SELECT t.host_id, t.ts, t.ports_json, t.updates_json, t.systemd_json,
+       t.security_json, t.docker_json, t.disk_deep_json, t.software_json,
+       h.timezone, h.dns_resolvers AS dns_resolvers_json, h.dns_search AS dns_search_json
+FROM tier2_snapshots t
+JOIN hosts h ON h.host_id = t.host_id
+WHERE t.host_id = ?
+ORDER BY t.ts DESC
 LIMIT 1`,
 		)
 		.bind(hostId)
@@ -59,9 +61,9 @@ LIMIT 1`,
 		docker: safeParse(row.docker_json),
 		disk_deep: safeParse(row.disk_deep_json),
 		software: safeParse(row.software_json),
-		timezone: null, // served from hosts table, not tier2_snapshots
-		dns_resolvers: null,
-		dns_search: null,
+		timezone: row.timezone ?? null,
+		dns_resolvers: safeParse(row.dns_resolvers_json),
+		dns_search: safeParse(row.dns_search_json),
 	};
 }
 
@@ -75,6 +77,9 @@ interface Tier2Row {
 	docker_json: string | null;
 	disk_deep_json: string | null;
 	software_json: string | null;
+	timezone: string | null;
+	dns_resolvers_json: string | null;
+	dns_search_json: string | null;
 }
 
 function safeParse<T>(json: string | null): T | null {
