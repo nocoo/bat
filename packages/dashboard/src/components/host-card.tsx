@@ -1,9 +1,12 @@
 import { StatusBadge } from "@/components/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { HostOverviewItem } from "@bat/shared";
+import { Card } from "@/components/ui/card";
+import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
-import { Clock, Cpu, HardDrive } from "lucide-react";
 import Link from "next/link";
+
+// ---------------------------------------------------------------------------
+// Formatters
+// ---------------------------------------------------------------------------
 
 function formatUptime(seconds: number | null): string {
 	if (seconds === null || seconds <= 0) return "—";
@@ -26,7 +29,6 @@ function formatLastSeen(unixSeconds: number): string {
 /** Truncate PRETTY_NAME — "Ubuntu 22.04.3 LTS" → "Ubuntu 22.04" */
 function shortenOs(os: string | null): string | null {
 	if (!os) return null;
-	// Match "Name Major.Minor" and drop patch/suffix
 	const match = os.match(/^(\S+)\s+(\d+\.\d+)/);
 	return match ? `${match[1]} ${match[2]}` : os;
 }
@@ -49,71 +51,207 @@ function formatCpuTopology(physical: number | null, logical: number | null): str
 	return `${physical ?? logical}C`;
 }
 
-/** Build subtitle parts: "Ubuntu 22.04 · x86_64 · 4C/8T · 8 GB" */
+/** Format memory as used/total — "4.8 / 8 GB" */
+function formatMemoryUsage(totalBytes: number | null, usedPct: number | null): string | null {
+	if (totalBytes === null || usedPct === null) return null;
+	const totalGb = totalBytes / (1024 * 1024 * 1024);
+	const usedGb = (totalGb * usedPct) / 100;
+	if (totalGb >= 1) {
+		return `${usedGb.toFixed(1)} / ${Math.round(totalGb)} GB`;
+	}
+	const totalMb = totalBytes / (1024 * 1024);
+	const usedMb = (totalMb * usedPct) / 100;
+	return `${Math.round(usedMb)} / ${Math.round(totalMb)} MB`;
+}
+
+/** Format network rate — bytes/sec → human-readable */
+function formatNetRate(bytesPerSec: number | null): string {
+	if (bytesPerSec === null) return "—";
+	if (bytesPerSec >= 1024 * 1024 * 1024) return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
+	if (bytesPerSec >= 1024 * 1024) return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+	if (bytesPerSec >= 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+	return `${Math.round(bytesPerSec)} B/s`;
+}
+
+/** Format disk usage — just percentage string */
+function formatDiskUsage(pct: number | null): string {
+	if (pct === null) return "—";
+	return `${Math.round(pct)}%`;
+}
+
+/** Build subtitle: "Ubuntu 22.04 · x86_64 · KVM · 203.0.113.42" */
 function buildSubtitle(host: HostOverviewItem): string | null {
 	const parts: string[] = [];
 	const os = shortenOs(host.os);
 	if (os) parts.push(os);
 	if (host.arch) parts.push(host.arch);
-	const cpu = formatCpuTopology(host.cpu_physical, host.cpu_logical);
-	if (cpu) parts.push(cpu);
-	const mem = formatMemory(host.mem_total_bytes);
-	if (mem) parts.push(mem);
+	if (host.virtualization) parts.push(host.virtualization.toUpperCase());
+	if (host.public_ip) parts.push(host.public_ip);
 	return parts.length > 0 ? parts.join(" · ") : null;
 }
 
-function MetricRow({
-	icon,
-	label,
-	value,
-}: { icon: React.ReactNode; label: string; value: string }) {
+/** Color class for resource bar based on value threshold */
+function getBarColor(value: number): string {
+	if (value >= 80) return "bg-destructive";
+	if (value >= 60) return "bg-warning";
+	return "bg-success";
+}
+
+/** Text color class matching bar color */
+function getValueColor(value: number): string {
+	if (value >= 80) return "text-destructive";
+	if (value >= 60) return "text-warning";
+	return "text-success";
+}
+
+// ---------------------------------------------------------------------------
+// Inline sub-components
+// ---------------------------------------------------------------------------
+
+function ResourceBar({ value, label, suffix }: { value: number | null; label: string; suffix?: string | undefined }) {
+	const pct = value ?? 0;
+	const hasValue = value !== null;
 	return (
-		<div className="flex items-center justify-between text-sm">
-			<span className="flex items-center gap-2 text-muted-foreground">
-				{icon}
-				{label}
+		<div className="flex items-center gap-2">
+			<span className="w-8 text-[10px] font-medium text-muted-foreground shrink-0">{label}</span>
+			<div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+				{hasValue && (
+					<div
+						className={`h-full rounded-full transition-all ${getBarColor(pct)}`}
+						style={{ width: `${Math.min(pct, 100)}%` }}
+					/>
+				)}
+			</div>
+			<span className={`w-8 text-right text-[11px] font-display font-semibold tabular-nums ${hasValue ? getValueColor(pct) : "text-muted-foreground"}`}>
+				{hasValue ? `${Math.round(pct)}%` : "—"}
 			</span>
-			<span className="text-base font-semibold font-display tracking-tight">{value}</span>
+			{suffix && (
+				<span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{suffix}</span>
+			)}
 		</div>
 	);
 }
 
+function MiniBarChart({ data, color }: { data: SparklinePoint[]; color: string }) {
+	const barCount = data.length;
+	if (barCount === 0) return null;
+	const barWidth = 4;
+	const gap = 1;
+	const height = 20;
+	const svgWidth = barCount * (barWidth + gap) - gap;
+
+	return (
+		<svg width={svgWidth} height={height} className="shrink-0" aria-hidden>
+			{data.map((point, i) => {
+				const barHeight = Math.max((point.v / 100) * height, 1);
+				// Opacity varies with value: 0.3 at 0%, 1.0 at 100%
+				const opacity = 0.3 + (point.v / 100) * 0.7;
+				return (
+					<rect
+						key={point.ts}
+						x={i * (barWidth + gap)}
+						y={height - barHeight}
+						width={barWidth}
+						height={barHeight}
+						rx={1}
+						fill={color}
+						opacity={opacity}
+					/>
+				);
+			})}
+		</svg>
+	);
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function HostCard({ host }: { host: HostOverviewItem }) {
 	const subtitle = buildSubtitle(host);
+	const memUsage = formatMemoryUsage(host.mem_total_bytes, host.mem_used_pct);
+
 	return (
 		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
-			<Card className="transition-colors cursor-pointer hover:bg-accent/50" data-testid="host-card">
-				<CardHeader>
-					<div className="flex items-center justify-between">
-						<CardTitle className="text-base">{host.hostname}</CardTitle>
-						<StatusBadge status={host.status} />
+			<Card className="transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0" data-testid="host-card">
+				{/* Header */}
+				<div className="flex items-center justify-between px-0.5">
+					<div className="flex items-center gap-1.5 min-w-0">
+						<span className={`h-2 w-2 shrink-0 rounded-full ${
+							host.status === "healthy" ? "bg-success" :
+							host.status === "warning" ? "bg-warning" :
+							host.status === "critical" ? "bg-destructive" :
+							"bg-muted-foreground"
+						}`} />
+						<span className="text-sm font-semibold truncate">{host.hostname}</span>
 					</div>
-					{subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
-				</CardHeader>
-				<CardContent className="space-y-2">
-					<MetricRow
-						icon={<Cpu className="h-4 w-4" strokeWidth={1.5} />}
+					<StatusBadge status={host.status} />
+				</div>
+				{subtitle && (
+					<p className="text-[10px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
+				)}
+
+				{/* Resource bars */}
+				<div className="mt-2.5 space-y-1.5">
+					<ResourceBar
+						value={host.cpu_usage_pct}
 						label="CPU"
-						value={host.cpu_usage_pct !== null ? `${host.cpu_usage_pct.toFixed(1)}%` : "—"}
+						suffix={host.cpu_load1 !== null ? `Load ${host.cpu_load1.toFixed(1)}` : undefined}
 					/>
-					<MetricRow
-						icon={<HardDrive className="h-4 w-4" strokeWidth={1.5} />}
-						label="Memory"
-						value={host.mem_used_pct !== null ? `${host.mem_used_pct.toFixed(1)}%` : "—"}
+					<ResourceBar
+						value={host.mem_used_pct}
+						label="MEM"
+						suffix={memUsage ?? undefined}
 					/>
-					<MetricRow
-						icon={<Clock className="h-4 w-4" strokeWidth={1.5} />}
-						label="Uptime"
-						value={formatUptime(host.uptime_seconds)}
+					<ResourceBar
+						value={host.swap_used_pct}
+						label="SWAP"
+						suffix={host.disk_root_used_pct !== null ? `Disk / ${formatDiskUsage(host.disk_root_used_pct)}` : undefined}
 					/>
-					<div className="pt-2 border-t text-xs text-muted-foreground">
-						Last seen: {formatLastSeen(host.last_seen)}
+				</div>
+
+				{/* Sparklines */}
+				{(host.cpu_sparkline || host.mem_sparkline) && (
+					<div className="mt-2.5 space-y-1.5">
+						{host.cpu_sparkline && host.cpu_sparkline.length > 0 && (
+							<div className="flex items-center gap-2">
+								<span className="w-12 text-[10px] text-muted-foreground shrink-0">CPU 24h</span>
+								<MiniBarChart data={host.cpu_sparkline} color="hsl(var(--chart-1))" />
+							</div>
+						)}
+						{host.mem_sparkline && host.mem_sparkline.length > 0 && (
+							<div className="flex items-center gap-2">
+								<span className="w-12 text-[10px] text-muted-foreground shrink-0">MEM 24h</span>
+								<MiniBarChart data={host.mem_sparkline} color="hsl(var(--chart-2))" />
+							</div>
+						)}
 					</div>
-				</CardContent>
+				)}
+
+				{/* Footer */}
+				<div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+					{host.probe_version && <span>Probe v{host.probe_version}</span>}
+					{host.probe_version && <span>·</span>}
+					<span>Last seen {formatLastSeen(host.last_seen)}</span>
+					<span>·</span>
+					<span>Up {formatUptime(host.uptime_seconds)}</span>
+				</div>
 			</Card>
 		</Link>
 	);
 }
 
 // Export formatters for testing
-export { formatUptime, formatLastSeen, shortenOs, formatMemory, formatCpuTopology, buildSubtitle };
+export {
+	formatUptime,
+	formatLastSeen,
+	shortenOs,
+	formatMemory,
+	formatCpuTopology,
+	formatMemoryUsage,
+	formatNetRate,
+	formatDiskUsage,
+	buildSubtitle,
+	getBarColor,
+	getValueColor,
+};
