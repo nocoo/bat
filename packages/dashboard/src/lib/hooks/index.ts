@@ -1,6 +1,7 @@
 export { useHosts } from "./use-hosts";
 export { useHostDetail } from "./use-host-detail";
 export { useHostMetrics } from "./use-host-metrics";
+export { useHostTier2 } from "./use-host-tier2";
 export { useAlerts } from "./use-alerts";
 export { useSetup } from "./use-setup";
 export { useTags } from "./use-tags";

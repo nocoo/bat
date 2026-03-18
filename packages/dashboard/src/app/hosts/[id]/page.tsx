@@ -15,9 +15,10 @@ import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostDetail, useHostMetrics, useHosts } from "@/lib/hooks";
+import { useAlerts, useHostDetail, useHostMetrics, useHostTier2, useHosts } from "@/lib/hooks";
+import type { DetectedSoftware, SoftwareCategory } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
-import { AlertTriangle, Info, ShieldAlert } from "lucide-react";
+import { AlertTriangle, Box, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 
@@ -126,6 +127,105 @@ function formatDisks(disks: { device: string; size_bytes: number; rotational: bo
 		.join(", ");
 }
 
+// --- Software card helpers ---
+
+const CATEGORY_LABELS: Record<SoftwareCategory, string> = {
+	web: "Web Servers",
+	database: "Databases",
+	cache: "Caches",
+	queue: "Message Queues",
+	runtime: "Runtimes",
+	monitoring: "Monitoring",
+	security: "Security",
+	infra: "Infrastructure",
+	container: "Containers",
+};
+
+const CATEGORY_ORDER: SoftwareCategory[] = [
+	"web",
+	"database",
+	"cache",
+	"queue",
+	"runtime",
+	"container",
+	"monitoring",
+	"security",
+	"infra",
+];
+
+/** Group software by category, preserving a fixed display order. */
+function groupByCategory(
+	items: DetectedSoftware[],
+): { category: SoftwareCategory; label: string; items: DetectedSoftware[] }[] {
+	const map = new Map<SoftwareCategory, DetectedSoftware[]>();
+	for (const item of items) {
+		const cat = item.category;
+		const list = map.get(cat);
+		if (list) {
+			list.push(item);
+		} else {
+			map.set(cat, [item]);
+		}
+	}
+	return CATEGORY_ORDER.filter((c) => map.has(c)).map((c) => ({
+		category: c,
+		label: CATEGORY_LABELS[c],
+		items: map.get(c) ?? [],
+	}));
+}
+
+function SoftwareItem({ sw }: { sw: DetectedSoftware }) {
+	return (
+		<div className="flex items-center gap-2 text-sm">
+			<span
+				className={`h-1.5 w-1.5 rounded-full shrink-0 ${sw.running ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
+			/>
+			<span className="font-medium">{sw.name}</span>
+			{sw.version && <span className="text-xs text-muted-foreground">{sw.version}</span>}
+			{sw.listening_ports.length > 0 && (
+				<span className="text-xs text-muted-foreground ml-auto font-mono">
+					:{sw.listening_ports.join(",")}
+				</span>
+			)}
+		</div>
+	);
+}
+
+function SoftwareCard({ software }: { software: DetectedSoftware[] }) {
+	const groups = groupByCategory(software);
+
+	return (
+		<Card>
+			<CardHeader>
+				<CardTitle className="flex items-center gap-2 text-base">
+					<Box className="h-4 w-4" />
+					Installed Software ({software.length})
+				</CardTitle>
+			</CardHeader>
+			<CardContent>
+				{groups.length === 0 ? (
+					<p className="text-sm text-muted-foreground">No software detected</p>
+				) : (
+					<div className="grid gap-4">
+						{groups.map((group) => (
+							<div key={group.category}>
+								<h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5">
+									{group.label}
+								</h4>
+								<div className="grid gap-1">
+									{group.items.map((sw) => (
+										<SoftwareItem key={sw.id} sw={sw} />
+									))}
+								</div>
+							</div>
+						))}
+					</div>
+				)}
+			</CardContent>
+		</Card>
+	);
+}
+
 export default function HostDetailPage() {
 	const params = useParams<{ id: string }>();
 	const hid = params.id;
@@ -140,6 +240,7 @@ export default function HostDetailPage() {
 	const { data: detail } = useHostDetail(hid);
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: allAlerts } = useAlerts();
+	const { data: tier2 } = useHostTier2(hid);
 
 	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
 	const hostAlerts = allAlerts?.filter((a) => hashHostId(a.host_id) === hid) ?? [];
@@ -276,6 +377,9 @@ export default function HostDetailPage() {
 										</div>
 									</CardContent>
 								</Card>
+							)}
+							{tier2?.software && tier2.software.detected.length > 0 && (
+								<SoftwareCard software={tier2.software.detected} />
 							)}
 							<DiskBars data={metricsResponse.data} />
 						</div>
