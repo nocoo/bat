@@ -9,5 +9,6 @@ const REFRESH_INTERVAL_MS = 30_000;
 export function useAlerts() {
 	return useSWR<AlertItem[]>("alerts", () => fetchAPI<AlertItem[]>("/api/alerts"), {
 		refreshInterval: REFRESH_INTERVAL_MS,
+		keepPreviousData: true,
 	});
 }

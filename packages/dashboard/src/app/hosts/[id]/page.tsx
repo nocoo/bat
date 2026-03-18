@@ -258,7 +258,7 @@ export default function HostDetailPage() {
 				</div>
 
 				{/* Metrics — 6:4 two-column layout */}
-				{metricsLoading ? (
+				{metricsLoading && !metricsResponse ? (
 					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
 						<div className="space-y-4">
 							{Array.from({ length: 4 }, (_, i) => (

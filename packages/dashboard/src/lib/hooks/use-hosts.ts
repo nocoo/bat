@@ -9,5 +9,6 @@ const REFRESH_INTERVAL_MS = 30_000;
 export function useHosts() {
 	return useSWR<HostOverviewItem[]>("hosts", () => fetchAPI<HostOverviewItem[]>("/api/hosts"), {
 		refreshInterval: REFRESH_INTERVAL_MS,
+		keepPreviousData: true,
 	});
 }

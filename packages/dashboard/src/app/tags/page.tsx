@@ -99,7 +99,7 @@ export default function TagsPage() {
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Tags" }]}>
-			{isLoading ? (
+			{isLoading && !tags ? (
 				<Card>
 					<CardContent className="py-6 space-y-4">
 						{Array.from({ length: 5 }, (_, i) => (
@@ -107,7 +107,7 @@ export default function TagsPage() {
 						))}
 					</CardContent>
 				</Card>
-			) : error ? (
+			) : error && !tags ? (
 				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
 					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
 					<h2 className="text-lg font-semibold text-foreground">Failed to load tags</h2>
