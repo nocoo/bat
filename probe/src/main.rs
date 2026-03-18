@@ -107,15 +107,16 @@ async fn main() {
 
     let mut last_sample_at = tokio::time::Instant::now();
     let mut identity_timer = tokio::time::Instant::now();
-    let identity_interval = Duration::from_secs(6 * 3600); // 6 hours
+    let identity_interval = Duration::from_secs(6 * 3600);
 
-    // Tier 2: collect on startup + every 6 hours (same cadence as identity)
+    // Tier 2 deep collection: initial send on startup + every 6 hours
+    // Independent of identity timer — shares the interval but not the clock.
     let mut tier2_timer = tokio::time::Instant::now();
-    let tier2_interval = Duration::from_secs(6 * 3600); // 6 hours
+    let tier2_interval = Duration::from_secs(6 * 3600);
 
     // Public IP echo fetch: every 1 hour
     let mut echo_timer = tokio::time::Instant::now();
-    let echo_interval = Duration::from_secs(3600); // 1 hour
+    let echo_interval = Duration::from_secs(3600);
 
     // Send initial tier2 in background (does not block T1 seed)
     spawn_tier2_task(sender.clone(), Arc::clone(&host_id));
