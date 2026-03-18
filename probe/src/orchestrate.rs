@@ -341,7 +341,6 @@ pub const fn convert_fd(info: &collectors::fd::FdInfo) -> FdMetrics {
 }
 
 /// Convert sockstat extra to payload socket metrics.
-#[allow(dead_code)]
 pub const fn convert_socket(extra: &collectors::tcp::SockstatExtra) -> SocketMetrics {
     SocketMetrics {
         sockets_used: extra.sockets_used,
@@ -349,7 +348,6 @@ pub const fn convert_socket(extra: &collectors::tcp::SockstatExtra) -> SocketMet
 }
 
 /// Convert sockstat extra to payload UDP metrics.
-#[allow(dead_code)]
 pub const fn convert_udp(extra: &collectors::tcp::SockstatExtra) -> UdpMetrics {
     UdpMetrics {
         inuse: extra.udp_inuse,
@@ -358,7 +356,6 @@ pub const fn convert_udp(extra: &collectors::tcp::SockstatExtra) -> UdpMetrics {
 }
 
 /// Compute SNMP counter deltas/rates from two samples.
-#[allow(dead_code)]
 pub fn compute_snmp_delta(
     prev: Option<&collectors::snmp::SnmpCounters>,
     curr: Option<&collectors::snmp::SnmpCounters>,
@@ -386,7 +383,6 @@ pub fn compute_snmp_delta(
 }
 
 /// Compute netstat counter deltas from two samples.
-#[allow(dead_code)]
 pub const fn compute_netstat_delta(
     prev: Option<&collectors::netstat::NetstatCounters>,
     curr: Option<&collectors::netstat::NetstatCounters>,
@@ -409,7 +405,6 @@ pub const fn compute_netstat_delta(
 }
 
 /// Compute softnet counter deltas from two samples.
-#[allow(dead_code)]
 pub const fn compute_softnet_delta(
     prev: Option<&collectors::softnet::SoftnetCounters>,
     curr: Option<&collectors::softnet::SoftnetCounters>,
@@ -425,7 +420,6 @@ pub const fn compute_softnet_delta(
 }
 
 /// Convert conntrack state to payload metrics.
-#[allow(dead_code)]
 pub const fn convert_conntrack(state: &collectors::conntrack::ConntrackState) -> ConntrackMetrics {
     ConntrackMetrics {
         count: state.count,
@@ -451,7 +445,7 @@ pub const fn compute_boot_time(now_secs: u64, uptime_secs: u64) -> u64 {
 
 /// Vmstat rate fields computed from two samples.
 #[derive(Debug, Clone, Default)]
-#[allow(clippy::struct_field_names, dead_code)]
+#[allow(clippy::struct_field_names)]
 pub struct VmstatRates {
     pub swap_in_sec: Option<f64>,
     pub swap_out_sec: Option<f64>,
@@ -461,7 +455,6 @@ pub struct VmstatRates {
 }
 
 /// Compute vmstat rates from previous and current [`VmstatCounters`].
-#[allow(dead_code)]
 pub fn compute_vmstat_rates(
     prev: Option<&collectors::memory::VmstatCounters>,
     curr: Option<&collectors::memory::VmstatCounters>,

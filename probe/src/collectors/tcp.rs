@@ -108,6 +108,7 @@ pub fn parse_sockstat(content: &str) -> Option<(TcpState, Option<SockstatExtra>)
 }
 
 /// Read TCP state from a parameterized path (for testing).
+#[allow(dead_code)]
 pub fn read_tcp_state_from(path: &str) -> Option<TcpState> {
     let content = std::fs::read_to_string(path).ok()?;
     parse_sockstat(&content).map(|(tcp, _)| tcp)
@@ -115,6 +116,7 @@ pub fn read_tcp_state_from(path: &str) -> Option<TcpState> {
 
 /// Read TCP state from `/proc/net/sockstat`.
 #[cfg_attr(coverage_nightly, coverage(off))]
+#[allow(dead_code)]
 pub fn read_tcp_state() -> Option<TcpState> {
     read_tcp_state_from("/proc/net/sockstat")
 }
