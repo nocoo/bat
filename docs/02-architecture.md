@@ -21,26 +21,32 @@ Replace Netdata (120-243MB RSS) across 6 VPS hosts with a purpose-built monitori
 │  (per VPS)   │   JSON + API Key │  (Hono)      │        │      │
 └─────────────┘                   └──────┬───────┘        └──┬───┘
                                          │                   │
-                              GET /api/health        API Key (server-side)
-                                         │                   │
+                              GET /api/health         API Key │ D1 REST API
+                                         │                   │ (direct)
                                   ┌──────▼───────┐   ┌──────▼───────┐
                                   │ Uptime Kuma  │   │  Dashboard   │
                                   │ (existing)   │   │  Next.js 16  │
                                   └──────────────┘   │  Railway     │
                                                      └──────────────┘
 
+Dashboard has two data paths:
+  1. Proxy path: Dashboard /api/* → Worker /api/* (BAT_READ_KEY) for metrics & hosts
+  2. D1 direct path: Dashboard /api/* → D1 REST API (CF_API_TOKEN) for user-state data (tags, etc.)
+
 Dashboard auth model:
   - User authenticates with Google OAuth on Dashboard (cookie stays on Dashboard domain)
-  - Dashboard API Routes (Next.js /api/*) act as a server-side proxy to Worker
-  - Dashboard server holds BAT_READ_KEY, adds Authorization header when calling Worker
-  - Browser never talks to Worker directly — no cross-domain cookie issue
+  - Dashboard API Routes (Next.js /api/*) act as a server-side proxy to Worker for metrics data
+  - Dashboard API Routes query D1 directly via Cloudflare D1 REST API for user-initiated state (tags)
+  - Dashboard server holds BAT_READ_KEY (for Worker proxy) and CF_API_TOKEN (for D1 direct)
+  - Browser never talks to Worker or D1 directly — no cross-domain cookie issue
 ```
 
 ### Data flow summary
 
 1. **Probe → Worker** (write path): Probe POSTs metrics/identity JSON with `BAT_WRITE_KEY`. Worker validates, stores in D1, evaluates alert rules. See [04-probe.md](./04-probe.md) for Probe internals, [05-worker.md](./05-worker.md) for Worker ingest logic.
 2. **Dashboard → Worker** (read path): Dashboard API Routes proxy browser requests to Worker with `BAT_READ_KEY`. Worker queries D1, returns JSON. See [06-dashboard.md](./06-dashboard.md) for proxy architecture.
-3. **Uptime Kuma → Worker** (health path): Public `GET /api/health` returns aggregate status (200/503). No API key required. See [05-worker.md § Health endpoint](./05-worker.md).
+3. **Dashboard → D1** (user-state path): Dashboard API Routes query D1 directly via [Cloudflare D1 REST API](https://developers.cloudflare.com/d1/platform/client-api/) using `CF_API_TOKEN`. Used for user-initiated state (tags, future user preferences) that the Worker/Probe never touch. See [06-dashboard.md § D1 Direct Access](./06-dashboard.md) and [11-host-tags.md](./11-host-tags.md).
+4. **Uptime Kuma → Worker** (health path): Public `GET /api/health` returns aggregate status (200/503). No API key required. See [05-worker.md § Health endpoint](./05-worker.md).
 
 ---
 
@@ -51,7 +57,8 @@ Dashboard auth model:
 | Probe language | Rust | Single static binary, < 15MB RSS, < 10MB disk |
 | Transport | HTTPS POST JSON | CF Worker native, ~1KB/report, simple |
 | Auth (probe→worker) | Write API Key | `Authorization: Bearer <BAT_WRITE_KEY>`, stored as Worker secret. Only accepted on write routes (`/api/ingest`, `/api/identity`) |
-| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/hosts/:id/metrics`, `/api/alerts`). Even if Railway env leaks, attacker cannot forge metrics or manipulate alerts |
+| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/hosts/:id/metrics`, `/api/alerts`). Read key cannot forge metrics or manipulate alerts |
+| Auth (dashboard→D1) | CF API Token | Dashboard queries D1 directly via Cloudflare D1 REST API for user-state data (tags). Mutations gated by NextAuth session, not by Worker API key. See [11-host-tags.md](./11-host-tags.md) |
 | Server | CF Worker + D1 | Serverless, free tier sufficient for 6 hosts |
 | Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges. Schema details in [03-data-structures.md](./03-data-structures.md) |
 | Dashboard | Next.js 16 + Bun (from Surety template) | Clone auth, UI, deployment from `../surety`. Details in [06-dashboard.md](./06-dashboard.md) |
@@ -115,9 +122,12 @@ bat/
 │   │       ├── routes/
 │   │       │   ├── ingest.ts       # POST /api/ingest
 │   │       │   ├── identity.ts     # POST /api/identity
-│   │       │   ├── hosts.ts        # GET /api/hosts, /api/hosts/:id/metrics
+│   │       │   ├── hosts.ts        # GET /api/hosts, /api/hosts/:id, /api/hosts/:id/metrics
 │   │       │   ├── alerts.ts       # GET /api/alerts (all active alerts)
-│   │       │   └── health.ts       # GET /api/health (aggregate only)
+│   │       │   ├── health.ts       # GET /api/health (aggregate only)
+│   │       │   ├── host-detail.ts  # GET /api/hosts/:id (single host detail)
+│   │       │   ├── tier2-ingest.ts # POST /api/tier2 (Tier 2 payload)
+│   │       │   └── tier2-read.ts   # GET /api/hosts/:id/tier2 (latest Tier 2 snapshot)
 │   │       ├── services/
 │   │       │   ├── metrics.ts      # insertRaw(), queryMetrics()
 │   │       │   ├── alerts.ts       # evaluateAlerts(), 6 Tier-1 rules
@@ -137,19 +147,37 @@ bat/
 │           │   ├── globals.css     # Basalt design tokens
 │           │   ├── page.tsx        # → /hosts redirect
 │           │   ├── login/page.tsx  # Google login (from Surety)
-│           │   ├── api/            # Server-side proxy to Worker (holds BAT_READ_KEY)
+│           │   ├── api/            # Server-side proxy + D1 direct routes
 │           │   │   ├── hosts/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts
+│           │   │   ├── hosts/[id]/
+│           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts/:id
 │           │   │   ├── hosts/[id]/metrics/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts/:id/metrics
-│           │   │   └── alerts/
-│           │   │       └── route.ts        # Proxy → Worker GET /api/alerts
+│           │   │   ├── hosts/[id]/tier2/
+│           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts/:id/tier2
+│           │   │   ├── hosts/[id]/tags/
+│           │   │   │   └── route.ts        # D1 direct: GET/POST/PUT host tags
+│           │   │   ├── hosts/[id]/tags/[tagId]/
+│           │   │   │   └── route.ts        # D1 direct: DELETE tag from host
+│           │   │   ├── alerts/
+│           │   │   │   └── route.ts        # Proxy → Worker GET /api/alerts
+│           │   │   ├── tags/
+│           │   │   │   └── route.ts        # D1 direct: GET/POST tags
+│           │   │   ├── tags/[id]/
+│           │   │   │   └── route.ts        # D1 direct: PUT/DELETE tag
+│           │   │   └── tags/by-hosts/
+│           │   │       └── route.ts        # D1 direct: GET all host→tag mappings
 │           │   ├── hosts/
 │           │   │   ├── page.tsx    # Overview: host grid with status
 │           │   │   └── [id]/
-│           │   │       └── page.tsx # Host detail: charts + alerts
-│           │   └── alerts/
-│           │       └── page.tsx    # Active alerts across all hosts
+│           │   │       └── page.tsx # Host detail: charts + alerts + tier2 info
+│           │   ├── alerts/
+│           │   │   └── page.tsx    # Active alerts across all hosts
+│           │   ├── tags/
+│           │   │   └── page.tsx    # Tags management page
+│           │   └── setup/
+│           │       └── page.tsx    # Probe setup: install command
 │           ├── components/
 │           │   ├── layout/         # AppShell, Sidebar (from Surety)
 │           │   ├── ui/             # shadcn/ui (from Surety)
@@ -158,6 +186,7 @@ bat/
 │           │   └── charts/         # CPU, Memory, Disk, Network
 │           └── lib/
 │               ├── api.ts          # Fetch wrapper → Dashboard's own /api/* proxy routes
+│               ├── d1.ts           # Cloudflare D1 REST API client (for tags, user-state)
 │               └── hooks/          # SWR hooks (hosts, metrics, alerts)
 ├── pnpm-workspace.yaml             # packages: ["packages/*"]
 ├── package.json                    # root scripts
@@ -176,26 +205,34 @@ Two separate API keys stored as Worker secrets:
 - `BAT_WRITE_KEY` — used by Probe for `POST /api/ingest` and `POST /api/identity`
 - `BAT_READ_KEY` — used by Dashboard proxy for `GET` routes (`/api/hosts`, `/api/hosts/:id/metrics`, `/api/alerts`)
 
-Worker middleware checks `Authorization: Bearer <key>` and matches against the appropriate secret based on HTTP method + route. This ensures that even if the Dashboard's Railway environment leaks, an attacker can only read data — they cannot forge metrics, manipulate `last_seen`, or create/clear alerts.
+Worker middleware checks `Authorization: Bearer <key>` and matches against the appropriate secret based on HTTP method + route. Key scope isolation ensures that the read key cannot forge metrics or manipulate alerts.
 
 ### Dashboard proxy pattern
 
-Dashboard (Next.js) exposes its own `/api/*` routes to the browser. These routes:
+Dashboard (Next.js) exposes its own `/api/*` routes to the browser. These routes serve two purposes:
+
+**1. Worker proxy** (metrics, hosts, alerts): Routes forward requests to Worker with API key.
+**2. D1 direct** (tags, user-state): Routes query D1 via Cloudflare REST API.
+
+Both paths require an authenticated NextAuth session:
 
 1. Check the user's NextAuth session (Google OAuth cookie, same domain)
-2. If authenticated, forward the request to Worker with `Authorization: Bearer <BAT_READ_KEY>`
-3. Return the Worker response to the browser
+2. If authenticated:
+   - **Proxy routes**: forward to Worker with `Authorization: Bearer <BAT_READ_KEY>`
+   - **D1 direct routes**: query D1 REST API with `CF_API_TOKEN`
+3. Return response to browser
 
 ```
-Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
-                    (session check)         (server-side, no CORS)
+Worker proxy:  Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
+D1 direct:     Browser ──cookie──→ Dashboard /api/tags  ──CF Token──→ D1 REST API ──→ D1
+                                   (session check)         (server-side, no CORS)
 ```
 
 This means:
-- Browser never needs to know the Worker URL or API Key
+- Browser never needs to know the Worker URL, D1 endpoint, or any API key
 - No cross-domain cookie issues
 - Worker auth stays simple (one middleware handles both keys, scoped by route: write key for POST, read key for GET)
-- Dashboard API Routes are thin proxies, no business logic
+- Dashboard owns user-state mutations (tags) independently of Worker, keeping the Worker's attack surface unchanged
 
 ---
 
@@ -224,7 +261,11 @@ cd packages/worker && wrangler deploy
 - Dockerfile deployment (Bun standalone)
 - Environment variables:
   - `BAT_API_URL` — Worker URL
-  - `BAT_READ_KEY` — Read-only API Key for Worker (cannot write metrics or manipulate alerts)
+  - `BAT_READ_KEY` — Read-only API Key for Worker
+  - `BAT_WRITE_KEY` — Write API Key (used only by setup page to generate install commands)
+  - `CF_API_TOKEN` — Cloudflare API token with D1 read/write permission (for tags)
+  - `CF_ACCOUNT_ID` — Cloudflare account ID
+  - `CF_D1_DATABASE_ID` — D1 database ID for bat-db
   - `AUTH_SECRET` — NextAuth secret
   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (matches Surety's `auth.ts` env names)
   - `ALLOWED_EMAILS` — email allowlist

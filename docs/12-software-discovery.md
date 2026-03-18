@@ -266,7 +266,7 @@ Single column, same pattern as other tier2 JSON columns.
 
 ### Dashboard read path
 
-The Dashboard reads software data via the **existing** `GET /api/hosts/:id/tier2` route (already registered in the worker, authenticated with `BAT_READ_KEY`). This route returns the latest `Tier2Snapshot` which will now include the `software` field.
+The Dashboard reads software data via `GET /api/hosts/:id/tier2` (Worker read route, authenticated with `BAT_READ_KEY`). This route returns the latest `Tier2Snapshot` which will now include the `software` field. **Note**: This route must be added to the Worker as part of the Tier 2 feature — see [05-worker.md](./05-worker.md) for the route table.
 
 Dashboard proxy route already exists or needs to be added:
 

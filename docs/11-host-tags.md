@@ -104,7 +104,7 @@ CREATE INDEX idx_host_tags_tag ON host_tags(tag_id);
 
 ### Migration
 
-`0010_tags.sql` — creates both tables and the index. Non-destructive, additive only. Applied via `wrangler d1 migrations apply` as usual.
+`0010_tags.sql` — creates both tables and the index. Non-destructive, additive only. Applied via `wrangler d1 execute bat-db --file=migrations/0010_tags.sql` (see [03-data-structures.md § D1 Migration Strategy](./03-data-structures.md)).
 
 ---
 
@@ -209,7 +209,7 @@ This keeps the Worker completely unaware of tags.
 
 ### Host card changes
 
-- Below subtitle line, render `host.tags.map(t => <TagChip />)`.
+- Below subtitle line, render tags as `<TagChip />` components. The tags come from the page-level ViewModel — the hosts page merges `GET /api/hosts` (Worker) and `GET /api/tags/by-hosts` (D1 direct) into a combined view. `HostOverviewItem` itself does NOT contain tags.
 - Add `+` icon button that opens `TagSelector` popover.
 - Card width may need slight increase to accommodate chips.
 
