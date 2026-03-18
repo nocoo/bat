@@ -23,6 +23,10 @@ const MIGRATION_SIGNAL_EXPANSION_HOURLY_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0009_signal_expansion_hourly.sql",
 );
+const MIGRATION_SOFTWARE_COLUMN_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0011_software_column.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -172,6 +176,15 @@ export function createMockD1(): D1Database {
 	// Apply signal expansion migration (metrics_hourly)
 	const signalExpansionHourlySchema = readFileSync(MIGRATION_SIGNAL_EXPANSION_HOURLY_PATH, "utf-8");
 	for (const stmt of signalExpansionHourlySchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply software column migration (tier2_snapshots)
+	const softwareColumnSchema = readFileSync(MIGRATION_SOFTWARE_COLUMN_PATH, "utf-8");
+	for (const stmt of softwareColumnSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

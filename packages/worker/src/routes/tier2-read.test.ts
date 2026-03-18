@@ -147,5 +147,6 @@ describe("GET /api/hosts/:id/tier2", () => {
 		expect(body.security).toBeNull();
 		expect(body.docker).toBeNull();
 		expect(body.disk_deep).toBeNull();
+		expect(body.software).toBeNull();
 	});
 });

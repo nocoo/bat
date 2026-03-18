@@ -128,6 +128,7 @@ describe("POST /api/tier2", () => {
 		expect(snapshot?.security_json).toBeNull();
 		expect(snapshot?.docker_json).toBeNull();
 		expect(snapshot?.disk_deep_json).toBeNull();
+		expect(snapshot?.software_json).toBeNull();
 	});
 
 	test("invalid payload (missing host_id) → 400", async () => {

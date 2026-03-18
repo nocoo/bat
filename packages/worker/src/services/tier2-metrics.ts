@@ -12,8 +12,8 @@ export async function insertTier2Snapshot(
 	const result = await db
 		.prepare(
 			`INSERT OR IGNORE INTO tier2_snapshots
-  (host_id, ts, ports_json, updates_json, systemd_json, security_json, docker_json, disk_deep_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  (host_id, ts, ports_json, updates_json, systemd_json, security_json, docker_json, disk_deep_json, software_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -24,6 +24,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 			payload.security ? JSON.stringify(payload.security) : null,
 			payload.docker ? JSON.stringify(payload.docker) : null,
 			payload.disk_deep ? JSON.stringify(payload.disk_deep) : null,
+			payload.software ? JSON.stringify(payload.software) : null,
 		)
 		.run();
 	return result.meta.changes > 0;
@@ -37,7 +38,7 @@ export async function getLatestTier2Snapshot(
 	const row = await db
 		.prepare(
 			`SELECT host_id, ts, ports_json, updates_json, systemd_json,
-       security_json, docker_json, disk_deep_json
+       security_json, docker_json, disk_deep_json, software_json
 FROM tier2_snapshots
 WHERE host_id = ?
 ORDER BY ts DESC
@@ -57,6 +58,7 @@ LIMIT 1`,
 		security: safeParse(row.security_json),
 		docker: safeParse(row.docker_json),
 		disk_deep: safeParse(row.disk_deep_json),
+		software: safeParse(row.software_json),
 		timezone: null, // served from hosts table, not tier2_snapshots
 		dns_resolvers: null,
 		dns_search: null,
@@ -72,6 +74,7 @@ interface Tier2Row {
 	security_json: string | null;
 	docker_json: string | null;
 	disk_deep_json: string | null;
+	software_json: string | null;
 }
 
 function safeParse<T>(json: string | null): T | null {
