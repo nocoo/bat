@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, getAvatarColor } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
-import { Bell, ChevronUp, Download, LogOut, PanelLeft, Server } from "lucide-react";
+import { Bell, ChevronUp, Download, LogOut, PanelLeft, Server, Tag } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,6 +36,7 @@ const NAV_GROUPS: NavGroup[] = [
 		items: [
 			{ href: "/hosts", label: "Hosts", icon: Server },
 			{ href: "/alerts", label: "Alerts", icon: Bell },
+			{ href: "/tags", label: "Tags", icon: Tag },
 		],
 	},
 	{

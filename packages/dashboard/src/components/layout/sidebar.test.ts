@@ -6,14 +6,16 @@ describe("Sidebar NAV_GROUPS", () => {
 		expect(NAV_GROUPS).toHaveLength(2);
 	});
 
-	test("Monitoring group has Hosts and Alerts", () => {
+	test("Monitoring group has Hosts, Alerts, and Tags", () => {
 		const monitoring = NAV_GROUPS[0];
 		expect(monitoring?.label).toBe("Monitoring");
-		expect(monitoring?.items).toHaveLength(2);
+		expect(monitoring?.items).toHaveLength(3);
 		expect(monitoring?.items[0]?.href).toBe("/hosts");
 		expect(monitoring?.items[0]?.label).toBe("Hosts");
 		expect(monitoring?.items[1]?.href).toBe("/alerts");
 		expect(monitoring?.items[1]?.label).toBe("Alerts");
+		expect(monitoring?.items[2]?.href).toBe("/tags");
+		expect(monitoring?.items[2]?.label).toBe("Tags");
 	});
 
 	test("Settings group has Setup", () => {
@@ -40,8 +42,8 @@ describe("Sidebar NAV_GROUPS", () => {
 });
 
 describe("Sidebar NAV_ITEMS (flat)", () => {
-	test("has exactly 3 navigation items", () => {
-		expect(NAV_ITEMS).toHaveLength(3);
+	test("has exactly 4 navigation items", () => {
+		expect(NAV_ITEMS).toHaveLength(4);
 	});
 
 	test("first item is Hosts", () => {
@@ -54,8 +56,13 @@ describe("Sidebar NAV_ITEMS (flat)", () => {
 		expect(NAV_ITEMS[1]?.label).toBe("Alerts");
 	});
 
-	test("third item is Setup", () => {
-		expect(NAV_ITEMS[2]?.href).toBe("/setup");
-		expect(NAV_ITEMS[2]?.label).toBe("Setup");
+	test("third item is Tags", () => {
+		expect(NAV_ITEMS[2]?.href).toBe("/tags");
+		expect(NAV_ITEMS[2]?.label).toBe("Tags");
+	});
+
+	test("fourth item is Setup", () => {
+		expect(NAV_ITEMS[3]?.href).toBe("/setup");
+		expect(NAV_ITEMS[3]?.label).toBe("Setup");
 	});
 });
