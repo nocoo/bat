@@ -94,7 +94,6 @@ async fn main() {
     let mut prev_net_counters =
         collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
     let mut prev_disk_io = collectors::disk_io::read_diskstats().ok();
-    let mut prev_oom_kills = collectors::memory::read_oom_kill();
     let mut prev_vmstat = collectors::memory::read_vmstat();
     let mut prev_psi = collectors::psi::read_psi();
     let mut prev_snmp = collectors::snmp::read_snmp();
@@ -132,7 +131,6 @@ async fn main() {
                     &mut prev_jiffies,
                     &mut prev_net_counters,
                     &mut prev_disk_io,
-                    &mut prev_oom_kills,
                     &mut prev_vmstat,
                     &mut prev_psi,
                     &mut prev_snmp,
@@ -231,7 +229,6 @@ fn collect_metrics(
     prev_jiffies: &mut Option<CpuJiffies>,
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
     prev_disk_io: &mut Option<Vec<collectors::disk_io::DiskIoCounters>>,
-    prev_oom_kills: &mut Option<u64>,
     prev_vmstat: &mut Option<collectors::memory::VmstatCounters>,
     prev_psi: &mut Option<collectors::psi::PsiData>,
     prev_snmp: &mut Option<collectors::snmp::SnmpCounters>,
@@ -263,13 +260,12 @@ fn collect_metrics(
         .as_ref()
         .map_or((None, None), |la| (la.tasks_running, la.tasks_total));
 
-    // Memory
+    // Memory + vmstat (single /proc/vmstat read for both oom_kill and swap/pgfault rates)
     let mem_info = collectors::memory::read_meminfo().ok();
-    let curr_oom_kills = collectors::memory::read_oom_kill();
-    let oom_kills_delta = orchestrate::compute_oom_delta(*prev_oom_kills, curr_oom_kills);
-    *prev_oom_kills = curr_oom_kills;
-    // Vmstat rates (swap in/out, pgmajfault, etc.)
     let curr_vmstat = collectors::memory::read_vmstat();
+    let prev_oom = prev_vmstat.as_ref().and_then(|v| v.oom_kill);
+    let curr_oom = curr_vmstat.as_ref().and_then(|v| v.oom_kill);
+    let oom_kills_delta = orchestrate::compute_oom_delta(prev_oom, curr_oom);
     let vmstat_rates =
         orchestrate::compute_vmstat_rates(prev_vmstat.as_ref(), curr_vmstat.as_ref(), elapsed);
     *prev_vmstat = curr_vmstat;
