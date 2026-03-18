@@ -148,5 +148,35 @@ describe("GET /api/hosts/:id/tier2", () => {
 		expect(body.docker).toBeNull();
 		expect(body.disk_deep).toBeNull();
 		expect(body.software).toBeNull();
+		expect(body.timezone).toBeNull();
+		expect(body.dns_resolvers).toBeNull();
+		expect(body.dns_search).toBeNull();
+	});
+
+	test("returns inventory fields from hosts table", async () => {
+		const hostId = "host-inventory";
+		const now = Math.floor(Date.now() / 1000);
+		await seedHost(db, hostId);
+
+		// Set inventory fields on hosts table
+		await db
+			.prepare("UPDATE hosts SET timezone = ?, dns_resolvers = ?, dns_search = ? WHERE host_id = ?")
+			.bind(
+				"Europe/Berlin",
+				JSON.stringify(["1.1.1.1", "8.8.8.8"]),
+				JSON.stringify(["local.lan"]),
+				hostId,
+			)
+			.run();
+
+		await seedTier2(db, hostId, now);
+
+		const res = await get(app, hostId);
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as Tier2Snapshot;
+		expect(body.timezone).toBe("Europe/Berlin");
+		expect(body.dns_resolvers).toEqual(["1.1.1.1", "8.8.8.8"]);
+		expect(body.dns_search).toEqual(["local.lan"]);
 	});
 });
