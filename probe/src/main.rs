@@ -450,10 +450,9 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
 
     // Ports: synchronous procfs scan (/proc/*/fd), offload to blocking
     // thread pool so the executor can yield back to T1 immediately.
-    let ports = tokio::task::spawn_blocking(collectors::tier2::ports::read_listening_ports)
+    let ports_raw = tokio::task::spawn_blocking(collectors::tier2::ports::read_listening_ports)
         .await
         .unwrap_or_default();
-    let ports_payload = Some(orchestrate::convert_ports(ports));
 
     // Run all async collectors concurrently
     let (updates, systemd, security, docker, disk_deep) = tokio::join!(
@@ -463,6 +462,11 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         collectors::tier2::docker::collect_docker_status(),
         collectors::tier2::disk_deep::collect_disk_deep_scan(),
     );
+
+    // Software discovery — reuses raw ports data
+    let software = collectors::tier2::software::collect_software_discovery(Some(&ports_raw)).await;
+
+    let ports_payload = Some(orchestrate::convert_ports(ports_raw));
 
     // Tier 2 inventory: timezone + DNS (fast synchronous reads)
     let tz = collectors::inventory::read_timezone();
@@ -481,6 +485,7 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         Some(orchestrate::convert_security(security)),
         docker.map(orchestrate::convert_docker),
         Some(orchestrate::convert_disk_deep(disk_deep)),
+        Some(orchestrate::convert_software(software)),
         timezone,
         dns_resolvers,
         dns_search,
