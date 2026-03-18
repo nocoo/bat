@@ -14,6 +14,10 @@ pub struct CpuJiffies {
     pub processes: u64, // cumulative forks
     pub procs_running: u32,
     pub procs_blocked: u32,
+    // Signal expansion: cumulative counters from /proc/stat
+    pub intr_total: u64, // total hardware interrupts (first field of `intr` line)
+    pub softirq_net_rx: u64, // NET_RX softirqs (field 5 of `softirq` line, 0-indexed after name)
+    pub softirq_block: u64, // BLOCK softirqs (field 6 of `softirq` line)
 }
 
 impl CpuJiffies {
@@ -75,6 +79,28 @@ pub fn parse_stat(content: &str) -> Option<CpuJiffies> {
             && let Some(j) = jiffies.as_mut()
         {
             j.procs_blocked = rest.trim().parse().unwrap_or(0);
+        } else if let Some(rest) = line.strip_prefix("intr ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            // `intr` line: first field is total interrupt count
+            if let Some(total_str) = rest.split_whitespace().next() {
+                j.intr_total = total_str.parse().unwrap_or(0);
+            }
+        } else if let Some(rest) = line.strip_prefix("softirq ")
+            && let Some(j) = jiffies.as_mut()
+        {
+            // `softirq` line: total HI TIMER NET_TX NET_RX BLOCK ...
+            // fields (0-indexed after "softirq"): 0=total, 1=HI, 2=TIMER, 3=NET_TX, 4=NET_RX, 5=BLOCK
+            let fields: Vec<u64> = rest
+                .split_whitespace()
+                .filter_map(|f| f.parse().ok())
+                .collect();
+            if fields.len() > 4 {
+                j.softirq_net_rx = fields[4]; // NET_RX
+            }
+            if fields.len() > 5 {
+                j.softirq_block = fields[5]; // BLOCK
+            }
         }
     }
     jiffies
@@ -103,16 +129,47 @@ pub fn compute_cpu_usage(prev: &CpuJiffies, curr: &CpuJiffies) -> (f64, f64, f64
     )
 }
 
+/// Parsed load averages and task counts from `/proc/loadavg`.
+#[derive(Debug, Clone)]
+pub struct LoadAvg {
+    pub load1: f64,
+    pub load5: f64,
+    pub load15: f64,
+    /// Running tasks (numerator of field 3, e.g., "1/234" → 1)
+    #[allow(dead_code)]
+    pub tasks_running: Option<u32>,
+    /// Total tasks (denominator of field 3, e.g., "1/234" → 234)
+    #[allow(dead_code)]
+    pub tasks_total: Option<u32>,
+}
+
 /// Parse load averages from `/proc/loadavg`.
 ///
 /// Format: `0.50 0.30 0.20 1/234 5678`
-pub fn parse_loadavg(content: &str) -> Option<(f64, f64, f64)> {
+pub fn parse_loadavg(content: &str) -> Option<LoadAvg> {
     let fields: Vec<&str> = content.split_whitespace().collect();
     if fields.len() >= 3 {
         let load1: f64 = fields[0].parse().ok()?;
         let load5: f64 = fields[1].parse().ok()?;
         let load15: f64 = fields[2].parse().ok()?;
-        Some((load1, load5, load15))
+
+        let (tasks_running, tasks_total) = if fields.len() >= 4 {
+            if let Some((running, total)) = fields[3].split_once('/') {
+                (running.parse().ok(), total.parse().ok())
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        Some(LoadAvg {
+            load1,
+            load5,
+            load15,
+            tasks_running,
+            tasks_total,
+        })
     } else {
         None
     }
@@ -228,14 +285,14 @@ pub fn read_jiffies() -> Result<CpuJiffies, String> {
 }
 
 /// Read load averages from a file (parameterized path for testing).
-pub fn read_loadavg_from(path: &str) -> Result<(f64, f64, f64), String> {
+pub fn read_loadavg_from(path: &str) -> Result<LoadAvg, String> {
     let content = std::fs::read_to_string(path).map_err(|e| format!("read {path}: {e}"))?;
     parse_loadavg(&content).ok_or_else(|| format!("failed to parse {path}"))
 }
 
 /// Read load averages from `/proc/loadavg`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-pub fn read_loadavg() -> Result<(f64, f64, f64), String> {
+pub fn read_loadavg() -> Result<LoadAvg, String> {
     read_loadavg_from("/proc/loadavg")
 }
 
@@ -294,6 +351,8 @@ mod tests {
 cpu  10132153 290696 3084719 46828483 16683 0 25195 0 0 0
 cpu0 1393280 32966 572056 13343292 6130 0 17875 0 0 0
 cpu1 3585920 73768 503820 11226932 3694 0 4894 0 0 0
+intr 45678901 23 0 0 0 0 0 0 0 1 2 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+softirq 12345678 100000 3000000 200000 500000 300000 0 100000 4000000 50000 200000
 ctxt 1234567890
 processes 56789
 procs_running 2
@@ -447,15 +506,34 @@ cpu MHz\t\t: 2400.000
 
     #[test]
     fn parse_loadavg_normal() {
-        let (l1, l5, l15) = parse_loadavg(PROC_LOADAVG).unwrap();
-        assert!((l1 - 0.50).abs() < f64::EPSILON);
-        assert!((l5 - 0.30).abs() < f64::EPSILON);
-        assert!((l15 - 0.20).abs() < f64::EPSILON);
+        let la = parse_loadavg(PROC_LOADAVG).unwrap();
+        assert!((la.load1 - 0.50).abs() < f64::EPSILON);
+        assert!((la.load5 - 0.30).abs() < f64::EPSILON);
+        assert!((la.load15 - 0.20).abs() < f64::EPSILON);
+        assert_eq!(la.tasks_running, Some(1));
+        assert_eq!(la.tasks_total, Some(234));
     }
 
     #[test]
     fn parse_loadavg_empty() {
         assert!(parse_loadavg("").is_none());
+    }
+
+    #[test]
+    fn parse_loadavg_no_tasks_field() {
+        // Only 3 fields, no tasks
+        let la = parse_loadavg("0.50 0.30 0.20\n").unwrap();
+        assert!((la.load1 - 0.50).abs() < f64::EPSILON);
+        assert_eq!(la.tasks_running, None);
+        assert_eq!(la.tasks_total, None);
+    }
+
+    #[test]
+    fn parse_loadavg_malformed_tasks() {
+        // Tasks field without slash
+        let la = parse_loadavg("0.50 0.30 0.20 noslash 5678\n").unwrap();
+        assert_eq!(la.tasks_running, None);
+        assert_eq!(la.tasks_total, None);
     }
 
     #[test]
@@ -589,10 +667,12 @@ model name\t: Some CPU
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("loadavg");
         std::fs::write(&path, PROC_LOADAVG).unwrap();
-        let (l1, l5, l15) = read_loadavg_from(path.to_str().unwrap()).unwrap();
-        assert!((l1 - 0.50).abs() < f64::EPSILON);
-        assert!((l5 - 0.30).abs() < f64::EPSILON);
-        assert!((l15 - 0.20).abs() < f64::EPSILON);
+        let la = read_loadavg_from(path.to_str().unwrap()).unwrap();
+        assert!((la.load1 - 0.50).abs() < f64::EPSILON);
+        assert!((la.load5 - 0.30).abs() < f64::EPSILON);
+        assert!((la.load15 - 0.20).abs() < f64::EPSILON);
+        assert_eq!(la.tasks_running, Some(1));
+        assert_eq!(la.tasks_total, Some(234));
     }
 
     #[test]
@@ -648,16 +728,50 @@ model name\t: Some CPU
         assert_eq!(jiffies.processes, 56789);
         assert_eq!(jiffies.procs_running, 2);
         assert_eq!(jiffies.procs_blocked, 0);
+        // Signal expansion: intr and softirq
+        assert_eq!(jiffies.intr_total, 45_678_901);
+        // softirq fields (0-indexed after name): 4=NET_RX(500000), 5=BLOCK(300000)
+        assert_eq!(jiffies.softirq_net_rx, 500_000);
+        assert_eq!(jiffies.softirq_block, 300_000);
     }
 
     #[test]
     fn parse_stat_no_extended_fields() {
-        // PROC_STAT_WITH_STEAL has no ctxt/processes/procs_* lines
+        // PROC_STAT_WITH_STEAL has no ctxt/processes/procs_*/intr/softirq lines
         let jiffies = parse_stat(PROC_STAT_WITH_STEAL).unwrap();
         assert_eq!(jiffies.ctxt, 0);
         assert_eq!(jiffies.processes, 0);
         assert_eq!(jiffies.procs_running, 0);
         assert_eq!(jiffies.procs_blocked, 0);
+        assert_eq!(jiffies.intr_total, 0);
+        assert_eq!(jiffies.softirq_net_rx, 0);
+        assert_eq!(jiffies.softirq_block, 0);
+    }
+
+    #[test]
+    fn parse_stat_intr_only() {
+        // intr line present but no softirq line
+        let content = "\
+cpu  10000 200 3000 40000 500 100 150 250 0 0
+intr 99999 1 2 3 4 5
+";
+        let jiffies = parse_stat(content).unwrap();
+        assert_eq!(jiffies.intr_total, 99999);
+        assert_eq!(jiffies.softirq_net_rx, 0);
+        assert_eq!(jiffies.softirq_block, 0);
+    }
+
+    #[test]
+    fn parse_stat_softirq_short_line() {
+        // softirq line with fewer than 5 fields after name
+        let content = "\
+cpu  10000 200 3000 40000 500 100 150 250 0 0
+softirq 1000 100 200 300
+";
+        let jiffies = parse_stat(content).unwrap();
+        // Only 4 fields parsed (total, HI, TIMER, NET_TX) — NET_RX and BLOCK missing
+        assert_eq!(jiffies.softirq_net_rx, 0);
+        assert_eq!(jiffies.softirq_block, 0);
     }
 
     #[test]
