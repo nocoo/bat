@@ -1,5 +1,5 @@
 // @bat/shared — Tier 2 payload and snapshot types
-// Source of truth: docs/01-metrics-catalogue.md § Tier 2
+// Source of truth: docs/01-metrics-catalogue.md § Slow-Scan Signals
 // Probe → Worker (POST /api/tier2), Worker → Dashboard (GET /api/hosts/:id/tier2)
 
 // --- Service Ports (2.4) ---

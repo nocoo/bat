@@ -42,7 +42,7 @@ This means the systemd unit works without any flags — the binary finds `/etc/b
 
 ## Collectors
 
-All Tier-1 collectors read procfs/sysfs directly — zero process fork, zero root required. Metric definitions match [01-metrics-catalogue.md § Tier 1](./01-metrics-catalogue.md).
+All real-time collectors read procfs/sysfs directly — zero process fork, zero root required. Metric definitions match [01-metrics-catalogue.md § Real-Time Signals](./01-metrics-catalogue.md).
 
 | Collector | Source | Notes |
 |-----------|--------|-------|
