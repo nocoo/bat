@@ -23,10 +23,24 @@ export async function insertMetricsRaw(
    disk_io_json,
    tcp_established, tcp_time_wait, tcp_orphan, tcp_allocated,
    context_switches_sec, forks_sec, procs_running, procs_blocked,
-   oom_kills, fd_allocated, fd_max)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+   oom_kills, fd_allocated, fd_max,
+   interrupts_sec, softirq_net_rx_sec, softirq_block_sec, tasks_running, tasks_total,
+   mem_buffers, mem_cached, mem_dirty, mem_writeback, mem_shmem,
+   mem_slab_reclaimable, mem_slab_unreclaim, mem_committed_as, mem_commit_limit, mem_hw_corrupted,
+   swap_in_sec, swap_out_sec, pgmajfault_sec, pgpgin_sec, pgpgout_sec,
+   psi_cpu_some_total_delta, psi_mem_some_total_delta, psi_mem_full_total_delta,
+   psi_io_some_total_delta, psi_io_full_total_delta,
+   tcp_mem_pages, sockets_used, udp_inuse, udp_mem_pages,
+   snmp_retrans_segs_sec, snmp_active_opens_sec, snmp_passive_opens_sec,
+   snmp_attempt_fails_delta, snmp_estab_resets_delta, snmp_in_errs_delta, snmp_out_rsts_delta,
+   snmp_udp_rcvbuf_errors_delta, snmp_udp_sndbuf_errors_delta, snmp_udp_in_errors_delta,
+   netstat_listen_overflows_delta, netstat_listen_drops_delta,
+   netstat_tcp_timeouts_delta, netstat_tcp_syn_retrans_delta,
+   netstat_tcp_fast_retrans_delta, netstat_tcp_ofo_queue_delta,
+   netstat_tcp_abort_on_memory_delta, netstat_syncookies_sent_delta,
+   softnet_processed_delta, softnet_dropped_delta, softnet_time_squeeze_delta,
+   conntrack_count, conntrack_max)
+VALUES (${Array(97).fill("?").join(", ")})`,
 		)
 		.bind(
 			hostId,
@@ -80,6 +94,69 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
 			// File descriptors
 			payload.fd?.allocated ?? null,
 			payload.fd?.max ?? null,
+			// --- Signal expansion fields ---
+			// CPU extensions
+			payload.cpu.interrupts_sec ?? null,
+			payload.cpu.softirq_net_rx_sec ?? null,
+			payload.cpu.softirq_block_sec ?? null,
+			payload.cpu.tasks_running ?? null,
+			payload.cpu.tasks_total ?? null,
+			// Memory composition
+			payload.mem.buffers ?? null,
+			payload.mem.cached ?? null,
+			payload.mem.dirty ?? null,
+			payload.mem.writeback ?? null,
+			payload.mem.shmem ?? null,
+			payload.mem.slab_reclaimable ?? null,
+			payload.mem.slab_unreclaim ?? null,
+			payload.mem.committed_as ?? null,
+			payload.mem.commit_limit ?? null,
+			payload.mem.hw_corrupted ?? null,
+			// VMstat rates
+			payload.mem.swap_in_sec ?? null,
+			payload.mem.swap_out_sec ?? null,
+			payload.mem.pgmajfault_sec ?? null,
+			payload.mem.pgpgin_sec ?? null,
+			payload.mem.pgpgout_sec ?? null,
+			// PSI total deltas
+			payload.psi?.cpu_some_total_delta ?? null,
+			payload.psi?.mem_some_total_delta ?? null,
+			payload.psi?.mem_full_total_delta ?? null,
+			payload.psi?.io_some_total_delta ?? null,
+			payload.psi?.io_full_total_delta ?? null,
+			// TCP memory
+			payload.tcp?.mem_pages ?? null,
+			// Socket / UDP
+			payload.socket?.sockets_used ?? null,
+			payload.udp?.inuse ?? null,
+			payload.udp?.mem_pages ?? null,
+			// SNMP
+			payload.snmp?.retrans_segs_sec ?? null,
+			payload.snmp?.active_opens_sec ?? null,
+			payload.snmp?.passive_opens_sec ?? null,
+			payload.snmp?.attempt_fails_delta ?? null,
+			payload.snmp?.estab_resets_delta ?? null,
+			payload.snmp?.in_errs_delta ?? null,
+			payload.snmp?.out_rsts_delta ?? null,
+			payload.snmp?.udp_rcvbuf_errors_delta ?? null,
+			payload.snmp?.udp_sndbuf_errors_delta ?? null,
+			payload.snmp?.udp_in_errors_delta ?? null,
+			// Netstat
+			payload.netstat?.listen_overflows_delta ?? null,
+			payload.netstat?.listen_drops_delta ?? null,
+			payload.netstat?.tcp_timeouts_delta ?? null,
+			payload.netstat?.tcp_syn_retrans_delta ?? null,
+			payload.netstat?.tcp_fast_retrans_delta ?? null,
+			payload.netstat?.tcp_ofo_queue_delta ?? null,
+			payload.netstat?.tcp_abort_on_memory_delta ?? null,
+			payload.netstat?.syncookies_sent_delta ?? null,
+			// Softnet
+			payload.softnet?.processed_delta ?? null,
+			payload.softnet?.dropped_delta ?? null,
+			payload.softnet?.time_squeeze_delta ?? null,
+			// Conntrack
+			payload.conntrack?.count ?? null,
+			payload.conntrack?.max ?? null,
 		)
 		.run();
 	return result.meta.changes > 0;
