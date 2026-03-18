@@ -24,7 +24,8 @@ export async function GET(req: NextRequest) {
 		let script = await readFile(SCRIPT_PATH, "utf-8");
 
 		const dashboardUrl = getDashboardUrl(req);
-		script = script.replace(/__DASHBOARD_URL__/g, dashboardUrl);
+		// Only replace the assignment line — avoid clobbering the validation check
+		script = script.replace('DASHBOARD_URL="__DASHBOARD_URL__"', `DASHBOARD_URL="${dashboardUrl}"`);
 
 		return new Response(script, {
 			headers: {
