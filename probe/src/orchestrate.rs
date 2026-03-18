@@ -105,6 +105,11 @@ pub fn build_metrics_payload(
             forks_sec: cpu_ext.1,
             procs_running: cpu_ext.2,
             procs_blocked: cpu_ext.3,
+            interrupts_sec: None,
+            softirq_net_rx_sec: None,
+            softirq_block_sec: None,
+            tasks_running: None,
+            tasks_total: None,
         },
         mem,
         swap,
@@ -115,6 +120,12 @@ pub fn build_metrics_payload(
         disk_io,
         tcp,
         fd,
+        socket: None,
+        udp: None,
+        snmp: None,
+        netstat: None,
+        softnet: None,
+        conntrack: None,
     }
 }
 
@@ -127,6 +138,9 @@ pub fn convert_disk_infos(infos: Vec<collectors::disk::DiskInfo>) -> Vec<DiskMet
             total_bytes: d.total_bytes,
             avail_bytes: d.avail_bytes,
             used_pct: d.used_pct,
+            inodes_total: None,
+            inodes_avail: None,
+            inodes_used_pct: None,
         })
         .collect()
 }
@@ -141,6 +155,10 @@ pub fn convert_net_infos(infos: Vec<collectors::network::NetInfo>) -> Vec<NetMet
             tx_bytes_rate: n.tx_bytes_rate,
             rx_errors: n.rx_errors,
             tx_errors: n.tx_errors,
+            rx_packets_rate: None,
+            tx_packets_rate: None,
+            rx_dropped: None,
+            tx_dropped: None,
         })
         .collect()
 }
@@ -163,6 +181,11 @@ pub const fn convert_psi(data: &collectors::psi::PsiData) -> PsiMetrics {
         io_full_avg10: data.io.full.avg10,
         io_full_avg60: data.io.full.avg60,
         io_full_avg300: data.io.full.avg300,
+        cpu_some_total_delta: None,
+        mem_some_total_delta: None,
+        mem_full_total_delta: None,
+        io_some_total_delta: None,
+        io_full_total_delta: None,
     }
 }
 
@@ -215,6 +238,9 @@ pub fn compute_disk_io_delta(
                 read_bytes_sec: sectors_read_delta as f64 * 512.0 / elapsed_secs,
                 write_bytes_sec: sectors_written_delta as f64 * 512.0 / elapsed_secs,
                 io_util_pct,
+                read_await_ms: None,
+                write_await_ms: None,
+                io_queue_depth: None,
             });
         }
     }
@@ -229,6 +255,7 @@ pub const fn convert_tcp(state: &collectors::tcp::TcpState) -> TcpMetrics {
         time_wait: state.time_wait,
         orphan: state.orphan,
         allocated: state.allocated,
+        mem_pages: None,
     }
 }
 
@@ -268,6 +295,21 @@ pub fn build_mem_swap_metrics(
                 available_bytes: 0,
                 used_pct: 0.0,
                 oom_kills_delta: None,
+                buffers: None,
+                cached: None,
+                dirty: None,
+                writeback: None,
+                shmem: None,
+                slab_reclaimable: None,
+                slab_unreclaim: None,
+                committed_as: None,
+                commit_limit: None,
+                hw_corrupted: None,
+                swap_in_sec: None,
+                swap_out_sec: None,
+                pgmajfault_sec: None,
+                pgpgin_sec: None,
+                pgpgout_sec: None,
             },
             SwapMetrics {
                 total_bytes: 0,
@@ -282,6 +324,21 @@ pub fn build_mem_swap_metrics(
                     available_bytes: info.mem_available,
                     used_pct: info.mem_used_pct,
                     oom_kills_delta,
+                    buffers: None,
+                    cached: None,
+                    dirty: None,
+                    writeback: None,
+                    shmem: None,
+                    slab_reclaimable: None,
+                    slab_unreclaim: None,
+                    committed_as: None,
+                    commit_limit: None,
+                    hw_corrupted: None,
+                    swap_in_sec: None,
+                    swap_out_sec: None,
+                    pgmajfault_sec: None,
+                    pgpgin_sec: None,
+                    pgpgout_sec: None,
                 },
                 SwapMetrics {
                     total_bytes: info.swap_total,
@@ -613,6 +670,21 @@ mod tests {
             available_bytes: 2_000_000,
             used_pct: 50.0,
             oom_kills_delta: None,
+            buffers: None,
+            cached: None,
+            dirty: None,
+            writeback: None,
+            shmem: None,
+            slab_reclaimable: None,
+            slab_unreclaim: None,
+            committed_as: None,
+            commit_limit: None,
+            hw_corrupted: None,
+            swap_in_sec: None,
+            swap_out_sec: None,
+            pgmajfault_sec: None,
+            pgpgin_sec: None,
+            pgpgout_sec: None,
         };
         let swap = SwapMetrics {
             total_bytes: 1_000_000,
@@ -624,6 +696,9 @@ mod tests {
             total_bytes: 100,
             avail_bytes: 50,
             used_pct: 50.0,
+            inodes_total: None,
+            inodes_avail: None,
+            inodes_used_pct: None,
         }];
         let net = vec![NetMetric {
             iface: "eth0".into(),
@@ -631,6 +706,10 @@ mod tests {
             tx_bytes_rate: 200.0,
             rx_errors: 0,
             tx_errors: 0,
+            rx_packets_rate: None,
+            tx_packets_rate: None,
+            rx_dropped: None,
+            tx_dropped: None,
         }];
         let p = build_metrics_payload(
             "0.2.0",
@@ -669,6 +748,21 @@ mod tests {
             available_bytes: 0,
             used_pct: 0.0,
             oom_kills_delta: None,
+            buffers: None,
+            cached: None,
+            dirty: None,
+            writeback: None,
+            shmem: None,
+            slab_reclaimable: None,
+            slab_unreclaim: None,
+            committed_as: None,
+            commit_limit: None,
+            hw_corrupted: None,
+            swap_in_sec: None,
+            swap_out_sec: None,
+            pgmajfault_sec: None,
+            pgpgin_sec: None,
+            pgpgout_sec: None,
         };
         let swap = SwapMetrics {
             total_bytes: 0,
@@ -1140,6 +1234,21 @@ mod tests {
             available_bytes: 0,
             used_pct: 0.0,
             oom_kills_delta: None,
+            buffers: None,
+            cached: None,
+            dirty: None,
+            writeback: None,
+            shmem: None,
+            slab_reclaimable: None,
+            slab_unreclaim: None,
+            committed_as: None,
+            commit_limit: None,
+            hw_corrupted: None,
+            swap_in_sec: None,
+            swap_out_sec: None,
+            pgmajfault_sec: None,
+            pgpgin_sec: None,
+            pgpgout_sec: None,
         };
         let swap = SwapMetrics {
             total_bytes: 0,
@@ -1162,6 +1271,11 @@ mod tests {
             io_full_avg10: 0.0,
             io_full_avg60: 0.0,
             io_full_avg300: 0.0,
+            cpu_some_total_delta: None,
+            mem_some_total_delta: None,
+            mem_full_total_delta: None,
+            io_some_total_delta: None,
+            io_full_total_delta: None,
         });
         let p = build_metrics_payload(
             "0.3.0",
