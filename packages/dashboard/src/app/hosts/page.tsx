@@ -10,7 +10,7 @@ import Link from "next/link";
 
 function HostsLoading() {
 	return (
-		<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 			{Array.from({ length: 6 }, (_, i) => (
 				<Card key={`skeleton-${i.toString()}`}>
 					<CardContent className="space-y-4 py-6">
@@ -63,7 +63,7 @@ export default function HostsPage() {
 			) : !hosts || hosts.length === 0 ? (
 				<HostsEmpty />
 			) : (
-				<div className="grid gap-3 md:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+				<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 					{hosts.map((host) => (
 						<HostCard key={host.host_id} host={host} />
 					))}
