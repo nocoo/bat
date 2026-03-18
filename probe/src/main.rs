@@ -244,13 +244,18 @@ fn collect_metrics(
     let loadavg = loadavg_data
         .as_ref()
         .map_or((0.0, 0.0, 0.0), |la| (la.load1, la.load5, la.load15));
+    let tasks = loadavg_data
+        .as_ref()
+        .map_or((None, None), |la| (la.tasks_running, la.tasks_total));
 
     // Memory
     let mem_info = collectors::memory::read_meminfo().ok();
     let curr_oom_kills = collectors::memory::read_oom_kill();
     let oom_kills_delta = orchestrate::compute_oom_delta(*prev_oom_kills, curr_oom_kills);
     *prev_oom_kills = curr_oom_kills;
-    let (mem, swap) = orchestrate::build_mem_swap_metrics(mem_info.as_ref(), oom_kills_delta);
+    let vmstat_rates = orchestrate::VmstatRates::default(); // TODO: wire up vmstat collector
+    let (mem, swap) =
+        orchestrate::build_mem_swap_metrics(mem_info.as_ref(), oom_kills_delta, &vmstat_rates);
 
     // Disk
     let disk = orchestrate::convert_disk_infos(
@@ -269,7 +274,7 @@ fn collect_metrics(
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
     // PSI pressure (Tier 3)
-    let psi = collectors::psi::read_psi().map(|data| orchestrate::convert_psi(&data));
+    let psi = collectors::psi::read_psi().map(|data| orchestrate::convert_psi(&data, None));
 
     // Disk I/O (Tier 3) — delta from previous diskstats sample
     let curr_disk_io = collectors::disk_io::read_diskstats().ok();
@@ -295,6 +300,7 @@ fn collect_metrics(
         cpu_usage,
         loadavg,
         cpu_ext,
+        tasks,
         mem,
         swap,
         disk,
@@ -304,6 +310,12 @@ fn collect_metrics(
         disk_io,
         tcp,
         fd,
+        None, // socket
+        None, // udp
+        None, // snmp
+        None, // netstat
+        None, // softnet
+        None, // conntrack
     )
 }
 

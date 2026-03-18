@@ -5,11 +5,11 @@ use crate::collectors;
 use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
-    CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics, MetricsPayload,
-    NetMetric, PsiMetrics, SwapMetrics, TcpMetrics, Tier2DiskDeep, Tier2Docker,
-    Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
-    Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports, Tier2Security, Tier2Systemd,
-    Tier2TopDir, Tier2Updates,
+    ConntrackMetrics, CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics,
+    MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, SnmpMetrics, SocketMetrics,
+    SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer,
+    Tier2DockerImages, Tier2FailedService, Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate,
+    Tier2Payload, Tier2Ports, Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates, UdpMetrics,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -22,13 +22,23 @@ pub fn compute_cpu_delta(prev: Option<&CpuJiffies>, curr: Option<&CpuJiffies>) -
 
 /// Compute Tier 3 CPU extensions from previous and current jiffies.
 ///
-/// Returns `(context_switches_sec, forks_sec, procs_running, procs_blocked)`.
+/// Returns `(context_switches_sec, forks_sec, procs_running, procs_blocked,
+///           interrupts_sec, softirq_net_rx_sec, softirq_block_sec)`.
 /// All `None` if either sample is missing.
+#[allow(clippy::type_complexity)]
 pub fn compute_cpu_ext(
     prev: Option<&CpuJiffies>,
     curr: Option<&CpuJiffies>,
     elapsed: Duration,
-) -> (Option<f64>, Option<f64>, Option<u32>, Option<u32>) {
+) -> (
+    Option<f64>,
+    Option<f64>,
+    Option<u32>,
+    Option<u32>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+) {
     match (prev, curr) {
         (Some(p), Some(c)) => {
             let secs = elapsed.as_secs_f64();
@@ -42,14 +52,32 @@ pub fn compute_cpu_ext(
             } else {
                 None
             };
+            let intr_sec = if secs > 0.0 {
+                Some(c.intr_total.saturating_sub(p.intr_total) as f64 / secs)
+            } else {
+                None
+            };
+            let softirq_net_rx_sec = if secs > 0.0 {
+                Some(c.softirq_net_rx.saturating_sub(p.softirq_net_rx) as f64 / secs)
+            } else {
+                None
+            };
+            let softirq_block_sec = if secs > 0.0 {
+                Some(c.softirq_block.saturating_sub(p.softirq_block) as f64 / secs)
+            } else {
+                None
+            };
             (
                 ctxt_sec,
                 forks_sec,
                 Some(c.procs_running),
                 Some(c.procs_blocked),
+                intr_sec,
+                softirq_net_rx_sec,
+                softirq_block_sec,
             )
         }
-        _ => (None, None, None, None),
+        _ => (None, None, None, None, None, None, None),
     }
 }
 
@@ -68,7 +96,7 @@ pub fn compute_net_delta(
 }
 
 /// Build a [`MetricsPayload`] from collected system values.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn build_metrics_payload(
     probe_version: &str,
     host_id: &str,
@@ -77,7 +105,16 @@ pub fn build_metrics_payload(
     cpu_count: u32,
     usage: (f64, f64, f64),
     loadavg: (f64, f64, f64),
-    cpu_ext: (Option<f64>, Option<f64>, Option<u32>, Option<u32>),
+    cpu_ext: (
+        Option<f64>,
+        Option<f64>,
+        Option<u32>,
+        Option<u32>,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+    ),
+    tasks: (Option<u32>, Option<u32>),
     mem: MemMetrics,
     swap: SwapMetrics,
     disk: Vec<DiskMetric>,
@@ -87,6 +124,12 @@ pub fn build_metrics_payload(
     disk_io: Option<Vec<DiskIoMetric>>,
     tcp: Option<TcpMetrics>,
     fd: Option<FdMetrics>,
+    socket: Option<SocketMetrics>,
+    udp: Option<UdpMetrics>,
+    snmp: Option<SnmpMetrics>,
+    netstat: Option<NetstatMetrics>,
+    softnet: Option<SoftnetMetrics>,
+    conntrack: Option<ConntrackMetrics>,
 ) -> MetricsPayload {
     MetricsPayload {
         probe_version: probe_version.to_string(),
@@ -105,11 +148,11 @@ pub fn build_metrics_payload(
             forks_sec: cpu_ext.1,
             procs_running: cpu_ext.2,
             procs_blocked: cpu_ext.3,
-            interrupts_sec: None,
-            softirq_net_rx_sec: None,
-            softirq_block_sec: None,
-            tasks_running: None,
-            tasks_total: None,
+            interrupts_sec: cpu_ext.4,
+            softirq_net_rx_sec: cpu_ext.5,
+            softirq_block_sec: cpu_ext.6,
+            tasks_running: tasks.0,
+            tasks_total: tasks.1,
         },
         mem,
         swap,
@@ -120,12 +163,12 @@ pub fn build_metrics_payload(
         disk_io,
         tcp,
         fd,
-        socket: None,
-        udp: None,
-        snmp: None,
-        netstat: None,
-        softnet: None,
-        conntrack: None,
+        socket,
+        udp,
+        snmp,
+        netstat,
+        softnet,
+        conntrack,
     }
 }
 
@@ -138,9 +181,9 @@ pub fn convert_disk_infos(infos: Vec<collectors::disk::DiskInfo>) -> Vec<DiskMet
             total_bytes: d.total_bytes,
             avail_bytes: d.avail_bytes,
             used_pct: d.used_pct,
-            inodes_total: None,
-            inodes_avail: None,
-            inodes_used_pct: None,
+            inodes_total: d.inodes_total,
+            inodes_avail: d.inodes_avail,
+            inodes_used_pct: d.inodes_used_pct,
         })
         .collect()
 }
@@ -155,16 +198,32 @@ pub fn convert_net_infos(infos: Vec<collectors::network::NetInfo>) -> Vec<NetMet
             tx_bytes_rate: n.tx_bytes_rate,
             rx_errors: n.rx_errors,
             tx_errors: n.tx_errors,
-            rx_packets_rate: None,
-            tx_packets_rate: None,
-            rx_dropped: None,
-            tx_dropped: None,
+            rx_packets_rate: Some(n.rx_packets_rate),
+            tx_packets_rate: Some(n.tx_packets_rate),
+            rx_dropped: Some(n.rx_dropped_delta),
+            tx_dropped: Some(n.tx_dropped_delta),
         })
         .collect()
 }
 
 /// Convert collector PSI data to payload PSI metrics.
-pub const fn convert_psi(data: &collectors::psi::PsiData) -> PsiMetrics {
+///
+/// If `prev` totals are provided, compute microsecond deltas for each resource.
+pub fn convert_psi(
+    data: &collectors::psi::PsiData,
+    prev: Option<&collectors::psi::PsiData>,
+) -> PsiMetrics {
+    let (cpu_some_td, mem_some_td, mem_full_td, io_some_td, io_full_td) =
+        prev.map_or((None, None, None, None, None), |p| {
+            (
+                Some(data.cpu.some.total.saturating_sub(p.cpu.some.total)),
+                Some(data.memory.some.total.saturating_sub(p.memory.some.total)),
+                Some(data.memory.full.total.saturating_sub(p.memory.full.total)),
+                Some(data.io.some.total.saturating_sub(p.io.some.total)),
+                Some(data.io.full.total.saturating_sub(p.io.full.total)),
+            )
+        });
+
     PsiMetrics {
         cpu_some_avg10: data.cpu.some.avg10,
         cpu_some_avg60: data.cpu.some.avg60,
@@ -181,11 +240,11 @@ pub const fn convert_psi(data: &collectors::psi::PsiData) -> PsiMetrics {
         io_full_avg10: data.io.full.avg10,
         io_full_avg60: data.io.full.avg60,
         io_full_avg300: data.io.full.avg300,
-        cpu_some_total_delta: None,
-        mem_some_total_delta: None,
-        mem_full_total_delta: None,
-        io_some_total_delta: None,
-        io_full_total_delta: None,
+        cpu_some_total_delta: cpu_some_td,
+        mem_some_total_delta: mem_some_td,
+        mem_full_total_delta: mem_full_td,
+        io_some_total_delta: io_some_td,
+        io_full_total_delta: io_full_td,
     }
 }
 
@@ -231,6 +290,20 @@ pub fn compute_disk_io_delta(
                 0.0
             };
 
+            // Compute average await times: total_ms / total_ios for each direction.
+            let read_ms_delta = curr_dev.read_ms.saturating_sub(prev_dev.read_ms);
+            let write_ms_delta = curr_dev.write_ms.saturating_sub(prev_dev.write_ms);
+            let read_await = if reads_delta > 0 {
+                Some(read_ms_delta as f64 / reads_delta as f64)
+            } else {
+                Some(0.0)
+            };
+            let write_await = if writes_delta > 0 {
+                Some(write_ms_delta as f64 / writes_delta as f64)
+            } else {
+                Some(0.0)
+            };
+
             metrics.push(DiskIoMetric {
                 device: curr_dev.device.clone(),
                 read_iops: reads_delta as f64 / elapsed_secs,
@@ -238,9 +311,9 @@ pub fn compute_disk_io_delta(
                 read_bytes_sec: sectors_read_delta as f64 * 512.0 / elapsed_secs,
                 write_bytes_sec: sectors_written_delta as f64 * 512.0 / elapsed_secs,
                 io_util_pct,
-                read_await_ms: None,
-                write_await_ms: None,
-                io_queue_depth: None,
+                read_await_ms: read_await,
+                write_await_ms: write_await,
+                io_queue_depth: Some(curr_dev.io_in_progress),
             });
         }
     }
@@ -255,7 +328,7 @@ pub const fn convert_tcp(state: &collectors::tcp::TcpState) -> TcpMetrics {
         time_wait: state.time_wait,
         orphan: state.orphan,
         allocated: state.allocated,
-        mem_pages: None,
+        mem_pages: state.mem_pages,
     }
 }
 
@@ -264,6 +337,99 @@ pub const fn convert_fd(info: &collectors::fd::FdInfo) -> FdMetrics {
     FdMetrics {
         allocated: info.allocated,
         max: info.max,
+    }
+}
+
+/// Convert sockstat extra to payload socket metrics.
+#[allow(dead_code)]
+pub const fn convert_socket(extra: &collectors::tcp::SockstatExtra) -> SocketMetrics {
+    SocketMetrics {
+        sockets_used: extra.sockets_used,
+    }
+}
+
+/// Convert sockstat extra to payload UDP metrics.
+#[allow(dead_code)]
+pub const fn convert_udp(extra: &collectors::tcp::SockstatExtra) -> UdpMetrics {
+    UdpMetrics {
+        inuse: extra.udp_inuse,
+        mem_pages: extra.udp_mem_pages,
+    }
+}
+
+/// Compute SNMP counter deltas/rates from two samples.
+#[allow(dead_code)]
+pub fn compute_snmp_delta(
+    prev: Option<&collectors::snmp::SnmpCounters>,
+    curr: Option<&collectors::snmp::SnmpCounters>,
+    elapsed: Duration,
+) -> Option<SnmpMetrics> {
+    let (Some(p), Some(c)) = (prev, curr) else {
+        return None;
+    };
+    let secs = elapsed.as_secs_f64();
+    if secs <= 0.0 {
+        return None;
+    }
+    Some(SnmpMetrics {
+        retrans_segs_sec: Some(c.retrans_segs.saturating_sub(p.retrans_segs) as f64 / secs),
+        active_opens_sec: Some(c.active_opens.saturating_sub(p.active_opens) as f64 / secs),
+        passive_opens_sec: Some(c.passive_opens.saturating_sub(p.passive_opens) as f64 / secs),
+        attempt_fails_delta: Some(c.attempt_fails.saturating_sub(p.attempt_fails)),
+        estab_resets_delta: Some(c.estab_resets.saturating_sub(p.estab_resets)),
+        in_errs_delta: Some(c.in_errs.saturating_sub(p.in_errs)),
+        out_rsts_delta: Some(c.out_rsts.saturating_sub(p.out_rsts)),
+        udp_rcvbuf_errors_delta: Some(c.udp_rcvbuf_errors.saturating_sub(p.udp_rcvbuf_errors)),
+        udp_sndbuf_errors_delta: Some(c.udp_sndbuf_errors.saturating_sub(p.udp_sndbuf_errors)),
+        udp_in_errors_delta: Some(c.udp_in_errors.saturating_sub(p.udp_in_errors)),
+    })
+}
+
+/// Compute netstat counter deltas from two samples.
+#[allow(dead_code)]
+pub const fn compute_netstat_delta(
+    prev: Option<&collectors::netstat::NetstatCounters>,
+    curr: Option<&collectors::netstat::NetstatCounters>,
+) -> Option<NetstatMetrics> {
+    let (Some(p), Some(c)) = (prev, curr) else {
+        return None;
+    };
+    Some(NetstatMetrics {
+        listen_overflows_delta: Some(c.listen_overflows.saturating_sub(p.listen_overflows)),
+        listen_drops_delta: Some(c.listen_drops.saturating_sub(p.listen_drops)),
+        tcp_timeouts_delta: Some(c.tcp_timeouts.saturating_sub(p.tcp_timeouts)),
+        tcp_syn_retrans_delta: Some(c.tcp_syn_retrans.saturating_sub(p.tcp_syn_retrans)),
+        tcp_fast_retrans_delta: Some(c.tcp_fast_retrans.saturating_sub(p.tcp_fast_retrans)),
+        tcp_ofo_queue_delta: Some(c.tcp_ofo_queue.saturating_sub(p.tcp_ofo_queue)),
+        tcp_abort_on_memory_delta: Some(
+            c.tcp_abort_on_memory.saturating_sub(p.tcp_abort_on_memory),
+        ),
+        syncookies_sent_delta: Some(c.syncookies_sent.saturating_sub(p.syncookies_sent)),
+    })
+}
+
+/// Compute softnet counter deltas from two samples.
+#[allow(dead_code)]
+pub const fn compute_softnet_delta(
+    prev: Option<&collectors::softnet::SoftnetCounters>,
+    curr: Option<&collectors::softnet::SoftnetCounters>,
+) -> Option<SoftnetMetrics> {
+    let (Some(p), Some(c)) = (prev, curr) else {
+        return None;
+    };
+    Some(SoftnetMetrics {
+        processed_delta: Some(c.processed.saturating_sub(p.processed)),
+        dropped_delta: Some(c.dropped.saturating_sub(p.dropped)),
+        time_squeeze_delta: Some(c.time_squeeze.saturating_sub(p.time_squeeze)),
+    })
+}
+
+/// Convert conntrack state to payload metrics.
+#[allow(dead_code)]
+pub const fn convert_conntrack(state: &collectors::conntrack::ConntrackState) -> ConntrackMetrics {
+    ConntrackMetrics {
+        count: state.count,
+        max: state.max,
     }
 }
 
@@ -283,10 +449,47 @@ pub const fn compute_boot_time(now_secs: u64, uptime_secs: u64) -> u64 {
     now_secs.saturating_sub(uptime_secs)
 }
 
+/// Vmstat rate fields computed from two samples.
+#[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_field_names, dead_code)]
+pub struct VmstatRates {
+    pub swap_in_sec: Option<f64>,
+    pub swap_out_sec: Option<f64>,
+    pub pgmajfault_sec: Option<f64>,
+    pub pgpgin_sec: Option<f64>,
+    pub pgpgout_sec: Option<f64>,
+}
+
+/// Compute vmstat rates from previous and current [`VmstatCounters`].
+#[allow(dead_code)]
+pub fn compute_vmstat_rates(
+    prev: Option<&collectors::memory::VmstatCounters>,
+    curr: Option<&collectors::memory::VmstatCounters>,
+    elapsed: Duration,
+) -> VmstatRates {
+    match (prev, curr) {
+        (Some(p), Some(c)) => {
+            let secs = elapsed.as_secs_f64();
+            if secs <= 0.0 {
+                return VmstatRates::default();
+            }
+            VmstatRates {
+                swap_in_sec: Some(c.pswpin.saturating_sub(p.pswpin) as f64 / secs),
+                swap_out_sec: Some(c.pswpout.saturating_sub(p.pswpout) as f64 / secs),
+                pgmajfault_sec: Some(c.pgmajfault.saturating_sub(p.pgmajfault) as f64 / secs),
+                pgpgin_sec: Some(c.pgpgin.saturating_sub(p.pgpgin) as f64 / secs),
+                pgpgout_sec: Some(c.pgpgout.saturating_sub(p.pgpgout) as f64 / secs),
+            }
+        }
+        _ => VmstatRates::default(),
+    }
+}
+
 /// Build memory and swap metrics from an optional [`MemInfo`], defaulting to zero.
 pub fn build_mem_swap_metrics(
     mem_info: Option<&collectors::memory::MemInfo>,
     oom_kills_delta: Option<u64>,
+    vmstat_rates: &VmstatRates,
 ) -> (MemMetrics, SwapMetrics) {
     mem_info.map_or(
         (
@@ -324,21 +527,21 @@ pub fn build_mem_swap_metrics(
                     available_bytes: info.mem_available,
                     used_pct: info.mem_used_pct,
                     oom_kills_delta,
-                    buffers: None,
-                    cached: None,
-                    dirty: None,
-                    writeback: None,
-                    shmem: None,
-                    slab_reclaimable: None,
-                    slab_unreclaim: None,
-                    committed_as: None,
-                    commit_limit: None,
-                    hw_corrupted: None,
-                    swap_in_sec: None,
-                    swap_out_sec: None,
-                    pgmajfault_sec: None,
-                    pgpgin_sec: None,
-                    pgpgout_sec: None,
+                    buffers: info.buffers,
+                    cached: info.cached,
+                    dirty: info.dirty,
+                    writeback: info.writeback,
+                    shmem: info.shmem,
+                    slab_reclaimable: info.slab_reclaimable,
+                    slab_unreclaim: info.slab_unreclaim,
+                    committed_as: info.committed_as,
+                    commit_limit: info.commit_limit,
+                    hw_corrupted: info.hw_corrupted,
+                    swap_in_sec: vmstat_rates.swap_in_sec,
+                    swap_out_sec: vmstat_rates.swap_out_sec,
+                    pgmajfault_sec: vmstat_rates.pgmajfault_sec,
+                    pgpgin_sec: vmstat_rates.pgpgin_sec,
+                    pgpgout_sec: vmstat_rates.pgpgout_sec,
                 },
                 SwapMetrics {
                     total_bytes: info.swap_total,
@@ -646,7 +849,7 @@ mod tests {
             commit_limit: None,
             hw_corrupted: None,
         };
-        let (mem, swap) = build_mem_swap_metrics(Some(&info), Some(5));
+        let (mem, swap) = build_mem_swap_metrics(Some(&info), Some(5), &VmstatRates::default());
         assert_eq!(mem.total_bytes, 4_000_000);
         assert_eq!(mem.available_bytes, 2_000_000);
         assert_eq!(mem.oom_kills_delta, Some(5));
@@ -656,7 +859,7 @@ mod tests {
 
     #[test]
     fn build_mem_swap_metrics_with_none() {
-        let (mem, swap) = build_mem_swap_metrics(None, None);
+        let (mem, swap) = build_mem_swap_metrics(None, None, &VmstatRates::default());
         assert_eq!(mem.total_bytes, 0);
         assert_eq!(mem.available_bytes, 0);
         assert_eq!(swap.total_bytes, 0);
@@ -719,12 +922,19 @@ mod tests {
             4,
             (12.5, 1.2, 0.0),
             (0.5, 0.3, 0.2),
-            (None, None, None, None),
+            (None, None, None, None, None, None, None),
+            (None, None),
             mem,
             swap,
             disk,
             net,
             86400,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -777,12 +987,19 @@ mod tests {
             1,
             (0.0, 0.0, 0.0),
             (0.0, 0.0, 0.0),
-            (None, None, None, None),
+            (None, None, None, None, None, None, None),
+            (None, None),
             mem,
             swap,
             vec![],
             vec![],
             0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1217,7 +1434,7 @@ mod tests {
             },
         };
 
-        let psi = convert_psi(&data);
+        let psi = convert_psi(&data, None);
         assert!((psi.cpu_some_avg10 - 2.40).abs() < f64::EPSILON);
         assert!((psi.cpu_some_avg60 - 2.13).abs() < f64::EPSILON);
         assert!((psi.cpu_some_avg300 - 1.40).abs() < f64::EPSILON);
@@ -1285,13 +1502,20 @@ mod tests {
             1,
             (0.0, 0.0, 0.0),
             (0.0, 0.0, 0.0),
-            (None, None, None, None),
+            (None, None, None, None, None, None, None),
+            (None, None),
             mem,
             swap,
             vec![],
             vec![],
             0,
             psi,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
             None,
             None,
             None,
@@ -1347,7 +1571,7 @@ mod tests {
             procs_blocked: 1,
             ..Default::default()
         };
-        let (ctxt, forks, running, blocked) =
+        let (ctxt, forks, running, blocked, intr, softirq_net_rx, softirq_block) =
             compute_cpu_ext(Some(&prev), Some(&curr), Duration::from_secs(30));
         // ctxt delta = 30000 / 30s = 1000/s
         assert!((ctxt.unwrap() - 1000.0).abs() < f64::EPSILON);
@@ -1355,6 +1579,10 @@ mod tests {
         assert!((forks.unwrap() - 10.0).abs() < f64::EPSILON);
         assert_eq!(running, Some(3));
         assert_eq!(blocked, Some(1));
+        // New fields: no intr/softirq data in fixtures → 0-delta / 0s = 0.0
+        assert!(intr.is_some());
+        assert!(softirq_net_rx.is_some());
+        assert!(softirq_block.is_some());
     }
 
     #[test]
@@ -1363,21 +1591,28 @@ mod tests {
             ctxt: 1000,
             ..Default::default()
         };
-        let (ctxt, forks, running, blocked) =
+        let (ctxt, forks, running, blocked, intr, softirq_net_rx, softirq_block) =
             compute_cpu_ext(None, Some(&curr), Duration::from_secs(30));
         assert!(ctxt.is_none());
         assert!(forks.is_none());
         assert!(running.is_none());
         assert!(blocked.is_none());
+        assert!(intr.is_none());
+        assert!(softirq_net_rx.is_none());
+        assert!(softirq_block.is_none());
     }
 
     #[test]
     fn compute_cpu_ext_both_none() {
-        let (ctxt, forks, running, blocked) = compute_cpu_ext(None, None, Duration::from_secs(30));
+        let (ctxt, forks, running, blocked, intr, softirq_net_rx, softirq_block) =
+            compute_cpu_ext(None, None, Duration::from_secs(30));
         assert!(ctxt.is_none());
         assert!(forks.is_none());
         assert!(running.is_none());
         assert!(blocked.is_none());
+        assert!(intr.is_none());
+        assert!(softirq_net_rx.is_none());
+        assert!(softirq_block.is_none());
     }
 
     #[test]
@@ -1394,13 +1629,16 @@ mod tests {
             procs_blocked: 0,
             ..Default::default()
         };
-        let (ctxt, forks, running, blocked) =
+        let (ctxt, forks, running, blocked, intr, softirq_net_rx, softirq_block) =
             compute_cpu_ext(Some(&prev), Some(&curr), Duration::from_secs(0));
         // Zero elapsed → rates are None, gauges still populated
         assert!(ctxt.is_none());
         assert!(forks.is_none());
         assert_eq!(running, Some(2));
         assert_eq!(blocked, Some(0));
+        assert!(intr.is_none());
+        assert!(softirq_net_rx.is_none());
+        assert!(softirq_block.is_none());
     }
 
     #[test]
