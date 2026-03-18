@@ -147,7 +147,7 @@ do_install() {
     if [[ -z "$WRITE_KEY" ]]; then
         error "Missing required option: --key <write_key>"
     fi
-    if [[ "$DASHBOARD_URL" == "__DASHBOARD_URL__" ]]; then
+    if [[ "$DASHBOARD_URL" == __* ]]; then
         error "DASHBOARD_URL was not injected — download this script from the dashboard"
     fi
 
