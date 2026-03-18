@@ -1,6 +1,7 @@
 import { StatusBadge } from "@/components/status-badge";
+import { TagChip } from "@/components/tag-chip";
 import { Card } from "@/components/ui/card";
-import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
+import type { HostOverviewItem, HostTag, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import Link from "next/link";
 
@@ -196,7 +197,7 @@ function MiniBarChart({ data, color }: { data: SparklinePoint[]; color: string }
 // Main component
 // ---------------------------------------------------------------------------
 
-export function HostCard({ host }: { host: HostOverviewItem }) {
+export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTag[] | undefined }) {
 	const subtitle = buildSubtitle(host);
 	const memUsage = formatMemoryUsage(host.mem_total_bytes, host.mem_used_pct);
 
@@ -216,6 +217,15 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 				</div>
 				{subtitle && (
 					<p className="text-[10px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
+				)}
+
+				{/* Tags */}
+				{tags && tags.length > 0 && (
+					<div className="flex items-center gap-1 flex-wrap mt-1.5 px-0.5">
+						{tags.map((tag) => (
+							<TagChip key={tag.id} name={tag.name} color={tag.color} size="sm" />
+						))}
+					</div>
 				)}
 
 				{/* Resource bars */}
