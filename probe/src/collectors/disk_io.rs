@@ -5,6 +5,7 @@
 
 /// Raw counters from a single `/proc/diskstats` line.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct DiskIoCounters {
     pub device: String,
     pub reads_completed: u64,
@@ -12,6 +13,10 @@ pub struct DiskIoCounters {
     pub writes_completed: u64,
     pub sectors_written: u64,
     pub io_ms: u64, // weighted time spent doing I/O (ms)
+    // Signal expansion: latency and queue depth
+    pub read_ms: u64,        // time spent reading (ms), field 6 in diskstats
+    pub write_ms: u64,       // time spent writing (ms), field 10 in diskstats
+    pub io_in_progress: u64, // I/Os currently in flight, field 11 in diskstats
 }
 
 /// Parse `/proc/diskstats` content into per-device counters.
@@ -57,8 +62,11 @@ pub fn parse_diskstats(content: &str) -> Vec<DiskIoCounters> {
 
         let reads_completed: u64 = fields[3].parse().unwrap_or(0);
         let sectors_read: u64 = fields[5].parse().unwrap_or(0);
+        let read_ms: u64 = fields[6].parse().unwrap_or(0);
         let writes_completed: u64 = fields[7].parse().unwrap_or(0);
         let sectors_written: u64 = fields[9].parse().unwrap_or(0);
+        let write_ms: u64 = fields[10].parse().unwrap_or(0);
+        let io_in_progress: u64 = fields[11].parse().unwrap_or(0);
         let io_ms: u64 = fields[12].parse().unwrap_or(0);
 
         // Skip dm-* devices with zero I/O
@@ -73,6 +81,9 @@ pub fn parse_diskstats(content: &str) -> Vec<DiskIoCounters> {
             writes_completed,
             sectors_written,
             io_ms,
+            read_ms,
+            write_ms,
+            io_in_progress,
         });
     }
 
@@ -187,6 +198,10 @@ mod tests {
         assert_eq!(sda.writes_completed, 142388);
         assert_eq!(sda.sectors_written, 2_598_810);
         assert_eq!(sda.io_ms, 11380);
+        // Signal expansion fields
+        assert_eq!(sda.read_ms, 3044);
+        assert_eq!(sda.write_ms, 70786);
+        assert_eq!(sda.io_in_progress, 0);
     }
 
     #[test]

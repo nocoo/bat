@@ -8,10 +8,13 @@
 
 /// Parsed averages from a single PSI line (some or full).
 #[derive(Debug, Default)]
+#[allow(dead_code)] // total field used in later commits for delta computation
 pub struct PsiLine {
     pub avg10: f64,
     pub avg60: f64,
     pub avg300: f64,
+    /// Cumulative total microseconds of pressure (for delta computation)
+    pub total: u64,
 }
 
 /// Parsed PSI data from one resource file (cpu, memory, or io).
@@ -43,6 +46,7 @@ pub fn parse_psi_line(line: &str) -> Option<(&str, PsiLine)> {
     let mut avg10 = 0.0;
     let mut avg60 = 0.0;
     let mut avg300 = 0.0;
+    let mut total = 0;
 
     for part in parts {
         if let Some(val) = part.strip_prefix("avg10=") {
@@ -51,8 +55,9 @@ pub fn parse_psi_line(line: &str) -> Option<(&str, PsiLine)> {
             avg60 = val.parse().ok()?;
         } else if let Some(val) = part.strip_prefix("avg300=") {
             avg300 = val.parse().ok()?;
+        } else if let Some(val) = part.strip_prefix("total=") {
+            total = val.parse().unwrap_or(0);
         }
-        // skip total=... and any unknown fields
     }
 
     Some((
@@ -61,6 +66,7 @@ pub fn parse_psi_line(line: &str) -> Option<(&str, PsiLine)> {
             avg10,
             avg60,
             avg300,
+            total,
         },
     ))
 }
@@ -133,6 +139,7 @@ some avg10=5.00 avg60=3.00 avg300=1.00 total=999999
         assert!((line.avg10 - 2.40).abs() < f64::EPSILON);
         assert!((line.avg60 - 2.13).abs() < f64::EPSILON);
         assert!((line.avg300 - 1.40).abs() < f64::EPSILON);
+        assert_eq!(line.total, 1_627_410_488);
     }
 
     #[test]

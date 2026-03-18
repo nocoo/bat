@@ -706,6 +706,9 @@ mod tests {
             total_bytes: 1000,
             avail_bytes: 400,
             used_pct: 60.0,
+            inodes_total: None,
+            inodes_avail: None,
+            inodes_used_pct: None,
         }];
         let metrics = convert_disk_infos(infos);
         assert_eq!(metrics.len(), 1);
@@ -728,6 +731,10 @@ mod tests {
             tx_bytes_rate: 200.0,
             rx_errors: 1,
             tx_errors: 2,
+            rx_packets_rate: 0.0,
+            tx_packets_rate: 0.0,
+            rx_dropped_delta: 0,
+            tx_dropped_delta: 0,
         }];
         let metrics = convert_net_infos(infos);
         assert_eq!(metrics.len(), 1);
@@ -1082,6 +1089,7 @@ mod tests {
                     avg10: 2.40,
                     avg60: 2.13,
                     avg300: 1.40,
+                    ..Default::default()
                 },
                 full: PsiLine::default(),
             },
@@ -1090,11 +1098,13 @@ mod tests {
                     avg10: 1.0,
                     avg60: 0.5,
                     avg300: 0.3,
+                    ..Default::default()
                 },
                 full: PsiLine {
                     avg10: 0.1,
                     avg60: 0.05,
                     avg300: 0.01,
+                    ..Default::default()
                 },
             },
             io: PsiResource {
@@ -1102,11 +1112,13 @@ mod tests {
                     avg10: 0.50,
                     avg60: 0.01,
                     avg300: 0.0,
+                    ..Default::default()
                 },
                 full: PsiLine {
                     avg10: 0.30,
                     avg60: 0.0,
                     avg300: 0.0,
+                    ..Default::default()
                 },
             },
         };
@@ -1302,6 +1314,7 @@ mod tests {
             writes_completed: 5000,
             sectors_written: 100000,
             io_ms: 5000,
+            ..Default::default()
         }];
         let curr = vec![DiskIoCounters {
             device: "sda".into(),
@@ -1310,6 +1323,7 @@ mod tests {
             writes_completed: 5600,
             sectors_written: 112000,
             io_ms: 8000,
+            ..Default::default()
         }];
         let result =
             compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();

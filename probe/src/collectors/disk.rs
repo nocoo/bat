@@ -85,11 +85,24 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
             let avail = u64::from(stat.blocks_available()) * block_size;
             let (_used, used_pct) = compute_disk_usage(total, avail);
 
+            // Inode stats from same statvfs call
+            let inodes_total_val = u64::from(stat.files());
+            let inodes_avail_val = u64::from(stat.files_available());
+            let (inodes_total, inodes_avail, inodes_used_pct) = if inodes_total_val > 0 {
+                let (_used, pct) = compute_inode_usage(inodes_total_val, inodes_avail_val);
+                (Some(inodes_total_val), Some(inodes_avail_val), Some(pct))
+            } else {
+                (None, None, None)
+            };
+
             results.push(DiskInfo {
                 mount: mount.mount_point.clone(),
                 total_bytes: total,
                 avail_bytes: avail,
                 used_pct,
+                inodes_total,
+                inodes_avail,
+                inodes_used_pct,
             });
         }
     }
@@ -99,11 +112,29 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
 
 /// Disk capacity info for a single mount point.
 #[derive(Debug)]
+#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct DiskInfo {
     pub mount: String,
     pub total_bytes: u64,
     pub avail_bytes: u64,
     pub used_pct: f64,
+    // Signal expansion: inode usage
+    pub inodes_total: Option<u64>,
+    pub inodes_avail: Option<u64>,
+    pub inodes_used_pct: Option<f64>,
+}
+
+/// Compute inode usage percentage from total and available counts.
+///
+/// Returns `(used, used_pct)`. Handles zero total (0%).
+pub fn compute_inode_usage(total: u64, avail: u64) -> (u64, f64) {
+    let used = total.saturating_sub(avail);
+    let pct = if total > 0 {
+        used as f64 / total as f64 * 100.0
+    } else {
+        0.0
+    };
+    (used, pct)
 }
 
 // ── Live reader (requires Linux /proc) ──────────────────────────────
@@ -250,6 +281,27 @@ btrfs-pool /mnt/storage btrfs rw,relatime 0 0
         let (used, pct) = compute_disk_usage(1000, 0);
         assert_eq!(used, 1000);
         assert!((pct - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_inode_usage_normal() {
+        let (used, pct) = compute_inode_usage(10000, 3000);
+        assert_eq!(used, 7000);
+        assert!((pct - 70.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_inode_usage_zero_total() {
+        let (used, pct) = compute_inode_usage(0, 0);
+        assert_eq!(used, 0);
+        assert_eq!(pct, 0.0);
+    }
+
+    #[test]
+    fn compute_inode_usage_avail_exceeds_total() {
+        let (used, pct) = compute_inode_usage(100, 200);
+        assert_eq!(used, 0);
+        assert_eq!(pct, 0.0);
     }
 
     #[test]
