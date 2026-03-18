@@ -14,3 +14,5 @@
 | 08 | [commits](./08-commits.md) | Atomic commits plan (Phase 0–5, 46 commits) |
 | 09 | [tier3-signals](./09-tier3-signals.md) | Tier 3 design rationale: PSI, disk I/O, TCP state, OOM kills, FD usage |
 | 10 | [host-inventory](./10-host-inventory.md) | Host inventory design: CPU topology, virtualization, network, block devices |
+| 11 | [host-tags](./11-host-tags.md) | Host tagging: tags table, CRUD API, dashboard UI, filtering |
+| 12 | [software-discovery](./12-software-discovery.md) | Tier 2 software detection: process/systemd/binary/package scanning, ~40 common tools |
