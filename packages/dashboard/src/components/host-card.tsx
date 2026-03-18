@@ -67,7 +67,8 @@ function formatMemoryUsage(totalBytes: number | null, usedPct: number | null): s
 /** Format network rate — bytes/sec → human-readable */
 function formatNetRate(bytesPerSec: number | null): string {
 	if (bytesPerSec === null) return "—";
-	if (bytesPerSec >= 1024 * 1024 * 1024) return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
+	if (bytesPerSec >= 1024 * 1024 * 1024)
+		return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
 	if (bytesPerSec >= 1024 * 1024) return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
 	if (bytesPerSec >= 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
 	return `${Math.round(bytesPerSec)} B/s`;
@@ -105,12 +106,32 @@ function getValueColor(value: number): string {
 }
 
 // ---------------------------------------------------------------------------
+// Status dot color
+// ---------------------------------------------------------------------------
+
+function statusDotColor(status: string): string {
+	if (status === "healthy") return "bg-success";
+	if (status === "warning") return "bg-warning";
+	if (status === "critical") return "bg-destructive";
+	return "bg-muted-foreground";
+}
+
+// ---------------------------------------------------------------------------
 // Inline sub-components
 // ---------------------------------------------------------------------------
 
-function ResourceBar({ value, label, suffix }: { value: number | null; label: string; suffix?: string | undefined }) {
+function ResourceBar({
+	value,
+	label,
+	suffix,
+}: {
+	value: number | null;
+	label: string;
+	suffix?: string | undefined;
+}) {
 	const pct = value ?? 0;
 	const hasValue = value !== null;
+	const valueColorClass = hasValue ? getValueColor(pct) : "text-muted-foreground";
 	return (
 		<div className="flex items-center gap-2">
 			<span className="w-8 text-[10px] font-medium text-muted-foreground shrink-0">{label}</span>
@@ -122,7 +143,9 @@ function ResourceBar({ value, label, suffix }: { value: number | null; label: st
 					/>
 				)}
 			</div>
-			<span className={`w-8 text-right text-[11px] font-display font-semibold tabular-nums ${hasValue ? getValueColor(pct) : "text-muted-foreground"}`}>
+			<span
+				className={`w-8 text-right text-[11px] font-display font-semibold tabular-nums ${valueColorClass}`}
+			>
 				{hasValue ? `${Math.round(pct)}%` : "—"}
 			</span>
 			{suffix && (
@@ -141,7 +164,13 @@ function MiniBarChart({ data, color }: { data: SparklinePoint[]; color: string }
 	const svgWidth = barCount * (barWidth + gap) - gap;
 
 	return (
-		<svg width={svgWidth} height={height} className="shrink-0" aria-hidden>
+		<svg
+			width={svgWidth}
+			height={height}
+			className="shrink-0"
+			role="img"
+			aria-label="Sparkline chart"
+		>
 			{data.map((point, i) => {
 				const barHeight = Math.max((point.v / 100) * height, 1);
 				// Opacity varies with value: 0.3 at 0%, 1.0 at 100%
@@ -173,16 +202,14 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 
 	return (
 		<Link href={`/hosts/${hashHostId(host.host_id)}`}>
-			<Card className="transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0" data-testid="host-card">
+			<Card
+				className="transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0"
+				data-testid="host-card"
+			>
 				{/* Header */}
 				<div className="flex items-center justify-between px-0.5">
 					<div className="flex items-center gap-1.5 min-w-0">
-						<span className={`h-2 w-2 shrink-0 rounded-full ${
-							host.status === "healthy" ? "bg-success" :
-							host.status === "warning" ? "bg-warning" :
-							host.status === "critical" ? "bg-destructive" :
-							"bg-muted-foreground"
-						}`} />
+						<span className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(host.status)}`} />
 						<span className="text-sm font-semibold truncate">{host.hostname}</span>
 					</div>
 					<StatusBadge status={host.status} />
@@ -198,15 +225,15 @@ export function HostCard({ host }: { host: HostOverviewItem }) {
 						label="CPU"
 						suffix={host.cpu_load1 !== null ? `Load ${host.cpu_load1.toFixed(1)}` : undefined}
 					/>
-					<ResourceBar
-						value={host.mem_used_pct}
-						label="MEM"
-						suffix={memUsage ?? undefined}
-					/>
+					<ResourceBar value={host.mem_used_pct} label="MEM" suffix={memUsage ?? undefined} />
 					<ResourceBar
 						value={host.swap_used_pct}
 						label="SWAP"
-						suffix={host.disk_root_used_pct !== null ? `Disk / ${formatDiskUsage(host.disk_root_used_pct)}` : undefined}
+						suffix={
+							host.disk_root_used_pct !== null
+								? `Disk / ${formatDiskUsage(host.disk_root_used_pct)}`
+								: undefined
+						}
 					/>
 				</div>
 
