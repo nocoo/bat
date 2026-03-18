@@ -52,6 +52,7 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 
 	if (useHourly) {
 		// Query hourly aggregated data
+		// Signal expansion fields are stored as JSON in ext_json column (D1 100-column limit)
 		const result = await db
 			.prepare(
 				`SELECT hour_ts as ts, cpu_usage_avg as cpu_usage_pct, cpu_iowait_avg as cpu_iowait,
@@ -90,71 +91,23 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
          oom_kills_sum as oom_kills,
          fd_allocated_avg as fd_allocated,
          fd_max,
-         interrupts_sec_avg as interrupts_sec,
-         softirq_net_rx_sec_avg as softirq_net_rx_sec,
-         softirq_block_sec_avg as softirq_block_sec,
-         tasks_running_avg as tasks_running,
-         tasks_total_avg as tasks_total,
-         mem_buffers_avg as mem_buffers,
-         mem_cached_avg as mem_cached,
-         mem_dirty_avg as mem_dirty,
-         mem_writeback_avg as mem_writeback,
-         mem_shmem_avg as mem_shmem,
-         mem_slab_reclaimable_avg as mem_slab_reclaimable,
-         mem_slab_unreclaim_avg as mem_slab_unreclaim,
-         mem_committed_as_avg as mem_committed_as,
-         mem_commit_limit,
-         mem_hw_corrupted_max as mem_hw_corrupted,
-         swap_in_sec_avg as swap_in_sec,
-         swap_out_sec_avg as swap_out_sec,
-         pgmajfault_sec_avg as pgmajfault_sec,
-         pgpgin_sec_avg as pgpgin_sec,
-         pgpgout_sec_avg as pgpgout_sec,
-         psi_cpu_some_total_delta_sum as psi_cpu_some_total_delta,
-         psi_mem_some_total_delta_sum as psi_mem_some_total_delta,
-         psi_mem_full_total_delta_sum as psi_mem_full_total_delta,
-         psi_io_some_total_delta_sum as psi_io_some_total_delta,
-         psi_io_full_total_delta_sum as psi_io_full_total_delta,
-         tcp_mem_pages_avg as tcp_mem_pages,
-         sockets_used_avg as sockets_used,
-         udp_inuse_avg as udp_inuse,
-         udp_mem_pages_avg as udp_mem_pages,
-         snmp_retrans_segs_sec_avg as snmp_retrans_segs_sec,
-         snmp_active_opens_sec_avg as snmp_active_opens_sec,
-         snmp_passive_opens_sec_avg as snmp_passive_opens_sec,
-         snmp_attempt_fails_delta_sum as snmp_attempt_fails_delta,
-         snmp_estab_resets_delta_sum as snmp_estab_resets_delta,
-         snmp_in_errs_delta_sum as snmp_in_errs_delta,
-         snmp_out_rsts_delta_sum as snmp_out_rsts_delta,
-         snmp_udp_rcvbuf_errors_delta_sum as snmp_udp_rcvbuf_errors_delta,
-         snmp_udp_sndbuf_errors_delta_sum as snmp_udp_sndbuf_errors_delta,
-         snmp_udp_in_errors_delta_sum as snmp_udp_in_errors_delta,
-         netstat_listen_overflows_delta_sum as netstat_listen_overflows_delta,
-         netstat_listen_drops_delta_sum as netstat_listen_drops_delta,
-         netstat_tcp_timeouts_delta_sum as netstat_tcp_timeouts_delta,
-         netstat_tcp_syn_retrans_delta_sum as netstat_tcp_syn_retrans_delta,
-         netstat_tcp_fast_retrans_delta_sum as netstat_tcp_fast_retrans_delta,
-         netstat_tcp_ofo_queue_delta_sum as netstat_tcp_ofo_queue_delta,
-         netstat_tcp_abort_on_memory_delta_sum as netstat_tcp_abort_on_memory_delta,
-         netstat_syncookies_sent_delta_sum as netstat_syncookies_sent_delta,
-         softnet_processed_delta_sum as softnet_processed_delta,
-         softnet_dropped_delta_sum as softnet_dropped_delta,
-         softnet_time_squeeze_delta_sum as softnet_time_squeeze_delta,
-         conntrack_count_avg as conntrack_count,
-         conntrack_max
+         ext_json
        FROM metrics_hourly
        WHERE host_id = ? AND hour_ts >= ? AND hour_ts <= ?
        ORDER BY hour_ts ASC`,
 			)
 			.bind(hostId, from, to)
-			.all<MetricsDataPoint>();
+			.all<HourlyRow>();
+
+		// Unpack ext_json into flat MetricsDataPoint fields
+		const data: MetricsDataPoint[] = result.results.map(expandHourlyRow);
 
 		const response: MetricsQueryResponse = {
 			host_id: hostId,
 			resolution: "hourly",
 			from,
 			to,
-			data: result.results,
+			data,
 		};
 		return c.json(response);
 	}
@@ -212,4 +165,153 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 		data: result.results,
 	};
 	return c.json(response);
+}
+
+// --- ext_json unpacking for hourly queries ---
+
+/** Hourly row as returned by SQL (includes ext_json as a TEXT column) */
+interface HourlyRow extends Omit<MetricsDataPoint, ExtJsonKeys> {
+	ext_json: string | null;
+}
+
+/** Keys that come from ext_json rather than scalar columns */
+type ExtJsonKeys =
+	| "interrupts_sec"
+	| "softirq_net_rx_sec"
+	| "softirq_block_sec"
+	| "tasks_running"
+	| "tasks_total"
+	| "mem_buffers"
+	| "mem_cached"
+	| "mem_dirty"
+	| "mem_writeback"
+	| "mem_shmem"
+	| "mem_slab_reclaimable"
+	| "mem_slab_unreclaim"
+	| "mem_committed_as"
+	| "mem_commit_limit"
+	| "mem_hw_corrupted"
+	| "swap_in_sec"
+	| "swap_out_sec"
+	| "pgmajfault_sec"
+	| "pgpgin_sec"
+	| "pgpgout_sec"
+	| "psi_cpu_some_total_delta"
+	| "psi_mem_some_total_delta"
+	| "psi_mem_full_total_delta"
+	| "psi_io_some_total_delta"
+	| "psi_io_full_total_delta"
+	| "tcp_mem_pages"
+	| "sockets_used"
+	| "udp_inuse"
+	| "udp_mem_pages"
+	| "snmp_retrans_segs_sec"
+	| "snmp_active_opens_sec"
+	| "snmp_passive_opens_sec"
+	| "snmp_attempt_fails_delta"
+	| "snmp_estab_resets_delta"
+	| "snmp_in_errs_delta"
+	| "snmp_out_rsts_delta"
+	| "snmp_udp_rcvbuf_errors_delta"
+	| "snmp_udp_sndbuf_errors_delta"
+	| "snmp_udp_in_errors_delta"
+	| "netstat_listen_overflows_delta"
+	| "netstat_listen_drops_delta"
+	| "netstat_tcp_timeouts_delta"
+	| "netstat_tcp_syn_retrans_delta"
+	| "netstat_tcp_fast_retrans_delta"
+	| "netstat_tcp_ofo_queue_delta"
+	| "netstat_tcp_abort_on_memory_delta"
+	| "netstat_syncookies_sent_delta"
+	| "softnet_processed_delta"
+	| "softnet_dropped_delta"
+	| "softnet_time_squeeze_delta"
+	| "conntrack_count"
+	| "conntrack_max";
+
+/**
+ * Map from ext_json key (aggregation column name) to MetricsDataPoint field name.
+ * Most use the _avg variant as the representative value for hourly resolution.
+ */
+const EXT_KEY_MAP: Record<string, string> = {
+	interrupts_sec_avg: "interrupts_sec",
+	softirq_net_rx_sec_avg: "softirq_net_rx_sec",
+	softirq_block_sec_avg: "softirq_block_sec",
+	tasks_running_avg: "tasks_running",
+	tasks_total_avg: "tasks_total",
+	mem_buffers_avg: "mem_buffers",
+	mem_cached_avg: "mem_cached",
+	mem_dirty_avg: "mem_dirty",
+	mem_writeback_avg: "mem_writeback",
+	mem_shmem_avg: "mem_shmem",
+	mem_slab_reclaimable_avg: "mem_slab_reclaimable",
+	mem_slab_unreclaim_avg: "mem_slab_unreclaim",
+	mem_committed_as_avg: "mem_committed_as",
+	mem_commit_limit: "mem_commit_limit",
+	mem_hw_corrupted_max: "mem_hw_corrupted",
+	swap_in_sec_avg: "swap_in_sec",
+	swap_out_sec_avg: "swap_out_sec",
+	pgmajfault_sec_avg: "pgmajfault_sec",
+	pgpgin_sec_avg: "pgpgin_sec",
+	pgpgout_sec_avg: "pgpgout_sec",
+	psi_cpu_some_total_delta_sum: "psi_cpu_some_total_delta",
+	psi_mem_some_total_delta_sum: "psi_mem_some_total_delta",
+	psi_mem_full_total_delta_sum: "psi_mem_full_total_delta",
+	psi_io_some_total_delta_sum: "psi_io_some_total_delta",
+	psi_io_full_total_delta_sum: "psi_io_full_total_delta",
+	tcp_mem_pages_avg: "tcp_mem_pages",
+	sockets_used_avg: "sockets_used",
+	udp_inuse_avg: "udp_inuse",
+	udp_mem_pages_avg: "udp_mem_pages",
+	snmp_retrans_segs_sec_avg: "snmp_retrans_segs_sec",
+	snmp_active_opens_sec_avg: "snmp_active_opens_sec",
+	snmp_passive_opens_sec_avg: "snmp_passive_opens_sec",
+	snmp_attempt_fails_delta_sum: "snmp_attempt_fails_delta",
+	snmp_estab_resets_delta_sum: "snmp_estab_resets_delta",
+	snmp_in_errs_delta_sum: "snmp_in_errs_delta",
+	snmp_out_rsts_delta_sum: "snmp_out_rsts_delta",
+	snmp_udp_rcvbuf_errors_delta_sum: "snmp_udp_rcvbuf_errors_delta",
+	snmp_udp_sndbuf_errors_delta_sum: "snmp_udp_sndbuf_errors_delta",
+	snmp_udp_in_errors_delta_sum: "snmp_udp_in_errors_delta",
+	netstat_listen_overflows_delta_sum: "netstat_listen_overflows_delta",
+	netstat_listen_drops_delta_sum: "netstat_listen_drops_delta",
+	netstat_tcp_timeouts_delta_sum: "netstat_tcp_timeouts_delta",
+	netstat_tcp_syn_retrans_delta_sum: "netstat_tcp_syn_retrans_delta",
+	netstat_tcp_fast_retrans_delta_sum: "netstat_tcp_fast_retrans_delta",
+	netstat_tcp_ofo_queue_delta_sum: "netstat_tcp_ofo_queue_delta",
+	netstat_tcp_abort_on_memory_delta_sum: "netstat_tcp_abort_on_memory_delta",
+	netstat_syncookies_sent_delta_sum: "netstat_syncookies_sent_delta",
+	softnet_processed_delta_sum: "softnet_processed_delta",
+	softnet_dropped_delta_sum: "softnet_dropped_delta",
+	softnet_time_squeeze_delta_sum: "softnet_time_squeeze_delta",
+	conntrack_count_avg: "conntrack_count",
+	conntrack_max: "conntrack_max",
+};
+
+/** Expand a HourlyRow into a flat MetricsDataPoint by unpacking ext_json. */
+function expandHourlyRow(row: HourlyRow): MetricsDataPoint {
+	// Start with all base columns (excluding ext_json)
+	const { ext_json, ...base } = row;
+	const result: Record<string, unknown> = { ...base };
+
+	// Set all ext fields to null by default
+	for (const field of Object.values(EXT_KEY_MAP)) {
+		result[field] = null;
+	}
+
+	// Unpack ext_json if present
+	if (ext_json) {
+		try {
+			const ext = JSON.parse(ext_json) as Record<string, number | null>;
+			for (const [extKey, dpKey] of Object.entries(EXT_KEY_MAP)) {
+				if (ext[extKey] !== undefined) {
+					result[dpKey] = ext[extKey];
+				}
+			}
+		} catch {
+			// Bad JSON — leave all ext fields as null
+		}
+	}
+
+	return result as unknown as MetricsDataPoint;
 }

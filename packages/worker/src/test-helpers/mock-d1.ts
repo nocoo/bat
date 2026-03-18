@@ -19,6 +19,10 @@ const MIGRATION_SIGNAL_EXPANSION_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0008_signal_expansion.sql",
 );
+const MIGRATION_SIGNAL_EXPANSION_HOURLY_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0009_signal_expansion_hourly.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -156,9 +160,18 @@ export function createMockD1(): D1Database {
 		db.run(`${stmt};`);
 	}
 
-	// Apply signal expansion migration
+	// Apply signal expansion migration (metrics_raw)
 	const signalExpansionSchema = readFileSync(MIGRATION_SIGNAL_EXPANSION_PATH, "utf-8");
 	for (const stmt of signalExpansionSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply signal expansion migration (metrics_hourly)
+	const signalExpansionHourlySchema = readFileSync(MIGRATION_SIGNAL_EXPANSION_HOURLY_PATH, "utf-8");
+	for (const stmt of signalExpansionHourlySchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

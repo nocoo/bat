@@ -149,97 +149,10 @@ async function aggregateHostHour(
 	const fdAllocatedMax = maxNullable(rows.map((r) => r.fd_allocated));
 	const fdMaxLast = rows[rows.length - 1].fd_max;
 
-	// --- Signal expansion aggregates ---
-
-	// CPU extensions: avg + max for rates, avg + max for gauges
-	const interruptsAvg = avgNullable(rows.map((r) => r.interrupts_sec));
-	const interruptsMax = maxNullable(rows.map((r) => r.interrupts_sec));
-	const softirqNetRxAvg = avgNullable(rows.map((r) => r.softirq_net_rx_sec));
-	const softirqNetRxMax = maxNullable(rows.map((r) => r.softirq_net_rx_sec));
-	const softirqBlockAvg = avgNullable(rows.map((r) => r.softirq_block_sec));
-	const softirqBlockMax = maxNullable(rows.map((r) => r.softirq_block_sec));
-	const tasksRunAvg = avgNullable(rows.map((r) => r.tasks_running));
-	const tasksRunMax = maxNullable(rows.map((r) => r.tasks_running));
-	const tasksTotalAvg = avgNullable(rows.map((r) => r.tasks_total));
-	const tasksTotalMax = maxNullable(rows.map((r) => r.tasks_total));
-
-	// Memory composition: avg for gauges
-	const memBuffersAvg = avgNullable(rows.map((r) => r.mem_buffers));
-	const memCachedAvg = avgNullable(rows.map((r) => r.mem_cached));
-	const memDirtyAvg = avgNullable(rows.map((r) => r.mem_dirty));
-	const memDirtyMax = maxNullable(rows.map((r) => r.mem_dirty));
-	const memWritebackAvg = avgNullable(rows.map((r) => r.mem_writeback));
-	const memShmemAvg = avgNullable(rows.map((r) => r.mem_shmem));
-	const memSlabReclaimAvg = avgNullable(rows.map((r) => r.mem_slab_reclaimable));
-	const memSlabUnreclaimAvg = avgNullable(rows.map((r) => r.mem_slab_unreclaim));
-	const memCommittedAsAvg = avgNullable(rows.map((r) => r.mem_committed_as));
-	const memCommittedAsMax = maxNullable(rows.map((r) => r.mem_committed_as));
-	const memCommitLimitLast = rows[rows.length - 1].mem_commit_limit;
-	const memHwCorruptedMax = maxNullable(rows.map((r) => r.mem_hw_corrupted));
-
-	// VMstat rates: avg + max
-	const swapInAvg = avgNullable(rows.map((r) => r.swap_in_sec));
-	const swapInMax = maxNullable(rows.map((r) => r.swap_in_sec));
-	const swapOutAvg = avgNullable(rows.map((r) => r.swap_out_sec));
-	const swapOutMax = maxNullable(rows.map((r) => r.swap_out_sec));
-	const pgmajfaultAvg = avgNullable(rows.map((r) => r.pgmajfault_sec));
-	const pgmajfaultMax = maxNullable(rows.map((r) => r.pgmajfault_sec));
-	const pgpginAvg = avgNullable(rows.map((r) => r.pgpgin_sec));
-	const pgpgoutAvg = avgNullable(rows.map((r) => r.pgpgout_sec));
-
-	// PSI total deltas: sum per hour
-	const psiCpuTotalDeltaSum = sumNullable(rows.map((r) => r.psi_cpu_some_total_delta));
-	const psiMemTotalDeltaSum = sumNullable(rows.map((r) => r.psi_mem_some_total_delta));
-	const psiMemFullTotalDeltaSum = sumNullable(rows.map((r) => r.psi_mem_full_total_delta));
-	const psiIoTotalDeltaSum = sumNullable(rows.map((r) => r.psi_io_some_total_delta));
-	const psiIoFullTotalDeltaSum = sumNullable(rows.map((r) => r.psi_io_full_total_delta));
-
-	// TCP memory: avg + max
-	const tcpMemPagesAvg = avgNullable(rows.map((r) => r.tcp_mem_pages));
-	const tcpMemPagesMax = maxNullable(rows.map((r) => r.tcp_mem_pages));
-
-	// Sockets: avg + max
-	const socketsUsedAvg = avgNullable(rows.map((r) => r.sockets_used));
-	const socketsUsedMax = maxNullable(rows.map((r) => r.sockets_used));
-
-	// UDP: avg + max
-	const udpInuseAvg = avgNullable(rows.map((r) => r.udp_inuse));
-	const udpInuseMax = maxNullable(rows.map((r) => r.udp_inuse));
-	const udpMemPagesAvg = avgNullable(rows.map((r) => r.udp_mem_pages));
-	const udpMemPagesMax = maxNullable(rows.map((r) => r.udp_mem_pages));
-
-	// SNMP: avg for rates, sum for deltas
-	const snmpRetransAvg = avgNullable(rows.map((r) => r.snmp_retrans_segs_sec));
-	const snmpRetransMax = maxNullable(rows.map((r) => r.snmp_retrans_segs_sec));
-	const snmpActiveOpensAvg = avgNullable(rows.map((r) => r.snmp_active_opens_sec));
-	const snmpPassiveOpensAvg = avgNullable(rows.map((r) => r.snmp_passive_opens_sec));
-	const snmpAttemptFailsSum = sumNullable(rows.map((r) => r.snmp_attempt_fails_delta));
-	const snmpEstabResetsSum = sumNullable(rows.map((r) => r.snmp_estab_resets_delta));
-	const snmpInErrsSum = sumNullable(rows.map((r) => r.snmp_in_errs_delta));
-	const snmpOutRstsSum = sumNullable(rows.map((r) => r.snmp_out_rsts_delta));
-	const snmpUdpRcvbufErrsSum = sumNullable(rows.map((r) => r.snmp_udp_rcvbuf_errors_delta));
-	const snmpUdpSndbufErrsSum = sumNullable(rows.map((r) => r.snmp_udp_sndbuf_errors_delta));
-	const snmpUdpInErrsSum = sumNullable(rows.map((r) => r.snmp_udp_in_errors_delta));
-
-	// Netstat: sum of deltas per hour
-	const netstatListenOverflowsSum = sumNullable(rows.map((r) => r.netstat_listen_overflows_delta));
-	const netstatListenDropsSum = sumNullable(rows.map((r) => r.netstat_listen_drops_delta));
-	const netstatTcpTimeoutsSum = sumNullable(rows.map((r) => r.netstat_tcp_timeouts_delta));
-	const netstatTcpSynRetransSum = sumNullable(rows.map((r) => r.netstat_tcp_syn_retrans_delta));
-	const netstatTcpFastRetransSum = sumNullable(rows.map((r) => r.netstat_tcp_fast_retrans_delta));
-	const netstatTcpOfoQueueSum = sumNullable(rows.map((r) => r.netstat_tcp_ofo_queue_delta));
-	const netstatTcpAbortMemSum = sumNullable(rows.map((r) => r.netstat_tcp_abort_on_memory_delta));
-	const netstatSyncookiesSentSum = sumNullable(rows.map((r) => r.netstat_syncookies_sent_delta));
-
-	// Softnet: sum of deltas per hour
-	const softnetProcessedSum = sumNullable(rows.map((r) => r.softnet_processed_delta));
-	const softnetDroppedSum = sumNullable(rows.map((r) => r.softnet_dropped_delta));
-	const softnetTimeSqueezeSum = sumNullable(rows.map((r) => r.softnet_time_squeeze_delta));
-
-	// Conntrack: avg + max
-	const conntrackCountAvg = avgNullable(rows.map((r) => r.conntrack_count));
-	const conntrackCountMax = maxNullable(rows.map((r) => r.conntrack_count));
-	const conntrackMaxLast = rows[rows.length - 1].conntrack_max;
+	// --- Signal expansion aggregates (stored as ext_json) ---
+	// D1 has a 100-column-per-table limit; these go into a single JSON column.
+	const ext = buildExtJson(rows);
+	const extJson = ext !== null ? JSON.stringify(ext) : null;
 
 	await db
 		.prepare(
@@ -269,40 +182,8 @@ async function aggregateHostHour(
   procs_blocked_avg, procs_blocked_max,
   oom_kills_sum,
   fd_allocated_avg, fd_allocated_max, fd_max,
-  interrupts_sec_avg, interrupts_sec_max,
-  softirq_net_rx_sec_avg, softirq_net_rx_sec_max,
-  softirq_block_sec_avg, softirq_block_sec_max,
-  tasks_running_avg, tasks_running_max,
-  tasks_total_avg, tasks_total_max,
-  mem_buffers_avg, mem_cached_avg,
-  mem_dirty_avg, mem_dirty_max,
-  mem_writeback_avg, mem_shmem_avg,
-  mem_slab_reclaimable_avg, mem_slab_unreclaim_avg,
-  mem_committed_as_avg, mem_committed_as_max,
-  mem_commit_limit, mem_hw_corrupted_max,
-  swap_in_sec_avg, swap_in_sec_max,
-  swap_out_sec_avg, swap_out_sec_max,
-  pgmajfault_sec_avg, pgmajfault_sec_max,
-  pgpgin_sec_avg, pgpgout_sec_avg,
-  psi_cpu_some_total_delta_sum, psi_mem_some_total_delta_sum, psi_mem_full_total_delta_sum,
-  psi_io_some_total_delta_sum, psi_io_full_total_delta_sum,
-  tcp_mem_pages_avg, tcp_mem_pages_max,
-  sockets_used_avg, sockets_used_max,
-  udp_inuse_avg, udp_inuse_max,
-  udp_mem_pages_avg, udp_mem_pages_max,
-  snmp_retrans_segs_sec_avg, snmp_retrans_segs_sec_max,
-  snmp_active_opens_sec_avg, snmp_passive_opens_sec_avg,
-  snmp_attempt_fails_delta_sum, snmp_estab_resets_delta_sum,
-  snmp_in_errs_delta_sum, snmp_out_rsts_delta_sum,
-  snmp_udp_rcvbuf_errors_delta_sum, snmp_udp_sndbuf_errors_delta_sum,
-  snmp_udp_in_errors_delta_sum,
-  netstat_listen_overflows_delta_sum, netstat_listen_drops_delta_sum,
-  netstat_tcp_timeouts_delta_sum, netstat_tcp_syn_retrans_delta_sum,
-  netstat_tcp_fast_retrans_delta_sum, netstat_tcp_ofo_queue_delta_sum,
-  netstat_tcp_abort_on_memory_delta_sum, netstat_syncookies_sent_delta_sum,
-  softnet_processed_delta_sum, softnet_dropped_delta_sum, softnet_time_squeeze_delta_sum,
-  conntrack_count_avg, conntrack_count_max, conntrack_max
-) VALUES (${Array(127).fill("?").join(", ")})
+  ext_json
+) VALUES (${Array(60).fill("?").join(", ")})
 ON CONFLICT(host_id, hour_ts) DO UPDATE SET
   sample_count = excluded.sample_count,
   cpu_usage_avg = excluded.cpu_usage_avg,
@@ -361,74 +242,7 @@ ON CONFLICT(host_id, hour_ts) DO UPDATE SET
   fd_allocated_avg = excluded.fd_allocated_avg,
   fd_allocated_max = excluded.fd_allocated_max,
   fd_max = excluded.fd_max,
-  interrupts_sec_avg = excluded.interrupts_sec_avg,
-  interrupts_sec_max = excluded.interrupts_sec_max,
-  softirq_net_rx_sec_avg = excluded.softirq_net_rx_sec_avg,
-  softirq_net_rx_sec_max = excluded.softirq_net_rx_sec_max,
-  softirq_block_sec_avg = excluded.softirq_block_sec_avg,
-  softirq_block_sec_max = excluded.softirq_block_sec_max,
-  tasks_running_avg = excluded.tasks_running_avg,
-  tasks_running_max = excluded.tasks_running_max,
-  tasks_total_avg = excluded.tasks_total_avg,
-  tasks_total_max = excluded.tasks_total_max,
-  mem_buffers_avg = excluded.mem_buffers_avg,
-  mem_cached_avg = excluded.mem_cached_avg,
-  mem_dirty_avg = excluded.mem_dirty_avg,
-  mem_dirty_max = excluded.mem_dirty_max,
-  mem_writeback_avg = excluded.mem_writeback_avg,
-  mem_shmem_avg = excluded.mem_shmem_avg,
-  mem_slab_reclaimable_avg = excluded.mem_slab_reclaimable_avg,
-  mem_slab_unreclaim_avg = excluded.mem_slab_unreclaim_avg,
-  mem_committed_as_avg = excluded.mem_committed_as_avg,
-  mem_committed_as_max = excluded.mem_committed_as_max,
-  mem_commit_limit = excluded.mem_commit_limit,
-  mem_hw_corrupted_max = excluded.mem_hw_corrupted_max,
-  swap_in_sec_avg = excluded.swap_in_sec_avg,
-  swap_in_sec_max = excluded.swap_in_sec_max,
-  swap_out_sec_avg = excluded.swap_out_sec_avg,
-  swap_out_sec_max = excluded.swap_out_sec_max,
-  pgmajfault_sec_avg = excluded.pgmajfault_sec_avg,
-  pgmajfault_sec_max = excluded.pgmajfault_sec_max,
-  pgpgin_sec_avg = excluded.pgpgin_sec_avg,
-  pgpgout_sec_avg = excluded.pgpgout_sec_avg,
-  psi_cpu_some_total_delta_sum = excluded.psi_cpu_some_total_delta_sum,
-  psi_mem_some_total_delta_sum = excluded.psi_mem_some_total_delta_sum,
-  psi_mem_full_total_delta_sum = excluded.psi_mem_full_total_delta_sum,
-  psi_io_some_total_delta_sum = excluded.psi_io_some_total_delta_sum,
-  psi_io_full_total_delta_sum = excluded.psi_io_full_total_delta_sum,
-  tcp_mem_pages_avg = excluded.tcp_mem_pages_avg,
-  tcp_mem_pages_max = excluded.tcp_mem_pages_max,
-  sockets_used_avg = excluded.sockets_used_avg,
-  sockets_used_max = excluded.sockets_used_max,
-  udp_inuse_avg = excluded.udp_inuse_avg,
-  udp_inuse_max = excluded.udp_inuse_max,
-  udp_mem_pages_avg = excluded.udp_mem_pages_avg,
-  udp_mem_pages_max = excluded.udp_mem_pages_max,
-  snmp_retrans_segs_sec_avg = excluded.snmp_retrans_segs_sec_avg,
-  snmp_retrans_segs_sec_max = excluded.snmp_retrans_segs_sec_max,
-  snmp_active_opens_sec_avg = excluded.snmp_active_opens_sec_avg,
-  snmp_passive_opens_sec_avg = excluded.snmp_passive_opens_sec_avg,
-  snmp_attempt_fails_delta_sum = excluded.snmp_attempt_fails_delta_sum,
-  snmp_estab_resets_delta_sum = excluded.snmp_estab_resets_delta_sum,
-  snmp_in_errs_delta_sum = excluded.snmp_in_errs_delta_sum,
-  snmp_out_rsts_delta_sum = excluded.snmp_out_rsts_delta_sum,
-  snmp_udp_rcvbuf_errors_delta_sum = excluded.snmp_udp_rcvbuf_errors_delta_sum,
-  snmp_udp_sndbuf_errors_delta_sum = excluded.snmp_udp_sndbuf_errors_delta_sum,
-  snmp_udp_in_errors_delta_sum = excluded.snmp_udp_in_errors_delta_sum,
-  netstat_listen_overflows_delta_sum = excluded.netstat_listen_overflows_delta_sum,
-  netstat_listen_drops_delta_sum = excluded.netstat_listen_drops_delta_sum,
-  netstat_tcp_timeouts_delta_sum = excluded.netstat_tcp_timeouts_delta_sum,
-  netstat_tcp_syn_retrans_delta_sum = excluded.netstat_tcp_syn_retrans_delta_sum,
-  netstat_tcp_fast_retrans_delta_sum = excluded.netstat_tcp_fast_retrans_delta_sum,
-  netstat_tcp_ofo_queue_delta_sum = excluded.netstat_tcp_ofo_queue_delta_sum,
-  netstat_tcp_abort_on_memory_delta_sum = excluded.netstat_tcp_abort_on_memory_delta_sum,
-  netstat_syncookies_sent_delta_sum = excluded.netstat_syncookies_sent_delta_sum,
-  softnet_processed_delta_sum = excluded.softnet_processed_delta_sum,
-  softnet_dropped_delta_sum = excluded.softnet_dropped_delta_sum,
-  softnet_time_squeeze_delta_sum = excluded.softnet_time_squeeze_delta_sum,
-  conntrack_count_avg = excluded.conntrack_count_avg,
-  conntrack_count_max = excluded.conntrack_count_max,
-  conntrack_max = excluded.conntrack_max`,
+  ext_json = excluded.ext_json`,
 		)
 		.bind(
 			hostId,
@@ -490,77 +304,102 @@ ON CONFLICT(host_id, hour_ts) DO UPDATE SET
 			fdAllocatedAvg,
 			fdAllocatedMax,
 			fdMaxLast,
-			// Signal expansion bind params
-			interruptsAvg,
-			interruptsMax,
-			softirqNetRxAvg,
-			softirqNetRxMax,
-			softirqBlockAvg,
-			softirqBlockMax,
-			tasksRunAvg,
-			tasksRunMax,
-			tasksTotalAvg,
-			tasksTotalMax,
-			memBuffersAvg,
-			memCachedAvg,
-			memDirtyAvg,
-			memDirtyMax,
-			memWritebackAvg,
-			memShmemAvg,
-			memSlabReclaimAvg,
-			memSlabUnreclaimAvg,
-			memCommittedAsAvg,
-			memCommittedAsMax,
-			memCommitLimitLast,
-			memHwCorruptedMax,
-			swapInAvg,
-			swapInMax,
-			swapOutAvg,
-			swapOutMax,
-			pgmajfaultAvg,
-			pgmajfaultMax,
-			pgpginAvg,
-			pgpgoutAvg,
-			psiCpuTotalDeltaSum,
-			psiMemTotalDeltaSum,
-			psiMemFullTotalDeltaSum,
-			psiIoTotalDeltaSum,
-			psiIoFullTotalDeltaSum,
-			tcpMemPagesAvg,
-			tcpMemPagesMax,
-			socketsUsedAvg,
-			socketsUsedMax,
-			udpInuseAvg,
-			udpInuseMax,
-			udpMemPagesAvg,
-			udpMemPagesMax,
-			snmpRetransAvg,
-			snmpRetransMax,
-			snmpActiveOpensAvg,
-			snmpPassiveOpensAvg,
-			snmpAttemptFailsSum,
-			snmpEstabResetsSum,
-			snmpInErrsSum,
-			snmpOutRstsSum,
-			snmpUdpRcvbufErrsSum,
-			snmpUdpSndbufErrsSum,
-			snmpUdpInErrsSum,
-			netstatListenOverflowsSum,
-			netstatListenDropsSum,
-			netstatTcpTimeoutsSum,
-			netstatTcpSynRetransSum,
-			netstatTcpFastRetransSum,
-			netstatTcpOfoQueueSum,
-			netstatTcpAbortMemSum,
-			netstatSyncookiesSentSum,
-			softnetProcessedSum,
-			softnetDroppedSum,
-			softnetTimeSqueezeSum,
-			conntrackCountAvg,
-			conntrackCountMax,
-			conntrackMaxLast,
+			extJson,
 		)
 		.run();
+}
+
+/**
+ * Build ext_json object from signal expansion aggregates.
+ * Returns null if all values are null (no signal expansion data in this hour).
+ * Keys use the same names as the former scalar columns for backward compatibility
+ * with the metrics read route, which unpacks ext_json into MetricsDataPoint.
+ */
+function buildExtJson(rows: RawRow[]): Record<string, number | null> | null {
+	const ext: Record<string, number | null> = {
+		interrupts_sec_avg: avgNullable(rows.map((r) => r.interrupts_sec)),
+		interrupts_sec_max: maxNullable(rows.map((r) => r.interrupts_sec)),
+		softirq_net_rx_sec_avg: avgNullable(rows.map((r) => r.softirq_net_rx_sec)),
+		softirq_net_rx_sec_max: maxNullable(rows.map((r) => r.softirq_net_rx_sec)),
+		softirq_block_sec_avg: avgNullable(rows.map((r) => r.softirq_block_sec)),
+		softirq_block_sec_max: maxNullable(rows.map((r) => r.softirq_block_sec)),
+		tasks_running_avg: avgNullable(rows.map((r) => r.tasks_running)),
+		tasks_running_max: maxNullable(rows.map((r) => r.tasks_running)),
+		tasks_total_avg: avgNullable(rows.map((r) => r.tasks_total)),
+		tasks_total_max: maxNullable(rows.map((r) => r.tasks_total)),
+		mem_buffers_avg: avgNullable(rows.map((r) => r.mem_buffers)),
+		mem_cached_avg: avgNullable(rows.map((r) => r.mem_cached)),
+		mem_dirty_avg: avgNullable(rows.map((r) => r.mem_dirty)),
+		mem_dirty_max: maxNullable(rows.map((r) => r.mem_dirty)),
+		mem_writeback_avg: avgNullable(rows.map((r) => r.mem_writeback)),
+		mem_shmem_avg: avgNullable(rows.map((r) => r.mem_shmem)),
+		mem_slab_reclaimable_avg: avgNullable(rows.map((r) => r.mem_slab_reclaimable)),
+		mem_slab_unreclaim_avg: avgNullable(rows.map((r) => r.mem_slab_unreclaim)),
+		mem_committed_as_avg: avgNullable(rows.map((r) => r.mem_committed_as)),
+		mem_committed_as_max: maxNullable(rows.map((r) => r.mem_committed_as)),
+		mem_commit_limit: rows[rows.length - 1].mem_commit_limit,
+		mem_hw_corrupted_max: maxNullable(rows.map((r) => r.mem_hw_corrupted)),
+		swap_in_sec_avg: avgNullable(rows.map((r) => r.swap_in_sec)),
+		swap_in_sec_max: maxNullable(rows.map((r) => r.swap_in_sec)),
+		swap_out_sec_avg: avgNullable(rows.map((r) => r.swap_out_sec)),
+		swap_out_sec_max: maxNullable(rows.map((r) => r.swap_out_sec)),
+		pgmajfault_sec_avg: avgNullable(rows.map((r) => r.pgmajfault_sec)),
+		pgmajfault_sec_max: maxNullable(rows.map((r) => r.pgmajfault_sec)),
+		pgpgin_sec_avg: avgNullable(rows.map((r) => r.pgpgin_sec)),
+		pgpgout_sec_avg: avgNullable(rows.map((r) => r.pgpgout_sec)),
+		psi_cpu_some_total_delta_sum: sumNullable(rows.map((r) => r.psi_cpu_some_total_delta)),
+		psi_mem_some_total_delta_sum: sumNullable(rows.map((r) => r.psi_mem_some_total_delta)),
+		psi_mem_full_total_delta_sum: sumNullable(rows.map((r) => r.psi_mem_full_total_delta)),
+		psi_io_some_total_delta_sum: sumNullable(rows.map((r) => r.psi_io_some_total_delta)),
+		psi_io_full_total_delta_sum: sumNullable(rows.map((r) => r.psi_io_full_total_delta)),
+		tcp_mem_pages_avg: avgNullable(rows.map((r) => r.tcp_mem_pages)),
+		tcp_mem_pages_max: maxNullable(rows.map((r) => r.tcp_mem_pages)),
+		sockets_used_avg: avgNullable(rows.map((r) => r.sockets_used)),
+		sockets_used_max: maxNullable(rows.map((r) => r.sockets_used)),
+		udp_inuse_avg: avgNullable(rows.map((r) => r.udp_inuse)),
+		udp_inuse_max: maxNullable(rows.map((r) => r.udp_inuse)),
+		udp_mem_pages_avg: avgNullable(rows.map((r) => r.udp_mem_pages)),
+		udp_mem_pages_max: maxNullable(rows.map((r) => r.udp_mem_pages)),
+		snmp_retrans_segs_sec_avg: avgNullable(rows.map((r) => r.snmp_retrans_segs_sec)),
+		snmp_retrans_segs_sec_max: maxNullable(rows.map((r) => r.snmp_retrans_segs_sec)),
+		snmp_active_opens_sec_avg: avgNullable(rows.map((r) => r.snmp_active_opens_sec)),
+		snmp_passive_opens_sec_avg: avgNullable(rows.map((r) => r.snmp_passive_opens_sec)),
+		snmp_attempt_fails_delta_sum: sumNullable(rows.map((r) => r.snmp_attempt_fails_delta)),
+		snmp_estab_resets_delta_sum: sumNullable(rows.map((r) => r.snmp_estab_resets_delta)),
+		snmp_in_errs_delta_sum: sumNullable(rows.map((r) => r.snmp_in_errs_delta)),
+		snmp_out_rsts_delta_sum: sumNullable(rows.map((r) => r.snmp_out_rsts_delta)),
+		snmp_udp_rcvbuf_errors_delta_sum: sumNullable(rows.map((r) => r.snmp_udp_rcvbuf_errors_delta)),
+		snmp_udp_sndbuf_errors_delta_sum: sumNullable(rows.map((r) => r.snmp_udp_sndbuf_errors_delta)),
+		snmp_udp_in_errors_delta_sum: sumNullable(rows.map((r) => r.snmp_udp_in_errors_delta)),
+		netstat_listen_overflows_delta_sum: sumNullable(
+			rows.map((r) => r.netstat_listen_overflows_delta),
+		),
+		netstat_listen_drops_delta_sum: sumNullable(rows.map((r) => r.netstat_listen_drops_delta)),
+		netstat_tcp_timeouts_delta_sum: sumNullable(rows.map((r) => r.netstat_tcp_timeouts_delta)),
+		netstat_tcp_syn_retrans_delta_sum: sumNullable(
+			rows.map((r) => r.netstat_tcp_syn_retrans_delta),
+		),
+		netstat_tcp_fast_retrans_delta_sum: sumNullable(
+			rows.map((r) => r.netstat_tcp_fast_retrans_delta),
+		),
+		netstat_tcp_ofo_queue_delta_sum: sumNullable(rows.map((r) => r.netstat_tcp_ofo_queue_delta)),
+		netstat_tcp_abort_on_memory_delta_sum: sumNullable(
+			rows.map((r) => r.netstat_tcp_abort_on_memory_delta),
+		),
+		netstat_syncookies_sent_delta_sum: sumNullable(
+			rows.map((r) => r.netstat_syncookies_sent_delta),
+		),
+		softnet_processed_delta_sum: sumNullable(rows.map((r) => r.softnet_processed_delta)),
+		softnet_dropped_delta_sum: sumNullable(rows.map((r) => r.softnet_dropped_delta)),
+		softnet_time_squeeze_delta_sum: sumNullable(rows.map((r) => r.softnet_time_squeeze_delta)),
+		conntrack_count_avg: avgNullable(rows.map((r) => r.conntrack_count)),
+		conntrack_count_max: maxNullable(rows.map((r) => r.conntrack_count)),
+		conntrack_max: rows[rows.length - 1].conntrack_max,
+	};
+
+	// Return null if every value is null (no signal expansion data)
+	if (Object.values(ext).every((v) => v === null)) return null;
+	return ext;
 }
 
 interface NetInterface {
