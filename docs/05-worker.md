@@ -16,10 +16,14 @@
 |-------|------|--------|---------|
 | `/api/ingest` | Write Key | POST | Receive Tier-1 metrics, evaluate alerts |
 | `/api/identity` | Write Key | POST | Receive/update host identity |
+| `/api/tier2` | Write Key | POST | Receive Tier-2 snapshot (ports, systemd, security, docker, disk, software) |
 | `/api/hosts` | Read Key | GET | List active hosts with latest status (`is_active = 1`) |
+| `/api/hosts/:id` | Read Key | GET | Single host detail (identity + latest metrics + alert state) |
 | `/api/hosts/:id/metrics` | Read Key | GET | Query metrics (`?from=&to=`, auto raw/hourly) |
+| `/api/hosts/:id/tier2` | Read Key | GET | Latest Tier-2 snapshot for a host |
 | `/api/alerts` | Read Key | GET | List all active alerts across all hosts |
 | `/api/health` | Public | GET | Overall health (200/degraded/503) for Uptime Kuma |
+| `/api/live` | Public | GET | Liveness check + version |
 
 ---
 
@@ -29,9 +33,9 @@
 
 One middleware handles both keys, scoped by route:
 
-- **Write routes** (`POST /api/ingest`, `POST /api/identity`): validate against `BAT_WRITE_KEY`
-- **Read routes** (`GET /api/hosts`, `GET /api/hosts/:id/metrics`, `GET /api/alerts`): validate against `BAT_READ_KEY`
-- **Public routes** (`GET /api/health`): no auth required
+- **Write routes** (`POST /api/ingest`, `POST /api/identity`, `POST /api/tier2`): validate against `BAT_WRITE_KEY`
+- **Read routes** (`GET /api/hosts`, `GET /api/hosts/:id`, `GET /api/hosts/:id/metrics`, `GET /api/hosts/:id/tier2`, `GET /api/alerts`): validate against `BAT_READ_KEY`
+- **Public routes** (`GET /api/health`, `GET /api/live`): no auth required
 
 **Rejection semantics**:
 - Missing `Authorization` header → `401 Unauthorized`
@@ -157,6 +161,12 @@ Returns all active hosts (`is_active = 1`) as `HostOverviewItem[]` — including
    - `"healthy"` otherwise
 5. Merge into `HostOverviewItem[]`, return JSON
 
+### GET /api/hosts/:id (`routes/host-detail.ts`)
+
+Returns a single host's full detail — identity fields, latest metrics, active alerts, and boot time. Response contract defined in [03-data-structures.md § GET /api/hosts/:id](./03-data-structures.md).
+
+Returns `404` if host not found or `is_active = 0`.
+
 ### GET /api/hosts/:id/metrics (`routes/hosts.ts`)
 
 Query parameters: `?from=<unix>&to=<unix>`
@@ -176,6 +186,29 @@ JOIN hosts h ON a.host_id = h.host_id
 WHERE h.is_active = 1
 ORDER BY a.triggered_at DESC
 ```
+
+### GET /api/hosts/:id/tier2 (`routes/tier2-read.ts`)
+
+Returns the latest Tier-2 snapshot for a host. Response contract: `Tier2Snapshot` (defined in [03-data-structures.md](./03-data-structures.md)). Each JSON column is parsed and returned as its typed object. Returns `null` for fields that have never been collected.
+
+Returns `404` if host not found or `is_active = 0`.
+
+---
+
+## Write Routes (Tier 2)
+
+### POST /api/tier2 (`routes/tier2-ingest.ts`)
+
+Receives Tier-2 snapshot payload from Probe. Sent every 6 hours. Contains ports, systemd services, security info, docker containers, deep disk scan, and software discovery data.
+
+**Critical path**:
+
+1. Validate payload shape
+2. Clock skew guard (same as `/api/ingest`)
+3. Check retirement (same as `/api/ingest`)
+4. UPSERT `hosts.last_seen`
+5. `INSERT INTO tier2_snapshots` — serialize each section to its `*_json` column
+6. Return `204 No Content`
 
 ---
 

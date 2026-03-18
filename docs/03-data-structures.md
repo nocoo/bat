@@ -496,22 +496,86 @@ Response types for Worker read routes. Consumed by Dashboard proxy and SWR hooks
 
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
+
+/** Sparkline data point — one hour of aggregated data */
+interface SparklinePoint {
+  ts: number;     // unix seconds (hour boundary)
+  v: number;      // value (0–100 pct)
+}
+
 interface HostOverviewItem {
+  hid: string;                 // opaque FNV-1a hash of host_id for URL routing
   host_id: string;
   hostname: string;
   os: string | null;
   kernel: string | null;
   arch: string | null;
+  cpu_model: string | null;
+  boot_time: number | null;
   status: "healthy" | "warning" | "critical" | "offline";
   cpu_usage_pct: number | null;    // latest metrics_raw value
   mem_used_pct: number | null;     // latest metrics_raw value
   uptime_seconds: number | null;   // latest metrics_raw value
   last_seen: number;               // unix seconds (Worker time)
   alert_count: number;             // count of active alerts for this host
+  // Host inventory scalar fields (for list-page subtitle)
+  cpu_logical: number | null;
+  cpu_physical: number | null;
+  mem_total_bytes: number | null;
+  virtualization: string | null;
+  public_ip: string | null;
+  // Extended overview fields
+  probe_version: string | null;
+  cpu_load1: number | null;
+  swap_used_pct: number | null;
+  disk_root_used_pct: number | null;
+  net_rx_rate: number | null;      // bytes/sec aggregate
+  net_tx_rate: number | null;      // bytes/sec aggregate
+  cpu_sparkline: SparklinePoint[] | null;  // 24h hourly CPU usage
+  mem_sparkline: SparklinePoint[] | null;  // 24h hourly Memory usage
 }
 ```
 
 **Status derivation**: `"offline"` if `last_seen` stale > 120s → `"critical"` if any critical alert → `"warning"` if any warning alert → `"healthy"`. Query strategy in [05-worker.md § GET /api/hosts](./05-worker.md).
+
+### GET /api/hosts/:id → `HostDetailItem`
+
+```typescript
+// @bat/shared — packages/shared/src/api.ts
+interface HostDetailItem extends HostOverviewItem {
+  probe_version: string | null;
+  swap_total_bytes: number | null;
+  boot_mode: string | null;
+  timezone: string | null;
+  dns_resolvers: string[] | null;
+  dns_search: string[] | null;
+  net_interfaces: NetInterfaceDTO[] | null;
+  disks: BlockDeviceDTO[] | null;
+}
+```
+
+Extends the overview item with full identity fields and host inventory data. Used by the host detail page.
+
+### GET /api/hosts/:id/tier2 → `Tier2Snapshot`
+
+```typescript
+// @bat/shared — packages/shared/src/tier2.ts
+interface Tier2Snapshot {
+  host_id: string;
+  ts: number;
+  ports: ServicePortsData | null;
+  updates: PackageUpdatesData | null;
+  systemd: SystemdServicesData | null;
+  security: SecurityPostureData | null;
+  docker: DockerStatusData | null;
+  disk_deep: DiskDeepScanData | null;
+  timezone: string | null;
+  dns_resolvers: string[] | null;
+  dns_search: string[] | null;
+}
+```
+
+Returns the latest Tier-2 snapshot. Each JSON column is parsed by the Worker and returned as typed data. `null` fields indicate data not yet collected. Full type definitions in `packages/shared/src/tier2.ts`.
 
 ### GET /api/hosts/:id/metrics → `MetricsQueryResponse`
 
@@ -561,6 +625,7 @@ interface MetricsDataPoint {
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
 interface AlertItem {
+  hid: string;                    // opaque hash of host_id for URL routing
   host_id: string;
   hostname: string;                 // JOIN from hosts table
   rule_id: string;
@@ -580,10 +645,13 @@ interface AlertItem {
 export const API_ROUTES = {
   INGEST: "/api/ingest",
   IDENTITY: "/api/identity",
+  TIER2_INGEST: "/api/tier2",
   HOSTS: "/api/hosts",
+  HOST_DETAIL: "/api/hosts/:id",
   HOST_METRICS: "/api/hosts/:id/metrics",
+  HOST_TIER2: "/api/hosts/:id/tier2",
   ALERTS: "/api/alerts",
-  HEALTH: "/api/health",
+  LIVE: "/api/live",
 } as const;
 ```
 

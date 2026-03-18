@@ -1,12 +1,13 @@
 # 06 — Dashboard
 
-> Next.js 16 dashboard for monitoring visualization. Google OAuth login, server-side proxy to Worker, host overview, charts, alerts page.
+> Next.js 16 dashboard for monitoring visualization. Google OAuth login, server-side proxy to Worker for metrics data, D1 direct access for user-state data (tags), host overview, charts, alerts page, tags management.
 > Bootstrapped from `../surety` template. Deployed on Railway (Bun standalone Docker).
 >
 > Related documents:
 > - [02-architecture.md](./02-architecture.md) — System overview, auth model, proxy pattern, deployment
 > - [03-data-structures.md](./03-data-structures.md) — Payload types, alert definitions, health response
 > - [05-worker.md](./05-worker.md) — Worker read routes that Dashboard proxies to
+> - [11-host-tags.md](./11-host-tags.md) — Host tagging: D1 direct access pattern, tags API routes
 
 ---
 
@@ -32,23 +33,31 @@
 
 ---
 
-## Proxy Architecture
+## API Architecture
 
-Dashboard does NOT expose Worker URLs or API Keys to the browser. Instead, Dashboard API Routes act as a server-side proxy:
+Dashboard API routes serve two purposes:
+
+1. **Worker proxy** — forward authenticated requests to Worker with `BAT_READ_KEY` for metrics/hosts/alerts data
+2. **D1 direct** — query D1 via Cloudflare REST API with `CF_API_TOKEN` for user-initiated state (tags)
+
+Both paths require an authenticated NextAuth session. Unauthenticated requests → 401.
 
 ```
-Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
-                    (session check)         (server-side, no CORS)
+Worker proxy:  Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
+D1 direct:     Browser ──cookie──→ Dashboard /api/tags  ──CF Token──→ D1 REST API ──→ D1
+                                   (session check)         (server-side, no CORS)
 ```
 
 See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for full rationale.
 
-### Proxy routes
+### Worker proxy routes
 
 | Dashboard route | Proxies to Worker | Method |
 |-----------------|-------------------|--------|
 | `/api/hosts` | `GET /api/hosts` | GET |
+| `/api/hosts/[id]` | `GET /api/hosts/:id` | GET |
 | `/api/hosts/[id]/metrics` | `GET /api/hosts/:id/metrics` | GET |
+| `/api/hosts/[id]/tier2` | `GET /api/hosts/:id/tier2` | GET |
 | `/api/alerts` | `GET /api/alerts` | GET |
 
 Each proxy route:
@@ -58,9 +67,32 @@ Each proxy route:
 3. Forward request to `BAT_API_URL` + path with `Authorization: Bearer <BAT_READ_KEY>`
 4. Return Worker response to browser (pass through status code + JSON body)
 
-**Note**: Dashboard does NOT proxy write routes (`/api/ingest`, `/api/identity`). Those are only accessible to Probe with `BAT_WRITE_KEY`.
+**Note**: Dashboard does NOT proxy write routes (`/api/ingest`, `/api/identity`, `/api/tier2`). Those are only accessible to Probe with `BAT_WRITE_KEY`.
 
 **Note**: Dashboard does NOT proxy `/api/health`. The health endpoint is public on the Worker and consumed directly by Uptime Kuma.
+
+### D1 direct routes
+
+Dashboard queries D1 directly via `lib/d1.ts` for user-state data that the Worker/Probe never touch. See [11-host-tags.md](./11-host-tags.md) for full API spec.
+
+| Dashboard route | Method | D1 operation |
+|-----------------|--------|-------------|
+| `/api/tags` | GET | List all tags with host count |
+| `/api/tags` | POST | Create tag |
+| `/api/tags/[id]` | PUT | Update tag (rename/recolor) |
+| `/api/tags/[id]` | DELETE | Delete tag (cascade removes host_tags) |
+| `/api/tags/by-hosts` | GET | All host→tag mappings (for hosts page) |
+| `/api/hosts/[id]/tags` | GET | Tags for a host |
+| `/api/hosts/[id]/tags` | POST | Add tag to host |
+| `/api/hosts/[id]/tags` | PUT | Replace host's tags |
+| `/api/hosts/[id]/tags/[tagId]` | DELETE | Remove tag from host |
+
+Each D1 direct route:
+
+1. Checks the user's NextAuth session → 401 if missing
+2. Validates input (name format, limits, tag/host existence)
+3. Calls `d1Query()` with parameterized SQL
+4. Returns JSON response
 
 ---
 
@@ -71,8 +103,10 @@ Each proxy route:
 | `/` | Redirect to `/hosts` |
 | `/login` | Google OAuth login (from Surety) |
 | `/hosts` | Overview grid: per-host cards with status badge, CPU%, MEM%, uptime |
-| `/hosts/[id]` | Detail: time-series charts (CPU, Memory, Network), disk bars, system info, active alerts |
+| `/hosts/[id]` | Detail: time-series charts (CPU, Memory, Network), disk bars, system info, active alerts, tier2 data |
 | `/alerts` | All active alerts across hosts |
+| `/tags` | Tags management: create, rename, recolor, delete tags |
+| `/setup` | Probe installation: auth-protected, shows pre-filled install command |
 
 ### `/hosts` — Host Overview
 
@@ -135,8 +169,12 @@ export async function fetchAPI<T>(path: string, params?: Record<string, string>)
 | Hook | Endpoint | Response type | Refresh |
 |------|----------|---------------|---------|
 | `useHosts()` | `/api/hosts` | `HostOverviewItem[]` | 30s |
+| `useHostDetail(id)` | `/api/hosts/[id]` | `HostDetailItem` | 30s |
 | `useHostMetrics(id, from, to)` | `/api/hosts/[id]/metrics?from=&to=` | `MetricsQueryResponse` | 30s |
+| `useHostTier2(id)` | `/api/hosts/[id]/tier2` | `Tier2Snapshot` | 60s |
 | `useAlerts()` | `/api/alerts` | `AlertItem[]` | 30s |
+| `useTags()` | `/api/tags` | `TagItem[]` | — |
+| `useHostTags()` | `/api/tags/by-hosts` | `Record<string, HostTag[]>` | 30s |
 
 ---
 
@@ -171,9 +209,12 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 | Component | File | Description |
 |-----------|------|-------------|
-| `HostCard` | `components/host-card.tsx` | Card with status badge, key metrics, click → detail |
+| `HostCard` | `components/host-card.tsx` | Card with status badge, key metrics, tags, click → detail |
 | `StatusBadge` | `components/status-badge.tsx` | Colored badge: healthy (green), warning (yellow), critical (red), offline (gray) |
 | `AlertTable` | `components/alert-table.tsx` | Table of active alerts with severity, host link, timestamp |
+| `TagChip` | `components/tag-chip.tsx` | Small colored pill for tag display, optional remove button |
+| `TagSelector` | `components/tag-selector.tsx` | Autocomplete dropdown to search/create tags |
+| `TagFilterBar` | `components/tag-filter-bar.tsx` | Horizontal pill bar above host grid for filtering by tag |
 | CPU/Memory/Network/Disk charts | `components/charts/*` | Recharts wrappers with Basalt palette |
 | AppShell, Sidebar | `components/layout/*` | From Surety template, nav items updated |
 
@@ -184,12 +225,17 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 | Variable | Purpose |
 |----------|---------|
 | `BAT_API_URL` | Worker URL (e.g. `https://bat-worker.xxx.workers.dev`) |
-| `BAT_READ_KEY` | Read-only API Key for Worker |
+| `BAT_READ_KEY` | Read-only API Key for Worker proxy routes |
+| `BAT_WRITE_KEY` | Write API Key (used only by setup page to generate install commands) |
+| `CF_API_TOKEN` | Cloudflare API token with D1 read/write permission (for tags, D1 direct access) |
+| `CF_ACCOUNT_ID` | Cloudflare account ID |
+| `CF_D1_DATABASE_ID` | D1 database ID for bat-db |
 | `AUTH_SECRET` | NextAuth secret |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `ALLOWED_EMAILS` | Comma-separated email allowlist |
 | `USE_SECURE_COOKIES` | `true` for production |
+| `PROBE_BIN_DIR` | Probe binary storage path (default `/app/probe-bin`) |
 | `E2E_SKIP_AUTH` | `1` to bypass auth in E2E tests |
 
 ---
@@ -220,7 +266,7 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 ### L3
 
-Not applicable — Dashboard has no server-side API logic beyond thin proxies (tested in L1 above). Worker API E2E is covered by [05-worker.md § L3](./05-worker.md).
+D1 direct routes (tags CRUD) contain server-side business logic (validation, D1 queries). These are tested via L1 unit tests with mocked D1 responses — no separate L3 integration suite. Worker API E2E is covered by [05-worker.md § L3](./05-worker.md).
 
 ### L4 — BDD E2E (Playwright)
 
