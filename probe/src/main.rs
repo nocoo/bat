@@ -95,6 +95,11 @@ async fn main() {
         collectors::network::read_all_counters(&cfg.network.exclude_interfaces).ok();
     let mut prev_disk_io = collectors::disk_io::read_diskstats().ok();
     let mut prev_oom_kills = collectors::memory::read_oom_kill();
+    let mut prev_vmstat = collectors::memory::read_vmstat();
+    let mut prev_psi = collectors::psi::read_psi();
+    let mut prev_snmp = collectors::snmp::read_snmp();
+    let mut prev_netstat = collectors::netstat::read_netstat();
+    let mut prev_softnet = collectors::softnet::read_softnet_stat();
 
     let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
@@ -128,6 +133,11 @@ async fn main() {
                     &mut prev_net_counters,
                     &mut prev_disk_io,
                     &mut prev_oom_kills,
+                    &mut prev_vmstat,
+                    &mut prev_psi,
+                    &mut prev_snmp,
+                    &mut prev_netstat,
+                    &mut prev_softnet,
                     &mut last_sample_at,
                 );
 
@@ -213,7 +223,7 @@ fn spawn_tier2_task(sender: Sender, host_id: Arc<str>) {
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn collect_metrics(
     host_id: &str,
     cfg: &config::Config,
@@ -222,6 +232,11 @@ fn collect_metrics(
     prev_net_counters: &mut Option<HashMap<String, NetCounters>>,
     prev_disk_io: &mut Option<Vec<collectors::disk_io::DiskIoCounters>>,
     prev_oom_kills: &mut Option<u64>,
+    prev_vmstat: &mut Option<collectors::memory::VmstatCounters>,
+    prev_psi: &mut Option<collectors::psi::PsiData>,
+    prev_snmp: &mut Option<collectors::snmp::SnmpCounters>,
+    prev_netstat: &mut Option<collectors::netstat::NetstatCounters>,
+    prev_softnet: &mut Option<collectors::softnet::SoftnetCounters>,
     last_sample_at: &mut tokio::time::Instant,
 ) -> payload::MetricsPayload {
     let now = tokio::time::Instant::now();
@@ -253,7 +268,12 @@ fn collect_metrics(
     let curr_oom_kills = collectors::memory::read_oom_kill();
     let oom_kills_delta = orchestrate::compute_oom_delta(*prev_oom_kills, curr_oom_kills);
     *prev_oom_kills = curr_oom_kills;
-    let vmstat_rates = orchestrate::VmstatRates::default(); // TODO: wire up vmstat collector
+    // Vmstat rates (swap in/out, pgmajfault, etc.)
+    let curr_vmstat = collectors::memory::read_vmstat();
+    let vmstat_rates =
+        orchestrate::compute_vmstat_rates(prev_vmstat.as_ref(), curr_vmstat.as_ref(), elapsed);
+    *prev_vmstat = curr_vmstat;
+
     let (mem, swap) =
         orchestrate::build_mem_swap_metrics(mem_info.as_ref(), oom_kills_delta, &vmstat_rates);
 
@@ -273,8 +293,12 @@ fn collect_metrics(
     // Uptime
     let uptime_seconds = collectors::identity::read_uptime().unwrap_or(0);
 
-    // PSI pressure (Tier 3)
-    let psi = collectors::psi::read_psi().map(|data| orchestrate::convert_psi(&data, None));
+    // PSI pressure (with total deltas from previous sample)
+    let curr_psi = collectors::psi::read_psi();
+    let psi = curr_psi
+        .as_ref()
+        .map(|data| orchestrate::convert_psi(data, prev_psi.as_ref()));
+    *prev_psi = curr_psi;
 
     // Disk I/O (Tier 3) — delta from previous diskstats sample
     let curr_disk_io = collectors::disk_io::read_diskstats().ok();
@@ -285,11 +309,39 @@ fn collect_metrics(
     );
     *prev_disk_io = curr_disk_io;
 
-    // TCP connection state (Tier 3)
-    let tcp = collectors::tcp::read_tcp_state().map(|s| orchestrate::convert_tcp(&s));
+    // TCP connection state + sockstat extras
+    let sockstat = collectors::tcp::read_sockstat();
+    let tcp = sockstat
+        .as_ref()
+        .map(|(state, _)| orchestrate::convert_tcp(state));
+    let socket = sockstat
+        .as_ref()
+        .and_then(|(_, extra)| extra.as_ref().map(orchestrate::convert_socket));
+    let udp = sockstat
+        .as_ref()
+        .and_then(|(_, extra)| extra.as_ref().map(orchestrate::convert_udp));
 
-    // File descriptor usage (Tier 3)
+    // File descriptor usage
     let fd = collectors::fd::read_fd_info().map(|i| orchestrate::convert_fd(&i));
+
+    // SNMP protocol counters (delta/rate)
+    let curr_snmp = collectors::snmp::read_snmp();
+    let snmp = orchestrate::compute_snmp_delta(prev_snmp.as_ref(), curr_snmp.as_ref(), elapsed);
+    *prev_snmp = curr_snmp;
+
+    // Netstat extended TCP stats (delta)
+    let curr_netstat = collectors::netstat::read_netstat();
+    let netstat = orchestrate::compute_netstat_delta(prev_netstat.as_ref(), curr_netstat.as_ref());
+    *prev_netstat = curr_netstat;
+
+    // Softnet counters (delta)
+    let curr_softnet = collectors::softnet::read_softnet_stat();
+    let softnet = orchestrate::compute_softnet_delta(prev_softnet.as_ref(), curr_softnet.as_ref());
+    *prev_softnet = curr_softnet;
+
+    // Conntrack (instantaneous gauge, no delta)
+    let conntrack =
+        collectors::conntrack::read_conntrack().map(|s| orchestrate::convert_conntrack(&s));
 
     orchestrate::build_metrics_payload(
         PROBE_VERSION,
@@ -310,12 +362,12 @@ fn collect_metrics(
         disk_io,
         tcp,
         fd,
-        None, // socket
-        None, // udp
-        None, // snmp
-        None, // netstat
-        None, // softnet
-        None, // conntrack
+        socket,
+        udp,
+        snmp,
+        netstat,
+        softnet,
+        conntrack,
     )
 }
 
