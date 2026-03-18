@@ -6,3 +6,4 @@ export { useAlerts } from "./use-alerts";
 export { useSetup } from "./use-setup";
 export { useTags } from "./use-tags";
 export { useHostTags } from "./use-host-tags";
+export { useSingleHostTags } from "./use-single-host-tags";
