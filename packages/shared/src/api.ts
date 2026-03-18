@@ -38,6 +38,12 @@ export const API_ROUTES = {
 
 export type HostStatus = "healthy" | "warning" | "critical" | "offline";
 
+/** Sparkline data point — one hour of aggregated data */
+export interface SparklinePoint {
+	ts: number; // unix seconds (hour boundary)
+	v: number; // value (0–100 pct)
+}
+
 /** GET /api/hosts → HostOverviewItem[] */
 export interface HostOverviewItem {
 	hid: string; // opaque hash of host_id for URL routing
@@ -60,6 +66,15 @@ export interface HostOverviewItem {
 	mem_total_bytes: number | null;
 	virtualization: string | null;
 	public_ip: string | null;
+	// Extended overview fields
+	probe_version: string | null;
+	cpu_load1: number | null;
+	swap_used_pct: number | null;
+	disk_root_used_pct: number | null;
+	net_rx_rate: number | null; // bytes/sec aggregate
+	net_tx_rate: number | null; // bytes/sec aggregate
+	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
+	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
 }
 
 /** GET /api/hosts/:id → HostDetailItem */

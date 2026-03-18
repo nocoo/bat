@@ -70,6 +70,7 @@ export type {
 	MetricsDataPoint,
 	MetricsQueryResponse,
 	MetricsResolution,
+	SparklinePoint,
 } from "./api.js";
 export { API_ROUTES, hashHostId } from "./api.js";
 

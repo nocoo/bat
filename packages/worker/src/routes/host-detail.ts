@@ -33,6 +33,10 @@ interface LatestMetrics {
 	cpu_usage_pct: number | null;
 	mem_used_pct: number | null;
 	uptime_seconds: number | null;
+	cpu_load1: number | null;
+	swap_used_pct: number | null;
+	disk_json: string | null;
+	net_json: string | null;
 }
 
 interface AlertRow {
@@ -65,6 +69,35 @@ function safeParse<T>(json: string | null): T | null {
 	}
 }
 
+/** Parse disk_json to find root mount used_pct */
+function extractRootDiskPct(diskJson: string | null): number | null {
+	if (!diskJson) return null;
+	try {
+		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
+		const root = disks.find((d) => d.mount === "/");
+		return root?.used_pct ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/** Sum net_json rx/tx rates across all interfaces */
+function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
+	if (!netJson) return { rx: null, tx: null };
+	try {
+		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
+		let rx = 0;
+		let tx = 0;
+		for (const iface of ifaces) {
+			rx += iface.rx_bytes ?? 0;
+			tx += iface.tx_bytes ?? 0;
+		}
+		return { rx, tx };
+	} catch {
+		return { rx: null, tx: null };
+	}
+}
+
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const idParam = c.req.param("id");
 	const db = c.env.DB;
@@ -94,7 +127,7 @@ FROM hosts WHERE host_id = ? AND is_active = 1`,
 	// Latest metrics
 	const metrics = await db
 		.prepare(
-			`SELECT cpu_usage_pct, mem_used_pct, uptime_seconds
+			`SELECT cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
 FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		)
 		.bind(hostId)
@@ -107,6 +140,8 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		.all<AlertRow>();
 	const alerts = alertsResult.results;
 	const status = deriveHostStatus(host.last_seen, now, alerts);
+	const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
+	const netRates = extractNetRates(metrics?.net_json ?? null);
 
 	const item: HostDetailItem = {
 		hid: hashHostId(host.host_id),
@@ -129,6 +164,13 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		virtualization: host.virtualization,
 		public_ip: host.public_ip,
 		probe_version: host.probe_version,
+		cpu_load1: metrics?.cpu_load1 ?? null,
+		swap_used_pct: metrics?.swap_used_pct ?? null,
+		disk_root_used_pct: diskRootPct,
+		net_rx_rate: netRates.rx,
+		net_tx_rate: netRates.tx,
+		cpu_sparkline: null, // detail page uses its own metrics endpoint
+		mem_sparkline: null,
 		swap_total_bytes: host.swap_total_bytes,
 		boot_mode: host.boot_mode,
 		timezone: host.timezone,

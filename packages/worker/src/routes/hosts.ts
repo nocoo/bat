@@ -1,5 +1,5 @@
 // GET /api/hosts — list all active hosts with overview DTO
-import type { HostOverviewItem } from "@bat/shared";
+import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import { deriveHostStatus } from "../services/status.js";
@@ -20,6 +20,7 @@ interface HostRow {
 	mem_total_bytes: number | null;
 	virtualization: string | null;
 	public_ip: string | null;
+	probe_version: string | null;
 }
 
 interface LatestMetrics {
@@ -27,6 +28,10 @@ interface LatestMetrics {
 	cpu_usage_pct: number | null;
 	mem_used_pct: number | null;
 	uptime_seconds: number | null;
+	cpu_load1: number | null;
+	swap_used_pct: number | null;
+	disk_json: string | null;
+	net_json: string | null;
 }
 
 interface AlertCount {
@@ -39,6 +44,42 @@ interface AlertRow {
 	severity: string;
 }
 
+interface SparklineRow {
+	host_id: string;
+	ts: number;
+	cpu: number | null;
+	mem: number | null;
+}
+
+/** Parse disk_json to find root mount used_pct */
+function extractRootDiskPct(diskJson: string | null): number | null {
+	if (!diskJson) return null;
+	try {
+		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
+		const root = disks.find((d) => d.mount === "/");
+		return root?.used_pct ?? null;
+	} catch {
+		return null;
+	}
+}
+
+/** Sum net_json rx/tx rates across all interfaces */
+function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
+	if (!netJson) return { rx: null, tx: null };
+	try {
+		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
+		let rx = 0;
+		let tx = 0;
+		for (const iface of ifaces) {
+			rx += iface.rx_bytes ?? 0;
+			tx += iface.tx_bytes ?? 0;
+		}
+		return { rx, tx };
+	} catch {
+		return { rx: null, tx: null };
+	}
+}
+
 export async function hostsListRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
 	const now = Math.floor(Date.now() / 1000);
@@ -46,7 +87,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	// 1. Get all active hosts
 	const hostsResult = await db
 		.prepare(
-			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip FROM hosts WHERE is_active = 1",
+			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, probe_version FROM hosts WHERE is_active = 1",
 		)
 		.all<HostRow>();
 	const hosts = hostsResult.results;
@@ -61,9 +102,9 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	// 2. Latest metrics per host via window function
 	const metricsResult = await db
 		.prepare(
-			`SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds
+			`SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
 FROM (
-  SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds,
+  SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json,
     ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY ts DESC) as rn
   FROM metrics_raw
   WHERE host_id IN (${placeholders})
@@ -103,11 +144,37 @@ FROM (
 		alertsByHost.set(a.host_id, existing);
 	}
 
-	// 5. Build response
+	// 5. Sparkline data — last 24h hourly aggregates
+	const sparklineCutoff = now - 86400;
+	const sparklineResult = await db
+		.prepare(
+			`SELECT host_id, hour_ts as ts, cpu_usage_avg as cpu, mem_used_pct_avg as mem
+FROM metrics_hourly
+WHERE host_id IN (${placeholders}) AND hour_ts >= ?
+ORDER BY host_id, hour_ts ASC`,
+		)
+		.bind(...hostIds, sparklineCutoff)
+		.all<SparklineRow>();
+
+	const sparklinesByHost = new Map<string, { cpu: SparklinePoint[]; mem: SparklinePoint[] }>();
+	for (const row of sparklineResult.results) {
+		let entry = sparklinesByHost.get(row.host_id);
+		if (!entry) {
+			entry = { cpu: [], mem: [] };
+			sparklinesByHost.set(row.host_id, entry);
+		}
+		if (row.cpu !== null) entry.cpu.push({ ts: row.ts, v: row.cpu });
+		if (row.mem !== null) entry.mem.push({ ts: row.ts, v: row.mem });
+	}
+
+	// 6. Build response
 	const items: HostOverviewItem[] = hosts.map((host) => {
 		const metrics = metricsMap.get(host.host_id);
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const status = deriveHostStatus(host.last_seen, now, alerts);
+		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
+		const netRates = extractNetRates(metrics?.net_json ?? null);
+		const sparklines = sparklinesByHost.get(host.host_id);
 
 		return {
 			hid: hashHostId(host.host_id),
@@ -129,6 +196,14 @@ FROM (
 			mem_total_bytes: host.mem_total_bytes,
 			virtualization: host.virtualization,
 			public_ip: host.public_ip,
+			probe_version: host.probe_version,
+			cpu_load1: metrics?.cpu_load1 ?? null,
+			swap_used_pct: metrics?.swap_used_pct ?? null,
+			disk_root_used_pct: diskRootPct,
+			net_rx_rate: netRates.rx,
+			net_tx_rate: netRates.tx,
+			cpu_sparkline: sparklines?.cpu.length ? sparklines.cpu : null,
+			mem_sparkline: sparklines?.mem.length ? sparklines.mem : null,
 		};
 	});
 
