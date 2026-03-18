@@ -50,8 +50,8 @@ docker build --platform linux/amd64 -f probe/Dockerfile.build -o probe/out .
 docker build --platform linux/arm64 -f probe/Dockerfile.build -o probe/out .
 ```
 
-- Dockerfile: `probe/Dockerfile.build` (rust:1-slim, opt-level=z + LTO + strip)
-- Output: `probe/out/bat-probe-linux-{x86_64,aarch64}` (~300KB, statically stripped ELF)
+- Dockerfile: `probe/Dockerfile.build` (rust:1-alpine + musl, opt-level=z + LTO + strip)
+- Output: `probe/out/bat-probe-linux-{x86_64,aarch64}` (~3.5MB, fully static musl ELF)
 - `probe/out/` is gitignored — binaries are build artifacts, not committed
 
 ### Release checklist
