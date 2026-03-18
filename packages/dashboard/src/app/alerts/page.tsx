@@ -12,7 +12,7 @@ export default function AlertsPage() {
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Alerts" }]}>
-			{isLoading ? (
+			{isLoading && !alerts ? (
 				<Card>
 					<CardContent className="py-6 space-y-4">
 						{Array.from({ length: 5 }, (_, i) => (
@@ -20,7 +20,7 @@ export default function AlertsPage() {
 						))}
 					</CardContent>
 				</Card>
-			) : error ? (
+			) : error && !alerts ? (
 				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
 					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
 					<h2 className="text-lg font-semibold text-foreground">Failed to load alerts</h2>

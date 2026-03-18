@@ -27,13 +27,13 @@ export default function SetupPage() {
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Setup" }]}>
-			{isLoading ? (
+			{isLoading && !config ? (
 				<div className="space-y-4">
 					<Skeleton className="h-8 w-48" />
 					<Skeleton className="h-32 w-full" />
 					<Skeleton className="h-32 w-full" />
 				</div>
-			) : error ? (
+			) : error && !config ? (
 				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
 					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
 					<h2 className="text-lg font-semibold text-foreground">

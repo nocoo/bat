@@ -83,9 +83,9 @@ export default function HostsPage() {
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts" }]}>
-			{isLoading ? (
+			{isLoading && !hosts ? (
 				<HostsLoading />
-			) : error ? (
+			) : error && !hosts ? (
 				<HostsError message={error.message} />
 			) : !hosts || hosts.length === 0 ? (
 				<HostsEmpty />
