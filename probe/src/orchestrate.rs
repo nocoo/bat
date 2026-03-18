@@ -7,9 +7,10 @@ use crate::collectors::network::NetCounters;
 use crate::payload::{
     ConntrackMetrics, CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics,
     MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, SnmpMetrics, SocketMetrics,
-    SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DiskDeep, Tier2Docker, Tier2DockerContainer,
-    Tier2DockerImages, Tier2FailedService, Tier2LargeFile, Tier2ListeningPort, Tier2PackageUpdate,
-    Tier2Payload, Tier2Ports, Tier2Security, Tier2Systemd, Tier2TopDir, Tier2Updates, UdpMetrics,
+    SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiskDeep, Tier2Docker,
+    Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
+    Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software,
+    Tier2Systemd, Tier2TopDir, Tier2Updates, UdpMetrics,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -598,6 +599,7 @@ use crate::collectors::tier2::disk_deep::DiskDeepScanInfo;
 use crate::collectors::tier2::docker::DockerStatusInfo;
 use crate::collectors::tier2::ports::ListeningPort;
 use crate::collectors::tier2::security::SecurityPostureInfo;
+use crate::collectors::tier2::software::SoftwareDiscoveryInfo;
 use crate::collectors::tier2::systemd::SystemdServicesInfo;
 use crate::collectors::tier2::updates::PackageUpdatesInfo;
 
@@ -720,6 +722,27 @@ pub fn convert_disk_deep(info: DiskDeepScanInfo) -> Tier2DiskDeep {
     }
 }
 
+/// Convert collector software discovery to payload software.
+pub fn convert_software(info: SoftwareDiscoveryInfo) -> Tier2Software {
+    Tier2Software {
+        detected: info
+            .detected
+            .into_iter()
+            .map(|s| Tier2DetectedSoftware {
+                id: s.id,
+                name: s.name,
+                category: s.category,
+                version: s.version,
+                source: s.source,
+                running: s.running,
+                listening_ports: s.listening_ports,
+            })
+            .collect(),
+        scan_duration_ms: info.scan_duration_ms,
+        version_duration_ms: info.version_duration_ms,
+    }
+}
+
 /// Build a [`Tier2Payload`] from collected tier 2 data.
 #[allow(clippy::too_many_arguments)]
 pub fn build_tier2_payload(
@@ -732,6 +755,7 @@ pub fn build_tier2_payload(
     security: Option<Tier2Security>,
     docker: Option<Tier2Docker>,
     disk_deep: Option<Tier2DiskDeep>,
+    software: Option<Tier2Software>,
     timezone: Option<String>,
     dns_resolvers: Option<Vec<String>>,
     dns_search: Option<Vec<String>>,
@@ -746,6 +770,7 @@ pub fn build_tier2_payload(
         security,
         docker,
         disk_deep,
+        software,
         timezone,
         dns_resolvers,
         dns_search,
@@ -1330,6 +1355,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             Some("UTC".to_string()),
             Some(vec!["1.1.1.1".to_string()]),
             Some(vec![]),
@@ -1339,6 +1365,7 @@ mod tests {
         assert_eq!(payload.timestamp, 1_700_000_000);
         assert!(payload.ports.is_some());
         assert!(payload.updates.is_none());
+        assert!(payload.software.is_none());
         assert_eq!(payload.timezone, Some("UTC".to_string()));
         assert_eq!(payload.dns_resolvers, Some(vec!["1.1.1.1".to_string()]));
         assert_eq!(payload.dns_search, Some(vec![]));

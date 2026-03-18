@@ -350,6 +350,8 @@ pub struct Tier2Payload {
     pub docker: Option<Tier2Docker>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk_deep: Option<Tier2DiskDeep>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub software: Option<Tier2Software>,
     // --- Host inventory tier 2 fields ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
@@ -479,6 +481,25 @@ pub struct Tier2DiskDeep {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub journal_bytes: Option<u64>,
     pub large_files: Vec<Tier2LargeFile>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2DetectedSoftware {
+    pub id: String,
+    pub name: String,
+    pub category: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    pub source: String,
+    pub running: bool,
+    pub listening_ports: Vec<u16>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Software {
+    pub detected: Vec<Tier2DetectedSoftware>,
+    pub scan_duration_ms: u64,
+    pub version_duration_ms: u64,
 }
 
 #[cfg(test)]
@@ -839,6 +860,7 @@ mod tests {
                     size_bytes: 150_000_000,
                 }],
             }),
+            software: None,
             timezone: Some("UTC".into()),
             dns_resolvers: Some(vec!["1.1.1.1".into(), "8.8.8.8".into()]),
             dns_search: Some(vec!["example.com".into()]),
@@ -907,6 +929,7 @@ mod tests {
             security: None,
             docker: None,
             disk_deep: None,
+            software: None,
             timezone: None,
             dns_resolvers: None,
             dns_search: None,
