@@ -106,6 +106,35 @@ export interface DiskDeepScanData {
 	large_files: LargeFile[];
 }
 
+// --- Software Discovery (2.7) ---
+
+export type SoftwareCategory =
+	| "web"
+	| "database"
+	| "cache"
+	| "queue"
+	| "runtime"
+	| "monitoring"
+	| "security"
+	| "infra"
+	| "container";
+
+export interface DetectedSoftware {
+	id: string; // "nginx", "postgres", "redis"
+	name: string; // "Nginx", "PostgreSQL", "Redis"
+	category: SoftwareCategory;
+	version: string | null;
+	source: "port" | "process" | "systemd" | "binary" | "package";
+	running: boolean;
+	listening_ports: number[];
+}
+
+export interface SoftwareDiscoveryData {
+	detected: DetectedSoftware[];
+	scan_duration_ms: number;
+	version_duration_ms: number;
+}
+
 // --- Tier 2 Payload (Probe → Worker) ---
 
 export interface Tier2Payload {
@@ -118,6 +147,7 @@ export interface Tier2Payload {
 	security?: SecurityPostureData;
 	docker?: DockerStatusData;
 	disk_deep?: DiskDeepScanData;
+	software?: SoftwareDiscoveryData;
 	// Host inventory slow-drift fields
 	timezone?: string;
 	dns_resolvers?: string[];
@@ -135,6 +165,7 @@ export interface Tier2Snapshot {
 	security: SecurityPostureData | null;
 	docker: DockerStatusData | null;
 	disk_deep: DiskDeepScanData | null;
+	software: SoftwareDiscoveryData | null;
 	// Host inventory slow-drift fields
 	timezone: string | null;
 	dns_resolvers: string[] | null;

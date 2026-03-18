@@ -84,6 +84,7 @@ export {
 
 // Tier 2 payload types
 export type {
+	DetectedSoftware,
 	DiskDeepScanData,
 	DockerContainer,
 	DockerImagesInfo,
@@ -95,6 +96,8 @@ export type {
 	PackageUpdatesData,
 	SecurityPostureData,
 	ServicePortsData,
+	SoftwareCategory,
+	SoftwareDiscoveryData,
 	SystemdServicesData,
 	Tier2Payload,
 	Tier2Snapshot,
