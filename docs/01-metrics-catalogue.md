@@ -16,17 +16,18 @@
 
 ## Signal Architecture
 
-Two collection cadences, one unified heartbeat endpoint:
+Three collection cadences, three dedicated endpoints:
 
-| Cadence | Default | Configurable | Nature |
-|---------|---------|-------------|--------|
-| **Real-time** | 30s | `interval` (min 10s) | procfs/sysfs reads, zero fork |
-| **Slow scan** | 4h | `slow_interval` | procfs reads + subprocess commands + HTTP |
+| Cadence | Default | Endpoint | Nature |
+|---------|---------|----------|--------|
+| **Real-time** | 30s (`interval`, min 10s) | `POST /api/ingest` | procfs/sysfs reads, zero fork |
+| **Identity** | 6h | `POST /api/identity` | procfs/sysfs reads, +HTTP for public IP |
+| **Slow scan** | 6h | `POST /api/tier2` | procfs reads + subprocess commands |
 
-Both cadences deliver via **`POST /api/heartbeat`**. Real-time signals are sent every tick. Slow-scan signals piggyback on the heartbeat at their own cadence (on startup, then every `slow_interval`).
+Identity and slow scan share the 6h cadence but tick independently. Both fire on startup, then every 6 hours.
 
-<!-- Historical note: earlier versions used 3 endpoints (ingest/identity/tier2) and a "Tier" taxonomy.
-     Code no longer uses Tier naming; this doc retains Tier labels in comments for traceability. -->
+<!-- Historical note: docs/01 previously described a unified POST /api/heartbeat and a configurable slow_interval.
+     That merge is deferred; the current implementation uses 3 separate endpoints. -->
 
 ---
 
@@ -62,11 +63,11 @@ One file read. Already open for CPU jiffies — extract everything.
 | `cpu.forks_sec` | rate | /sec | `processes` line, delta / elapsed | ✅ |
 | `cpu.procs_running` | gauge | count | `procs_running` line | ✅ |
 | `cpu.procs_blocked` | gauge | count | `procs_blocked` line | ✅ |
-| `cpu.interrupts_sec` | rate | /sec | `intr` line first field (total), delta / elapsed | 🆕 |
-| `cpu.softirq_net_rx_sec` | rate | /sec | `softirq` line field 5 (NET_RX), delta / elapsed | 🆕 |
-| `cpu.softirq_block_sec` | rate | /sec | `softirq` line field 6 (BLOCK), delta / elapsed | 🆕 |
+| `cpu.interrupts_sec` | rate | /sec | `intr` line first field (total), delta / elapsed | ✅ |
+| `cpu.softirq_net_rx_sec` | rate | /sec | `softirq` line field 5 (NET_RX), delta / elapsed | ✅ |
+| `cpu.softirq_block_sec` | rate | /sec | `softirq` line field 6 (BLOCK), delta / elapsed | ✅ |
 
-**Implementation**: `collectors/cpu.rs`. 🆕 = planned addition.
+**Implementation**: `collectors/cpu.rs`.
 
 **Rationale for new fields**: interrupt total rate detects IRQ storms; NET_RX softirq correlates with packet floods; BLOCK softirq correlates with disk I/O latency spikes. All extractable from the same `read()` at zero cost.
 
@@ -79,8 +80,8 @@ One file read. 5 fields in a single line — extract all useful ones.
 | `cpu.load1` | gauge | float | field 0 | ✅ |
 | `cpu.load5` | gauge | float | field 1 | ✅ |
 | `cpu.load15` | gauge | float | field 2 | ✅ |
-| `cpu.tasks_running` | gauge | count | field 3 numerator (before `/`) | 🆕 |
-| `cpu.tasks_total` | gauge | count | field 3 denominator (after `/`) | 🆕 |
+| `cpu.tasks_running` | gauge | count | field 3 numerator (before `/`) | ✅ |
+| `cpu.tasks_total` | gauge | count | field 3 denominator (after `/`) | ✅ |
 
 **Rationale**: `tasks_total` is the cheapest thread count available — no `/proc/[pid]` walk needed.
 
@@ -93,16 +94,16 @@ One file read (~50 lines). Currently extracting 4 fields out of ~50 — expand t
 | `mem.total_bytes` | gauge | bytes | MemTotal × 1024 | ✅ |
 | `mem.available_bytes` | gauge | bytes | MemAvailable × 1024 | ✅ |
 | `mem.used_pct` | gauge | % | (total - available) / total × 100 | ✅ |
-| `mem.buffers_bytes` | gauge | bytes | Buffers × 1024 | 🆕 |
-| `mem.cached_bytes` | gauge | bytes | Cached × 1024 | 🆕 |
-| `mem.dirty_bytes` | gauge | bytes | Dirty × 1024 | 🆕 |
-| `mem.writeback_bytes` | gauge | bytes | Writeback × 1024 | 🆕 |
-| `mem.shmem_bytes` | gauge | bytes | Shmem × 1024 | 🆕 |
-| `mem.slab_reclaimable_bytes` | gauge | bytes | SReclaimable × 1024 | 🆕 |
-| `mem.slab_unreclaim_bytes` | gauge | bytes | SUnreclaim × 1024 | 🆕 |
-| `mem.committed_as_bytes` | gauge | bytes | Committed_AS × 1024 | 🆕 |
-| `mem.commit_limit_bytes` | gauge | bytes | CommitLimit × 1024 | 🆕 |
-| `mem.hardware_corrupted_bytes` | gauge | bytes | HardwareCorrupted × 1024 | 🆕 |
+| `mem.buffers_bytes` | gauge | bytes | Buffers × 1024 | ✅ |
+| `mem.cached_bytes` | gauge | bytes | Cached × 1024 | ✅ |
+| `mem.dirty_bytes` | gauge | bytes | Dirty × 1024 | ✅ |
+| `mem.writeback_bytes` | gauge | bytes | Writeback × 1024 | ✅ |
+| `mem.shmem_bytes` | gauge | bytes | Shmem × 1024 | ✅ |
+| `mem.slab_reclaimable_bytes` | gauge | bytes | SReclaimable × 1024 | ✅ |
+| `mem.slab_unreclaim_bytes` | gauge | bytes | SUnreclaim × 1024 | ✅ |
+| `mem.committed_as_bytes` | gauge | bytes | Committed_AS × 1024 | ✅ |
+| `mem.commit_limit_bytes` | gauge | bytes | CommitLimit × 1024 | ✅ |
+| `mem.hardware_corrupted_bytes` | gauge | bytes | HardwareCorrupted × 1024 | ✅ |
 | `swap.total_bytes` | gauge | bytes | SwapTotal × 1024 | ✅ |
 | `swap.used_bytes` | gauge | bytes | (SwapTotal - SwapFree) × 1024 | ✅ |
 | `swap.used_pct` | gauge | % | used / total × 100 | ✅ |
@@ -121,11 +122,11 @@ One file read. Currently extracting only `oom_kill` — expand to cover swap I/O
 | Signal | Type | Unit | Parse | Status |
 |--------|------|------|-------|--------|
 | `mem.oom_kills_delta` | counter | count | `oom_kill` line, delta | ✅ |
-| `mem.swap_in_sec` | rate | pages/sec | `pswpin` line, delta / elapsed | 🆕 |
-| `mem.swap_out_sec` | rate | pages/sec | `pswpout` line, delta / elapsed | 🆕 |
-| `mem.pgmajfault_sec` | rate | faults/sec | `pgmajfault` line, delta / elapsed | 🆕 |
-| `mem.pgpgin_sec` | rate | KB/sec | `pgpgin` line, delta / elapsed | 🆕 |
-| `mem.pgpgout_sec` | rate | KB/sec | `pgpgout` line, delta / elapsed | 🆕 |
+| `mem.swap_in_sec` | rate | pages/sec | `pswpin` line, delta / elapsed | ✅ |
+| `mem.swap_out_sec` | rate | pages/sec | `pswpout` line, delta / elapsed | ✅ |
+| `mem.pgmajfault_sec` | rate | faults/sec | `pgmajfault` line, delta / elapsed | ✅ |
+| `mem.pgpgin_sec` | rate | KB/sec | `pgpgin` line, delta / elapsed | ✅ |
+| `mem.pgpgout_sec` | rate | KB/sec | `pgpgout` line, delta / elapsed | ✅ |
 
 **Rationale**: `pswpin/pswpout` is the #1 swap activity indicator — even 1 swap-out/s matters on a small VPS. `pgmajfault` measures stalls waiting for disk I/O to service page faults. All deltas from the same file already in memory.
 
@@ -141,9 +142,9 @@ One file read. Currently extracting 5 fields per device — expand to include la
 | `disk_io[].read_bytes_sec` | rate | bytes/sec | sectors_read × 512 delta / elapsed | ✅ |
 | `disk_io[].write_bytes_sec` | rate | bytes/sec | sectors_written × 512 delta / elapsed | ✅ |
 | `disk_io[].io_util_pct` | gauge | % | io_ms delta / elapsed_ms × 100 (cap 100) | ✅ |
-| `disk_io[].read_await_ms` | gauge | ms | read_ms delta / reads delta (0 if no reads) | 🆕 |
-| `disk_io[].write_await_ms` | gauge | ms | write_ms delta / writes delta (0 if no writes) | 🆕 |
-| `disk_io[].io_queue_depth` | gauge | count | io_in_progress (instant, no delta) | 🆕 |
+| `disk_io[].read_await_ms` | gauge | ms | read_ms delta / reads delta (0 if no reads) | ✅ |
+| `disk_io[].write_await_ms` | gauge | ms | write_ms delta / writes delta (0 if no writes) | ✅ |
+| `disk_io[].io_queue_depth` | gauge | count | io_in_progress (instant, no delta) | ✅ |
 
 **Fields from `/proc/diskstats`** (0-indexed after name): 0=reads, 1=reads_merged, 2=sectors_read, **3=read_ms**, 4=writes, 5=writes_merged, 6=sectors_written, **7=write_ms**, **8=io_in_progress**, 9=io_ms, 10=io_ms_weighted.
 
@@ -160,10 +161,10 @@ One file read. Currently extracting 5 fields per device — expand to include la
 | `net[].tx_bytes_rate` | rate | bytes/sec | `tx_bytes` delta / elapsed | ✅ |
 | `net[].rx_errors` | counter | count | `rx_errors` delta | ✅ |
 | `net[].tx_errors` | counter | count | `tx_errors` delta | ✅ |
-| `net[].rx_packets_rate` | rate | pkts/sec | `rx_packets` delta / elapsed | 🆕 |
-| `net[].tx_packets_rate` | rate | pkts/sec | `tx_packets` delta / elapsed | 🆕 |
-| `net[].rx_dropped` | counter | count | `rx_dropped` delta | 🆕 |
-| `net[].tx_dropped` | counter | count | `tx_dropped` delta | 🆕 |
+| `net[].rx_packets_rate` | rate | pkts/sec | `rx_packets` delta / elapsed | ✅ |
+| `net[].tx_packets_rate` | rate | pkts/sec | `tx_packets` delta / elapsed | ✅ |
+| `net[].rx_dropped` | counter | count | `rx_dropped` delta | ✅ |
+| `net[].tx_dropped` | counter | count | `tx_dropped` delta | ✅ |
 
 **Rationale**: packet rate + byte rate → average packet size (workload type indicator). `rx_dropped` is packet loss at the NIC/kernel level — the root cause of mysterious connection timeouts. 4 extra sysfs reads per interface, same pattern as existing reads.
 
@@ -178,11 +179,11 @@ One file read. Currently extracting 5 fields per device — expand to include la
 | `psi.mem_full_avg10/60/300` | gauge | % | `full` line avg fields | ✅ |
 | `psi.io_some_avg10/60/300` | gauge | % | `some` line avg fields | ✅ |
 | `psi.io_full_avg10/60/300` | gauge | % | `full` line avg fields | ✅ |
-| `psi.cpu_some_total_delta` | counter | μs | `some` line `total=`, delta | 🆕 |
-| `psi.mem_some_total_delta` | counter | μs | `some` line `total=`, delta | 🆕 |
-| `psi.mem_full_total_delta` | counter | μs | `full` line `total=`, delta | 🆕 |
-| `psi.io_some_total_delta` | counter | μs | `some` line `total=`, delta | 🆕 |
-| `psi.io_full_total_delta` | counter | μs | `full` line `total=`, delta | 🆕 |
+| `psi.cpu_some_total_delta` | counter | μs | `some` line `total=`, delta | ✅ |
+| `psi.mem_some_total_delta` | counter | μs | `some` line `total=`, delta | ✅ |
+| `psi.mem_full_total_delta` | counter | μs | `full` line `total=`, delta | ✅ |
+| `psi.io_some_total_delta` | counter | μs | `some` line `total=`, delta | ✅ |
+| `psi.io_full_total_delta` | counter | μs | `full` line `total=`, delta | ✅ |
 
 **Rationale**: `total` is a monotonic μs counter; delta / interval gives exact stall fraction per collection period, more precise than kernel-smoothed avg10/60/300 which can mask short spikes. Note: cpu only has `some`, no `full` — 5 new deltas, not 6.
 
@@ -198,58 +199,58 @@ One file read. Currently extracting 4 TCP fields — expand to full socket inven
 | `tcp.time_wait` | gauge | count | `TCP: tw` | ✅ |
 | `tcp.orphan` | gauge | count | `TCP: orphan` | ✅ |
 | `tcp.allocated` | gauge | count | `TCP: alloc` | ✅ |
-| `tcp.mem_pages` | gauge | pages | `TCP: mem` | 🆕 |
-| `sockets.used` | gauge | count | `sockets: used` | 🆕 |
-| `udp.inuse` | gauge | count | `UDP: inuse` | 🆕 |
-| `udp.mem_pages` | gauge | pages | `UDP: mem` | 🆕 |
+| `tcp.mem_pages` | gauge | pages | `TCP: mem` | ✅ |
+| `sockets.used` | gauge | count | `sockets: used` | ✅ |
+| `udp.inuse` | gauge | count | `UDP: inuse` | ✅ |
+| `udp.mem_pages` | gauge | pages | `UDP: mem` | ✅ |
 
 **Rationale**: TCP mem pages approaching kernel limit = TCP memory pressure. `sockets.used` is the cheapest total-socket gauge. UDP inuse matters for DNS-heavy or game servers.
 
-### `/proc/net/snmp` — TCP/UDP Protocol Counters 🆕
+### `/proc/net/snmp` — TCP/UDP Protocol Counters
 
 **New file, +1 read.** Two-line format: header row + values row, repeated per protocol. Parse `Tcp:` and `Udp:` sections.
 
 | Signal | Type | Unit | Parse | Status |
 |--------|------|------|-------|--------|
-| `tcp.retrans_segs_sec` | rate | segs/sec | `RetransSegs` delta / elapsed | 🆕 |
-| `tcp.active_opens_sec` | rate | conn/sec | `ActiveOpens` delta / elapsed | 🆕 |
-| `tcp.passive_opens_sec` | rate | conn/sec | `PassiveOpens` delta / elapsed | 🆕 |
-| `tcp.attempt_fails_sec` | rate | fails/sec | `AttemptFails` delta / elapsed | 🆕 |
-| `tcp.estab_resets_sec` | rate | resets/sec | `EstabResets` delta / elapsed | 🆕 |
-| `tcp.in_errs` | counter | count | `InErrs` delta | 🆕 |
-| `tcp.out_rsts_sec` | rate | resets/sec | `OutRsts` delta / elapsed | 🆕 |
-| `udp.rcvbuf_errors` | counter | count | `RcvbufErrors` delta | 🆕 |
-| `udp.sndbuf_errors` | counter | count | `SndbufErrors` delta | 🆕 |
-| `udp.in_errors` | counter | count | `InErrors` delta | 🆕 |
+| `tcp.retrans_segs_sec` | rate | segs/sec | `RetransSegs` delta / elapsed | ✅ |
+| `tcp.active_opens_sec` | rate | conn/sec | `ActiveOpens` delta / elapsed | ✅ |
+| `tcp.passive_opens_sec` | rate | conn/sec | `PassiveOpens` delta / elapsed | ✅ |
+| `tcp.attempt_fails_sec` | rate | fails/sec | `AttemptFails` delta / elapsed | ✅ |
+| `tcp.estab_resets_sec` | rate | resets/sec | `EstabResets` delta / elapsed | ✅ |
+| `tcp.in_errs` | counter | count | `InErrs` delta | ✅ |
+| `tcp.out_rsts_sec` | rate | resets/sec | `OutRsts` delta / elapsed | ✅ |
+| `udp.rcvbuf_errors` | counter | count | `RcvbufErrors` delta | ✅ |
+| `udp.sndbuf_errors` | counter | count | `SndbufErrors` delta | ✅ |
+| `udp.in_errors` | counter | count | `InErrors` delta | ✅ |
 
 **Rationale**: This is the single highest-value new file. tongji showed 65 SYN retransmits/sec peak — completely invisible to current bat. `RetransSegs` is the #1 network quality indicator. `ActiveOpens/PassiveOpens` give connection rate. `AttemptFails` detects unreachable remote services. `EstabResets` detects abrupt disconnections.
 
-### `/proc/net/netstat` — Extended TCP Statistics 🆕
+### `/proc/net/netstat` — Extended TCP Statistics
 
 **New file, +1 read.** Same two-line format. Parse `TcpExt:` section.
 
 | Signal | Type | Unit | Parse | Status |
 |--------|------|------|-------|--------|
-| `tcp.listen_overflows` | counter | count | `ListenOverflows` delta | 🆕 |
-| `tcp.listen_drops` | counter | count | `ListenDrops` delta | 🆕 |
-| `tcp.timeouts` | counter | count | `TCPTimeouts` delta | 🆕 |
-| `tcp.syn_retrans` | counter | count | `TCPSynRetrans` delta | 🆕 |
-| `tcp.fast_retrans` | counter | count | `TCPFastRetrans` delta | 🆕 |
-| `tcp.ofo_queue` | counter | count | `TCPOFOQueue` delta | 🆕 |
-| `tcp.abort_on_memory` | counter | count | `TCPAbortOnMemory` delta | 🆕 |
-| `tcp.syncookies_sent` | counter | count | `SyncookiesSent` delta | 🆕 |
+| `tcp.listen_overflows` | counter | count | `ListenOverflows` delta | ✅ |
+| `tcp.listen_drops` | counter | count | `ListenDrops` delta | ✅ |
+| `tcp.timeouts` | counter | count | `TCPTimeouts` delta | ✅ |
+| `tcp.syn_retrans` | counter | count | `TCPSynRetrans` delta | ✅ |
+| `tcp.fast_retrans` | counter | count | `TCPFastRetrans` delta | ✅ |
+| `tcp.ofo_queue` | counter | count | `TCPOFOQueue` delta | ✅ |
+| `tcp.abort_on_memory` | counter | count | `TCPAbortOnMemory` delta | ✅ |
+| `tcp.syncookies_sent` | counter | count | `SyncookiesSent` delta | ✅ |
 
 **Rationale**: `ListenOverflows` = connections dropped because accept backlog was full — the most direct server capacity saturation signal. `TCPTimeouts` + `TCPSynRetrans` decompose retransmit causes. `SyncookiesSent` > 0 means a SYN flood is happening. `TCPAbortOnMemory` = connections killed due to memory pressure.
 
-### `/proc/net/softnet_stat` — Network Processing 🆕
+### `/proc/net/softnet_stat` — Network Processing
 
 **New file, +1 read.** One line per CPU, hex fields. Aggregate across CPUs.
 
 | Signal | Type | Unit | Parse | Status |
 |--------|------|------|-------|--------|
-| `softnet.processed` | counter | pkts | col 0, sum across CPUs, delta | 🆕 |
-| `softnet.dropped` | counter | pkts | col 1, sum across CPUs, delta | 🆕 |
-| `softnet.time_squeeze` | counter | count | col 2, sum across CPUs, delta | 🆕 |
+| `softnet.processed` | counter | pkts | col 0, sum across CPUs, delta | ✅ |
+| `softnet.dropped` | counter | pkts | col 1, sum across CPUs, delta | ✅ |
+| `softnet.time_squeeze` | counter | count | col 2, sum across CPUs, delta | ✅ |
 
 **Rationale**: `dropped` = kernel could not process incoming packets fast enough — the root cause of unexplained NIC-level packet loss that shows up as connection timeouts in applications. `time_squeeze` = CPU budget exhausted during softirq processing. blog.nocoo.cloud showed non-zero `squeezed`.
 
@@ -263,9 +264,9 @@ One syscall per mount. Already called for space — add inode fields from the sa
 | `disk[].total_bytes` | gauge | bytes | f_blocks × f_bsize | ✅ |
 | `disk[].avail_bytes` | gauge | bytes | f_bavail × f_frsize | ✅ |
 | `disk[].used_pct` | gauge | % | (total - avail) / total × 100 | ✅ |
-| `disk[].inodes_total` | gauge | count | f_files | 🆕 |
-| `disk[].inodes_avail` | gauge | count | f_favail | 🆕 |
-| `disk[].inodes_used_pct` | gauge | % | (total - avail) / total × 100 | 🆕 |
+| `disk[].inodes_total` | gauge | count | f_files | ✅ |
+| `disk[].inodes_avail` | gauge | count | f_favail | ✅ |
+| `disk[].inodes_used_pct` | gauge | % | (total - avail) / total × 100 | ✅ |
 
 **Rationale**: Inode exhaustion is a common production outage — disk shows plenty of free space but `cannot create file: no space on device`. Zero additional I/O — `statvfs()` already returns these fields.
 
@@ -286,14 +287,14 @@ One file read, unchanged.
 |--------|------|------|-------|--------|
 | `uptime_seconds` | gauge | seconds | field 0, truncated to u64 | ✅ |
 
-### `/proc/sys/net/netfilter/nf_conntrack_{count,max}` — Conntrack 🆕
+### `/proc/sys/net/netfilter/nf_conntrack_{count,max}` — Conntrack
 
 **New, 2 file reads.** Single integer per file.
 
 | Signal | Type | Unit | Parse | Status |
 |--------|------|------|-------|--------|
-| `conntrack.count` | gauge | count | `nf_conntrack_count` | 🆕 |
-| `conntrack.max` | gauge | count | `nf_conntrack_max` | 🆕 |
+| `conntrack.count` | gauge | count | `nf_conntrack_count` | ✅ |
+| `conntrack.max` | gauge | count | `nf_conntrack_max` | ✅ |
 
 **Rationale**: tongji had 936/65536 connections tracked; blog had 854. Conntrack table exhaustion drops all new connections — critical for any host running NAT, Docker, or iptables. 2 trivial file reads. `None` if netfilter not loaded.
 
@@ -303,30 +304,30 @@ One file read, unchanged.
 
 | Source | Signals | Cost | Status |
 |--------|---------|------|--------|
-| `/proc/stat` | 10 (cpu + interrupts + softirq) | 1 read + delta | ✅+🆕 |
-| `/proc/loadavg` | 5 (load + tasks) | 1 read | ✅+🆕 |
-| `/proc/meminfo` | 16 (mem + swap composition) | 1 read | ✅+🆕 |
-| `/proc/vmstat` | 6 (oom + swap I/O + pgfault) | 1 read + delta | ✅+🆕 |
-| `/proc/diskstats` | 9 per device (IOPS + throughput + latency + queue) | 1 read + delta | ✅+🆕 |
-| `/sys/class/net/*/statistics/` | 9 per iface (bytes + pkts + errors + drops) | 8 reads/iface | ✅+🆕 |
-| `/proc/pressure/{cpu,memory,io}` | 20 (avg + total delta) | 3 reads | ✅+🆕 |
-| `/proc/net/sockstat` | 8 (tcp + udp + sockets) | 1 read | ✅+🆕 |
-| `/proc/net/snmp` | 10 (tcp retrans + conn rate + udp errs) | 1 read + delta | 🆕 |
-| `/proc/net/netstat` | 8 (listen drops + timeouts + retrans detail) | 1 read + delta | 🆕 |
-| `/proc/net/softnet_stat` | 3 (processed + dropped + squeeze) | 1 read + delta | 🆕 |
-| `statvfs()` | 7 per mount (space + inodes) | 1 syscall/mount | ✅+🆕 |
+| `/proc/stat` | 10 (cpu + interrupts + softirq) | 1 read + delta | ✅ |
+| `/proc/loadavg` | 5 (load + tasks) | 1 read | ✅ |
+| `/proc/meminfo` | 16 (mem + swap composition) | 1 read | ✅ |
+| `/proc/vmstat` | 6 (oom + swap I/O + pgfault) | 1 read + delta | ✅ |
+| `/proc/diskstats` | 9 per device (IOPS + throughput + latency + queue) | 1 read + delta | ✅ |
+| `/sys/class/net/*/statistics/` | 9 per iface (bytes + pkts + errors + drops) | 8 reads/iface | ✅ |
+| `/proc/pressure/{cpu,memory,io}` | 20 (avg + total delta) | 3 reads | ✅ |
+| `/proc/net/sockstat` | 8 (tcp + udp + sockets) | 1 read | ✅ |
+| `/proc/net/snmp` | 10 (tcp retrans + conn rate + udp errs) | 1 read + delta | ✅ |
+| `/proc/net/netstat` | 8 (listen drops + timeouts + retrans detail) | 1 read + delta | ✅ |
+| `/proc/net/softnet_stat` | 3 (processed + dropped + squeeze) | 1 read + delta | ✅ |
+| `statvfs()` | 7 per mount (space + inodes) | 1 syscall/mount | ✅ |
 | `/proc/sys/fs/file-nr` | 2 (fd alloc + max) | 1 read | ✅ |
 | `/proc/uptime` | 1 | 1 read | ✅ |
-| `/proc/sys/net/netfilter/nf_conntrack_*` | 2 (count + max) | 2 reads | 🆕 |
+| `/proc/sys/net/netfilter/nf_conntrack_*` | 2 (count + max) | 2 reads | ✅ |
 
 **Total: ~27 file reads + N×8 sysfs reads + N statvfs calls per tick** (up from ~22+N×4).
 Netdata runs hundreds of collectors per tick consuming 237 MB RSS. Bat probe: ~5 MB RSS.
 
 ---
 
-## Slow-Scan Signals (every 4h)
+## Slow-Scan Signals (every 6h)
 
-Collected at startup + every `slow_interval` (default 4h). Includes host identity (procfs/sysfs, cheap), slow-drift config files, and subprocess-based scans.
+Collected at startup + every 6 hours via `POST /api/identity` (host identity) and `POST /api/tier2` (deep scans). Includes host identity (procfs/sysfs, cheap), slow-drift config files, and subprocess-based scans.
 
 ### Host Identity (procfs/sysfs reads, no fork)
 
@@ -432,11 +433,11 @@ Only `.service` units.
 
 ---
 
-## Alert Rules (21 + planned)
+## Alert Rules (30 rules)
 
 The probe reports raw numbers. Worker evaluates alerts server-side.
 
-### Implemented (21 rules)
+### Implemented (30 rules)
 
 | # | Rule ID | Condition | Severity | Duration |
 |---|---------|-----------|----------|----------|
@@ -461,19 +462,14 @@ The probe reports raw numbers. Worker evaluates alerts server-side.
 | 19 | `disk_io_saturated` | ANY `disk_io[].io_util_pct > 80` | warning | 5 min |
 | 20 | `tcp_conn_leak` | `tcp.time_wait > 500` | warning | 5 min |
 | 21 | `oom_kill` | `mem.oom_kills_delta > 0` | critical | instant |
-
-### Planned (with new signals)
-
-| # | Rule ID | Condition | Severity | Duration |
-|---|---------|-----------|----------|----------|
-| 22 | `tcp_retrans_high` | `tcp.retrans_segs_sec > 10` | warning | 5 min |
-| 23 | `listen_drops` | `tcp.listen_drops > 0` | critical | instant |
+| 22 | `tcp_retrans_high` | `snmp.retrans_segs_sec > 10` | warning | 5 min |
+| 23 | `listen_drops` | `netstat.listen_drops_delta > 0` | critical | instant |
 | 24 | `inode_full` | ANY `disk[].inodes_used_pct > 90` | critical | instant |
 | 25 | `swap_active` | `mem.swap_in_sec + mem.swap_out_sec > 1` | warning | 5 min |
-| 26 | `hw_corrupted` | `mem.hardware_corrupted_bytes > 0` | critical | instant |
+| 26 | `hw_corrupted` | `mem.hw_corrupted > 0` | critical | instant |
 | 27 | `overcommit_high` | `mem.committed_as / mem.commit_limit > 1.5` | warning | instant |
 | 28 | `conntrack_full` | `conntrack.count / conntrack.max > 0.8` | critical | instant |
-| 29 | `softnet_drops` | `softnet.dropped > 0` | warning | instant |
+| 29 | `softnet_drops` | `softnet.dropped_delta > 0` | warning | instant |
 | 30 | `disk_latency_high` | ANY `disk_io[].read_await_ms > 100` OR `write_await_ms > 200` | warning | 5 min |
 
 ### Alert Evaluation Mechanics
@@ -490,21 +486,21 @@ The probe reports raw numbers. Worker evaluates alerts server-side.
 |-------|-----------|-------------|
 | `metrics_raw` | 7 days | None (raw samples) |
 | `metrics_hourly` | 90 days | Cron: avg/max/min/sum per hour |
-| `slow_scan_snapshots` | 90 days | None (4h snapshots) |
+| `slow_scan_snapshots` | 90 days | None (6h snapshots) |
 
 ---
 
 ## Resource Budget
 
-| Resource | v0.5.2 Actual | After expansion (est.) | Netdata |
-|----------|---------------|----------------------|---------|
-| RSS | ~5 MB | ~6 MB | 120-243 MB |
-| CPU (idle) | 0.01% | < 0.05% | 1-3% |
-| Binary size | 3.2 MB (unstripped) | ~3.5 MB | 200+ MB |
-| Payload | ~1.1 KB/tick | ~1.8 KB/tick | 50+ KB/tick |
-| File reads/tick | ~22 + 4N | ~27 + 8N | Hundreds |
-| Dependencies | 0 (static binary) | 0 | Python, Go, Node.js |
-| Threads | 1 | 1 | 14+ |
-| Disk writes | 0 bytes | 0 bytes | Continuous DB writes |
+| Resource | v0.5.2 (with signal expansion) | Netdata |
+|----------|-------------------------------|---------|
+| RSS | ~6 MB | 120-243 MB |
+| CPU (idle) | < 0.05% | 1-3% |
+| Binary size | ~3.5 MB (unstripped) | 200+ MB |
+| Payload | ~1.8 KB/tick | 50+ KB/tick |
+| File reads/tick | ~27 + 8N | Hundreds |
+| Dependencies | 0 (static binary) | Python, Go, Node.js |
+| Threads | 1 | 14+ |
+| Disk writes | 0 bytes | Continuous DB writes |
 
 Where N = number of network interfaces (typically 1-2).
