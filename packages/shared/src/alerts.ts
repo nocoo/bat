@@ -1,7 +1,7 @@
 // @bat/shared — Alert types and Tier-1 rules
 // Source of truth: docs/03-data-structures.md § Alert Rules
 
-import { ALERT_THRESHOLDS, TIER3_THRESHOLDS } from "./constants.js";
+import { ALERT_THRESHOLDS, SIGNAL_EXPANSION_THRESHOLDS, TIER3_THRESHOLDS } from "./constants.js";
 
 export type AlertSeverity = "info" | "warning" | "critical";
 
@@ -182,11 +182,73 @@ export const TIER3_ALERT_RULES: readonly AlertRule[] = [
 	},
 ] as const;
 
-/** All alert rules (Tier 1 + Tier 2 + Tier 3) */
+/**
+ * 9 Signal-expansion alert rules.
+ * Evaluated during /api/ingest (same as Tier 1/3).
+ */
+export const SIGNAL_EXPANSION_ALERT_RULES: readonly AlertRule[] = [
+	{
+		id: "tcp_retrans_high",
+		label: "TCP Retransmissions",
+		severity: "warning",
+		duration_seconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+	},
+	{
+		id: "listen_drops",
+		label: "Listen Queue Drops",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "inode_full",
+		label: "Inode Usage Full",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "swap_active",
+		label: "Active Swapping",
+		severity: "warning",
+		duration_seconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+	},
+	{
+		id: "hw_corrupted",
+		label: "Hardware Memory Corruption",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "overcommit_high",
+		label: "Memory Overcommit",
+		severity: "warning",
+		duration_seconds: 0,
+	},
+	{
+		id: "conntrack_full",
+		label: "Conntrack Table Full",
+		severity: "critical",
+		duration_seconds: 0,
+	},
+	{
+		id: "softnet_drops",
+		label: "Softnet Packet Drops",
+		severity: "warning",
+		duration_seconds: 0,
+	},
+	{
+		id: "disk_latency_high",
+		label: "High Disk Latency",
+		severity: "warning",
+		duration_seconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+	},
+] as const;
+
+/** All alert rules (Tier 1 + Tier 2 + Tier 3 + Signal Expansion) */
 export const ALL_ALERT_RULES: readonly AlertRule[] = [
 	...TIER1_ALERT_RULES,
 	...TIER2_ALERT_RULES,
 	...TIER3_ALERT_RULES,
+	...SIGNAL_EXPANSION_ALERT_RULES,
 ] as const;
 
 /** Lookup a rule by ID across all tiers */

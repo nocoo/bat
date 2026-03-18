@@ -2,6 +2,7 @@
 import { describe, expect, test } from "bun:test";
 import {
 	ALL_ALERT_RULES,
+	SIGNAL_EXPANSION_ALERT_RULES,
 	TIER1_ALERT_RULES,
 	TIER2_ALERT_RULES,
 	TIER3_ALERT_RULES,
@@ -91,9 +92,12 @@ describe("TIER2_ALERT_RULES", () => {
 });
 
 describe("ALL_ALERT_RULES", () => {
-	test("contains all Tier 1 + Tier 2 + Tier 3 rules", () => {
+	test("contains all Tier 1 + Tier 2 + Tier 3 + Signal Expansion rules", () => {
 		expect(ALL_ALERT_RULES.length).toBe(
-			TIER1_ALERT_RULES.length + TIER2_ALERT_RULES.length + TIER3_ALERT_RULES.length,
+			TIER1_ALERT_RULES.length +
+				TIER2_ALERT_RULES.length +
+				TIER3_ALERT_RULES.length +
+				SIGNAL_EXPANSION_ALERT_RULES.length,
 		);
 	});
 
@@ -102,8 +106,8 @@ describe("ALL_ALERT_RULES", () => {
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 
-	test("has exactly 21 rules total", () => {
-		expect(ALL_ALERT_RULES.length).toBe(21);
+	test("has exactly 30 rules total", () => {
+		expect(ALL_ALERT_RULES.length).toBe(30);
 	});
 });
 
