@@ -135,7 +135,7 @@ function ResourceBar({
 	const valueColorClass = hasValue ? getValueColor(pct) : "text-muted-foreground";
 	return (
 		<div className="flex items-center gap-2">
-			<span className="w-8 text-[10px] font-medium text-muted-foreground shrink-0">{label}</span>
+			<span className="w-8 text-[11px] font-medium text-muted-foreground shrink-0">{label}</span>
 			<div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
 				{hasValue && (
 					<div
@@ -150,7 +150,7 @@ function ResourceBar({
 				{hasValue ? `${Math.round(pct)}%` : "—"}
 			</span>
 			{suffix && (
-				<span className="text-[10px] text-muted-foreground truncate max-w-[80px]">{suffix}</span>
+				<span className="text-[11px] text-muted-foreground truncate max-w-[80px]">{suffix}</span>
 			)}
 		</div>
 	);
@@ -159,33 +159,57 @@ function ResourceBar({
 function MiniBarChart({ data, color }: { data: SparklinePoint[]; color: string }) {
 	const barCount = data.length;
 	if (barCount === 0) return null;
-	const barWidth = 4;
-	const gap = 1;
 	const height = 20;
-	const svgWidth = barCount * (barWidth + gap) - gap;
+
+	// Total number of slots to fill the full width (24h at 30min intervals = 48 slots)
+	// Use actual data length as the slot count so the chart always fills 100% width
+	const totalSlots = barCount;
+
+	// Build a map from data-point index to value for O(1) lookup
+	// (currently data fills all slots sequentially, but this is future-proof)
+	const values = new Map<number, number>();
+	for (let i = 0; i < data.length; i++) {
+		const point = data[i];
+		if (point) values.set(i, point.v);
+	}
 
 	return (
 		<svg
-			width={svgWidth}
+			width="100%"
 			height={height}
-			className="shrink-0"
+			preserveAspectRatio="none"
+			viewBox={`0 0 ${totalSlots} ${height}`}
+			className="block"
 			role="img"
 			aria-label="Sparkline chart"
 		>
-			{data.map((point, i) => {
-				const barHeight = Math.max((point.v / 100) * height, 1);
-				// Opacity varies with value: 0.3 at 0%, 1.0 at 100%
-				const opacity = 0.3 + (point.v / 100) * 0.7;
+			{Array.from({ length: totalSlots }, (_, i) => {
+				const value = values.get(i);
+				if (value != null) {
+					const barHeight = Math.max((value / 100) * height, 1);
+					const opacity = 0.3 + (value / 100) * 0.7;
+					return (
+						<rect
+							key={`s${i.toString()}`}
+							x={i}
+							y={height - barHeight}
+							width={0.8}
+							height={barHeight}
+							fill={color}
+							opacity={opacity}
+						/>
+					);
+				}
+				// No data — render a 1px-tall placeholder to indicate the slot exists
 				return (
 					<rect
-						key={point.ts}
-						x={i * (barWidth + gap)}
-						y={height - barHeight}
-						width={barWidth}
-						height={barHeight}
-						rx={1}
+						key={`s${i.toString()}`}
+						x={i}
+						y={height - 1}
+						width={0.8}
+						height={1}
 						fill={color}
-						opacity={opacity}
+						opacity={0.15}
 					/>
 				);
 			})}
@@ -216,7 +240,7 @@ export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTa
 					<StatusBadge status={host.status} />
 				</div>
 				{subtitle && (
-					<p className="text-[10px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
+					<p className="text-[11px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
 				)}
 
 				{/* Tags */}
@@ -247,26 +271,20 @@ export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTa
 					/>
 				</div>
 
-				{/* Sparklines */}
+				{/* Sparklines — full-width, no labels */}
 				{(host.cpu_sparkline || host.mem_sparkline) && (
-					<div className="mt-2.5 space-y-1.5">
+					<div className="mt-2.5 space-y-1">
 						{host.cpu_sparkline && host.cpu_sparkline.length > 0 && (
-							<div className="flex items-center gap-2">
-								<span className="w-12 text-[10px] text-muted-foreground shrink-0">CPU 24h</span>
-								<MiniBarChart data={host.cpu_sparkline} color="hsl(var(--chart-1))" />
-							</div>
+							<MiniBarChart data={host.cpu_sparkline} color="hsl(var(--chart-1))" />
 						)}
 						{host.mem_sparkline && host.mem_sparkline.length > 0 && (
-							<div className="flex items-center gap-2">
-								<span className="w-12 text-[10px] text-muted-foreground shrink-0">MEM 24h</span>
-								<MiniBarChart data={host.mem_sparkline} color="hsl(var(--chart-2))" />
-							</div>
+							<MiniBarChart data={host.mem_sparkline} color="hsl(var(--chart-2))" />
 						)}
 					</div>
 				)}
 
 				{/* Footer */}
-				<div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-muted-foreground px-0.5">
+				<div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground px-0.5">
 					{host.probe_version && <span>Probe v{host.probe_version}</span>}
 					{host.probe_version && <span>·</span>}
 					<span>Last seen {formatLastSeen(host.last_seen)}</span>

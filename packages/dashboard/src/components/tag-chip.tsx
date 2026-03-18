@@ -17,7 +17,7 @@ export function TagChip({ name, color, onRemove, onClick, size = "sm" }: TagChip
 	return (
 		<span
 			className={`inline-flex items-center gap-1 rounded-full font-medium ${
-				size === "sm" ? "text-[10px] px-1.5 py-0" : "text-xs px-2 py-0.5"
+				size === "sm" ? "text-[11px] px-1.5 py-0" : "text-xs px-2 py-0.5"
 			} ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
 			style={{
 				backgroundColor: bgColor,
