@@ -67,12 +67,20 @@ export type {
 	HostDetailItem,
 	HostOverviewItem,
 	HostStatus,
+	HostTag,
 	MetricsDataPoint,
 	MetricsQueryResponse,
 	MetricsResolution,
 	SparklinePoint,
+	TagItem,
 } from "./api.js";
-export { API_ROUTES, hashHostId } from "./api.js";
+export {
+	API_ROUTES,
+	hashHostId,
+	MAX_TAGS_PER_HOST,
+	TAG_COLOR_COUNT,
+	TAG_NAME_REGEX,
+} from "./api.js";
 
 // Tier 2 payload types
 export type {

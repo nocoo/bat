@@ -220,3 +220,29 @@ export interface AlertItem {
 	triggered_at: number; // unix seconds (Worker time)
 	message: string | null;
 }
+
+// --- Tag types (Dashboard → D1 direct, docs/11-host-tags.md) ---
+
+/** Full tag info — returned by GET /api/tags (management page). */
+export interface TagItem {
+	id: number;
+	name: string;
+	color: number; // palette index 0..9
+	host_count: number; // populated for tag list
+}
+
+/** Lightweight tag reference — embedded in host cards. */
+export interface HostTag {
+	id: number;
+	name: string;
+	color: number;
+}
+
+/** Tag name constraints: 1-32 chars, lowercase, a-z 0-9 - _ */
+export const TAG_NAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+
+/** Maximum tags per host */
+export const MAX_TAGS_PER_HOST = 10;
+
+/** Number of color palette slots */
+export const TAG_COLOR_COUNT = 10;
