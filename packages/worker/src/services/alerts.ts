@@ -1,9 +1,14 @@
-// Alert evaluation service — evaluates 6 Tier-1 rules on each ingest
+// Alert evaluation service — evaluates Tier 1/3/signal expansion rules on each ingest
 // Source of truth: docs/03-data-structures.md § Alert Rules
 // Source of truth: docs/05-worker.md § Alert Evaluation
 
-import { ALERT_THRESHOLDS, TIER2_THRESHOLDS, TIER3_THRESHOLDS } from "@bat/shared";
-import type { DiskIoMetric, MetricsPayload } from "@bat/shared";
+import {
+	ALERT_THRESHOLDS,
+	SIGNAL_EXPANSION_THRESHOLDS,
+	TIER2_THRESHOLDS,
+	TIER3_THRESHOLDS,
+} from "@bat/shared";
+import type { DiskIoMetric, DiskMetric, MetricsPayload } from "@bat/shared";
 
 type AlertSeverity = "info" | "warning" | "critical";
 
@@ -197,6 +202,180 @@ function evaluateRules(payload: MetricsPayload): AlertEvalResult[] {
 					: "",
 			durationSeconds: 0,
 		});
+	}
+
+	// --- Signal expansion rules ---
+
+	// tcp_retrans_high: snmp.retrans_segs_sec > 10 → warning, 5 min duration
+	if (payload.snmp?.retrans_segs_sec != null) {
+		const val = payload.snmp.retrans_segs_sec;
+		results.push({
+			ruleId: "tcp_retrans_high",
+			fired: val > SIGNAL_EXPANSION_THRESHOLDS.TCP_RETRANS_SEC,
+			severity: "warning",
+			value: val,
+			message:
+				val > SIGNAL_EXPANSION_THRESHOLDS.TCP_RETRANS_SEC
+					? `TCP retransmissions at ${val.toFixed(1)}/s`
+					: "",
+			durationSeconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+		});
+	}
+
+	// listen_drops: netstat.listen_drops_delta > 0 → critical, instant
+	if (payload.netstat?.listen_drops_delta != null) {
+		const val = payload.netstat.listen_drops_delta;
+		results.push({
+			ruleId: "listen_drops",
+			fired: val > 0,
+			severity: "critical",
+			value: val,
+			message: val > 0 ? `${val} listen queue drop(s) detected` : "",
+			durationSeconds: 0,
+		});
+	}
+
+	// inode_full: any disk[].inodes_used_pct > 90 → critical, instant
+	{
+		let inodeFullDisk: DiskMetric | null = null;
+		for (const disk of payload.disk) {
+			if (
+				disk.inodes_used_pct != null &&
+				disk.inodes_used_pct > SIGNAL_EXPANSION_THRESHOLDS.INODE_FULL_PCT
+			) {
+				inodeFullDisk = disk;
+				break;
+			}
+		}
+		if (inodeFullDisk != null) {
+			results.push({
+				ruleId: "inode_full",
+				fired: true,
+				severity: "critical",
+				value: inodeFullDisk.inodes_used_pct ?? 0,
+				message: `Disk ${inodeFullDisk.mount} inode usage at ${inodeFullDisk.inodes_used_pct?.toFixed(1)}%`,
+				durationSeconds: 0,
+			});
+		} else if (payload.disk.some((d) => d.inodes_used_pct != null)) {
+			// At least one disk has inode data but none exceeded threshold
+			results.push({
+				ruleId: "inode_full",
+				fired: false,
+				severity: "critical",
+				value: Math.max(0, ...payload.disk.map((d) => d.inodes_used_pct ?? 0)),
+				message: "",
+				durationSeconds: 0,
+			});
+		}
+	}
+
+	// swap_active: swap_in_sec + swap_out_sec > 1 → warning, 5 min duration
+	if (payload.mem.swap_in_sec != null && payload.mem.swap_out_sec != null) {
+		const swapRate = payload.mem.swap_in_sec + payload.mem.swap_out_sec;
+		results.push({
+			ruleId: "swap_active",
+			fired: swapRate > SIGNAL_EXPANSION_THRESHOLDS.SWAP_ACTIVE_RATE,
+			severity: "warning",
+			value: swapRate,
+			message:
+				swapRate > SIGNAL_EXPANSION_THRESHOLDS.SWAP_ACTIVE_RATE
+					? `Active swapping at ${swapRate.toFixed(1)} pages/s`
+					: "",
+			durationSeconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+		});
+	}
+
+	// hw_corrupted: hw_corrupted > 0 → critical, instant
+	if (payload.mem.hw_corrupted != null) {
+		results.push({
+			ruleId: "hw_corrupted",
+			fired: payload.mem.hw_corrupted > 0,
+			severity: "critical",
+			value: payload.mem.hw_corrupted,
+			message:
+				payload.mem.hw_corrupted > 0
+					? `Hardware memory corruption: ${payload.mem.hw_corrupted} bytes`
+					: "",
+			durationSeconds: 0,
+		});
+	}
+
+	// overcommit_high: committed_as / commit_limit > 1.5 → warning, instant
+	if (payload.mem.committed_as != null && payload.mem.commit_limit != null) {
+		const ratio =
+			payload.mem.commit_limit > 0 ? payload.mem.committed_as / payload.mem.commit_limit : 0;
+		results.push({
+			ruleId: "overcommit_high",
+			fired: ratio > SIGNAL_EXPANSION_THRESHOLDS.OVERCOMMIT_RATIO,
+			severity: "warning",
+			value: ratio,
+			message:
+				ratio > SIGNAL_EXPANSION_THRESHOLDS.OVERCOMMIT_RATIO
+					? `Memory overcommit ratio at ${ratio.toFixed(2)}`
+					: "",
+			durationSeconds: 0,
+		});
+	}
+
+	// conntrack_full: conntrack.count / max > 0.8 → critical, instant
+	if (payload.conntrack != null) {
+		const ratio = payload.conntrack.max > 0 ? payload.conntrack.count / payload.conntrack.max : 0;
+		results.push({
+			ruleId: "conntrack_full",
+			fired: ratio > SIGNAL_EXPANSION_THRESHOLDS.CONNTRACK_FULL_RATIO,
+			severity: "critical",
+			value: ratio,
+			message:
+				ratio > SIGNAL_EXPANSION_THRESHOLDS.CONNTRACK_FULL_RATIO
+					? `Conntrack table at ${(ratio * 100).toFixed(1)}% (${payload.conntrack.count}/${payload.conntrack.max})`
+					: "",
+			durationSeconds: 0,
+		});
+	}
+
+	// softnet_drops: softnet.dropped_delta > 0 → warning, instant
+	if (payload.softnet?.dropped_delta != null) {
+		const val = payload.softnet.dropped_delta;
+		results.push({
+			ruleId: "softnet_drops",
+			fired: val > 0,
+			severity: "warning",
+			value: val,
+			message: val > 0 ? `${val} softnet packet drop(s) detected` : "",
+			durationSeconds: 0,
+		});
+	}
+
+	// disk_latency_high: any disk_io[].read_await_ms > 100 || write_await_ms > 200
+	// → warning, 5 min duration
+	if (payload.disk_io && payload.disk_io.length > 0) {
+		let latencyDevice: DiskIoMetric | null = null;
+		let latencyValue = 0;
+		for (const device of payload.disk_io) {
+			if (
+				(device.read_await_ms != null &&
+					device.read_await_ms > SIGNAL_EXPANSION_THRESHOLDS.DISK_READ_AWAIT_MS) ||
+				(device.write_await_ms != null &&
+					device.write_await_ms > SIGNAL_EXPANSION_THRESHOLDS.DISK_WRITE_AWAIT_MS)
+			) {
+				latencyDevice = device;
+				latencyValue = Math.max(device.read_await_ms ?? 0, device.write_await_ms ?? 0);
+				break;
+			}
+		}
+		// Only emit if at least one device has latency data
+		if (payload.disk_io.some((d) => d.read_await_ms != null || d.write_await_ms != null)) {
+			results.push({
+				ruleId: "disk_latency_high",
+				fired: latencyDevice !== null,
+				severity: "warning",
+				value: latencyDevice != null ? latencyValue : 0,
+				message: latencyDevice
+					? `Disk ${latencyDevice.device} latency ${latencyValue.toFixed(0)}ms`
+					: "",
+				durationSeconds: SIGNAL_EXPANSION_THRESHOLDS.SIGNAL_EXPANSION_DURATION_SECONDS,
+			});
+		}
 	}
 
 	return results;

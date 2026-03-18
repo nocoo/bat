@@ -1,5 +1,15 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import type { DiskIoMetric, MetricsPayload, PsiMetrics, TcpMetrics } from "@bat/shared";
+import type {
+	ConntrackMetrics,
+	DiskIoMetric,
+	DiskMetric,
+	MetricsPayload,
+	NetstatMetrics,
+	PsiMetrics,
+	SnmpMetrics,
+	SoftnetMetrics,
+	TcpMetrics,
+} from "@bat/shared";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateAlerts, evaluateRules } from "./alerts";
 
@@ -9,6 +19,7 @@ function makePayload(
 		swap_used_pct: number;
 		swap_total_bytes: number;
 		disk_used_pct: number;
+		disk: DiskMetric[];
 		iowait_pct: number;
 		steal_pct: number;
 		uptime_seconds: number;
@@ -16,6 +27,16 @@ function makePayload(
 		disk_io: DiskIoMetric[];
 		tcp: TcpMetrics;
 		oom_kills_delta: number;
+		// Signal expansion overrides
+		snmp: SnmpMetrics;
+		netstat: NetstatMetrics;
+		softnet: SoftnetMetrics;
+		conntrack: ConntrackMetrics;
+		hw_corrupted: number;
+		committed_as: number;
+		commit_limit: number;
+		swap_in_sec: number;
+		swap_out_sec: number;
 	}>,
 ): MetricsPayload {
 	return {
@@ -36,13 +57,18 @@ function makePayload(
 			available_bytes: 2_000_000_000,
 			used_pct: overrides?.mem_used_pct ?? 50,
 			oom_kills_delta: overrides?.oom_kills_delta,
+			hw_corrupted: overrides?.hw_corrupted,
+			committed_as: overrides?.committed_as,
+			commit_limit: overrides?.commit_limit,
+			swap_in_sec: overrides?.swap_in_sec,
+			swap_out_sec: overrides?.swap_out_sec,
 		},
 		swap: {
 			total_bytes: overrides?.swap_total_bytes ?? 2_000_000_000,
 			used_bytes: 100_000_000,
 			used_pct: overrides?.swap_used_pct ?? 5,
 		},
-		disk: [
+		disk: overrides?.disk ?? [
 			{
 				mount: "/",
 				total_bytes: 100_000_000_000,
@@ -63,6 +89,10 @@ function makePayload(
 		psi: overrides?.psi,
 		disk_io: overrides?.disk_io,
 		tcp: overrides?.tcp,
+		snmp: overrides?.snmp,
+		netstat: overrides?.netstat,
+		softnet: overrides?.softnet,
+		conntrack: overrides?.conntrack,
 	};
 }
 
@@ -304,6 +334,257 @@ describe("evaluateRules (pure function)", () => {
 		const results = evaluateRules(makePayload());
 		const rule = results.find((r) => r.ruleId === "oom_kill");
 		expect(rule).toBeUndefined();
+	});
+
+	// --- Signal expansion rules ---
+
+	test("tcp_retrans_high fires when retrans_segs_sec > 10", () => {
+		const snmp: SnmpMetrics = { retrans_segs_sec: 15 };
+		const results = evaluateRules(makePayload({ snmp }));
+		const rule = results.find((r) => r.ruleId === "tcp_retrans_high");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(300);
+	});
+
+	test("tcp_retrans_high does not fire at exactly 10", () => {
+		const snmp: SnmpMetrics = { retrans_segs_sec: 10 };
+		const results = evaluateRules(makePayload({ snmp }));
+		const rule = results.find((r) => r.ruleId === "tcp_retrans_high");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("tcp_retrans_high absent when no snmp data", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "tcp_retrans_high");
+		expect(rule).toBeUndefined();
+	});
+
+	test("listen_drops fires when listen_drops_delta > 0", () => {
+		const netstat: NetstatMetrics = { listen_drops_delta: 5 };
+		const results = evaluateRules(makePayload({ netstat }));
+		const rule = results.find((r) => r.ruleId === "listen_drops");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.durationSeconds).toBe(0);
+	});
+
+	test("listen_drops does not fire when listen_drops_delta == 0", () => {
+		const netstat: NetstatMetrics = { listen_drops_delta: 0 };
+		const results = evaluateRules(makePayload({ netstat }));
+		const rule = results.find((r) => r.ruleId === "listen_drops");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("inode_full fires when any disk inodes_used_pct > 90", () => {
+		const disk: DiskMetric[] = [
+			{
+				mount: "/",
+				total_bytes: 100_000_000_000,
+				avail_bytes: 50_000_000_000,
+				used_pct: 50,
+				inodes_total: 1000000,
+				inodes_avail: 50000,
+				inodes_used_pct: 95,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk }));
+		const rule = results.find((r) => r.ruleId === "inode_full");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.value).toBe(95);
+	});
+
+	test("inode_full does not fire at exactly 90", () => {
+		const disk: DiskMetric[] = [
+			{
+				mount: "/",
+				total_bytes: 100_000_000_000,
+				avail_bytes: 50_000_000_000,
+				used_pct: 50,
+				inodes_total: 1000000,
+				inodes_avail: 100000,
+				inodes_used_pct: 90,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk }));
+		const rule = results.find((r) => r.ruleId === "inode_full");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("inode_full absent when no inode data", () => {
+		const results = evaluateRules(makePayload());
+		const rule = results.find((r) => r.ruleId === "inode_full");
+		expect(rule).toBeUndefined();
+	});
+
+	test("swap_active fires when swap_in + swap_out > 1", () => {
+		const results = evaluateRules(makePayload({ swap_in_sec: 0.8, swap_out_sec: 0.5 }));
+		const rule = results.find((r) => r.ruleId === "swap_active");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(300);
+	});
+
+	test("swap_active does not fire when swap_in + swap_out <= 1", () => {
+		const results = evaluateRules(makePayload({ swap_in_sec: 0.3, swap_out_sec: 0.5 }));
+		const rule = results.find((r) => r.ruleId === "swap_active");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("hw_corrupted fires when hw_corrupted > 0", () => {
+		const results = evaluateRules(makePayload({ hw_corrupted: 4096 }));
+		const rule = results.find((r) => r.ruleId === "hw_corrupted");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.durationSeconds).toBe(0);
+	});
+
+	test("hw_corrupted does not fire when hw_corrupted == 0", () => {
+		const results = evaluateRules(makePayload({ hw_corrupted: 0 }));
+		const rule = results.find((r) => r.ruleId === "hw_corrupted");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("overcommit_high fires when committed_as / commit_limit > 1.5", () => {
+		const results = evaluateRules(
+			makePayload({ committed_as: 16_000_000_000, commit_limit: 10_000_000_000 }),
+		);
+		const rule = results.find((r) => r.ruleId === "overcommit_high");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(0);
+	});
+
+	test("overcommit_high does not fire at exactly 1.5", () => {
+		const results = evaluateRules(
+			makePayload({ committed_as: 15_000_000_000, commit_limit: 10_000_000_000 }),
+		);
+		const rule = results.find((r) => r.ruleId === "overcommit_high");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("conntrack_full fires when count/max > 0.8", () => {
+		const conntrack: ConntrackMetrics = { count: 90000, max: 100000 };
+		const results = evaluateRules(makePayload({ conntrack }));
+		const rule = results.find((r) => r.ruleId === "conntrack_full");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("critical");
+		expect(rule?.durationSeconds).toBe(0);
+	});
+
+	test("conntrack_full does not fire at exactly 0.8", () => {
+		const conntrack: ConntrackMetrics = { count: 80000, max: 100000 };
+		const results = evaluateRules(makePayload({ conntrack }));
+		const rule = results.find((r) => r.ruleId === "conntrack_full");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("softnet_drops fires when dropped_delta > 0", () => {
+		const softnet: SoftnetMetrics = { dropped_delta: 3 };
+		const results = evaluateRules(makePayload({ softnet }));
+		const rule = results.find((r) => r.ruleId === "softnet_drops");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(0);
+	});
+
+	test("softnet_drops does not fire when dropped_delta == 0", () => {
+		const softnet: SoftnetMetrics = { dropped_delta: 0 };
+		const results = evaluateRules(makePayload({ softnet }));
+		const rule = results.find((r) => r.ruleId === "softnet_drops");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("disk_latency_high fires when read_await_ms > 100", () => {
+		const disk_io: DiskIoMetric[] = [
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 50,
+				read_await_ms: 150,
+				write_await_ms: 50,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_latency_high");
+		expect(rule?.fired).toBe(true);
+		expect(rule?.severity).toBe("warning");
+		expect(rule?.durationSeconds).toBe(300);
+		expect(rule?.message).toContain("sda");
+	});
+
+	test("disk_latency_high fires when write_await_ms > 200", () => {
+		const disk_io: DiskIoMetric[] = [
+			{
+				device: "nvme0n1",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 50,
+				read_await_ms: 50,
+				write_await_ms: 250,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_latency_high");
+		expect(rule?.fired).toBe(true);
+	});
+
+	test("disk_latency_high does not fire when both under threshold", () => {
+		const disk_io: DiskIoMetric[] = [
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 50,
+				read_await_ms: 50,
+				write_await_ms: 100,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_latency_high");
+		expect(rule?.fired).toBe(false);
+	});
+
+	test("disk_latency_high absent when no latency data", () => {
+		const disk_io: DiskIoMetric[] = [
+			{
+				device: "sda",
+				read_iops: 10,
+				write_iops: 20,
+				read_bytes_sec: 1024,
+				write_bytes_sec: 2048,
+				io_util_pct: 50,
+			},
+		];
+		const results = evaluateRules(makePayload({ disk_io }));
+		const rule = results.find((r) => r.ruleId === "disk_latency_high");
+		expect(rule).toBeUndefined();
+	});
+
+	test("signal expansion rules not evaluated when data absent", () => {
+		const results = evaluateRules(makePayload());
+		const seRules = [
+			"tcp_retrans_high",
+			"listen_drops",
+			"inode_full",
+			"swap_active",
+			"hw_corrupted",
+			"overcommit_high",
+			"conntrack_full",
+			"softnet_drops",
+			"disk_latency_high",
+		];
+		for (const ruleId of seRules) {
+			expect(results.find((r) => r.ruleId === ruleId)).toBeUndefined();
+		}
 	});
 });
 
