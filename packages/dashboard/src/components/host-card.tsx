@@ -156,63 +156,75 @@ function ResourceBar({
 	);
 }
 
-function MiniBarChart({ data, color }: { data: SparklinePoint[]; color: string }) {
-	const barCount = data.length;
-	if (barCount === 0) return null;
-	const height = 20;
+/** Build an SVG polyline points string from sparkline data, mapping 0–100 → height–0 */
+function toPolyline(data: SparklinePoint[], totalSlots: number, height: number): string {
+	if (data.length === 0) return "";
+	return data
+		.map((p, i) => {
+			const x = totalSlots > 1 ? (i / (totalSlots - 1)) * 100 : 50;
+			const y = height - (p.v / 100) * height;
+			return `${x},${y}`;
+		})
+		.join(" ");
+}
 
-	// Total number of slots to fill the full width (24h at 30min intervals = 48 slots)
-	// Use actual data length as the slot count so the chart always fills 100% width
-	const totalSlots = barCount;
+/** Multi-line sparkline chart: CPU (red), Memory (green), Network (blue) */
+function SparklineChart({
+	cpu,
+	mem,
+	net,
+}: {
+	cpu: SparklinePoint[] | null;
+	mem: SparklinePoint[] | null;
+	net: SparklinePoint[] | null;
+}) {
+	const maxLen = Math.max(cpu?.length ?? 0, mem?.length ?? 0, net?.length ?? 0);
+	if (maxLen === 0) return null;
 
-	// Build a map from data-point index to value for O(1) lookup
-	// (currently data fills all slots sequentially, but this is future-proof)
-	const values = new Map<number, number>();
-	for (let i = 0; i < data.length; i++) {
-		const point = data[i];
-		if (point) values.set(i, point.v);
-	}
+	const height = 32;
 
 	return (
 		<svg
 			width="100%"
 			height={height}
 			preserveAspectRatio="none"
-			viewBox={`0 0 ${totalSlots} ${height}`}
+			viewBox={`0 0 100 ${height}`}
 			className="block"
 			role="img"
-			aria-label="Sparkline chart"
+			aria-label="CPU / Memory / Network sparkline"
 		>
-			{Array.from({ length: totalSlots }, (_, i) => {
-				const value = values.get(i);
-				if (value != null) {
-					const barHeight = Math.max((value / 100) * height, 1);
-					const opacity = 0.3 + (value / 100) * 0.7;
-					return (
-						<rect
-							key={`s${i.toString()}`}
-							x={i}
-							y={height - barHeight}
-							width={0.8}
-							height={barHeight}
-							fill={color}
-							opacity={opacity}
-						/>
-					);
-				}
-				// No data — render a 1px-tall placeholder to indicate the slot exists
-				return (
-					<rect
-						key={`s${i.toString()}`}
-						x={i}
-						y={height - 1}
-						width={0.8}
-						height={1}
-						fill={color}
-						opacity={0.15}
-					/>
-				);
-			})}
+			{net && net.length > 0 && (
+				<polyline
+					points={toPolyline(net, net.length, height)}
+					fill="none"
+					stroke="hsl(var(--chart-2))"
+					strokeWidth="1.2"
+					strokeLinejoin="round"
+					vectorEffect="non-scaling-stroke"
+					opacity={0.6}
+				/>
+			)}
+			{mem && mem.length > 0 && (
+				<polyline
+					points={toPolyline(mem, mem.length, height)}
+					fill="none"
+					stroke="hsl(var(--success))"
+					strokeWidth="1.2"
+					strokeLinejoin="round"
+					vectorEffect="non-scaling-stroke"
+					opacity={0.8}
+				/>
+			)}
+			{cpu && cpu.length > 0 && (
+				<polyline
+					points={toPolyline(cpu, cpu.length, height)}
+					fill="none"
+					stroke="hsl(var(--destructive))"
+					strokeWidth="1.2"
+					strokeLinejoin="round"
+					vectorEffect="non-scaling-stroke"
+				/>
+			)}
 		</svg>
 	);
 }
@@ -271,15 +283,14 @@ export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTa
 					/>
 				</div>
 
-				{/* Sparklines — full-width, no labels */}
-				{(host.cpu_sparkline || host.mem_sparkline) && (
-					<div className="mt-2.5 space-y-1">
-						{host.cpu_sparkline && host.cpu_sparkline.length > 0 && (
-							<MiniBarChart data={host.cpu_sparkline} color="hsl(var(--chart-1))" />
-						)}
-						{host.mem_sparkline && host.mem_sparkline.length > 0 && (
-							<MiniBarChart data={host.mem_sparkline} color="hsl(var(--chart-2))" />
-						)}
+				{/* Sparkline — CPU (red), Memory (green), Network (blue) */}
+				{(host.cpu_sparkline || host.mem_sparkline || host.net_sparkline) && (
+					<div className="mt-2.5">
+						<SparklineChart
+							cpu={host.cpu_sparkline}
+							mem={host.mem_sparkline}
+							net={host.net_sparkline}
+						/>
 					</div>
 				)}
 

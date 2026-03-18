@@ -49,6 +49,7 @@ interface SparklineRow {
 	ts: number;
 	cpu: number | null;
 	mem: number | null;
+	net: number | null;
 }
 
 /** Parse disk_json to find root mount used_pct */
@@ -148,7 +149,9 @@ FROM (
 	const sparklineCutoff = now - 86400;
 	const sparklineResult = await db
 		.prepare(
-			`SELECT host_id, hour_ts as ts, cpu_usage_avg as cpu, mem_used_pct_avg as mem
+			`SELECT host_id, hour_ts as ts, cpu_usage_avg as cpu, mem_used_pct_avg as mem,
+	CASE WHEN net_rx_bytes_avg IS NOT NULL AND net_tx_bytes_avg IS NOT NULL
+		THEN net_rx_bytes_avg + net_tx_bytes_avg ELSE NULL END as net
 FROM metrics_hourly
 WHERE host_id IN (${placeholders}) AND hour_ts >= ?
 ORDER BY host_id, hour_ts ASC`,
@@ -156,15 +159,19 @@ ORDER BY host_id, hour_ts ASC`,
 		.bind(...hostIds, sparklineCutoff)
 		.all<SparklineRow>();
 
-	const sparklinesByHost = new Map<string, { cpu: SparklinePoint[]; mem: SparklinePoint[] }>();
+	const sparklinesByHost = new Map<
+		string,
+		{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
+	>();
 	for (const row of sparklineResult.results) {
 		let entry = sparklinesByHost.get(row.host_id);
 		if (!entry) {
-			entry = { cpu: [], mem: [] };
+			entry = { cpu: [], mem: [], net: [] };
 			sparklinesByHost.set(row.host_id, entry);
 		}
 		if (row.cpu !== null) entry.cpu.push({ ts: row.ts, v: row.cpu });
 		if (row.mem !== null) entry.mem.push({ ts: row.ts, v: row.mem });
+		if (row.net !== null) entry.net.push({ ts: row.ts, v: row.net });
 	}
 
 	// 6. Build response
@@ -175,6 +182,16 @@ ORDER BY host_id, hour_ts ASC`,
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 		const netRates = extractNetRates(metrics?.net_json ?? null);
 		const sparklines = sparklinesByHost.get(host.host_id);
+
+		// Normalize net sparkline (bytes/sec) to 0–100 using max-normalization
+		let netSparkline: SparklinePoint[] | null = null;
+		if (sparklines?.net.length) {
+			const maxNet = Math.max(...sparklines.net.map((p) => p.v));
+			netSparkline =
+				maxNet > 0
+					? sparklines.net.map((p) => ({ ts: p.ts, v: (p.v / maxNet) * 100 }))
+					: sparklines.net.map((p) => ({ ts: p.ts, v: 0 }));
+		}
 
 		return {
 			hid: hashHostId(host.host_id),
@@ -204,6 +221,7 @@ ORDER BY host_id, hour_ts ASC`,
 			net_tx_rate: netRates.tx,
 			cpu_sparkline: sparklines?.cpu.length ? sparklines.cpu : null,
 			mem_sparkline: sparklines?.mem.length ? sparklines.mem : null,
+			net_sparkline: netSparkline,
 		};
 	});
 
