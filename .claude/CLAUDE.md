@@ -100,7 +100,9 @@ Probes are deployed on personal VPS fleet. SSH access uses `~/.ssh/id_rsa` key.
 
 | Host | User | Arch | Probe path | Config |
 |------|------|------|-----------|--------|
-| us2.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat-probe/config.toml` |
+| jp.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
+| us.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
+| us2.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
 
 Upgrade probe on a host:
 ```bash
@@ -116,3 +118,4 @@ ssh -i ~/.ssh/id_rsa nocoo@<host> "sudo systemctl stop bat-probe && sudo curl -f
 - **Cargo cache bust in Docker**: When using a dummy `main.rs` to cache deps, Docker `COPY` preserves original file mtime. If the real source has an older mtime than the cached build artifact, `cargo build` skips recompilation and produces the dummy binary. Fix: `touch src/main.rs` before `cargo build`.
 - **R2 CDN caching**: Uploading to the same R2 key with updated content may serve stale data due to Cloudflare CDN caching. When updating binaries in-place (e.g. `latest/`), either purge cache, use versioned paths, or SCP directly for immediate updates.
 - **Migration DROP TABLE destroys alert state**: `0003_tier2_tables.sql` uses `DROP TABLE IF EXISTS alert_states` + `CREATE TABLE` to add `'info'` to the CHECK constraint (SQLite doesn't support `ALTER TABLE ... ADD CHECK`). This clears all active alerts on deploy. Tier 1 alerts self-heal on the next 30s ingest, but Tier 2 instant alerts need the next 6h tier2 cycle, and Tier 2 duration alerts (7d threshold) lose their promotion progress entirely. Future migrations should use `CREATE TABLE new → INSERT INTO new SELECT → DROP old → ALTER TABLE new RENAME` to preserve data.
+- **glibc version mismatch from `rust:1-slim`**: The `rust:1-slim` Docker image tracks Debian unstable/testing, so its glibc version drifts upward silently. Binaries compiled against it fail with `GLIBC_2.39 not found` on Debian 12 (glibc 2.36) and older. Fix: use `rust:1-alpine` + musl for fully static binaries with zero host libc dependency. Always verify with `file <binary>` — expect `static-pie linked`.
