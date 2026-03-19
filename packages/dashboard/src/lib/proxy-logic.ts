@@ -32,6 +32,7 @@ export async function proxyToWorker(
 			headers: {
 				Authorization: `Bearer ${readKey}`,
 			},
+			cache: "no-store",
 		});
 
 		// Pass through Worker response status and body
@@ -40,6 +41,7 @@ export async function proxyToWorker(
 			status: workerRes.status,
 			headers: {
 				"Content-Type": workerRes.headers.get("Content-Type") ?? "application/json",
+				"Cache-Control": "no-store",
 			},
 		});
 	} catch {
@@ -83,6 +85,7 @@ export async function proxyToWorkerWithBody(
 			method,
 			headers,
 			body: body ?? null,
+			cache: "no-store",
 		});
 
 		const responseBody = await workerRes.text();
@@ -90,6 +93,7 @@ export async function proxyToWorkerWithBody(
 			status: workerRes.status,
 			headers: {
 				"Content-Type": workerRes.headers.get("Content-Type") ?? "application/json",
+				"Cache-Control": "no-store",
 			},
 		});
 	} catch {
