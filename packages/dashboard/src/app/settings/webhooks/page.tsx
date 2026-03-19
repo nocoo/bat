@@ -28,6 +28,7 @@ export default function WebhookSettingsPage() {
 	const { data: setupConfig } = useSetup();
 	const [selectedHostId, setSelectedHostId] = useState("");
 	const [creating, setCreating] = useState(false);
+	const [actionError, setActionError] = useState<string | null>(null);
 
 	// Hosts that don't have a webhook config yet
 	const availableHosts = (hosts ?? []).filter(
@@ -39,6 +40,7 @@ export default function WebhookSettingsPage() {
 	const handleCreate = useCallback(async () => {
 		if (!selectedHostId) return;
 		setCreating(true);
+		setActionError(null);
 		try {
 			await apiRequest("/api/webhooks", {
 				method: "POST",
@@ -46,8 +48,8 @@ export default function WebhookSettingsPage() {
 			});
 			setSelectedHostId("");
 			await mutate();
-		} catch {
-			// TODO: toast error
+		} catch (err) {
+			setActionError(err instanceof Error ? err.message : "Failed to create webhook");
 		} finally {
 			setCreating(false);
 		}
@@ -55,16 +57,26 @@ export default function WebhookSettingsPage() {
 
 	const handleRegenerate = useCallback(
 		async (id: number) => {
-			await apiRequest(`/api/webhooks/${id}/regenerate`, { method: "POST" });
-			await mutate();
+			setActionError(null);
+			try {
+				await apiRequest(`/api/webhooks/${id}/regenerate`, { method: "POST" });
+				await mutate();
+			} catch (err) {
+				setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
+			}
 		},
 		[mutate],
 	);
 
 	const handleDelete = useCallback(
 		async (id: number) => {
-			await apiRequest(`/api/webhooks/${id}`, { method: "DELETE" });
-			await mutate();
+			setActionError(null);
+			try {
+				await apiRequest(`/api/webhooks/${id}`, { method: "DELETE" });
+				await mutate();
+			} catch (err) {
+				setActionError(err instanceof Error ? err.message : "Failed to delete webhook");
+			}
 		},
 		[mutate],
 	);
@@ -93,6 +105,13 @@ export default function WebhookSettingsPage() {
 							Configure webhook tokens for hosts to send events via POST /api/events.
 						</p>
 					</div>
+
+					{/* Action error banner */}
+					{actionError && (
+						<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+							{actionError}
+						</div>
+					)}
 
 					{/* Create new webhook */}
 					<Card>
