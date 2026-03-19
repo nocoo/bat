@@ -27,6 +27,11 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return next();
 	}
 
+	// Webhook event ingest — uses its own token auth (validated in handler)
+	if (path === "/api/events" && c.req.method === "POST") {
+		return next();
+	}
+
 	const authHeader = c.req.header("Authorization");
 	const token = extractBearerToken(authHeader);
 
