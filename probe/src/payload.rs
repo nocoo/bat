@@ -341,8 +341,6 @@ pub struct Tier2Payload {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ports: Option<Tier2Ports>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub updates: Option<Tier2Updates>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub systemd: Option<Tier2Systemd>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub security: Option<Tier2Security>,
@@ -375,24 +373,6 @@ pub struct Tier2ListeningPort {
 #[derive(Debug, Serialize)]
 pub struct Tier2Ports {
     pub listening: Vec<Tier2ListeningPort>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Tier2PackageUpdate {
-    pub name: String,
-    pub current_version: String,
-    pub new_version: String,
-    pub is_security: bool,
-}
-
-#[derive(Debug, Serialize)]
-pub struct Tier2Updates {
-    pub total_count: u32,
-    pub security_count: u32,
-    pub list: Vec<Tier2PackageUpdate>,
-    pub reboot_required: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub cache_age_seconds: Option<u64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -797,18 +777,6 @@ mod tests {
                     process: Some("sshd".into()),
                 }],
             }),
-            updates: Some(Tier2Updates {
-                total_count: 3,
-                security_count: 1,
-                list: vec![Tier2PackageUpdate {
-                    name: "openssl".into(),
-                    current_version: "3.0.0".into(),
-                    new_version: "3.0.1".into(),
-                    is_security: true,
-                }],
-                reboot_required: false,
-                cache_age_seconds: Some(7200),
-            }),
             systemd: Some(Tier2Systemd {
                 failed_count: 1,
                 failed: vec![Tier2FailedService {
@@ -879,13 +847,6 @@ mod tests {
         assert_eq!(json["ports"]["listening"][0]["pid"], 1234);
         assert_eq!(json["ports"]["listening"][0]["process"], "sshd");
 
-        // Updates
-        assert_eq!(json["updates"]["total_count"], 3);
-        assert_eq!(json["updates"]["security_count"], 1);
-        assert_eq!(json["updates"]["list"][0]["name"], "openssl");
-        assert!(json["updates"]["list"][0]["is_security"].as_bool().unwrap());
-        assert_eq!(json["updates"]["cache_age_seconds"], 7200);
-
         // Systemd
         assert_eq!(json["systemd"]["failed_count"], 1);
         assert_eq!(json["systemd"]["failed"][0]["unit"], "nginx.service");
@@ -924,7 +885,6 @@ mod tests {
             host_id: "host-1".into(),
             timestamp: 1_710_000_000,
             ports: None,
-            updates: None,
             systemd: None,
             security: None,
             docker: None,
@@ -945,7 +905,6 @@ mod tests {
         // Optional fields must be absent (skip_serializing_if = "Option::is_none")
         let obj = json.as_object().unwrap();
         assert!(!obj.contains_key("ports"));
-        assert!(!obj.contains_key("updates"));
         assert!(!obj.contains_key("systemd"));
         assert!(!obj.contains_key("security"));
         assert!(!obj.contains_key("docker"));
@@ -1253,24 +1212,6 @@ mod tests {
         assert_eq!(json["hostname"], "服务器-01");
         assert_eq!(json["os"], "Ubuntu 22.04 中文版");
         assert_eq!(json["cpu_model"], "Apple M1 — Pro™");
-    }
-
-    #[test]
-    fn tier2_updates_no_cache_age() {
-        let updates = Tier2Updates {
-            total_count: 0,
-            security_count: 0,
-            list: vec![],
-            reboot_required: true,
-            cache_age_seconds: None,
-        };
-
-        let json: serde_json::Value = serde_json::to_value(&updates).unwrap();
-        let obj = json.as_object().unwrap();
-        assert_eq!(json["total_count"], 0);
-        assert!(json["reboot_required"].as_bool().unwrap());
-        assert!(!obj.contains_key("cache_age_seconds"));
-        assert!(json["list"].as_array().unwrap().is_empty());
     }
 
     #[test]

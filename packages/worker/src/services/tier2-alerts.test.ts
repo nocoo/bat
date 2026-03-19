@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, test } from "bun:test";
-import { TIER2_THRESHOLDS } from "@bat/shared";
 import type { Tier2Payload } from "@bat/shared";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateTier2Alerts, evaluateTier2Rules } from "./tier2-alerts";
@@ -181,40 +180,6 @@ describe("evaluateTier2Rules", () => {
 		expect(rule?.fired).toBe(false);
 	});
 
-	test("security_updates fires with duration", () => {
-		const results = evaluateTier2Rules(
-			makePayload({
-				updates: {
-					total_count: 10,
-					security_count: 3,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: 3600,
-				},
-			}),
-		);
-		const rule = results.find((r) => r.ruleId === "security_updates");
-		expect(rule?.fired).toBe(true);
-		expect(rule?.durationSeconds).toBe(TIER2_THRESHOLDS.SECURITY_UPDATES_DURATION);
-		expect(rule?.value).toBe(3);
-	});
-
-	test("security_updates clears when count is 0", () => {
-		const results = evaluateTier2Rules(
-			makePayload({
-				updates: {
-					total_count: 5,
-					security_count: 0,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: null,
-				},
-			}),
-		);
-		const rule = results.find((r) => r.ruleId === "security_updates");
-		expect(rule?.fired).toBe(false);
-	});
-
 	test("container_restart fires when restart_count > threshold", () => {
 		const results = evaluateTier2Rules(
 			makePayload({
@@ -323,43 +288,9 @@ describe("evaluateTier2Rules", () => {
 		expect(rule?.fired).toBe(false);
 	});
 
-	test("reboot_required fires with duration", () => {
-		const results = evaluateTier2Rules(
-			makePayload({
-				updates: {
-					total_count: 0,
-					security_count: 0,
-					list: [],
-					reboot_required: true,
-					cache_age_seconds: null,
-				},
-			}),
-		);
-		const rule = results.find((r) => r.ruleId === "reboot_required");
-		expect(rule?.fired).toBe(true);
-		expect(rule?.severity).toBe("info");
-		expect(rule?.durationSeconds).toBe(TIER2_THRESHOLDS.REBOOT_REQUIRED_DURATION);
-	});
-
-	test("reboot_required clears when false", () => {
-		const results = evaluateTier2Rules(
-			makePayload({
-				updates: {
-					total_count: 0,
-					security_count: 0,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: null,
-				},
-			}),
-		);
-		const rule = results.find((r) => r.ruleId === "reboot_required");
-		expect(rule?.fired).toBe(false);
-	});
-
 	test("missing sections produce no rules for those sections", () => {
 		const results = evaluateTier2Rules(makePayload());
-		// No security, ports, updates, systemd, docker data → no rules
+		// No security, ports, systemd, docker data → no rules
 		expect(results.length).toBe(0);
 	});
 });
@@ -452,110 +383,5 @@ describe("evaluateTier2Alerts (DB integration)", () => {
 			.bind("host-001", "ssh_password_auth")
 			.first();
 		expect(alert).toBeNull();
-	});
-
-	test("duration rule starts tracking in alert_pending", async () => {
-		const now = Math.floor(Date.now() / 1000);
-		await evaluateTier2Alerts(
-			db,
-			"host-001",
-			makePayload({
-				updates: {
-					total_count: 5,
-					security_count: 2,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: null,
-				},
-			}),
-			now,
-		);
-
-		// Should be in alert_pending, NOT in alert_states yet
-		const pending = await db
-			.prepare("SELECT * FROM alert_pending WHERE host_id = ? AND rule_id = ?")
-			.bind("host-001", "security_updates")
-			.first<{ first_seen: number }>();
-		expect(pending).not.toBeNull();
-		expect(pending?.first_seen).toBe(now);
-
-		const alert = await db
-			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
-			.bind("host-001", "security_updates")
-			.first();
-		expect(alert).toBeNull();
-	});
-
-	test("duration rule promotes after threshold elapsed", async () => {
-		const now = Math.floor(Date.now() / 1000);
-		const payload = makePayload({
-			updates: {
-				total_count: 5,
-				security_count: 2,
-				list: [],
-				reboot_required: false,
-				cache_age_seconds: null,
-			},
-		});
-
-		// First eval: starts tracking
-		await evaluateTier2Alerts(db, "host-001", payload, now);
-
-		// Second eval after 7 days: promotes
-		await evaluateTier2Alerts(
-			db,
-			"host-001",
-			payload,
-			now + TIER2_THRESHOLDS.SECURITY_UPDATES_DURATION,
-		);
-
-		const alert = await db
-			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
-			.bind("host-001", "security_updates")
-			.first<{ severity: string }>();
-		expect(alert).not.toBeNull();
-		expect(alert?.severity).toBe("warning");
-	});
-
-	test("duration rule clears pending and states when resolved", async () => {
-		const now = Math.floor(Date.now() / 1000);
-
-		// Start tracking
-		await evaluateTier2Alerts(
-			db,
-			"host-001",
-			makePayload({
-				updates: {
-					total_count: 5,
-					security_count: 2,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: null,
-				},
-			}),
-			now,
-		);
-
-		// Condition clears
-		await evaluateTier2Alerts(
-			db,
-			"host-001",
-			makePayload({
-				updates: {
-					total_count: 5,
-					security_count: 0,
-					list: [],
-					reboot_required: false,
-					cache_age_seconds: null,
-				},
-			}),
-			now + 3600,
-		);
-
-		const pending = await db
-			.prepare("SELECT * FROM alert_pending WHERE host_id = ? AND rule_id = ?")
-			.bind("host-001", "security_updates")
-			.first();
-		expect(pending).toBeNull();
 	});
 });

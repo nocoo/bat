@@ -18,21 +18,6 @@ export interface ServicePortsData {
 
 // --- Package Updates (2.1) ---
 
-export interface PackageUpdate {
-	name: string;
-	current_version: string;
-	new_version: string;
-	is_security: boolean;
-}
-
-export interface PackageUpdatesData {
-	total_count: number;
-	security_count: number;
-	list: PackageUpdate[];
-	reboot_required: boolean;
-	cache_age_seconds: number | null;
-}
-
 // --- Systemd Services (2.6) ---
 
 export interface FailedService {
@@ -142,7 +127,6 @@ export interface Tier2Payload {
 	host_id: string;
 	timestamp: number; // Unix seconds, Probe clock
 	ports?: ServicePortsData;
-	updates?: PackageUpdatesData;
 	systemd?: SystemdServicesData;
 	security?: SecurityPostureData;
 	docker?: DockerStatusData;
@@ -160,7 +144,6 @@ export interface Tier2Snapshot {
 	host_id: string;
 	ts: number;
 	ports: ServicePortsData | null;
-	updates: PackageUpdatesData | null;
 	systemd: SystemdServicesData | null;
 	security: SecurityPostureData | null;
 	docker: DockerStatusData | null;

@@ -9,8 +9,8 @@ use crate::payload::{
     MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, SnmpMetrics, SocketMetrics,
     SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiskDeep, Tier2Docker,
     Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
-    Tier2ListeningPort, Tier2PackageUpdate, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software,
-    Tier2Systemd, Tier2TopDir, Tier2Updates, UdpMetrics,
+    Tier2ListeningPort, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software, Tier2Systemd,
+    Tier2TopDir, UdpMetrics,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -601,7 +601,6 @@ use crate::collectors::tier2::ports::ListeningPort;
 use crate::collectors::tier2::security::SecurityPostureInfo;
 use crate::collectors::tier2::software::SoftwareDiscoveryInfo;
 use crate::collectors::tier2::systemd::SystemdServicesInfo;
-use crate::collectors::tier2::updates::PackageUpdatesInfo;
 
 /// Convert collector ports to payload ports.
 pub fn convert_ports(ports: Vec<ListeningPort>) -> Tier2Ports {
@@ -616,26 +615,6 @@ pub fn convert_ports(ports: Vec<ListeningPort>) -> Tier2Ports {
                 process: p.process,
             })
             .collect(),
-    }
-}
-
-/// Convert collector updates to payload updates.
-pub fn convert_updates(info: PackageUpdatesInfo) -> Tier2Updates {
-    Tier2Updates {
-        total_count: info.total_count,
-        security_count: info.security_count,
-        list: info
-            .list
-            .into_iter()
-            .map(|u| Tier2PackageUpdate {
-                name: u.name,
-                current_version: u.current_version,
-                new_version: u.new_version,
-                is_security: u.is_security,
-            })
-            .collect(),
-        reboot_required: info.reboot_required,
-        cache_age_seconds: info.cache_age_seconds,
     }
 }
 
@@ -750,7 +729,6 @@ pub fn build_tier2_payload(
     host_id: &str,
     timestamp: u64,
     ports: Option<Tier2Ports>,
-    updates: Option<Tier2Updates>,
     systemd: Option<Tier2Systemd>,
     security: Option<Tier2Security>,
     docker: Option<Tier2Docker>,
@@ -765,7 +743,6 @@ pub fn build_tier2_payload(
         host_id: host_id.to_string(),
         timestamp,
         ports,
-        updates,
         systemd,
         security,
         docker,
@@ -1211,31 +1188,6 @@ mod tests {
     }
 
     #[test]
-    fn convert_updates_normal() {
-        use collectors::tier2::updates::PackageUpdate;
-        let info = PackageUpdatesInfo {
-            total_count: 2,
-            security_count: 1,
-            list: vec![PackageUpdate {
-                name: "openssl".into(),
-                current_version: "3.0.0".into(),
-                new_version: "3.0.1".into(),
-                is_security: true,
-            }],
-            reboot_required: false,
-            cache_age_seconds: Some(3600),
-        };
-        let result = convert_updates(info);
-        assert_eq!(result.total_count, 2);
-        assert_eq!(result.security_count, 1);
-        assert_eq!(result.list.len(), 1);
-        assert_eq!(result.list[0].name, "openssl");
-        assert!(result.list[0].is_security);
-        assert!(!result.reboot_required);
-        assert_eq!(result.cache_age_seconds, Some(3600));
-    }
-
-    #[test]
     fn convert_systemd_normal() {
         use collectors::tier2::systemd::FailedService;
         let info = SystemdServicesInfo {
@@ -1355,7 +1307,6 @@ mod tests {
             None,
             None,
             None,
-            None,
             Some("UTC".to_string()),
             Some(vec!["1.1.1.1".to_string()]),
             Some(vec![]),
@@ -1364,7 +1315,6 @@ mod tests {
         assert_eq!(payload.host_id, "host-1");
         assert_eq!(payload.timestamp, 1_700_000_000);
         assert!(payload.ports.is_some());
-        assert!(payload.updates.is_none());
         assert!(payload.software.is_none());
         assert_eq!(payload.timezone, Some("UTC".to_string()));
         assert_eq!(payload.dns_resolvers, Some(vec!["1.1.1.1".to_string()]));

@@ -114,12 +114,6 @@ export const TIER2_ALERT_RULES: readonly AlertRule[] = [
 		duration_seconds: 0,
 	},
 	{
-		id: "security_updates",
-		label: "Security Updates Pending",
-		severity: "warning",
-		duration_seconds: 604800, // 7 days
-	},
-	{
 		id: "container_restart",
 		label: "Container Restarting",
 		severity: "critical",
@@ -130,12 +124,6 @@ export const TIER2_ALERT_RULES: readonly AlertRule[] = [
 		label: "Systemd Unit Failed",
 		severity: "warning",
 		duration_seconds: 0,
-	},
-	{
-		id: "reboot_required",
-		label: "Reboot Required",
-		severity: "info",
-		duration_seconds: 604800, // 7 days
 	},
 ] as const;
 

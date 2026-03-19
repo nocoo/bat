@@ -123,7 +123,6 @@ describe("POST /api/tier2", () => {
 			.first<Record<string, unknown>>();
 		expect(snapshot).not.toBeNull();
 		expect(snapshot?.ports_json).toBeNull();
-		expect(snapshot?.updates_json).toBeNull();
 		expect(snapshot?.systemd_json).toBeNull();
 		expect(snapshot?.security_json).toBeNull();
 		expect(snapshot?.docker_json).toBeNull();
@@ -216,15 +215,6 @@ describe("POST /api/tier2", () => {
 			host_id: "host-full",
 			timestamp: now,
 			ports: { listening: [{ port: 443, bind: "::", protocol: "tcp6", pid: null, process: null }] },
-			updates: {
-				total_count: 5,
-				security_count: 2,
-				list: [
-					{ name: "openssl", current_version: "3.0.1", new_version: "3.0.2", is_security: true },
-				],
-				reboot_required: true,
-				cache_age_seconds: 3600,
-			},
 			systemd: {
 				failed_count: 1,
 				failed: [
@@ -286,7 +276,6 @@ describe("POST /api/tier2", () => {
 
 		// All JSON columns should be populated
 		expect(snapshot?.ports_json).not.toBeNull();
-		expect(snapshot?.updates_json).not.toBeNull();
 		expect(snapshot?.systemd_json).not.toBeNull();
 		expect(snapshot?.security_json).not.toBeNull();
 		expect(snapshot?.docker_json).not.toBeNull();

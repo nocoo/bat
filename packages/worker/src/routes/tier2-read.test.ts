@@ -36,7 +36,6 @@ async function seedTier2(
 	ts: number,
 	data?: Partial<{
 		ports: string;
-		updates: string;
 		systemd: string;
 		security: string;
 		docker: string;
@@ -46,14 +45,13 @@ async function seedTier2(
 	await db
 		.prepare(
 			`INSERT INTO tier2_snapshots
-  (host_id, ts, ports_json, updates_json, systemd_json, security_json, docker_json, disk_deep_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  (host_id, ts, ports_json, systemd_json, security_json, docker_json, disk_deep_json)
+VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
 			ts,
 			data?.ports ?? null,
-			data?.updates ?? null,
 			data?.systemd ?? null,
 			data?.security ?? null,
 			data?.docker ?? null,
@@ -99,7 +97,6 @@ describe("GET /api/hosts/:id/tier2", () => {
 		expect(body.ports?.listening.length).toBe(1);
 		expect(body.ports?.listening[0].port).toBe(80);
 		expect(body.security?.ssh_password_auth).toBe(false);
-		expect(body.updates).toBeNull();
 	});
 
 	test("unknown host → 404", async () => {
@@ -142,7 +139,6 @@ describe("GET /api/hosts/:id/tier2", () => {
 
 		const body = (await res.json()) as Tier2Snapshot;
 		expect(body.ports).toBeNull();
-		expect(body.updates).toBeNull();
 		expect(body.systemd).toBeNull();
 		expect(body.security).toBeNull();
 		expect(body.docker).toBeNull();
