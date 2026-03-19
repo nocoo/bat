@@ -173,6 +173,25 @@ export interface ConntrackMetrics {
 	max: number;
 }
 
+export interface TopProcess {
+	pid: number;
+	name: string;
+	cmd: string;
+	state: string;
+	ppid: number;
+	user: string;
+	cpu_pct: number | null;
+	mem_rss: number;
+	mem_pct: number;
+	mem_virt: number;
+	num_threads: number;
+	uptime: number;
+	majflt_rate: number | null;
+	io_read_rate?: number | null;
+	io_write_rate?: number | null;
+	processor: number;
+}
+
 export interface MetricsPayload {
 	probe_version?: string;
 	host_id: string;
@@ -196,4 +215,5 @@ export interface MetricsPayload {
 	netstat?: NetstatMetrics;
 	softnet?: SoftnetMetrics;
 	conntrack?: ConntrackMetrics;
+	top_processes?: TopProcess[];
 }
