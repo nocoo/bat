@@ -51,14 +51,8 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Source IP does not match host" }, 403);
 	}
 
-	// 3. Rate limiting
-	const nowSeconds = Math.floor(Date.now() / 1000);
-	const withinLimit = await checkRateLimit(db, config.id, config.rate_limit, nowSeconds);
-	if (!withinLimit) {
-		return c.json({ error: "Rate limit exceeded" }, 429);
-	}
-
-	// 4. Parse and validate payload
+	// 3. Parse and validate payload BEFORE rate limiting,
+	//    so malformed requests don't consume rate-limit quota.
 	let body: unknown;
 	try {
 		body = await c.req.json();
@@ -107,6 +101,13 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 			}
 		}
 		tags = payload.tags as string[];
+	}
+
+	// 4. Rate limiting — after payload validation so bad requests don't consume quota
+	const nowSeconds = Math.floor(Date.now() / 1000);
+	const withinLimit = await checkRateLimit(db, config.id, config.rate_limit, nowSeconds);
+	if (!withinLimit) {
+		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 
 	// 5. Insert event

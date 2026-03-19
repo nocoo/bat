@@ -35,6 +35,10 @@ const MIGRATION_HOST_EVENTS_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0013_host_events.sql",
 );
+const MIGRATION_EVENTS_FK_SET_NULL_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0014_events_fk_set_null.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -211,6 +215,15 @@ export function createMockD1(): D1Database {
 	// Apply host events migration
 	const hostEventsSchema = readFileSync(MIGRATION_HOST_EVENTS_PATH, "utf-8");
 	for (const stmt of hostEventsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply events FK set null migration
+	const eventsFkSetNullSchema = readFileSync(MIGRATION_EVENTS_FK_SET_NULL_PATH, "utf-8");
+	for (const stmt of eventsFkSetNullSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
