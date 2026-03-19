@@ -64,6 +64,7 @@ export {
 // API route types and constants
 export type {
 	AlertItem,
+	AllowedPort,
 	HostDetailItem,
 	HostOverviewItem,
 	HostStatus,
@@ -77,6 +78,7 @@ export type {
 export {
 	API_ROUTES,
 	hashHostId,
+	MAX_ALLOWED_PORTS_PER_HOST,
 	MAX_TAGS_PER_HOST,
 	TAG_COLOR_COUNT,
 	TAG_NAME_REGEX,

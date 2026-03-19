@@ -85,6 +85,7 @@ beforeAll(async () => {
 		"migrations/0009_signal_expansion_hourly.sql",
 		"migrations/0010_tags.sql",
 		"migrations/0011_software_column.sql",
+		"migrations/0012_port_allowlist.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(

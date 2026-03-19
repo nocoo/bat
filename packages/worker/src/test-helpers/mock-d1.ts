@@ -27,6 +27,10 @@ const MIGRATION_SOFTWARE_COLUMN_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0011_software_column.sql",
 );
+const MIGRATION_PORT_ALLOWLIST_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0012_port_allowlist.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -185,6 +189,15 @@ export function createMockD1(): D1Database {
 	// Apply software column migration (tier2_snapshots)
 	const softwareColumnSchema = readFileSync(MIGRATION_SOFTWARE_COLUMN_PATH, "utf-8");
 	for (const stmt of softwareColumnSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply port allowlist migration
+	const portAllowlistSchema = readFileSync(MIGRATION_PORT_ALLOWLIST_PATH, "utf-8");
+	for (const stmt of portAllowlistSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

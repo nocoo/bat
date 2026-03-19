@@ -16,9 +16,13 @@ interface AlertEvalResult {
 
 /**
  * Evaluate all Tier-2 alert rules against a Tier 2 payload.
+ * @param perHostAllowed Extra port numbers to allowlist for this host (from port_allowlist table)
  * Returns evaluation results for each applicable rule.
  */
-function evaluateTier2Rules(payload: Tier2Payload): AlertEvalResult[] {
+function evaluateTier2Rules(
+	payload: Tier2Payload,
+	perHostAllowed: number[] = [],
+): AlertEvalResult[] {
 	const results: AlertEvalResult[] = [];
 
 	// #8 ssh_password_auth: ssh_password_auth == true → critical, instant
@@ -62,9 +66,10 @@ function evaluateTier2Rules(payload: Tier2Payload): AlertEvalResult[] {
 
 	// #11 public_port: port on 0.0.0.0/:: not in allowlist → warning, instant
 	if (payload.ports) {
+		const allowed = new Set([...DEFAULT_PUBLIC_PORT_ALLOWLIST, ...perHostAllowed]);
 		const publicPorts = payload.ports.listening.filter((p) => {
 			const isPublic = p.bind === "0.0.0.0" || p.bind === "::";
-			return isPublic && !DEFAULT_PUBLIC_PORT_ALLOWLIST.includes(p.port);
+			return isPublic && !allowed.has(p.port);
 		});
 		const fired = publicPorts.length > 0;
 		results.push({
@@ -150,7 +155,14 @@ export async function evaluateTier2Alerts(
 	payload: Tier2Payload,
 	now: number,
 ): Promise<void> {
-	const results = evaluateTier2Rules(payload);
+	// Query per-host port allowlist
+	const allowlistRows = await db
+		.prepare("SELECT port FROM port_allowlist WHERE host_id = ?")
+		.bind(hostId)
+		.all<{ port: number }>();
+	const perHostAllowed = allowlistRows.results.map((r) => r.port);
+
+	const results = evaluateTier2Rules(payload, perHostAllowed);
 
 	for (const result of results) {
 		if (result.durationSeconds === 0) {
