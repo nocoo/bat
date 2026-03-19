@@ -90,6 +90,7 @@ beforeAll(async () => {
 		"migrations/0012_port_allowlist.sql",
 		"migrations/0013_host_events.sql",
 		"migrations/0014_events_fk_set_null.sql",
+		"migrations/0015_top_processes.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(
