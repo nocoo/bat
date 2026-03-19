@@ -42,6 +42,9 @@ pub struct MetricsPayload {
     /// Connection tracking from `/proc/sys/net/netfilter/`
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conntrack: Option<ConntrackMetrics>,
+    /// Top N processes snapshot — per-process CPU/memory/IO
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top_processes: Option<Vec<TopProcess>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -295,6 +298,29 @@ pub struct SoftnetMetrics {
 pub struct ConntrackMetrics {
     pub count: u64,
     pub max: u64,
+}
+
+/// Per-process snapshot for top processes table.
+#[derive(Debug, Serialize)]
+pub struct TopProcess {
+    pub pid: u32,
+    pub name: String,
+    pub cmd: String,
+    pub state: String,
+    pub ppid: u32,
+    pub user: String,
+    pub cpu_pct: Option<f64>,
+    pub mem_rss: u64,
+    pub mem_pct: f64,
+    pub mem_virt: u64,
+    pub num_threads: u32,
+    pub uptime: u64,
+    pub majflt_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_read_rate: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub io_write_rate: Option<f64>,
+    pub processor: i32,
 }
 
 use crate::collectors::inventory::{BlockDevice, NetInterface};
@@ -568,6 +594,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -755,6 +782,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1095,6 +1123,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1174,6 +1203,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         // Should serialize without panic
@@ -1278,6 +1308,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1370,6 +1401,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1444,6 +1476,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -1518,6 +1551,7 @@ mod tests {
             netstat: None,
             softnet: None,
             conntrack: None,
+            top_processes: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();

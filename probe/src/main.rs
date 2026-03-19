@@ -365,6 +365,7 @@ fn collect_metrics(
         netstat,
         softnet,
         conntrack,
+        None, // top_processes: wired in next commit
     )
 }
 
