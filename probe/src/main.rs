@@ -109,10 +109,10 @@ async fn main() {
     let mut identity_timer = tokio::time::Instant::now();
     let identity_interval = Duration::from_secs(6 * 3600);
 
-    // Tier 2 deep collection: initial send on startup + every 6 hours
-    // Independent of identity timer — shares the interval but not the clock.
+    // Tier 2 deep collection: initial send on startup + every 30 minutes
+    // Independent of identity timer.
     let mut tier2_timer = tokio::time::Instant::now();
-    let tier2_interval = Duration::from_secs(6 * 3600);
+    let tier2_interval = Duration::from_secs(30 * 60);
 
     // Public IP echo fetch: every 1 hour
     let mut echo_timer = tokio::time::Instant::now();
