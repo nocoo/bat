@@ -10,7 +10,7 @@ use crate::payload::{
     SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiskDeep, Tier2Docker,
     Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
     Tier2ListeningPort, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software, Tier2Systemd,
-    Tier2TopDir, UdpMetrics,
+    Tier2TopDir, TopProcess, UdpMetrics,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -131,6 +131,7 @@ pub fn build_metrics_payload(
     netstat: Option<NetstatMetrics>,
     softnet: Option<SoftnetMetrics>,
     conntrack: Option<ConntrackMetrics>,
+    top_processes: Option<Vec<TopProcess>>,
 ) -> MetricsPayload {
     MetricsPayload {
         probe_version: probe_version.to_string(),
@@ -170,6 +171,7 @@ pub fn build_metrics_payload(
         netstat,
         softnet,
         conntrack,
+        top_processes,
     }
 }
 
@@ -426,6 +428,37 @@ pub const fn convert_conntrack(state: &collectors::conntrack::ConntrackState) ->
         count: state.count,
         max: state.max,
     }
+}
+
+/// Convert a collector `ProcessSnapshot` to a payload `TopProcess`.
+#[allow(dead_code)] // used in commit #3 when wired into collect_metrics
+pub fn convert_top_process(snap: &collectors::top_processes::ProcessSnapshot) -> TopProcess {
+    TopProcess {
+        pid: snap.pid,
+        name: snap.name.clone(),
+        cmd: snap.cmd.clone(),
+        state: snap.state.clone(),
+        ppid: snap.ppid,
+        user: snap.user.clone(),
+        cpu_pct: snap.cpu_pct,
+        mem_rss: snap.mem_rss,
+        mem_pct: snap.mem_pct,
+        mem_virt: snap.mem_virt,
+        num_threads: snap.num_threads,
+        uptime: snap.uptime_secs,
+        majflt_rate: snap.majflt_rate,
+        io_read_rate: snap.io_read_rate,
+        io_write_rate: snap.io_write_rate,
+        processor: snap.processor,
+    }
+}
+
+/// Convert a list of process snapshots to payload format.
+#[allow(dead_code)] // used in commit #3 when wired into collect_metrics
+pub fn convert_top_processes(
+    snapshots: &[collectors::top_processes::ProcessSnapshot],
+) -> Vec<TopProcess> {
+    snapshots.iter().map(convert_top_process).collect()
 }
 
 /// Compute OOM kill delta from previous and current cumulative counters.
@@ -934,6 +967,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         );
         assert_eq!(p.host_id, "host-1");
         assert_eq!(p.timestamp, 1_700_000_000);
@@ -989,6 +1023,7 @@ mod tests {
             vec![],
             vec![],
             0,
+            None,
             None,
             None,
             None,
@@ -1480,6 +1515,7 @@ mod tests {
             vec![],
             0,
             psi,
+            None,
             None,
             None,
             None,
