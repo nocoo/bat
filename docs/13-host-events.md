@@ -44,9 +44,9 @@ Event log entries submitted via webhook.
 | POST | /api/events | Webhook token + IP | Ingest event |
 | GET | /api/events | BAT_READ_KEY | List events |
 | GET | /api/webhooks | BAT_READ_KEY | List webhook configs |
-| POST | /api/webhooks | BAT_READ_KEY | Create webhook config |
-| DELETE | /api/webhooks/:id | BAT_READ_KEY | Delete webhook config |
-| POST | /api/webhooks/:id/regenerate | BAT_READ_KEY | Regenerate token |
+| POST | /api/webhooks | BAT_WRITE_KEY | Create webhook config |
+| DELETE | /api/webhooks/:id | BAT_WRITE_KEY | Delete webhook config |
+| POST | /api/webhooks/:id/regenerate | BAT_WRITE_KEY | Regenerate token |
 
 ### POST /api/events validation
 

@@ -1,5 +1,5 @@
 // API Key auth middleware with read/write scope separation
-// Write routes: POST /api/ingest, POST /api/identity → BAT_WRITE_KEY
+// Write routes: POST /api/ingest, POST /api/identity, webhook CRUD → BAT_WRITE_KEY
 // Read routes: GET /api/hosts, GET /api/hosts/:id/metrics, GET /api/alerts → BAT_READ_KEY
 // Public routes: GET /api/live → no auth required
 
@@ -9,7 +9,7 @@ import type { AppEnv } from "../types.js";
 /** Routes that require no authentication */
 const PUBLIC_ROUTES = ["/api/live"];
 
-/** Routes that require write key (BAT_WRITE_KEY) */
+/** Routes that require write key (BAT_WRITE_KEY) — exact match */
 const WRITE_ROUTES = ["/api/ingest", "/api/identity", "/api/tier2"];
 
 function extractBearerToken(header: string | undefined): string | null {
@@ -17,6 +17,22 @@ function extractBearerToken(header: string | undefined): string | null {
 	const parts = header.split(" ");
 	if (parts.length !== 2 || parts[0] !== "Bearer") return null;
 	return parts[1];
+}
+
+/** Check if a request requires BAT_WRITE_KEY based on method + path */
+function isWriteRequest(method: string, path: string): boolean {
+	// Probe ingest routes
+	if (WRITE_ROUTES.includes(path)) return true;
+
+	// Webhook CRUD mutations require write key
+	// POST /api/webhooks — create
+	// DELETE /api/webhooks/:id — delete
+	// POST /api/webhooks/:id/regenerate — regenerate token
+	// (GET /api/webhooks remains read-only → read key)
+	if (path === "/api/webhooks" && method === "POST") return true;
+	if (path.startsWith("/api/webhooks/") && (method === "DELETE" || method === "POST")) return true;
+
+	return false;
 }
 
 export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
@@ -39,9 +55,7 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return c.json({ error: "Missing or invalid Authorization header" }, 401);
 	}
 
-	const isWriteRoute = WRITE_ROUTES.includes(path);
-
-	if (isWriteRoute) {
+	if (isWriteRequest(c.req.method, path)) {
 		// Write routes require BAT_WRITE_KEY
 		if (token === c.env.BAT_WRITE_KEY) {
 			return next();

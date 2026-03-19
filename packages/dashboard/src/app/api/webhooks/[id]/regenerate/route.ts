@@ -8,5 +8,5 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const { id } = await params;
-	return proxyToWorkerWithBody(`/api/webhooks/${id}/regenerate`, "POST");
+	return proxyToWorkerWithBody(`/api/webhooks/${id}/regenerate`, "POST", null, true);
 }

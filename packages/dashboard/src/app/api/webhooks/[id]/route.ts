@@ -8,5 +8,5 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const { id } = await params;
-	return proxyToWorkerWithBody(`/api/webhooks/${id}`, "DELETE");
+	return proxyToWorkerWithBody(`/api/webhooks/${id}`, "DELETE", null, true);
 }
