@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import type { EventItem } from "@bat/shared";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 
 function formatTime(unixSeconds: number): string {
 	const now = Math.floor(Date.now() / 1000);
@@ -50,9 +50,8 @@ export function EventTable({ events }: EventTableProps) {
 				{events.map((event) => {
 					const isExpanded = expandedId === event.id;
 					return (
-						<>
+						<Fragment key={event.id}>
 							<TableRow
-								key={event.id}
 								className="cursor-pointer hover:bg-muted/50"
 								onClick={() => setExpandedId(isExpanded ? null : event.id)}
 							>
@@ -85,7 +84,7 @@ export function EventTable({ events }: EventTableProps) {
 								</TableCell>
 							</TableRow>
 							{isExpanded && (
-								<TableRow key={`${event.id}-body`}>
+								<TableRow>
 									<TableCell colSpan={5} className="bg-muted/30 py-3">
 										<pre className="text-xs font-mono whitespace-pre-wrap break-all max-h-64 overflow-y-auto px-2">
 											{formatBody(event.body)}
@@ -93,7 +92,7 @@ export function EventTable({ events }: EventTableProps) {
 									</TableCell>
 								</TableRow>
 							)}
-						</>
+						</Fragment>
 					);
 				})}
 			</TableBody>
