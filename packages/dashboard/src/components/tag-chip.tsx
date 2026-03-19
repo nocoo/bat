@@ -1,6 +1,6 @@
 "use client";
 
-import { getTagColor } from "@/lib/palette";
+import { getBadgeStyleByIndex } from "@/lib/palette";
 import { X } from "lucide-react";
 
 interface TagChipProps {
@@ -12,17 +12,14 @@ interface TagChipProps {
 }
 
 export function TagChip({ name, color, onRemove, onClick, size = "sm" }: TagChipProps) {
-	const bgColor = getTagColor(color);
+	const style = getBadgeStyleByIndex(color);
 
 	return (
 		<span
 			className={`inline-flex items-center gap-1 rounded-full font-medium ${
-				size === "sm" ? "text-[11px] px-1.5 py-0" : "text-xs px-2 py-0.5"
+				size === "sm" ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-0.5"
 			} ${onClick ? "cursor-pointer hover:opacity-80" : ""}`}
-			style={{
-				backgroundColor: bgColor,
-				color: "white",
-			}}
+			style={style}
 			onClick={onClick}
 			onKeyDown={onClick ? (e) => e.key === "Enter" && onClick() : undefined}
 			role={onClick ? "button" : undefined}
@@ -39,7 +36,7 @@ export function TagChip({ name, color, onRemove, onClick, size = "sm" }: TagChip
 					className="hover:opacity-70 -mr-0.5"
 					aria-label={`Remove tag ${name}`}
 				>
-					<X className={size === "sm" ? "h-2.5 w-2.5" : "h-3 w-3"} strokeWidth={2} />
+					<X className={size === "sm" ? "h-3 w-3" : "h-3.5 w-3.5"} strokeWidth={2} />
 				</button>
 			)}
 		</span>

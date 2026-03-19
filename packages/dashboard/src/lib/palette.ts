@@ -22,9 +22,70 @@ export const chartAxis = v("chart-axis");
 export const chartMuted = v("chart-muted");
 
 /**
- * Tag color palette — maps color index (0-9) to CSS custom property.
- * Used by TagChip component and tag management UI.
+ * Badge color palette — soft/tinted style following Basalt design system.
+ * Each entry: [bg class, text class] using chart CSS custom properties.
+ * Style: bg-color/12 (light tint) + text-color (vivid foreground).
  */
+export const BADGE_PALETTE = [
+	{ bg: "chart-1", label: "pink" }, // 0: pink 340°
+	{ bg: "chart-2", label: "sky" }, // 1: sky 200°
+	{ bg: "chart-3", label: "teal" }, // 2: teal 186°
+	{ bg: "chart-4", label: "green" }, // 3: green 166°
+	{ bg: "chart-5", label: "lime" }, // 4: lime 142°
+	{ bg: "chart-6", label: "amber" }, // 5: amber 84°
+	{ bg: "chart-7", label: "purple" }, // 6: purple 270°
+	{ bg: "chart-8", label: "orange" }, // 7: orange 30°
+	{ bg: "chart-9", label: "indigo" }, // 8: indigo 220°
+	{ bg: "chart-10", label: "red" }, // 9: red 14°
+] as const;
+
+/**
+ * Stable hash for any string (supports CJK / Unicode).
+ * Same input always returns the same number (djb2 algorithm).
+ */
+function hashText(str: string): number {
+	let hash = 5381;
+	for (let i = 0; i < str.length; i++) {
+		hash = ((hash << 5) + hash + str.charCodeAt(i)) | 0;
+	}
+	return Math.abs(hash);
+}
+
+/**
+ * Get soft/tinted badge style by text content — deterministic hash-based.
+ * Returns inline style object with backgroundColor and color using CSS vars.
+ */
+export function getBadgeStyle(text: string): {
+	backgroundColor: string;
+	color: string;
+} {
+	const idx = hashText(text) % BADGE_PALETTE.length;
+	// biome-ignore lint: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
+	const token = BADGE_PALETTE[idx]!.bg;
+	return {
+		backgroundColor: `hsl(var(--${token}) / 0.12)`,
+		color: `hsl(var(--${token}))`,
+	};
+}
+
+/**
+ * Get soft/tinted badge style by numeric palette index (for tags with stored color).
+ * Uses the same BADGE_PALETTE as hash-based version.
+ */
+export function getBadgeStyleByIndex(colorIndex: number): {
+	backgroundColor: string;
+	color: string;
+} {
+	const idx = ((colorIndex % BADGE_PALETTE.length) + BADGE_PALETTE.length) % BADGE_PALETTE.length;
+	// biome-ignore lint: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
+	const token = BADGE_PALETTE[idx]!.bg;
+	return {
+		backgroundColor: `hsl(var(--${token}) / 0.12)`,
+		color: `hsl(var(--${token}))`,
+	};
+}
+
+/** @deprecated Use getBadgeStyleByIndex instead */
 export const TAG_COLORS: readonly string[] = [
 	v("chart-1"), // 0: pink
 	v("chart-2"), // 1: sky
@@ -38,7 +99,7 @@ export const TAG_COLORS: readonly string[] = [
 	v("chart-10"), // 9: red
 ] as const;
 
-/** Get tag color by palette index (wraps around) */
+/** @deprecated Use getBadgeStyleByIndex instead */
 export function getTagColor(colorIndex: number): string {
 	const idx = ((colorIndex % TAG_COLORS.length) + TAG_COLORS.length) % TAG_COLORS.length;
 	// biome-ignore lint: TAG_COLORS is a fixed 10-element array, idx is always 0-9

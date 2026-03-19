@@ -271,7 +271,7 @@ function TagRow({
 			</div>
 
 			{/* Host count */}
-			<Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal tabular-nums">
+			<Badge variant="secondary" className="text-xs px-2 py-0.5 font-normal tabular-nums">
 				{tag.host_count} {tag.host_count === 1 ? "host" : "hosts"}
 			</Badge>
 

@@ -254,7 +254,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 									<span className="text-lg font-bold tracking-tighter">bat</span>
 									<Badge
 										variant="secondary"
-										className="text-[10px] px-1.5 py-0 font-normal text-muted-foreground"
+										className="text-xs px-2 py-0.5 font-normal text-muted-foreground"
 									>
 										v{APP_VERSION}
 									</Badge>
