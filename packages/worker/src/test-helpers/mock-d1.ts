@@ -31,6 +31,10 @@ const MIGRATION_PORT_ALLOWLIST_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0012_port_allowlist.sql",
 );
+const MIGRATION_HOST_EVENTS_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0013_host_events.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -198,6 +202,15 @@ export function createMockD1(): D1Database {
 	// Apply port allowlist migration
 	const portAllowlistSchema = readFileSync(MIGRATION_PORT_ALLOWLIST_PATH, "utf-8");
 	for (const stmt of portAllowlistSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply host events migration
+	const hostEventsSchema = readFileSync(MIGRATION_HOST_EVENTS_PATH, "utf-8");
+	for (const stmt of hostEventsSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

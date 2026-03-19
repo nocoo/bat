@@ -8,8 +8,6 @@ import type {
 	FailedService,
 	LargeFile,
 	ListeningPort,
-	PackageUpdate,
-	PackageUpdatesData,
 	SecurityPostureData,
 	ServicePortsData,
 	SystemdServicesData,
@@ -49,39 +47,6 @@ describe("tier2 types compile verification", () => {
 			listening: [{ port: 22, bind: "0.0.0.0", protocol: "tcp", pid: 100, process: "sshd" }],
 		};
 		expect(data.listening.length).toBe(1);
-	});
-
-	test("PackageUpdate shape", () => {
-		const update: PackageUpdate = {
-			name: "openssl",
-			current_version: "3.0.2-0ubuntu1.14",
-			new_version: "3.0.2-0ubuntu1.15",
-			is_security: true,
-		};
-		expect(update.is_security).toBe(true);
-	});
-
-	test("PackageUpdatesData shape", () => {
-		const data: PackageUpdatesData = {
-			total_count: 5,
-			security_count: 2,
-			list: [],
-			reboot_required: false,
-			cache_age_seconds: 3600,
-		};
-		expect(data.total_count).toBe(5);
-		expect(data.cache_age_seconds).toBe(3600);
-	});
-
-	test("PackageUpdatesData with null cache_age", () => {
-		const data: PackageUpdatesData = {
-			total_count: 0,
-			security_count: 0,
-			list: [],
-			reboot_required: false,
-			cache_age_seconds: null,
-		};
-		expect(data.cache_age_seconds).toBeNull();
 	});
 
 	test("FailedService shape", () => {
@@ -225,7 +190,6 @@ describe("tier2 types compile verification", () => {
 		};
 		expect(payload.host_id).toBe("test-host");
 		expect(payload.ports).toBeUndefined();
-		expect(payload.updates).toBeUndefined();
 	});
 
 	test("Tier2Payload full", () => {
@@ -234,13 +198,6 @@ describe("tier2 types compile verification", () => {
 			host_id: "test-host",
 			timestamp: 1700000000,
 			ports: { listening: [] },
-			updates: {
-				total_count: 0,
-				security_count: 0,
-				list: [],
-				reboot_required: false,
-				cache_age_seconds: null,
-			},
 			systemd: { failed_count: 0, failed: [] },
 			security: {
 				ssh_password_auth: false,
@@ -265,11 +222,14 @@ describe("tier2 types compile verification", () => {
 			host_id: "test-host",
 			ts: 1700000000,
 			ports: null,
-			updates: null,
 			systemd: null,
 			security: null,
 			docker: null,
 			disk_deep: null,
+			software: null,
+			timezone: null,
+			dns_resolvers: null,
+			dns_search: null,
 		};
 		expect(snapshot.host_id).toBe("test-host");
 		expect(snapshot.ports).toBeNull();

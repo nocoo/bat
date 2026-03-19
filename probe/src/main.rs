@@ -455,8 +455,7 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         .unwrap_or_default();
 
     // Run all async collectors concurrently
-    let (updates, systemd, security, docker, disk_deep) = tokio::join!(
-        collectors::tier2::updates::collect_package_updates(),
+    let (systemd, security, docker, disk_deep) = tokio::join!(
         collectors::tier2::systemd::collect_failed_services(),
         collectors::tier2::security::collect_security_posture(),
         collectors::tier2::docker::collect_docker_status(),
@@ -480,7 +479,6 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         host_id,
         timestamp,
         ports_payload,
-        updates.map(orchestrate::convert_updates),
         systemd.map(orchestrate::convert_systemd),
         Some(orchestrate::convert_security(security)),
         docker.map(orchestrate::convert_docker),

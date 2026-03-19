@@ -12,14 +12,13 @@ export async function insertTier2Snapshot(
 	const result = await db
 		.prepare(
 			`INSERT OR IGNORE INTO tier2_snapshots
-  (host_id, ts, ports_json, updates_json, systemd_json, security_json, docker_json, disk_deep_json, software_json)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  (host_id, ts, ports_json, systemd_json, security_json, docker_json, disk_deep_json, software_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
 			payload.timestamp,
 			payload.ports ? JSON.stringify(payload.ports) : null,
-			payload.updates ? JSON.stringify(payload.updates) : null,
 			payload.systemd ? JSON.stringify(payload.systemd) : null,
 			payload.security ? JSON.stringify(payload.security) : null,
 			payload.docker ? JSON.stringify(payload.docker) : null,
@@ -37,7 +36,7 @@ export async function getLatestTier2Snapshot(
 ): Promise<Tier2Snapshot | null> {
 	const row = await db
 		.prepare(
-			`SELECT t.host_id, t.ts, t.ports_json, t.updates_json, t.systemd_json,
+			`SELECT t.host_id, t.ts, t.ports_json, t.systemd_json,
        t.security_json, t.docker_json, t.disk_deep_json, t.software_json,
        h.timezone, h.dns_resolvers AS dns_resolvers_json, h.dns_search AS dns_search_json
 FROM tier2_snapshots t
@@ -55,7 +54,6 @@ LIMIT 1`,
 		host_id: row.host_id,
 		ts: row.ts,
 		ports: safeParse(row.ports_json),
-		updates: safeParse(row.updates_json),
 		systemd: safeParse(row.systemd_json),
 		security: safeParse(row.security_json),
 		docker: safeParse(row.docker_json),
@@ -71,7 +69,6 @@ interface Tier2Row {
 	host_id: string;
 	ts: number;
 	ports_json: string | null;
-	updates_json: string | null;
 	systemd_json: string | null;
 	security_json: string | null;
 	docker_json: string | null;

@@ -10,8 +10,8 @@ import {
 } from "../alerts";
 
 describe("TIER2_ALERT_RULES", () => {
-	test("has 9 rules", () => {
-		expect(TIER2_ALERT_RULES.length).toBe(9);
+	test("has 7 rules", () => {
+		expect(TIER2_ALERT_RULES.length).toBe(7);
 	});
 
 	test("all rules have required fields", () => {
@@ -66,12 +66,6 @@ describe("TIER2_ALERT_RULES", () => {
 		expect(rule?.duration_seconds).toBe(0);
 	});
 
-	test("security_updates is warning, 7d duration", () => {
-		const rule = TIER2_ALERT_RULES.find((r) => r.id === "security_updates");
-		expect(rule?.severity).toBe("warning");
-		expect(rule?.duration_seconds).toBe(604800);
-	});
-
 	test("container_restart is critical, instant", () => {
 		const rule = TIER2_ALERT_RULES.find((r) => r.id === "container_restart");
 		expect(rule?.severity).toBe("critical");
@@ -82,12 +76,6 @@ describe("TIER2_ALERT_RULES", () => {
 		const rule = TIER2_ALERT_RULES.find((r) => r.id === "systemd_failed");
 		expect(rule?.severity).toBe("warning");
 		expect(rule?.duration_seconds).toBe(0);
-	});
-
-	test("reboot_required is info, 7d duration", () => {
-		const rule = TIER2_ALERT_RULES.find((r) => r.id === "reboot_required");
-		expect(rule?.severity).toBe("info");
-		expect(rule?.duration_seconds).toBe(604800);
 	});
 });
 
@@ -106,8 +94,8 @@ describe("ALL_ALERT_RULES", () => {
 		expect(new Set(ids).size).toBe(ids.length);
 	});
 
-	test("has exactly 30 rules total", () => {
-		expect(ALL_ALERT_RULES.length).toBe(30);
+	test("has exactly 28 rules total", () => {
+		expect(ALL_ALERT_RULES.length).toBe(28);
 	});
 });
 

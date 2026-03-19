@@ -1,5 +1,6 @@
-// Tier 2 alert evaluation service — evaluates 9 Tier-2 rules on /api/tier2 ingest
+// Tier 2 alert evaluation service — evaluates 7 Tier-2 rules on /api/tier2 ingest
 // Source of truth: docs/01-metrics-catalogue.md § Alert Rules #7–15
+// Removed: #12 security_updates, #15 reboot_required (updates collector deleted)
 
 import { DEFAULT_PUBLIC_PORT_ALLOWLIST, TIER2_THRESHOLDS, type Tier2Payload } from "@bat/shared";
 
@@ -82,21 +83,6 @@ function evaluateTier2Rules(
 		});
 	}
 
-	// #12 security_updates: security_count > 0 sustained for 7 days → warning, duration
-	if (payload.updates) {
-		results.push({
-			ruleId: "security_updates",
-			fired: payload.updates.security_count > 0,
-			severity: "warning",
-			value: payload.updates.security_count,
-			message:
-				payload.updates.security_count > 0
-					? `${payload.updates.security_count} security update(s) pending`
-					: "",
-			durationSeconds: TIER2_THRESHOLDS.SECURITY_UPDATES_DURATION,
-		});
-	}
-
 	// #13 container_restart: restart_count > 5 → critical, instant
 	if (payload.docker) {
 		const troubled = payload.docker.containers.filter(
@@ -127,18 +113,6 @@ function evaluateTier2Rules(
 					? `${payload.systemd.failed_count} systemd unit(s) failed: ${payload.systemd.failed.map((f) => f.unit).join(", ")}`
 					: "",
 			durationSeconds: 0,
-		});
-	}
-
-	// #15 reboot_required: reboot_required sustained for 7 days → info, duration
-	if (payload.updates) {
-		results.push({
-			ruleId: "reboot_required",
-			fired: payload.updates.reboot_required === true,
-			severity: "info",
-			value: payload.updates.reboot_required ? 1 : 0,
-			message: payload.updates.reboot_required ? "System reboot required" : "",
-			durationSeconds: TIER2_THRESHOLDS.REBOOT_REQUIRED_DURATION,
 		});
 	}
 

@@ -94,8 +94,6 @@ export type {
 	FailedService,
 	LargeFile,
 	ListeningPort,
-	PackageUpdate,
-	PackageUpdatesData,
 	SecurityPostureData,
 	ServicePortsData,
 	SoftwareCategory,
