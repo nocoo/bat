@@ -16,3 +16,4 @@
 | 10 | [host-inventory](./10-host-inventory.md) | Host inventory design: CPU topology, virtualization, network, block devices |
 | 11 | [host-tags](./11-host-tags.md) | Host tagging: tags table, CRUD API, dashboard UI, filtering |
 | 12 | [software-discovery](./12-software-discovery.md) | Tier 2 software detection: process/systemd/binary/package scanning, ~40 common tools |
+| 13 | [host-events](./13-host-events.md) | Host events: webhook tokens, event ingest, rate limiting, dashboard UI |
