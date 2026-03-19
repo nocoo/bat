@@ -51,7 +51,7 @@ Event log entries submitted via webhook.
 ### POST /api/events validation
 
 1. Bearer token → lookup active webhook_config
-2. CF-Connecting-IP must equal host's public_ip (null → 403)
+2. CF-Connecting-IP (Cloudflare-injected, non-spoofable) must equal host's public_ip; missing header → 400, null public_ip → 403, mismatch → 403
 3. Rate limit check (sliding minute window in D1)
 4. Payload validation: title, body (JSON object), tags (optional)
 5. Insert → 204

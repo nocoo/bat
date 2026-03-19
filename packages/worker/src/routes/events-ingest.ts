@@ -32,7 +32,12 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 	}
 
 	// 2. IP validation: CF-Connecting-IP must match host's public_ip
-	const sourceIp = c.req.header("CF-Connecting-IP") ?? c.req.header("X-Forwarded-For") ?? "";
+	// Only trust CF-Connecting-IP (injected by Cloudflare, cannot be spoofed).
+	// X-Forwarded-For is client-controlled and must NOT be used as fallback.
+	const sourceIp = c.req.header("CF-Connecting-IP");
+	if (!sourceIp) {
+		return c.json({ error: "Missing CF-Connecting-IP header" }, 400);
+	}
 	const host = await db
 		.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
 		.bind(config.host_id)
