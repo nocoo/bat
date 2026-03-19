@@ -9,6 +9,7 @@ import {
 	NetworkChart,
 	PsiChart,
 	TcpChart,
+	TopProcessesTable,
 } from "@/components/charts";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
@@ -316,6 +317,7 @@ export default function HostDetailPage() {
 								rangeSeconds={rangeSeconds}
 							/>
 							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<TopProcessesTable data={metricsResponse.data} />
 						</div>
 
 						{/* Right column — snapshot / non-time-series */}
