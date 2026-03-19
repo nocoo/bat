@@ -3,9 +3,6 @@
 //! Two-phase collection strategy:
 //! - Phase 1: scan ALL `/proc/[pid]/stat` (single read per PID)
 //! - Phase 2: enrich Top N with `/proc/[pid]/cmdline` + `/proc/[pid]/io`
-//!
-//! Dead-code allowed: public API consumed starting from commit #2 (payload + orchestrate).
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 

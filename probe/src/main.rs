@@ -14,6 +14,7 @@ use std::time::Duration;
 
 use collectors::cpu::CpuJiffies;
 use collectors::network::NetCounters;
+use collectors::top_processes::PrevProcStat;
 use sender::Sender;
 use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
@@ -100,6 +101,18 @@ async fn main() {
     let mut prev_netstat = collectors::netstat::read_netstat();
     let mut prev_softnet = collectors::softnet::read_softnet_stat();
 
+    // Top processes: per-PID state for delta calculation + passwd cache
+    let mut prev_proc_states: HashMap<u32, PrevProcStat> = HashMap::new();
+    let passwd_map = collectors::top_processes::read_passwd_map();
+    let uptime_for_boot = collectors::identity::read_uptime().unwrap_or(0);
+    let boot_time_secs = orchestrate::compute_boot_time(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+        uptime_for_boot,
+    );
+
     let interval = Duration::from_secs(u64::from(cfg.interval));
     let mut ticker = tokio::time::interval(interval);
     ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -138,6 +151,9 @@ async fn main() {
                     &mut prev_netstat,
                     &mut prev_softnet,
                     &mut last_sample_at,
+                    &mut prev_proc_states,
+                    &passwd_map,
+                    boot_time_secs,
                 );
 
                 // Phase 2: send metrics (slow, cancellable by shutdown)
@@ -236,6 +252,9 @@ fn collect_metrics(
     prev_netstat: &mut Option<collectors::netstat::NetstatCounters>,
     prev_softnet: &mut Option<collectors::softnet::SoftnetCounters>,
     last_sample_at: &mut tokio::time::Instant,
+    prev_proc_states: &mut HashMap<u32, PrevProcStat>,
+    passwd_map: &HashMap<u32, String>,
+    boot_time_secs: u64,
 ) -> payload::MetricsPayload {
     let now = tokio::time::Instant::now();
     let elapsed = now.duration_since(*last_sample_at);
@@ -250,6 +269,11 @@ fn collect_metrics(
     let cpu_usage = orchestrate::compute_cpu_delta(prev_jiffies.as_ref(), curr_jiffies.as_ref());
     let cpu_ext =
         orchestrate::compute_cpu_ext(prev_jiffies.as_ref(), curr_jiffies.as_ref(), elapsed);
+    // total_jiffies_delta needed for per-process CPU% calculation
+    let total_jiffies_delta = match (prev_jiffies.as_ref(), curr_jiffies.as_ref()) {
+        (Some(p), Some(c)) => c.total().saturating_sub(p.total()),
+        _ => 0,
+    };
     *prev_jiffies = curr_jiffies;
 
     // Load averages
@@ -340,6 +364,21 @@ fn collect_metrics(
     let conntrack =
         collectors::conntrack::read_conntrack().map(|s| orchestrate::convert_conntrack(&s));
 
+    // Top processes (two-phase collection: scan ALL stat → enrich Top 50)
+    let mem_total = mem_info.as_ref().map_or(0, |m| m.mem_total);
+    let now_secs = timestamp; // reuse the unix timestamp already computed
+    let top_snapshots = collectors::top_processes::collect_top_processes(
+        prev_proc_states,
+        total_jiffies_delta,
+        elapsed.as_secs_f64(),
+        cpu_count,
+        mem_total,
+        boot_time_secs,
+        now_secs,
+        passwd_map,
+    );
+    let top_processes = Some(orchestrate::convert_top_processes(&top_snapshots));
+
     orchestrate::build_metrics_payload(
         PROBE_VERSION,
         host_id,
@@ -365,7 +404,7 @@ fn collect_metrics(
         netstat,
         softnet,
         conntrack,
-        None, // top_processes: wired in next commit
+        top_processes,
     )
 }
 
