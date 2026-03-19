@@ -105,3 +105,19 @@ export type {
 	Tier2Snapshot,
 	TopDir,
 } from "./tier2.js";
+
+// Event and webhook types
+export type {
+	EventIngestPayload,
+	EventItem,
+	EventRow,
+	WebhookConfig,
+	WebhookConfigRow,
+} from "./events.js";
+export {
+	EVENT_BODY_MAX_BYTES,
+	EVENT_RETENTION_DAYS,
+	EVENT_TAG_MAX_LENGTH,
+	EVENT_TAGS_MAX_COUNT,
+	EVENT_TITLE_MAX_LENGTH,
+} from "./events.js";

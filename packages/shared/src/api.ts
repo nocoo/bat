@@ -32,6 +32,10 @@ export const API_ROUTES = {
 	HOST_TIER2: "/api/hosts/:id/tier2",
 	ALERTS: "/api/alerts",
 	LIVE: "/api/live",
+	EVENTS: "/api/events",
+	WEBHOOKS: "/api/webhooks",
+	WEBHOOK_DETAIL: "/api/webhooks/:id",
+	WEBHOOK_REGENERATE: "/api/webhooks/:id/regenerate",
 } as const;
 
 // --- Response DTOs ---
