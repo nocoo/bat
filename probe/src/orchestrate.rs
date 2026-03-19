@@ -431,7 +431,6 @@ pub const fn convert_conntrack(state: &collectors::conntrack::ConntrackState) ->
 }
 
 /// Convert a collector `ProcessSnapshot` to a payload `TopProcess`.
-#[allow(dead_code)] // used in commit #3 when wired into collect_metrics
 pub fn convert_top_process(snap: &collectors::top_processes::ProcessSnapshot) -> TopProcess {
     TopProcess {
         pid: snap.pid,
@@ -454,7 +453,6 @@ pub fn convert_top_process(snap: &collectors::top_processes::ProcessSnapshot) ->
 }
 
 /// Convert a list of process snapshots to payload format.
-#[allow(dead_code)] // used in commit #3 when wired into collect_metrics
 pub fn convert_top_processes(
     snapshots: &[collectors::top_processes::ProcessSnapshot],
 ) -> Vec<TopProcess> {
