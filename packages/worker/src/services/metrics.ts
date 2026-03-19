@@ -39,8 +39,9 @@ export async function insertMetricsRaw(
    netstat_tcp_fast_retrans_delta, netstat_tcp_ofo_queue_delta,
    netstat_tcp_abort_on_memory_delta, netstat_syncookies_sent_delta,
    softnet_processed_delta, softnet_dropped_delta, softnet_time_squeeze_delta,
-   conntrack_count, conntrack_max)
-VALUES (${Array(97).fill("?").join(", ")})`,
+   conntrack_count, conntrack_max,
+   top_processes_json)
+VALUES (${Array(98).fill("?").join(", ")})`,
 		)
 		.bind(
 			hostId,
@@ -157,6 +158,8 @@ VALUES (${Array(97).fill("?").join(", ")})`,
 			// Conntrack
 			payload.conntrack?.count ?? null,
 			payload.conntrack?.max ?? null,
+			// Top processes (JSON array)
+			payload.top_processes ? JSON.stringify(payload.top_processes) : null,
 		)
 		.run();
 	return result.meta.changes > 0;
