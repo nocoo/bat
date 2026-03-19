@@ -275,3 +275,77 @@ export function transformTcpData(data: MetricsDataPoint[]): TcpChartPoint[] {
 		orphan: d.tcp_orphan ?? 0,
 	}));
 }
+
+// --- Top Processes Table ---
+export interface TopProcessEntry {
+	pid: number;
+	name: string;
+	cmd: string;
+	state: string;
+	ppid: number;
+	user: string;
+	cpu_pct: number | null;
+	mem_rss: number;
+	mem_pct: number;
+	mem_virt: number;
+	num_threads: number;
+	uptime: number;
+	majflt_rate: number | null;
+	io_read_rate: number | null;
+	io_write_rate: number | null;
+	processor: number;
+}
+
+/**
+ * Extract top processes from the latest data point's top_processes_json.
+ * Returns empty array if no data or hourly resolution (not applicable).
+ */
+export function transformTopProcessesData(data: MetricsDataPoint[]): TopProcessEntry[] {
+	if (data.length === 0) return [];
+
+	// Find last data point that has top_processes_json
+	for (let i = data.length - 1; i >= 0; i--) {
+		const point = data[i];
+		if (point?.top_processes_json) {
+			try {
+				const raw = JSON.parse(point.top_processes_json) as TopProcessEntry[];
+				return raw.map((p) => ({
+					pid: p.pid,
+					name: p.name ?? "",
+					cmd: p.cmd ?? "",
+					state: p.state ?? "?",
+					ppid: p.ppid ?? 0,
+					user: p.user ?? "",
+					cpu_pct: p.cpu_pct ?? null,
+					mem_rss: p.mem_rss ?? 0,
+					mem_pct: p.mem_pct ?? 0,
+					mem_virt: p.mem_virt ?? 0,
+					num_threads: p.num_threads ?? 0,
+					uptime: p.uptime ?? 0,
+					majflt_rate: p.majflt_rate ?? null,
+					io_read_rate: p.io_read_rate ?? null,
+					io_write_rate: p.io_write_rate ?? null,
+					processor: p.processor ?? -1,
+				}));
+			} catch {
+				return [];
+			}
+		}
+	}
+
+	return [];
+}
+
+/** Format seconds into human-readable uptime (e.g. "2d 3h", "15m", "30s") */
+export function formatUptime(seconds: number): string {
+	if (seconds < 60) return `${seconds}s`;
+	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+	if (seconds < 86400) {
+		const h = Math.floor(seconds / 3600);
+		const m = Math.floor((seconds % 3600) / 60);
+		return m > 0 ? `${h}h ${m}m` : `${h}h`;
+	}
+	const d = Math.floor(seconds / 86400);
+	const h = Math.floor((seconds % 86400) / 3600);
+	return h > 0 ? `${d}d ${h}h` : `${d}d`;
+}
