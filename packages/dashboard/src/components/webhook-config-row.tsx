@@ -88,15 +88,12 @@ export function WebhookConfigRow({
 				<div className="flex-1" />
 
 				{/* Rate limit */}
-				<Badge variant="secondary" className="text-[10px] px-1.5 py-0 font-normal tabular-nums">
+				<Badge variant="secondary" className="text-xs px-2 py-0.5 font-normal tabular-nums">
 					{config.rate_limit}/min
 				</Badge>
 
 				{/* Status */}
-				<Badge
-					variant={config.is_active ? "default" : "secondary"}
-					className="text-[10px] px-1.5 py-0"
-				>
+				<Badge variant={config.is_active ? "default" : "secondary"} className="text-xs px-2 py-0.5">
 					{config.is_active ? "Active" : "Inactive"}
 				</Badge>
 

@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import {
 	Table,
 	TableBody,
@@ -7,6 +6,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { getBadgeStyle } from "@/lib/palette";
 import type { EventItem } from "@bat/shared";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Fragment, useState } from "react";
@@ -72,13 +72,13 @@ export function EventTable({ events }: EventTableProps) {
 								<TableCell className="py-2">
 									<div className="flex flex-wrap gap-1">
 										{event.tags.map((tag) => (
-											<Badge
+											<span
 												key={tag}
-												variant="secondary"
-												className="text-[10px] px-1.5 py-0 font-normal"
+												className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+												style={getBadgeStyle(tag)}
 											>
 												{tag}
-											</Badge>
+											</span>
 										))}
 									</div>
 								</TableCell>
