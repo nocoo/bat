@@ -5,6 +5,7 @@ import { useAllowedPorts } from "@/lib/hooks";
 import type { AlertItem } from "@bat/shared";
 import { Plus, Shield, X } from "lucide-react";
 import { useCallback, useState } from "react";
+import { useSWRConfig } from "swr";
 
 async function apiRequest(url: string, options?: RequestInit) {
 	const res = await fetch(url, {
@@ -52,12 +53,20 @@ interface AllowedPortsPanelProps {
 
 export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps) {
 	const { data: allowedPorts, mutate } = useAllowedPorts(hostId);
+	const { mutate: globalMutate } = useSWRConfig();
 	const [adding, setAdding] = useState(false);
 	const [portInput, setPortInput] = useState("");
 	const [reasonInput, setReasonInput] = useState("");
 	// Quick-allow inline reason input state: which port is being allowed
 	const [quickAllowPort, setQuickAllowPort] = useState<number | null>(null);
 	const [quickAllowReason, setQuickAllowReason] = useState("");
+
+	/** Revalidate related SWR caches so status badge and alert table update immediately. */
+	const revalidateRelated = useCallback(() => {
+		globalMutate("hosts");
+		globalMutate("alerts");
+		globalMutate("all-allowed-ports");
+	}, [globalMutate]);
 
 	const addPort = useCallback(
 		async (port: number, reason: string) => {
@@ -68,13 +77,14 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 					body: JSON.stringify({ port, reason }),
 				});
 				await mutate();
+				revalidateRelated();
 			} catch {
 				// TODO: toast
 			} finally {
 				setAdding(false);
 			}
 		},
-		[hostId, mutate],
+		[hostId, mutate, revalidateRelated],
 	);
 
 	const removePort = useCallback(
@@ -84,11 +94,12 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 					method: "DELETE",
 				});
 				await mutate();
+				revalidateRelated();
 			} catch {
 				// TODO: toast
 			}
 		},
-		[hostId, mutate],
+		[hostId, mutate, revalidateRelated],
 	);
 
 	const handleManualAdd = useCallback(async () => {
