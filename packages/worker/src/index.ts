@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import { alertsListRoute } from "./routes/alerts.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
+import { eventsListRoute } from "./routes/events-list.js";
 import { hostDetailRoute } from "./routes/host-detail.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
@@ -36,6 +37,7 @@ app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 app.get("/api/hosts/:id/tier2", hostTier2Route);
 app.get("/api/hosts/:id", hostDetailRoute);
 app.get("/api/alerts", alertsListRoute);
+app.get("/api/events", eventsListRoute);
 
 export default {
 	fetch: app.fetch,
