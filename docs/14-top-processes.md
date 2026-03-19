@@ -31,9 +31,9 @@
 
 | File | Parse Cost | Fields Extracted |
 |------|-----------|------------------|
-| `/proc/[pid]/stat` | 极低（单行 split） | pid, comm, state, ppid, utime, stime, num_threads, starttime, vsize, rss, majflt, processor |
+| `/proc/[pid]/stat` | 极低（单行，需 comm 括号感知解析，见 §2.2） | pid, comm, state, ppid, utime, stime, num_threads, starttime, vsize, rss, majflt, processor |
 | `/proc/[pid]/cmdline` | 极低（单次 read） | full command line（`\0` → space） |
-| `/proc/[pid]/io` | 极低（key-value） | read_bytes, write_bytes（需 root / same-uid） |
+| `/proc/[pid]/io` | 极低（key-value），**默认弱可用**（见 §2.7） | read_bytes, write_bytes |
 
 **不读取的文件及原因**：
 
@@ -42,7 +42,48 @@
 | `/proc/[pid]/statm` | 与 stat 的 rss/vsize 重复，且 man page 标注 "inaccurate" |
 | `/proc/[pid]/status` | 解析开销高（~49 行 key-value），仅 Uid 和 VmSwap 有独特价值 |
 
-### 2.2 `/proc/[pid]/stat` 字段详解
+### 2.2 `/proc/[pid]/stat` Parse Strategy
+
+**⚠️ 不能简单按空白 split**。`comm` 字段（#2）被 `(...)` 括号包裹，内部可以包含空格、括号等任意字符。例如：
+
+```
+1234 (Web Content) S 1230 ...
+5678 (kworker/0:1-events) I 2 ...
+```
+
+直接按空白切分会导致后续所有字段（state/ppid/utime/rss）错位，解析结果全部错误。
+
+**正确的解析算法**：
+
+```rust
+fn parse_proc_stat(content: &str) -> Option<ProcStat> {
+    // 1. 找到第一个 '(' 和最后一个 ')'
+    let comm_start = content.find('(')?;
+    let comm_end = content.rfind(')')?;
+
+    // 2. pid 在 '(' 之前
+    let pid: u32 = content[..comm_start].trim().parse().ok()?;
+
+    // 3. comm 在括号之间
+    let comm = &content[comm_start + 1..comm_end];
+
+    // 4. ')' 之后的部分才能按空白 split
+    let rest = &content[comm_end + 2..]; // skip ") "
+    let fields: Vec<&str> = rest.split_whitespace().collect();
+
+    // fields[0] = state (#3), fields[1] = ppid (#4), ...
+    // fields[N] 对应 stat 字段 #(N+3)
+    let state = fields.get(0)?;
+    let ppid: u32 = fields.get(1)?.parse().ok()?;
+    let utime: u64 = fields.get(11)?.parse().ok()?;  // field #14, index 11
+    let stime: u64 = fields.get(12)?.parse().ok()?;  // field #15, index 12
+    // ... etc
+}
+```
+
+**关键点**：使用 `rfind(')')` 而非 `find(')')`，因为 comm 本身可以包含 `)` 字符。
+
+### 2.3 `/proc/[pid]/stat` 字段详解
 
 52 个字段中，采集以下 12 个：
 
@@ -57,18 +98,18 @@
 | 20 | `num_threads` | u32 | 线程数 — 高线程数可能指示泄漏 |
 | 22 | `starttime` | u64 | 启动时间（boot 后 ticks）— 可算进程 uptime |
 | 23 | `vsize` | u64 | 虚拟内存 (bytes) |
-| 24 | `rss` | i64 | 驻留内存 (pages) — **内存核心**，需 × page_size(4096) |
+| 24 | `rss` | i64 | 驻留内存 (pages) — **内存核心**，需 × `page_size`（运行时通过 `sysconf(_SC_PAGESIZE)` 获取，**不可硬编码 4096**：aarch64 可能为 16KiB/64KiB） |
 | 12 | `majflt` | u64 | 主缺页（触发磁盘 I/O）— delta 有性能诊断价值 |
 | 39 | `processor` | i32 | 上次运行的 CPU 编号 — NUMA 调试 |
 
-### 2.3 `/proc/[pid]/cmdline`
+### 2.4 `/proc/[pid]/cmdline`
 
 - 格式：以 `\0` 分隔的参数列表，如 `/usr/sbin/nginx\0-g\0daemon off;\0`
 - 读取后 `\0` → 空格，**截断前 200 字节**（防止巨长命令行膨胀 payload）
 - 对 zombie 进程为空，此时 fallback 到 `comm`
 - **价值**：区分同名进程（多个 `python3` 分别跑什么脚本）
 
-### 2.4 `/proc/[pid]/io`（需 root）
+### 2.5 `/proc/[pid]/io`（默认弱可用，见 §2.7）
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -76,14 +117,38 @@
 | `write_bytes` | u64 | 真正写入磁盘的字节（累计） |
 
 - 只取 `read_bytes` / `write_bytes`（物理 I/O），不取 `rchar`/`wchar`（含缓存命中，价值低）
-- 需要 root 权限或 `CAP_SYS_PTRACE`；读取失败时字段为 `None`，graceful degradation
+- 权限模型详见 §2.7；读取失败时字段为 `None`，graceful degradation
 - delta 计算后转为 bytes/sec
 
-### 2.5 用户名解析
+### 2.6 用户名解析
 
 - 使用 `stat()` 系统调用取文件 UID（开销低于解析 `/proc/[pid]/status`）
 - **启动时**一次性解析 `/etc/passwd` 构建 `HashMap<u32, String>` (UID → username)
 - 缓存不命中时显示 `uid:<N>` fallback
+
+### 2.7 `/proc/[pid]/io` Permission Model — 默认弱可用
+
+bat-probe 以普通用户运行（`docs/04-probe.md:211`，systemd `User=root` 未设置时默认当前用户）。`/proc/[pid]/io` 的可读性取决于内核参数和进程归属：
+
+| 条件 | 可读性 | 说明 |
+|------|--------|------|
+| **自身进程**（UID 匹配） | ✅ 始终可读 | 内核允许进程读取自己的 io |
+| **其他用户进程** + `ptrace_scope = 0` | ✅ 可读 | 大多数 VPS 默认值（Ubuntu/Debian） |
+| **其他用户进程** + `ptrace_scope = 1` | ❌ 不可读 | 需 `CAP_SYS_PTRACE` 或 root |
+| **以 root 运行 probe** | ✅ 全部可读 | 但当前部署不使用 root |
+
+**实际影响**：在当前 VPS 部署环境中（Ubuntu + `ptrace_scope = 1`），probe 以 `nocoo` 用户运行，**只能读取 `nocoo` 自有进程的 io**，其他用户（root、www-data 等）的进程 io 字段为 `null`。
+
+**设计决策**：标记为**默认弱可用** —— 不要求部署时修改系统配置或提权，接受部分进程 io 数据缺失。Dashboard 已有 graceful degradation（`io_read_rate: null` → 显示 `—`）。若用户需要完整 io 数据，可通过以下方式提权：
+
+```bash
+# 方案 1：给二进制 capability（推荐，最小权限）
+sudo setcap cap_sys_ptrace+ep /usr/local/bin/bat-probe
+
+# 方案 2：systemd 配置 AmbientCapabilities
+# [Service]
+# AmbientCapabilities=CAP_SYS_PTRACE
+```
 
 ---
 
@@ -206,7 +271,7 @@ pub struct TopProcess {
     pub ppid: u32,              // parent PID
     pub user: String,           // resolved username or "uid:N"
     pub cpu_pct: Option<f64>,   // None on first cycle
-    pub mem_rss: u64,           // bytes (rss × page_size)
+    pub mem_rss: u64,           // bytes (rss × page_size via sysconf)
     pub mem_pct: f64,           // rss / total_mem × 100
     pub mem_virt: u64,          // bytes (vsize)
     pub num_threads: u32,
@@ -386,7 +451,7 @@ export interface MetricsDataPoint {
 | State | Display |
 |-------|---------|
 | Loading | Skeleton rows (5 rows × all columns) |
-| No data (hourly resolution / timeRange > 6h) | "Process data is only available in real-time view (≤6h range)" |
+| No data (hourly resolution / timeRange > 24h) | "Process data is only available in real-time view (≤24h range)" |
 | First cycle (all cpu_pct null) | Show table, CPU% column displays `—` |
 | Probe version too old (no top_processes_json) | "Process monitoring requires probe ≥ 0.8.0" |
 
@@ -424,7 +489,7 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | 2 | `feat: add TopProcess to payload and orchestrate (probe)` | `probe/src/payload.rs`, `probe/src/orchestrate.rs` | `cargo test` — serialization round-trip |
 | 3 | `feat: wire top_processes into main loop (probe)` | `probe/src/main.rs` | `cargo test` — integration (mock procfs dir) |
 | 4 | `feat: add TopProcess shared types` | `packages/shared/src/metrics.ts`, `packages/shared/src/api.ts` | `bun test` — type compilation check |
-| 5 | `feat: add D1 migration for top_processes_json` | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts` | `bun test` — E2E migration list sync |
+| 5 | `feat: add D1 migration for top_processes_json` | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts`, `packages/worker/src/test-helpers/mock-d1.ts` | `bun test` — E2E migration list sync + mock-d1 loads 0015 |
 | 6 | `feat: ingest and store top_processes_json (worker)` | `packages/worker/src/services/metrics.ts` | `bun test` — E2E ingest with/without top_processes |
 | 7 | `feat: return top_processes_json in metrics read (worker)` | `packages/worker/src/routes/metrics.ts` | `bun test` — E2E metrics endpoint returns new field |
 | 8 | `feat: add TopProcessesTable component (dashboard)` | `packages/dashboard/src/components/charts/top-processes-table.tsx`, `packages/dashboard/src/lib/transforms.ts` | `bun test` — transform function unit tests |
@@ -475,7 +540,7 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | `packages/worker/migrations/0015_top_processes.sql` | `ALTER TABLE metrics_raw ADD COLUMN top_processes_json TEXT` |
 | `packages/dashboard/src/components/charts/top-processes-table.tsx` | Table component with sort/filter/color |
 
-### Modified Files (9)
+### Modified Files (11)
 
 | File | Change |
 |------|--------|
@@ -484,8 +549,10 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | `probe/src/orchestrate.rs` | Add `build_top_processes()` function, modify `build_metrics_payload()` signature |
 | `probe/src/main.rs` | Wire collector into `collect_metrics()`, manage prev-state HashMap |
 | `packages/shared/src/metrics.ts` | Add `TopProcess` interface + `MetricsPayload.top_processes` |
+| `packages/shared/src/index.ts` | Barrel export `TopProcess` type |
 | `packages/shared/src/api.ts` | Add `MetricsDataPoint.top_processes_json` |
 | `packages/worker/src/services/metrics.ts` | `insertMetricsRaw()` — add column + bind parameter (97→98) |
+| `packages/worker/src/test-helpers/mock-d1.ts` | Load `0015_top_processes.sql` migration in mock DB setup |
 | `packages/worker/src/routes/metrics.ts` | SELECT 加 `top_processes_json` |
 | `packages/dashboard/src/app/hosts/[id]/page.tsx` | Import and render `TopProcessesTable` |
 
@@ -496,7 +563,6 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | `packages/worker/src/routes/ingest.ts` | Optional field, no validation needed |
 | `packages/worker/src/services/aggregation.ts` | Snapshot data, not aggregated to hourly |
 | `packages/worker/src/services/alerts.ts` | No new alert rules (see §7) |
-| `packages/worker/test/e2e/wrangler.test.ts` | **Needs update** — hardcoded migration list (listed in Modified above in commit #5) |
 
 ---
 
@@ -505,8 +571,8 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | D1 100-column limit | 当前 98 列 + 1 = 99, 仅剩 1 列余量 | 未来新指标必须使用 `ext_json` 打包模式 |
-| `/proc/[pid]/io` 需 root 权限 | 非 root 运行的 probe 无法采集 I/O 数据 | Graceful degradation: `io_read_rate: null` |
+| `/proc/[pid]/io` 默认弱可用（见 §2.7） | 非 root 运行的 probe 仅能采集自有进程 I/O | Graceful degradation: `io_read_rate: null`；可通过 `setcap cap_sys_ptrace+ep` 提权 |
 | PID 复用（short-lived processes） | CPU% 计算错误 | `starttime` 校验，不匹配则重置 delta |
 | Payload 膨胀（50 processes × 250B） | 12.5KB/request | 可接受；若需进一步压缩，减少到 Top 20 |
-| Hourly 聚合无进程数据 | >6h 时间范围无进程表格 | UI 提示 "仅在实时视图中可用" |
+| Hourly 聚合无进程数据 | >24h 时间范围无进程表格 | UI 提示 "仅在实时视图（≤24h）中可用"；阈值与 `AUTO_RESOLUTION_THRESHOLD_SECONDS = 86400` 一致 |
 | 进程扫描的 race condition | `/proc/[pid]/` 在读取过程中消失 | 每个 read 操作 catch ENOENT/EPERM，skip |
