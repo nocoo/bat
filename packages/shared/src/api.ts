@@ -212,6 +212,7 @@ export interface MetricsDataPoint {
 	softnet_time_squeeze_delta: number | null;
 	conntrack_count: number | null;
 	conntrack_max: number | null;
+	top_processes_json: string | null;
 }
 
 /** GET /api/alerts → AlertItem[] */

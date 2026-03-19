@@ -21,6 +21,7 @@ export type {
 	NetstatMetrics,
 	SoftnetMetrics,
 	ConntrackMetrics,
+	TopProcess,
 } from "./metrics.js";
 
 // Identity payload types
