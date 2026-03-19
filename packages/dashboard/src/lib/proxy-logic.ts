@@ -46,3 +46,50 @@ export async function proxyToWorker(
 		return Response.json({ error: "Failed to reach Worker API" }, { status: 502 });
 	}
 }
+
+/**
+ * Forward a request with a body (POST, PUT, DELETE) to the Worker API.
+ * Injects the read API key and passes through the request body.
+ */
+export async function proxyToWorkerWithBody(
+	workerPath: string,
+	method: string,
+	body?: string | null,
+): Promise<Response> {
+	const apiUrl = process.env.BAT_API_URL;
+	const readKey = process.env.BAT_READ_KEY;
+
+	if (!apiUrl || !readKey) {
+		return Response.json(
+			{ error: "Server misconfigured: missing BAT_API_URL or BAT_READ_KEY" },
+			{ status: 502 },
+		);
+	}
+
+	const url = new URL(workerPath, apiUrl);
+
+	try {
+		const headers: Record<string, string> = {
+			Authorization: `Bearer ${readKey}`,
+		};
+		if (body) {
+			headers["Content-Type"] = "application/json";
+		}
+
+		const workerRes = await fetch(url.toString(), {
+			method,
+			headers,
+			body: body ?? null,
+		});
+
+		const responseBody = await workerRes.text();
+		return new Response(responseBody, {
+			status: workerRes.status,
+			headers: {
+				"Content-Type": workerRes.headers.get("Content-Type") ?? "application/json",
+			},
+		});
+	} catch {
+		return Response.json({ error: "Failed to reach Worker API" }, { status: 502 });
+	}
+}
