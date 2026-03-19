@@ -13,3 +13,4 @@ pub mod snmp;
 pub mod softnet;
 pub mod tcp;
 pub mod tier2;
+pub mod top_processes;
