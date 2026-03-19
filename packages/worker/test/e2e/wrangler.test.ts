@@ -18,9 +18,11 @@ import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
 	AlertItem,
+	EventItem,
 	HostDetailItem,
 	HostOverviewItem,
 	MetricsQueryResponse,
+	WebhookConfig,
 } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 
@@ -378,5 +380,393 @@ describe("Worker L3 E2E — real Wrangler", () => {
 		expect(detail.timezone).toBe("America/New_York");
 		expect(detail.dns_resolvers).toEqual(["1.1.1.1", "8.8.8.8"]);
 		expect(detail.dns_search).toEqual(["example.com"]);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Host Events & Webhooks E2E
+// ---------------------------------------------------------------------------
+// Uses "e2e-host-inv" (public_ip: "203.0.113.42") from the inventory test above.
+// Tests run in order — later tests depend on state created by earlier ones.
+
+describe("Events & Webhooks E2E", () => {
+	let webhookId: number;
+	let webhookToken: string;
+
+	// --- Webhook CRUD ---
+
+	test("POST /api/webhooks with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/webhooks`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+			body: JSON.stringify({ host_id: "e2e-host-inv" }),
+		});
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("Read key");
+	});
+
+	test("POST /api/webhooks → 201 (create webhook config)", async () => {
+		const res = await fetch(`${BASE}/api/webhooks`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ host_id: "e2e-host-inv" }),
+		});
+		expect(res.status).toBe(201);
+		const config = (await res.json()) as WebhookConfig;
+		expect(config.host_id).toBe("e2e-host-inv");
+		expect(config.token).toHaveLength(32);
+		expect(config.is_active).toBe(true);
+		expect(config.rate_limit).toBe(10);
+		webhookId = config.id;
+		webhookToken = config.token;
+	});
+
+	test("POST /api/webhooks duplicate host → 409", async () => {
+		const res = await fetch(`${BASE}/api/webhooks`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ host_id: "e2e-host-inv" }),
+		});
+		expect(res.status).toBe(409);
+	});
+
+	test("POST /api/webhooks unknown host → 404", async () => {
+		const res = await fetch(`${BASE}/api/webhooks`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ host_id: "nonexistent-host" }),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("GET /api/webhooks → lists configs", async () => {
+		const res = await fetch(`${BASE}/api/webhooks`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const configs = (await res.json()) as (WebhookConfig & { hostname: string })[];
+		expect(configs.length).toBeGreaterThanOrEqual(1);
+		const ours = configs.find((c) => c.host_id === "e2e-host-inv");
+		expect(ours).toBeDefined();
+		expect(ours?.hostname).toBe("e2e-host-inv.example.com");
+	});
+
+	test("POST /api/webhooks/:id/regenerate with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/webhooks/${webhookId}/regenerate`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("POST /api/webhooks/:id/regenerate → new token", async () => {
+		const res = await fetch(`${BASE}/api/webhooks/${webhookId}/regenerate`, {
+			method: "POST",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { token: string };
+		expect(body.token).toHaveLength(32);
+		expect(body.token).not.toBe(webhookToken);
+		webhookToken = body.token; // use new token for ingest tests
+	});
+
+	// --- Event ingest auth chain ---
+
+	test("POST /api/events without token → 401", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "test", body: {} }),
+		});
+		expect(res.status).toBe(401);
+	});
+
+	test("POST /api/events with invalid token → 403", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: "Bearer deadbeefdeadbeefdeadbeefdeadbeef",
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({ title: "test", body: {} }),
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("POST /api/events without CF-Connecting-IP → local wrangler injects 127.0.0.1 → IP mismatch 403", async () => {
+		// Note: In production Cloudflare always injects CF-Connecting-IP.
+		// Local wrangler/miniflare auto-injects "127.0.0.1", so we can't test
+		// the "missing header → 400" path locally. Instead this verifies the
+		// IP mismatch path when the injected IP doesn't match the host's public_ip.
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ title: "test", body: {} }),
+		});
+		// Local wrangler injects CF-Connecting-IP: 127.0.0.1 which != 203.0.113.42
+		expect(res.status).toBe(403);
+	});
+
+	test("POST /api/events with wrong IP → 403", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "198.51.100.1",
+			},
+			body: JSON.stringify({ title: "test", body: {} }),
+		});
+		expect(res.status).toBe(403);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("IP");
+	});
+
+	// --- Event ingest payload validation ---
+
+	test("POST /api/events missing title → 400", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({ body: { msg: "hello" } }),
+		});
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("title");
+	});
+
+	test("POST /api/events title too long → 400", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({ title: "x".repeat(201), body: {} }),
+		});
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("200");
+	});
+
+	test("POST /api/events body not an object → 400", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({ title: "test", body: "not-an-object" }),
+		});
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("body");
+	});
+
+	test("POST /api/events too many tags → 400", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({
+				title: "test",
+				body: {},
+				tags: Array.from({ length: 11 }, (_, i) => `tag${i}`),
+			}),
+		});
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("10");
+	});
+
+	// --- Successful event ingest ---
+
+	test("POST /api/events valid payload → 204", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({
+				title: "Deployment completed",
+				body: { version: "1.0.0", duration_ms: 12345 },
+				tags: ["deploy", "production"],
+			}),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	test("POST /api/events minimal payload (no tags) → 204", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({
+				title: "Backup finished",
+				body: { size_bytes: 1024000 },
+			}),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	// --- Events listing ---
+
+	test("GET /api/events → lists ingested events", async () => {
+		const res = await fetch(`${BASE}/api/events`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const events = (await res.json()) as EventItem[];
+		expect(events.length).toBeGreaterThanOrEqual(2);
+		// Most recent first
+		const deploy = events.find((e) => e.title === "Deployment completed");
+		expect(deploy).toBeDefined();
+		expect(deploy?.host_id).toBe("e2e-host-inv");
+		expect(deploy?.hostname).toBe("e2e-host-inv.example.com");
+		expect(deploy?.tags).toEqual(["deploy", "production"]);
+		expect(deploy?.source_ip).toBe("203.0.113.42");
+	});
+
+	test("GET /api/events?host_id= → filtered by host", async () => {
+		const res = await fetch(`${BASE}/api/events?host_id=e2e-host-inv`, {
+			headers: readHeaders(),
+		});
+		expect(res.status).toBe(200);
+		const events = (await res.json()) as EventItem[];
+		expect(events.length).toBeGreaterThanOrEqual(2);
+		for (const event of events) {
+			expect(event.host_id).toBe("e2e-host-inv");
+		}
+	});
+
+	test("GET /api/events?host_id= for host with no events → empty array", async () => {
+		const res = await fetch(`${BASE}/api/events?host_id=e2e-host-001`, {
+			headers: readHeaders(),
+		});
+		expect(res.status).toBe(200);
+		const events = (await res.json()) as EventItem[];
+		expect(events).toEqual([]);
+	});
+
+	test("GET /api/events without auth → 401", async () => {
+		const res = await fetch(`${BASE}/api/events`);
+		expect(res.status).toBe(401);
+	});
+
+	// --- Rate limiting ---
+	// Uses a dedicated host+webhook so the counter is not polluted by
+	// payload-validation tests above (those pass rate-limit before failing
+	// on validation, consuming quota from the shared webhook).
+
+	test("POST /api/events rate limiting → 429 after exceeding limit", async () => {
+		// 1. Create a dedicated host for rate-limit testing
+		const identRes = await fetch(`${BASE}/api/identity`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({
+				...makeIdentityPayload("e2e-host-rl"),
+				public_ip: "198.51.100.99",
+			}),
+		});
+		expect(identRes.status).toBe(204);
+
+		// 2. Create webhook for this host
+		const whRes = await fetch(`${BASE}/api/webhooks`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ host_id: "e2e-host-rl" }),
+		});
+		expect(whRes.status).toBe(201);
+		const whConfig = (await whRes.json()) as WebhookConfig;
+		const rlToken = whConfig.token;
+
+		// 3. Send exactly 10 events (the default rate limit)
+		for (let i = 0; i < 10; i++) {
+			const res = await fetch(`${BASE}/api/events`, {
+				method: "POST",
+				headers: {
+					Authorization: `Bearer ${rlToken}`,
+					"Content-Type": "application/json",
+					"CF-Connecting-IP": "198.51.100.99",
+				},
+				body: JSON.stringify({
+					title: `Rate limit test ${i}`,
+					body: { seq: i },
+				}),
+			});
+			expect(res.status).toBe(204);
+		}
+
+		// 4. 11th event should be rate limited
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${rlToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "198.51.100.99",
+			},
+			body: JSON.stringify({
+				title: "Should be rate limited",
+				body: { over: true },
+			}),
+		});
+		expect(res.status).toBe(429);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("Rate limit");
+	});
+
+	// --- Webhook delete ---
+
+	test("DELETE /api/webhooks/:id with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/webhooks/${webhookId}`, {
+			method: "DELETE",
+			headers: { Authorization: `Bearer ${READ_KEY}` },
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("DELETE /api/webhooks/:id → 204", async () => {
+		const res = await fetch(`${BASE}/api/webhooks/${webhookId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	test("DELETE /api/webhooks/:id already deleted → 404", async () => {
+		const res = await fetch(`${BASE}/api/webhooks/${webhookId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("POST /api/events with deleted webhook token → 403", async () => {
+		const res = await fetch(`${BASE}/api/events`, {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${webhookToken}`,
+				"Content-Type": "application/json",
+				"CF-Connecting-IP": "203.0.113.42",
+			},
+			body: JSON.stringify({ title: "should fail", body: {} }),
+		});
+		expect(res.status).toBe(403);
 	});
 });
