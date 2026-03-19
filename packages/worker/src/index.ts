@@ -11,6 +11,12 @@ import { liveRoute } from "./routes/live.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
 import { tier2IngestRoute } from "./routes/tier2-ingest.js";
 import { hostTier2Route } from "./routes/tier2-read.js";
+import {
+	webhooksCreateRoute,
+	webhooksDeleteRoute,
+	webhooksListRoute,
+	webhooksRegenerateRoute,
+} from "./routes/webhooks.js";
 import { aggregateHour, purgeOldData } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
 
@@ -38,6 +44,10 @@ app.get("/api/hosts/:id/tier2", hostTier2Route);
 app.get("/api/hosts/:id", hostDetailRoute);
 app.get("/api/alerts", alertsListRoute);
 app.get("/api/events", eventsListRoute);
+app.get("/api/webhooks", webhooksListRoute);
+app.post("/api/webhooks", webhooksCreateRoute);
+app.delete("/api/webhooks/:id", webhooksDeleteRoute);
+app.post("/api/webhooks/:id/regenerate", webhooksRegenerateRoute);
 
 export default {
 	fetch: app.fetch,
