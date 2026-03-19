@@ -8,3 +8,4 @@ export { useTags } from "./use-tags";
 export { useHostTags } from "./use-host-tags";
 export { useSingleHostTags } from "./use-single-host-tags";
 export { useAllowedPorts } from "./use-allowed-ports";
+export { useAllAllowedPorts } from "./use-all-allowed-ports";

@@ -17,7 +17,14 @@ import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostDetail, useHostMetrics, useHostTier2, useHosts } from "@/lib/hooks";
+import {
+	useAlerts,
+	useAllowedPorts,
+	useHostDetail,
+	useHostMetrics,
+	useHostTier2,
+	useHosts,
+} from "@/lib/hooks";
 import type { DetectedSoftware, SoftwareCategory } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Box, Info, ShieldAlert } from "lucide-react";
@@ -246,6 +253,13 @@ export default function HostDetailPage() {
 
 	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
 	const hostAlerts = allAlerts?.filter((a) => hashHostId(a.host_id) === hid) ?? [];
+	const { data: allowedPorts } = useAllowedPorts(host?.host_id ?? null);
+
+	// Build allowedPortsMap for AlertTable
+	const allowedPortsMap: Record<string, number[]> = {};
+	if (host && allowedPorts && allowedPorts.length > 0) {
+		allowedPortsMap[host.host_id] = allowedPorts.map((p) => p.port);
+	}
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
@@ -316,7 +330,11 @@ export default function HostDetailPage() {
 										</CardTitle>
 									</CardHeader>
 									<CardContent>
-										<AlertTable alerts={hostAlerts} showHost={false} />
+										<AlertTable
+											alerts={hostAlerts}
+											showHost={false}
+											allowedPortsMap={allowedPortsMap}
+										/>
 									</CardContent>
 								</Card>
 							)}

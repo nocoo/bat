@@ -4,11 +4,12 @@ import { AlertTable } from "@/components/alert-table";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts } from "@/lib/hooks";
+import { useAlerts, useAllAllowedPorts } from "@/lib/hooks";
 import { AlertTriangle, Bell } from "lucide-react";
 
 export default function AlertsPage() {
 	const { data: alerts, error, isLoading } = useAlerts();
+	const { data: allowedPortsMap } = useAllAllowedPorts();
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Alerts" }]}>
@@ -35,7 +36,7 @@ export default function AlertsPage() {
 			) : (
 				<Card>
 					<CardContent className="py-2">
-						<AlertTable alerts={alerts} />
+						<AlertTable alerts={alerts} allowedPortsMap={allowedPortsMap ?? {}} />
 					</CardContent>
 				</Card>
 			)}
