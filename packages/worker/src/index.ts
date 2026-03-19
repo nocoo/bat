@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import { alertsListRoute } from "./routes/alerts.js";
+import { eventsIngestRoute } from "./routes/events-ingest.js";
 import { hostDetailRoute } from "./routes/host-detail.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
@@ -27,6 +28,7 @@ app.get("/api/live", liveRoute);
 app.post("/api/identity", identityRoute);
 app.post("/api/ingest", ingestRoute);
 app.post("/api/tier2", tier2IngestRoute);
+app.post("/api/events", eventsIngestRoute);
 
 // Read routes (dashboard → worker)
 app.get("/api/hosts", hostsListRoute);
