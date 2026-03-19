@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.7.0 (2026-03-19)
+
+### Features
+
+- **Host Events** (docs/13) — Webhook-based event ingestion for servers to report deployments, backups, cron jobs, and other event logs. D1 storage, dashboard Events page with expandable JSON body, Webhook Settings page for token management
+  - `POST /api/events` — webhook token + IP-validated event ingest with rate limiting (10/min default)
+  - `GET /api/events` — event listing with host filter and pagination
+  - Webhook CRUD (`/api/webhooks`) — create, list, delete, regenerate tokens
+  - 30-day automatic event retention via scheduled worker
+- **Per-host port allowlist** — Suppress `public_port` alerts for expected open ports, with info badge annotation in alert table
+- **Tag management panel** — Inline tag editing on host detail page
+- **Sparkline chart upgrade** — Replace bar charts with 3-line CPU/MEM/NET area chart on host cards
+
+### Fixes
+
+- **Strict IP validation** — Remove `X-Forwarded-For` fallback in event ingest, only trust `CF-Connecting-IP`
+- **Write key enforcement** — Require `BAT_WRITE_KEY` for webhook CRUD mutations (was incorrectly using read key)
+- **Webhook settings error handling** — Add try/catch to regenerate/delete actions with error banner UI
+- **React key warning** — Use keyed `<Fragment>` in EventTable
+- Revalidate hosts and alerts SWR cache after allowlist change
+- Exclude fully-allowed `public_port` alerts from host warning status
+- Enforce min 11px font and full-width sparklines in host card
+- Prevent flash-to-skeleton on SWR background revalidation
+
+### Database
+
+- Migration `0012_port_allowlist.sql` — Add port_allowlist column to hosts table
+- Migration `0013_host_events.sql` — Create webhook_configs and events tables with indexes
+
+### Tests
+
+- E2E coverage for webhook CRUD, event ingest auth chain, payload validation, rate limiting, and event listing
+
+## v0.6.0 (2026-03-18)
+
+### Features
+
+- **Host tags** (docs/11) — D1 direct tags CRUD, management page, filter bar on hosts page
+- **Software discovery** (docs/12) — Probe 5-signal collector (~40 items), shared types, worker ingest/read, dashboard UI card
+
+### Fixes
+
+- Tags PUT validate-before-delete
+- Tier2 read path inventory fields JOIN
+- E2E test migration list updated
+
 ## v0.5.2 (2026-03-17)
 
 ### Features
