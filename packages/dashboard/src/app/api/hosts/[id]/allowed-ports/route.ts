@@ -50,7 +50,16 @@ export async function POST(request: Request, { params }: Params) {
 		return Response.json({ error: "reason must be 200 characters or fewer" }, { status: 400 });
 	}
 
-	// Check entry limit
+	// Idempotent: if this port is already allowed, return it directly
+	const existing = await d1Query<AllowedPort>(
+		"SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? AND port = ?",
+		[hostId, body.port],
+	);
+	if (existing.results.length > 0) {
+		return Response.json(existing.results[0], { status: 201 });
+	}
+
+	// Check entry limit (only for genuinely new ports)
 	const countResult = await d1Query<{ cnt: number }>(
 		"SELECT COUNT(*) as cnt FROM port_allowlist WHERE host_id = ?",
 		[hostId],
