@@ -49,19 +49,22 @@ export async function proxyToWorker(
 
 /**
  * Forward a request with a body (POST, PUT, DELETE) to the Worker API.
- * Injects the read API key and passes through the request body.
+ * Injects the appropriate API key and passes through the request body.
+ * @param useWriteKey - If true, uses BAT_WRITE_KEY instead of BAT_READ_KEY
  */
 export async function proxyToWorkerWithBody(
 	workerPath: string,
 	method: string,
 	body?: string | null,
+	useWriteKey?: boolean,
 ): Promise<Response> {
 	const apiUrl = process.env.BAT_API_URL;
-	const readKey = process.env.BAT_READ_KEY;
+	const apiKey = useWriteKey ? process.env.BAT_WRITE_KEY : process.env.BAT_READ_KEY;
+	const keyName = useWriteKey ? "BAT_WRITE_KEY" : "BAT_READ_KEY";
 
-	if (!apiUrl || !readKey) {
+	if (!apiUrl || !apiKey) {
 		return Response.json(
-			{ error: "Server misconfigured: missing BAT_API_URL or BAT_READ_KEY" },
+			{ error: `Server misconfigured: missing BAT_API_URL or ${keyName}` },
 			{ status: 502 },
 		);
 	}
@@ -70,7 +73,7 @@ export async function proxyToWorkerWithBody(
 
 	try {
 		const headers: Record<string, string> = {
-			Authorization: `Bearer ${readKey}`,
+			Authorization: `Bearer ${apiKey}`,
 		};
 		if (body) {
 			headers["Content-Type"] = "application/json";

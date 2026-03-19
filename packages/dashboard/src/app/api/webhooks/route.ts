@@ -17,5 +17,5 @@ export async function POST(request: Request) {
 		return Response.json({ error: "Unauthorized" }, { status: 401 });
 	}
 	const body = await request.text();
-	return proxyToWorkerWithBody("/api/webhooks", "POST", body);
+	return proxyToWorkerWithBody("/api/webhooks", "POST", body, true);
 }
