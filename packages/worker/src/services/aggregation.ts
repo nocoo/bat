@@ -1,5 +1,6 @@
 // Hourly aggregation and data purge service
 import { RETENTION } from "@bat/shared";
+import { EVENT_RETENTION_DAYS } from "@bat/shared";
 
 /**
  * Aggregate raw metrics for all active hosts in a given hour.
@@ -545,6 +546,10 @@ export async function purgeOldData(db: D1Database, nowSeconds: number): Promise<
 	await db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(hourlyCutoff).run();
 
 	await db.prepare("DELETE FROM tier2_snapshots WHERE ts < ?").bind(hourlyCutoff).run();
+
+	// Purge old events (30-day retention)
+	const eventCutoff = nowSeconds - EVENT_RETENTION_DAYS * 86400;
+	await db.prepare("DELETE FROM events WHERE created_at < ?").bind(eventCutoff).run();
 }
 
 // --- Helpers ---
