@@ -39,6 +39,10 @@ const MIGRATION_EVENTS_FK_SET_NULL_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0014_events_fk_set_null.sql",
 );
+const MIGRATION_TOP_PROCESSES_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0015_top_processes.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -224,6 +228,15 @@ export function createMockD1(): D1Database {
 	// Apply events FK set null migration
 	const eventsFkSetNullSchema = readFileSync(MIGRATION_EVENTS_FK_SET_NULL_PATH, "utf-8");
 	for (const stmt of eventsFkSetNullSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply top_processes migration
+	const topProcessesSchema = readFileSync(MIGRATION_TOP_PROCESSES_PATH, "utf-8");
+	for (const stmt of topProcessesSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
