@@ -483,17 +483,17 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 按依赖关系排列，每个 commit 独立可构建、可测试。
 
-| # | Commit | Files | Test |
-|---|--------|-------|------|
-| 1 | `feat: add top_processes collector (probe)` | `probe/src/collectors/top_processes.rs`, `probe/src/collectors/mod.rs` | `cargo test` — parse unit tests with sample `/proc/[pid]/stat` data |
-| 2 | `feat: add TopProcess to payload and orchestrate (probe)` | `probe/src/payload.rs`, `probe/src/orchestrate.rs` | `cargo test` — serialization round-trip |
-| 3 | `feat: wire top_processes into main loop (probe)` | `probe/src/main.rs` | `cargo test` — integration (mock procfs dir) |
-| 4 | `feat: add TopProcess shared types` | `packages/shared/src/metrics.ts`, `packages/shared/src/api.ts` | `bun test` — type compilation check |
-| 5 | `feat: add D1 migration for top_processes_json` | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts`, `packages/worker/src/test-helpers/mock-d1.ts` | `bun test` — E2E migration list sync + mock-d1 loads 0015 |
-| 6 | `feat: ingest and store top_processes_json (worker)` | `packages/worker/src/services/metrics.ts` | `bun test` — E2E ingest with/without top_processes |
-| 7 | `feat: return top_processes_json in metrics read (worker)` | `packages/worker/src/routes/metrics.ts` | `bun test` — E2E metrics endpoint returns new field |
-| 8 | `feat: add TopProcessesTable component (dashboard)` | `packages/dashboard/src/components/charts/top-processes-table.tsx`, `packages/dashboard/src/lib/transforms.ts` | `bun test` — transform function unit tests |
-| 9 | `feat: integrate TopProcessesTable into host detail page` | `packages/dashboard/src/app/hosts/[id]/page.tsx` | Manual visual verification + existing E2E |
+| # | Commit | Files | Test | Status |
+|---|--------|-------|------|--------|
+| 1 | `feat: add top_processes collector (probe)` | `probe/src/collectors/top_processes.rs`, `probe/src/collectors/mod.rs` | `cargo test` — parse unit tests with sample `/proc/[pid]/stat` data | ✅ |
+| 2 | `feat: add TopProcess to payload and orchestrate (probe)` | `probe/src/payload.rs`, `probe/src/orchestrate.rs` | `cargo test` — serialization round-trip | ✅ |
+| 3 | `feat: wire top_processes into main loop (probe)` | `probe/src/main.rs` | `cargo test` — integration (mock procfs dir) | ✅ |
+| 4 | `feat: add TopProcess shared types` | `packages/shared/src/metrics.ts`, `packages/shared/src/api.ts` | `bun test` — type compilation check | ✅ |
+| 5 | `feat: add D1 migration for top_processes_json` | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts`, `packages/worker/src/test-helpers/mock-d1.ts` | `bun test` — E2E migration list sync + mock-d1 loads 0015 | ✅ |
+| 6 | `feat: ingest and store top_processes_json (worker)` | `packages/worker/src/services/metrics.ts` | `bun test` — E2E ingest with/without top_processes | ✅ |
+| 7 | `feat: return top_processes_json in metrics read (worker)` | `packages/worker/src/routes/metrics.ts` | `bun test` — E2E metrics endpoint returns new field | ✅ |
+| 8 | `feat: add TopProcessesTable component (dashboard)` | `packages/dashboard/src/components/charts/top-processes-table.tsx`, `packages/dashboard/src/lib/transforms.ts` | `bun test` — transform function unit tests | ✅ |
+| 9 | `feat: integrate TopProcessesTable into host detail page` | `packages/dashboard/src/app/hosts/[id]/page.tsx` | Manual visual verification + existing E2E | ✅ |
 
 ---
 
