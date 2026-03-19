@@ -12,6 +12,13 @@ interface HostRow {
 interface AlertRow {
 	host_id: string;
 	severity: string;
+	rule_id: string;
+	message: string | null;
+}
+
+interface AllowedPortRow {
+	host_id: string;
+	port: number;
 }
 
 export async function liveRoute(c: Context<AppEnv>) {
@@ -42,7 +49,9 @@ export async function liveRoute(c: Context<AppEnv>) {
 
 	// Get all alerts for active hosts
 	const alertsResult = await db
-		.prepare(`SELECT host_id, severity FROM alert_states WHERE host_id IN (${placeholders})`)
+		.prepare(
+			`SELECT host_id, severity, rule_id, message FROM alert_states WHERE host_id IN (${placeholders})`,
+		)
 		.bind(...hostIds)
 		.all<AlertRow>();
 
@@ -53,6 +62,22 @@ export async function liveRoute(c: Context<AppEnv>) {
 		alertsByHost.set(a.host_id, existing);
 	}
 
+	// Per-host port allowlist for status derivation
+	const allowlistResult = await db
+		.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
+		.bind(...hostIds)
+		.all<AllowedPortRow>();
+
+	const allowedByHost = new Map<string, Set<number>>();
+	for (const row of allowlistResult.results) {
+		let s = allowedByHost.get(row.host_id);
+		if (!s) {
+			s = new Set();
+			allowedByHost.set(row.host_id, s);
+		}
+		s.add(row.port);
+	}
+
 	// Derive status for each host
 	let healthy = 0;
 	let warning = 0;
@@ -60,7 +85,8 @@ export async function liveRoute(c: Context<AppEnv>) {
 
 	for (const host of hosts) {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
-		const status: HostStatus = deriveHostStatus(host.last_seen, now, alerts);
+		const allowedPorts = allowedByHost.get(host.host_id);
+		const status: HostStatus = deriveHostStatus(host.last_seen, now, alerts, allowedPorts);
 
 		switch (status) {
 			case "healthy":

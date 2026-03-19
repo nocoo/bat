@@ -41,6 +41,8 @@ interface LatestMetrics {
 
 interface AlertRow {
 	severity: string;
+	rule_id: string;
+	message: string | null;
 }
 
 /**
@@ -135,11 +137,22 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 
 	// Alerts for status derivation + count
 	const alertsResult = await db
-		.prepare("SELECT severity FROM alert_states WHERE host_id = ?")
+		.prepare("SELECT severity, rule_id, message FROM alert_states WHERE host_id = ?")
 		.bind(hostId)
 		.all<AlertRow>();
 	const alerts = alertsResult.results;
-	const status = deriveHostStatus(host.last_seen, now, alerts);
+
+	// Per-host port allowlist for status derivation
+	const allowlistResult = await db
+		.prepare("SELECT port FROM port_allowlist WHERE host_id = ?")
+		.bind(hostId)
+		.all<{ port: number }>();
+	const allowedPorts =
+		allowlistResult.results.length > 0
+			? new Set(allowlistResult.results.map((r) => r.port))
+			: undefined;
+
+	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts);
 	const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 	const netRates = extractNetRates(metrics?.net_json ?? null);
 
