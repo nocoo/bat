@@ -91,7 +91,8 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
          oom_kills_sum as oom_kills,
          fd_allocated_avg as fd_allocated,
          fd_max,
-         ext_json
+         ext_json,
+         NULL as top_processes_json
        FROM metrics_hourly
        WHERE host_id = ? AND hour_ts >= ? AND hour_ts <= ?
        ORDER BY hour_ts ASC`,
@@ -185,7 +186,8 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
          'softnet_time_squeeze_delta', softnet_time_squeeze_delta,
          'conntrack_count', conntrack_count,
          'conntrack_max', conntrack_max
-       ) as ext_json
+       ) as ext_json,
+       top_processes_json
      FROM metrics_raw
      WHERE host_id = ? AND ts >= ? AND ts <= ?
      ORDER BY ts ASC`,
