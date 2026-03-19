@@ -17,3 +17,4 @@
 | 11 | [host-tags](./11-host-tags.md) | Host tagging: tags table, CRUD API, dashboard UI, filtering |
 | 12 | [software-discovery](./12-software-discovery.md) | Tier 2 software detection: process/systemd/binary/package scanning, ~40 common tools |
 | 13 | [host-events](./13-host-events.md) | Host events: webhook tokens, event ingest, rate limiting, dashboard UI |
+| 14 | [top-processes](./14-top-processes.md) | Per-process CPU/Memory/IO monitoring: procfs collection, Top 50 snapshot, Dashboard table with sort/filter/color |
