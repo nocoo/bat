@@ -5,6 +5,7 @@ import {
 	formatBytesRate,
 	formatDateTime,
 	formatTime,
+	formatUptime,
 	getTimeFormatter,
 	transformCpuData,
 	transformDiskData,
@@ -13,6 +14,7 @@ import {
 	transformNetData,
 	transformPsiData,
 	transformTcpData,
+	transformTopProcessesData,
 } from "./transforms";
 
 function makePoint(overrides: Partial<MetricsDataPoint> = {}): MetricsDataPoint {
@@ -68,6 +70,7 @@ function makePoint(overrides: Partial<MetricsDataPoint> = {}): MetricsDataPoint 
 		oom_kills: null,
 		fd_allocated: null,
 		fd_max: null,
+		top_processes_json: null,
 		...overrides,
 	};
 }
@@ -325,5 +328,121 @@ describe("transformTcpData", () => {
 	test("null fields default to 0", () => {
 		const result = transformTcpData([makePoint({ ts: 100, tcp_established: 5 })]);
 		expect(result).toEqual([{ ts: 100, established: 5, time_wait: 0, orphan: 0 }]);
+	});
+});
+
+// --- Top Processes ---
+
+const SAMPLE_PROCESSES = [
+	{
+		pid: 1234,
+		name: "nginx",
+		cmd: "nginx: worker process",
+		state: "S",
+		ppid: 1230,
+		user: "www-data",
+		cpu_pct: 12.3,
+		mem_rss: 268435456,
+		mem_pct: 6.2,
+		mem_virt: 536870912,
+		num_threads: 4,
+		uptime: 86400,
+		majflt_rate: 0.0,
+		io_read_rate: 1024,
+		io_write_rate: 2048,
+		processor: 2,
+	},
+	{
+		pid: 5678,
+		name: "postgres",
+		cmd: "postgres: writer process",
+		state: "S",
+		ppid: 5670,
+		user: "postgres",
+		cpu_pct: null,
+		mem_rss: 134217728,
+		mem_pct: 3.1,
+		mem_virt: 268435456,
+		num_threads: 1,
+		uptime: 3600,
+		majflt_rate: null,
+		io_read_rate: null,
+		io_write_rate: null,
+		processor: 0,
+	},
+];
+
+describe("transformTopProcessesData", () => {
+	test("parses top_processes_json from latest data point", () => {
+		const result = transformTopProcessesData([
+			makePoint({ ts: 100, top_processes_json: JSON.stringify(SAMPLE_PROCESSES) }),
+		]);
+		expect(result).toHaveLength(2);
+		expect(result[0]?.pid).toBe(1234);
+		expect(result[0]?.name).toBe("nginx");
+		expect(result[0]?.cpu_pct).toBe(12.3);
+		expect(result[0]?.io_read_rate).toBe(1024);
+		expect(result[1]?.pid).toBe(5678);
+		expect(result[1]?.cpu_pct).toBeNull();
+		expect(result[1]?.io_read_rate).toBeNull();
+	});
+
+	test("uses last point with top_processes_json", () => {
+		const result = transformTopProcessesData([
+			makePoint({ ts: 100, top_processes_json: JSON.stringify([SAMPLE_PROCESSES[0]]) }),
+			makePoint({ ts: 200 }), // no top_processes_json
+			makePoint({ ts: 300, top_processes_json: JSON.stringify(SAMPLE_PROCESSES) }),
+		]);
+		expect(result).toHaveLength(2);
+	});
+
+	test("returns empty for empty data", () => {
+		expect(transformTopProcessesData([])).toEqual([]);
+	});
+
+	test("returns empty when no top_processes_json present", () => {
+		expect(transformTopProcessesData([makePoint()])).toEqual([]);
+	});
+
+	test("returns empty for invalid JSON", () => {
+		expect(transformTopProcessesData([makePoint({ top_processes_json: "bad json" })])).toEqual([]);
+	});
+
+	test("handles null fields gracefully", () => {
+		const partial = [{ pid: 1, name: "test" }]; // missing most fields
+		const result = transformTopProcessesData([
+			makePoint({ top_processes_json: JSON.stringify(partial) }),
+		]);
+		expect(result).toHaveLength(1);
+		expect(result[0]?.pid).toBe(1);
+		expect(result[0]?.cpu_pct).toBeNull();
+		expect(result[0]?.state).toBe("?");
+		expect(result[0]?.mem_rss).toBe(0);
+	});
+});
+
+describe("formatUptime", () => {
+	test("formats seconds", () => {
+		expect(formatUptime(30)).toBe("30s");
+	});
+
+	test("formats minutes", () => {
+		expect(formatUptime(300)).toBe("5m");
+	});
+
+	test("formats hours and minutes", () => {
+		expect(formatUptime(3660)).toBe("1h 1m");
+	});
+
+	test("formats hours only when no remaining minutes", () => {
+		expect(formatUptime(7200)).toBe("2h");
+	});
+
+	test("formats days and hours", () => {
+		expect(formatUptime(90000)).toBe("1d 1h");
+	});
+
+	test("formats days only when no remaining hours", () => {
+		expect(formatUptime(172800)).toBe("2d");
 	});
 });
