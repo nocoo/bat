@@ -5,7 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, getAvatarColor } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
-import { Bell, ChevronUp, Download, LogOut, PanelLeft, Server, Tag } from "lucide-react";
+import {
+	Bell,
+	ChevronUp,
+	Download,
+	LogOut,
+	PanelLeft,
+	ScrollText,
+	Server,
+	Tag,
+	Webhook,
+} from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
@@ -36,13 +46,17 @@ const NAV_GROUPS: NavGroup[] = [
 		items: [
 			{ href: "/hosts", label: "Hosts", icon: Server },
 			{ href: "/alerts", label: "Alerts", icon: Bell },
+			{ href: "/events", label: "Events", icon: ScrollText },
 			{ href: "/tags", label: "Tags", icon: Tag },
 		],
 	},
 	{
 		label: "Settings",
 		defaultOpen: true,
-		items: [{ href: "/setup", label: "Setup", icon: Download }],
+		items: [
+			{ href: "/setup", label: "Setup", icon: Download },
+			{ href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+		],
 	},
 ];
 
