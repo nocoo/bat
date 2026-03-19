@@ -247,3 +247,15 @@ export const MAX_TAGS_PER_HOST = 10;
 
 /** Number of color palette slots */
 export const TAG_COLOR_COUNT = 10;
+
+// --- Port allowlist types (Dashboard → D1 direct) ---
+
+/** A per-host allowed port entry — returned by GET /api/hosts/:id/allowed-ports. */
+export interface AllowedPort {
+	port: number;
+	reason: string;
+	created_at: number;
+}
+
+/** Maximum allowed-port entries per host */
+export const MAX_ALLOWED_PORTS_PER_HOST = 50;

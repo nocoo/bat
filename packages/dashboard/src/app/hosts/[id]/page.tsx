@@ -10,6 +10,7 @@ import {
 	PsiChart,
 	TcpChart,
 } from "@/components/charts";
+import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { AppShell } from "@/components/layout";
@@ -380,6 +381,7 @@ export default function HostDetailPage() {
 								</Card>
 							)}
 							{host && <HostTagsPanel hostId={host.host_id} />}
+							{host && <AllowedPortsPanel hostId={host.host_id} hostAlerts={hostAlerts} />}
 							{tier2?.software && tier2.software.detected.length > 0 && (
 								<SoftwareCard software={tier2.software.detected} />
 							)}
