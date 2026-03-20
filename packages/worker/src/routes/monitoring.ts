@@ -325,8 +325,13 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 	}
 
 	// Group by tag — a host appears in every group it belongs to
+	interface GroupHostRef {
+		host_id: string;
+		hostname: string;
+	}
+
 	interface GroupAcc {
-		hosts: string[];
+		hosts: GroupHostRef[];
 		byTier: { healthy: number; warning: number; critical: number; offline: number };
 		alertCount: number;
 		worstTier: HostStatus;
@@ -334,7 +339,13 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 
 	const groups = new Map<string, GroupAcc>();
 
-	function addToGroup(tag: string, hostname: string, tier: HostStatus, alertCount: number) {
+	function addToGroup(
+		tag: string,
+		hostId: string,
+		hostname: string,
+		tier: HostStatus,
+		alertCount: number,
+	) {
 		let g = groups.get(tag);
 		if (!g) {
 			g = {
@@ -345,7 +356,7 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 			};
 			groups.set(tag, g);
 		}
-		g.hosts.push(hostname);
+		g.hosts.push({ host_id: hostId, hostname });
 		g.byTier[tier]++;
 		g.alertCount += alertCount;
 		g.worstTier = worstTier(g.worstTier, tier);
@@ -357,10 +368,10 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 		const tags = tagsByHost.get(host.host_id);
 
 		if (!tags || tags.length === 0) {
-			addToGroup("(untagged)", host.hostname, tier, alertCount);
+			addToGroup("(untagged)", host.host_id, host.hostname, tier, alertCount);
 		} else {
 			for (const tag of tags) {
-				addToGroup(tag, host.hostname, tier, alertCount);
+				addToGroup(tag, host.host_id, host.hostname, tier, alertCount);
 			}
 		}
 	}

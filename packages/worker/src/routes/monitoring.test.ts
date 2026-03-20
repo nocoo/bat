@@ -419,10 +419,12 @@ describe("GET /api/monitoring/groups", () => {
 		const vps = body.groups.find((g: { tag: string }) => g.tag === "vps");
 		const database = body.groups.find((g: { tag: string }) => g.tag === "database");
 		expect(vps.host_count).toBe(2);
-		expect(vps.hosts).toContain("h1");
-		expect(vps.hosts).toContain("h2");
+		const vpsHostIds = vps.hosts.map((h: { host_id: string }) => h.host_id);
+		expect(vpsHostIds).toContain("h1");
+		expect(vpsHostIds).toContain("h2");
 		expect(database.host_count).toBe(1);
-		expect(database.hosts).toContain("h1");
+		expect(database.hosts[0].host_id).toBe("h1");
+		expect(database.hosts[0].hostname).toBe("h1");
 	});
 
 	test("worst-tier derivation: offline > critical > warning > healthy", async () => {

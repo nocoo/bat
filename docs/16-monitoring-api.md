@@ -135,7 +135,10 @@ Hosts with **no tags** are collected into a synthetic `"(untagged)"` group so th
         "offline": 1
       },
       "alert_count": 2,
-      "hosts": ["us.nocoo.cloud", "jp.nocoo.cloud", "..."]
+      "hosts": [
+        { "host_id": "abc123", "hostname": "us.nocoo.cloud" },
+        { "host_id": "def456", "hostname": "jp.nocoo.cloud" }
+      ]
     },
     {
       "tag": "(untagged)",
@@ -143,7 +146,7 @@ Hosts with **no tags** are collected into a synthetic `"(untagged)"` group so th
       "tier": "healthy",
       "by_tier": { "healthy": 1, "warning": 0, "critical": 0, "offline": 0 },
       "alert_count": 0,
-      "hosts": ["new-host.example.com"]
+      "hosts": [{ "host_id": "ghi789", "hostname": "new-host.example.com" }]
     }
   ]
 }
