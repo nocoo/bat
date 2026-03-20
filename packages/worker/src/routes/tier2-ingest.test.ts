@@ -128,6 +128,7 @@ describe("POST /api/tier2", () => {
 		expect(snapshot?.docker_json).toBeNull();
 		expect(snapshot?.disk_deep_json).toBeNull();
 		expect(snapshot?.software_json).toBeNull();
+		expect(snapshot?.websites_json).toBeNull();
 	});
 
 	test("invalid payload (missing host_id) → 400", async () => {
@@ -153,6 +154,48 @@ describe("POST /api/tier2", () => {
 		expect(res.status).toBe(400);
 		const body = (await res.json()) as { error: string };
 		expect(body.error).toContain("Invalid JSON");
+	});
+
+	test("websites data round-trips through JSON", async () => {
+		const payload = makePayload({
+			websites: {
+				sites: [
+					{ domain: "example.com", web_server: "nginx", ssl: true },
+					{ domain: "blog.example.com", web_server: "apache", ssl: false },
+				],
+			},
+		});
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const snapshot = await db
+			.prepare("SELECT websites_json FROM tier2_snapshots WHERE host_id = ?")
+			.bind("host-001")
+			.first<{ websites_json: string | null }>();
+		expect(snapshot).not.toBeNull();
+		expect(snapshot?.websites_json).not.toBeNull();
+
+		const parsed = JSON.parse(snapshot?.websites_json as string);
+		expect(parsed.sites).toBeArray();
+		expect(parsed.sites.length).toBe(2);
+		expect(parsed.sites[0].domain).toBe("example.com");
+		expect(parsed.sites[0].web_server).toBe("nginx");
+		expect(parsed.sites[0].ssl).toBe(true);
+		expect(parsed.sites[1].domain).toBe("blog.example.com");
+		expect(parsed.sites[1].ssl).toBe(false);
+	});
+
+	test("websites null when absent from payload", async () => {
+		const payload = makePayload();
+		const res = await post(app, payload);
+		expect(res.status).toBe(204);
+
+		const snapshot = await db
+			.prepare("SELECT websites_json FROM tier2_snapshots WHERE host_id = ?")
+			.bind("host-001")
+			.first<{ websites_json: string | null }>();
+		expect(snapshot).not.toBeNull();
+		expect(snapshot?.websites_json).toBeNull();
 	});
 
 	test("clock skew → 400", async () => {

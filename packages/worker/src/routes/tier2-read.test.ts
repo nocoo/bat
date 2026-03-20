@@ -40,13 +40,15 @@ async function seedTier2(
 		security: string;
 		docker: string;
 		disk_deep: string;
+		software: string;
+		websites: string;
 	}>,
 ): Promise<void> {
 	await db
 		.prepare(
 			`INSERT INTO tier2_snapshots
-  (host_id, ts, ports_json, systemd_json, security_json, docker_json, disk_deep_json)
-VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  (host_id, ts, ports_json, systemd_json, security_json, docker_json, disk_deep_json, software_json, websites_json)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -56,6 +58,8 @@ VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			data?.security ?? null,
 			data?.docker ?? null,
 			data?.disk_deep ?? null,
+			data?.software ?? null,
+			data?.websites ?? null,
 		)
 		.run();
 }
@@ -144,9 +148,39 @@ describe("GET /api/hosts/:id/tier2", () => {
 		expect(body.docker).toBeNull();
 		expect(body.disk_deep).toBeNull();
 		expect(body.software).toBeNull();
+		expect(body.websites).toBeNull();
 		expect(body.timezone).toBeNull();
 		expect(body.dns_resolvers).toBeNull();
 		expect(body.dns_search).toBeNull();
+	});
+
+	test("websites data round-trips through read", async () => {
+		const hostId = "host-websites";
+		const now = Math.floor(Date.now() / 1000);
+		await seedHost(db, hostId);
+
+		const websitesData = {
+			sites: [
+				{ domain: "example.com", web_server: "nginx", ssl: true },
+				{ domain: "blog.example.com", web_server: "apache", ssl: false },
+			],
+		};
+		await seedTier2(db, hostId, now, {
+			websites: JSON.stringify(websitesData),
+		});
+
+		const res = await get(app, hostId);
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as Tier2Snapshot;
+		expect(body.websites).not.toBeNull();
+		expect(body.websites?.sites).toBeArray();
+		expect(body.websites?.sites.length).toBe(2);
+		expect(body.websites?.sites[0].domain).toBe("example.com");
+		expect(body.websites?.sites[0].web_server).toBe("nginx");
+		expect(body.websites?.sites[0].ssl).toBe(true);
+		expect(body.websites?.sites[1].domain).toBe("blog.example.com");
+		expect(body.websites?.sites[1].ssl).toBe(false);
 	});
 
 	test("returns inventory fields from hosts table", async () => {
