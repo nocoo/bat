@@ -4,6 +4,7 @@ import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/sha
 import { Hono } from "hono";
 import { apiKeyAuth } from "../../src/middleware/api-key";
 import { alertsListRoute } from "../../src/routes/alerts";
+import { fleetStatusRoute } from "../../src/routes/fleet-status";
 import { hostsListRoute } from "../../src/routes/hosts";
 import { identityRoute } from "../../src/routes/identity";
 import { ingestRoute } from "../../src/routes/ingest";
@@ -28,6 +29,7 @@ function createApp(db: D1Database) {
 	app.get("/api/hosts", hostsListRoute);
 	app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 	app.get("/api/alerts", alertsListRoute);
+	app.get("/api/fleet/status", fleetStatusRoute);
 	return app;
 }
 
@@ -295,36 +297,17 @@ describe("Worker E2E — full lifecycle", () => {
 		expect(diskAlert?.severity).toBe("critical");
 	});
 
-	test("live endpoint returns 200 when hosts exist with no critical alerts", async () => {
-		// Need at least one host for live to return 200
-		await app.request(
-			new Request("http://localhost/api/identity", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${WRITE_KEY}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(makeIdentityPayload("host-healthy")),
-			}),
-		);
-		await app.request(
-			new Request("http://localhost/api/ingest", {
-				method: "POST",
-				headers: {
-					Authorization: `Bearer ${WRITE_KEY}`,
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(makeMetricsPayload("host-healthy")),
-			}),
-		);
-
+	test("live endpoint always returns 200 with ok status", async () => {
 		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.status).toBe(200);
+		const body = (await res.json()) as { status: string; component: string };
+		expect(body.status).toBe("ok");
+		expect(body.component).toBe("worker");
 	});
 
-	test("live endpoint returns 503 when no hosts exist", async () => {
+	test("live endpoint returns 200 even when no hosts exist", async () => {
 		const res = await app.request(new Request("http://localhost/api/live"));
-		expect(res.status).toBe(503);
+		expect(res.status).toBe(200);
 	});
 
 	test("duplicate ingest (same host_id + ts) does not create duplicate rows", async () => {
