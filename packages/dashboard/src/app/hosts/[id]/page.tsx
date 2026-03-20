@@ -18,6 +18,7 @@ import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { WebsitesPanel } from "@/components/websites-panel";
 import {
 	useAlerts,
 	useAllowedPorts,
@@ -409,6 +410,9 @@ export default function HostDetailPage() {
 							{host && <AllowedPortsPanel hostId={host.host_id} hostAlerts={hostAlerts} />}
 							{tier2?.software && tier2.software.detected.length > 0 && (
 								<SoftwareCard software={tier2.software.detected} />
+							)}
+							{tier2?.websites && tier2.websites.sites.length > 0 && (
+								<WebsitesPanel sites={tier2.websites.sites} />
 							)}
 							<DiskBars data={metricsResponse.data} />
 						</div>
