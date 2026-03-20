@@ -33,6 +33,13 @@ export interface HealthResponse {
 	checked_at: number;
 }
 
+/** GET /api/live — simple liveness response (worker + dashboard) */
+export interface LiveResponse {
+	status: "ok";
+	version: string;
+	component: string;
+}
+
 /**
  * 6 Tier-1 alert rules for MVP.
  * - Instant rules: fire immediately when threshold exceeded

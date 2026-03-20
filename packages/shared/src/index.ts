@@ -39,6 +39,7 @@ export type {
 	AlertState,
 	HealthResponse,
 	HealthStatus,
+	LiveResponse,
 } from "./alerts.js";
 export {
 	ALL_ALERT_RULES,
