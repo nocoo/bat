@@ -1143,6 +1143,7 @@ pub fn match_by_docker_images(
     already_detected: &HashSet<String>,
 ) -> Vec<DetectedSoftware> {
     let mut results = Vec::new();
+    let mut seen = HashSet::new();
 
     for container in containers {
         // Split image into name and tag
@@ -1152,7 +1153,10 @@ pub fn match_by_docker_images(
         };
 
         for &(pattern, software_id) in DOCKER_IMAGE_REGISTRY {
-            if image_name.starts_with(pattern) && !already_detected.contains(software_id) {
+            if image_name.starts_with(pattern)
+                && !already_detected.contains(software_id)
+                && seen.insert(software_id)
+            {
                 let sig = REGISTRY.iter().find(|s| s.id == software_id);
                 let name = sig.map_or(software_id, |s| s.name);
                 let category = sig.map_or("infra", |s| s.category);
@@ -1689,5 +1693,29 @@ wg-quick@wg0.service                   enabled         enabled
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].id, "umami");
         assert!(results[0].version.is_none());
+    }
+
+    #[test]
+    fn docker_image_dedup_same_image_multiple_containers() {
+        let containers = vec![
+            DockerContainerRef {
+                image: "n8nio/n8n:1.76.1".to_string(),
+                state: "running".to_string(),
+            },
+            DockerContainerRef {
+                image: "n8nio/n8n:1.76.1".to_string(),
+                state: "running".to_string(),
+            },
+            DockerContainerRef {
+                image: "n8nio/n8n:1.80.0".to_string(),
+                state: "running".to_string(),
+            },
+        ];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "n8n");
+        // First container's version wins
+        assert_eq!(results[0].version, Some("1.76.1".to_string()));
     }
 }
