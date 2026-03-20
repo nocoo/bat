@@ -1,6 +1,6 @@
 # 16 — Monitoring API (Uptime Kuma Integration)
 
-> Related: [05-worker](./05-worker.md), [01-metrics-catalogue](./01-metrics-catalogue.md), [03-data-structures](./03-data-structures.md)
+> Related: [05-worker](./05-worker.md), [01-metrics-catalogue](./01-metrics-catalogue.md), [03-data-structures](./03-data-structures.md), [11-host-tags](./11-host-tags.md)
 
 ## Overview
 
@@ -24,7 +24,7 @@ A monitoring API enables:
 1. **Read-only** — no mutations via these endpoints; state lives in D1 alert_states.
 2. **Auth via `BAT_READ_KEY`** — same as existing Dashboard→Worker read routes.
 3. **Keyword-friendly** — responses include deterministic keyword strings (`"tier":"healthy"`) that Uptime Kuma keyword monitors can match against.
-4. **Cacheable** — responses can tolerate 30s staleness (aligned with probe ingest interval).
+4. **No caching** — responses carry `Cache-Control: private, no-store` to prevent shared caches from leaking authenticated host/alert data. Data staleness is bounded by the 30s probe ingest interval regardless.
 
 ---
 
@@ -82,7 +82,7 @@ List all onboarded hosts with their current health tier and alert summary.
 | `tier` | string | (all) | Filter: `healthy`, `warning`, `critical`, `offline` |
 | `tag` | string | (all) | Filter by tag name (multiple allowed, AND logic) |
 
-**Uptime Kuma usage:** keyword monitor on `"status":"ok"` — goes DOWN if the Worker itself is unhealthy.
+**Uptime Kuma usage:** keyword monitor on `"tier":"healthy"` per host. For fleet-level liveness, use the existing `GET /api/live` (public, no auth) or `GET /api/fleet/status` (auth, returns `"status":"healthy"/"degraded"/"critical"`).
 
 ---
 
@@ -116,6 +116,8 @@ Single host health detail — designed as a dedicated Uptime Kuma keyword endpoi
 
 Aggregate health by tag group — maps naturally to Uptime Kuma monitor groups.
 
+Hosts with **no tags** are collected into a synthetic `"(untagged)"` group so they are never silently excluded from the aggregation view.
+
 **Response:**
 
 ```jsonc
@@ -134,12 +136,20 @@ Aggregate health by tag group — maps naturally to Uptime Kuma monitor groups.
       },
       "alert_count": 2,
       "hosts": ["us.nocoo.cloud", "jp.nocoo.cloud", "..."]
+    },
+    {
+      "tag": "(untagged)",
+      "host_count": 1,
+      "tier": "healthy",
+      "by_tier": { "healthy": 1, "warning": 0, "critical": 0, "offline": 0 },
+      "alert_count": 0,
+      "hosts": ["new-host.example.com"]
     }
   ]
 }
 ```
 
-**Group tier derivation:** worst-of among members (offline > critical > warning > healthy), consistent with existing `deriveHostStatus` priority.
+**Group tier derivation:** worst-of among members (offline > critical > warning > healthy), using `deriveHostStatus` with port_allowlist (see Tiered Health Model below).
 
 **Uptime Kuma usage:** one keyword monitor per group checking `"tier":"healthy"`. The `uptime-kuma` skill can auto-create a monitor group per tag.
 
@@ -189,22 +199,34 @@ Active alerts enriched for monitoring consumption — flatter structure than `/a
 
 ## Tiered Health Model
 
-Map existing `deriveHostStatus` logic to a clear keyword vocabulary:
+**Must call `deriveHostStatus()` from `services/status.ts`** — not re-implement. This function encapsulates the full derivation logic including the `port_allowlist` suppression rule:
 
 | Tier | Condition | Uptime Kuma Keyword |
 |------|-----------|---------------------|
 | `healthy` | No alerts, last_seen < 120s | `"tier":"healthy"` |
-| `warning` | Any warning-severity alert | `"tier":"warning"` |
+| `warning` | Any warning-severity alert (excluding port_allowlist-suppressed `public_port`) | `"tier":"warning"` |
 | `critical` | Any critical-severity alert | `"tier":"critical"` |
 | `offline` | last_seen > 120s | `"tier":"offline"` |
 
-This is identical to the existing `deriveHostStatus` in `/api/hosts` — no new logic, just a stable keyword contract.
+The monitoring endpoints must query `port_allowlist` and pass `allowedPorts` to `deriveHostStatus`, exactly as `fleet-status.ts` and `hosts.ts` already do. This ensures Dashboard and Uptime Kuma always agree on a host's tier.
+
+---
+
+## Architecture Decision: Worker Reads Tags (Read-Only)
+
+[11-host-tags](./11-host-tags.md) established that tags are "user-initiated state" with CRUD owned by the Dashboard via D1 REST API. That boundary remains intact — **the Worker never writes tags**.
+
+However, this design introduces **Worker read access to `tags` and `host_tags`** for the `/api/monitoring/groups` and tag-enriched endpoints. This is a new cross-boundary read:
+
+- **Justification**: the monitoring API runs on the Worker (Cloudflare Workers) where D1 is a native binding — no REST roundtrip needed. Duplicating this in the Dashboard would require the Dashboard to proxy Uptime Kuma requests, adding unnecessary latency and complexity.
+- **Scope**: read-only SELECT on `tags` and `host_tags`. No INSERT/UPDATE/DELETE.
+- **11-host-tags.md update**: amend the "Worker never touch tags" statement to "Worker never **writes** tags; read access is permitted for monitoring aggregation endpoints."
 
 ---
 
 ## Integration with Uptime Kuma Skill
 
-The `uptime-kuma` skill (`.claude/skills/uptime-kuma/`) can automate monitor lifecycle:
+The `uptime-kuma` skill (`.agents/skills/uptime-kuma/`) can automate monitor lifecycle:
 
 ### Auto-onboarding flow
 
@@ -237,22 +259,32 @@ bat (group)
 
 ### Phase 1: Core endpoints (Worker)
 
-1. Add route group `/api/monitoring/*` in `packages/worker/src/routes/`.
-2. Reuse existing query logic from `hosts.ts` and `alerts.ts` — extract shared helpers if needed.
-3. `GET /api/monitoring/hosts` — query hosts + LEFT JOIN alert_states + LEFT JOIN host_tags.
-4. `GET /api/monitoring/hosts/:id` — single host variant with tag enrichment.
-5. `GET /api/monitoring/alerts` — query alert_states JOIN hosts JOIN host_tags, add `duration_seconds` (now - triggered_at).
-6. `GET /api/monitoring/groups` — query host_tags → GROUP BY tag, derive worst-tier per group.
+1. Add route file `packages/worker/src/routes/monitoring.ts`.
+2. **Query strategy** — follow the existing pattern in `fleet-status.ts` and `hosts.ts`: **separate queries, assemble in code**. No multi-table JOINs that risk cartesian blowup.
+   - Query 1: `SELECT host_id, hostname, last_seen FROM hosts WHERE is_active = 1`
+   - Query 2: `SELECT host_id, severity, rule_id, message FROM alert_states WHERE host_id IN (?...)`
+   - Query 3: `SELECT host_id, port FROM port_allowlist WHERE host_id IN (?...)`
+   - Query 4 (tag endpoints only): `SELECT ht.host_id, t.name FROM host_tags ht JOIN tags t ON ht.tag_id = t.id WHERE ht.host_id IN (?...)`
+   - Assemble: build per-host Maps, call `deriveHostStatus()` per host, aggregate by tag for groups.
+3. `GET /api/monitoring/hosts` — host list with tier + alerts.
+4. `GET /api/monitoring/hosts/:id` — single host with tags.
+5. `GET /api/monitoring/alerts` — alert_states enriched with hostname and tags.
+6. `GET /api/monitoring/groups` — group by tag, derive worst-tier per group. Untagged hosts → `"(untagged)"` group.
 7. Auth: `BAT_READ_KEY` (reuse existing `apiKeyAuth` middleware).
-8. Add `Cache-Control: public, max-age=30` — safe since data is 30s stale at worst.
+8. Response headers: `Cache-Control: private, no-store`.
+9. Register routes in `index.ts` under the existing read routes block.
 
-### Phase 2: Tests
+### Phase 2: Update 11-host-tags.md
 
-1. Unit tests for tier derivation and group aggregation logic.
-2. E2E tests: seed D1 with hosts + alerts + tags → assert response shapes and keyword presence.
+Amend the architecture decision to reflect Worker read access to tags (see section above).
+
+### Phase 3: Tests
+
+1. Unit tests for group aggregation and `(untagged)` fallback logic.
+2. E2E tests: seed D1 with hosts + alerts + tags + port_allowlist → assert response shapes, keyword presence, and tier correctness (especially port_allowlist suppression).
 3. Add migration entries to E2E `wrangler.test.ts` migration list if new migrations are needed (see retrospective).
 
-### Phase 3: Uptime Kuma sync script
+### Phase 4: Uptime Kuma sync script
 
 1. Create a one-shot bun script (extend `socketio-client.mjs` pattern) that:
    - Fetches `/api/monitoring/hosts` and `/api/monitoring/groups`.
@@ -262,7 +294,7 @@ bat (group)
 
 ### No new migrations needed
 
-All required data already exists: `hosts`, `alert_states`, `host_tags`, `tags`. The new endpoints are pure read queries — no schema changes.
+All required data already exists: `hosts`, `alert_states`, `host_tags`, `tags`, `port_allowlist`. The new endpoints are pure read queries — no schema changes.
 
 ---
 
