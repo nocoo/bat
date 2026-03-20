@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.10.0 (2026-03-21)
+
+### Features
+
+- **Monitoring API** (docs/16) — 4 new read-only Worker endpoints under `/api/monitoring/*` for Uptime Kuma integration:
+  - `GET /api/monitoring/hosts` — fleet overview with health tiers, alert summaries, tier/tag filters
+  - `GET /api/monitoring/hosts/:id` — single host keyword endpoint (`"tier":"healthy"`) for Uptime Kuma monitors
+  - `GET /api/monitoring/groups` — tag-based group aggregation with worst-tier derivation and `(untagged)` fallback
+  - `GET /api/monitoring/alerts` — active alerts enriched with hostname, tags, duration, severity/tag filters
+- **Fleet status split** — Extract `GET /api/fleet/status` from `/api/live`, separating liveness probe from fleet health
+
+### Architecture
+
+- **Worker reads tags (read-only)** — Worker now has read-only SELECT access to `tags` and `host_tags` for monitoring aggregation. Tag CRUD remains Dashboard-only
+- **Separate-query-then-assemble** — Monitoring endpoints use parallel D1 queries assembled in-memory, avoiding cartesian JOIN blowup on alerts × tags
+- **`deriveHostStatus()` reuse** — All tier derivation goes through the shared function including `port_allowlist` suppression
+
+### Tests
+
+- 36 new monitoring route tests with 100% line and function coverage
+- Added `0010_tags.sql` migration to mock-d1 test helper
+
 ## v0.9.0 (2026-03-20)
 
 ### Features

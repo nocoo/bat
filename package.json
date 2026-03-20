@@ -1,6 +1,6 @@
 {
 	"name": "bat",
-	"version": "0.9.0",
+	"version": "0.10.0",
 	"private": true,
 	"packageManager": "pnpm@10.28.1",
 	"scripts": {
@@ -19,6 +19,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"husky": "^9.1.0",
+		"socket.io-client": "^4.8.3",
 		"turbo": "^2.5.0",
 		"typescript": "^5.8.2"
 	}
