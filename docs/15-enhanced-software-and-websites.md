@@ -427,7 +427,7 @@ export interface WebsiteDiscoveryData {
 | Area | Tests |
 |------|-------|
 | New registry entries | Verify frps/xray/v2ray/n8n signatures match expected patterns |
-| `match_by_ports` without process name | Port-only matching returns correct software ID |
+| Port detection with capability | Verify `match_by_ports` correctly maps socket→PID→process when `/proc/[pid]/fd` is readable |
 | Nginx parser | Parse real-world nginx config with multiple server blocks, SSL, redirects, includes |
 | Nginx parser edge cases | `server_name _`, localhost, IP-only, commented `server_name`, missing files |
 | Apache parser | Parse `<VirtualHost>`, `ServerName`, `ServerAlias`, SSL detection |
