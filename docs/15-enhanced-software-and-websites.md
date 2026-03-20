@@ -309,15 +309,18 @@ Without the ability to map socket → PID → process name, `ListeningPort.proce
 | C. Parse `/proc/net/tcp` inode → match from `/proc/[pid]/net/tcp6` per-pid | Works per-process | Complex, still needs /proc/[pid] access |
 | D. Hybrid: read `/proc/net/tcp` for ports, match against known port→software mapping without process name | No extra privileges | Less accurate (port 80 could be any web server) |
 
-**Recommended**: Option B — grant `CAP_DAC_READ_SEARCH` to the bat-probe binary. This is the minimal privilege escalation needed to restore correct fd→inode→process mapping. Add to `install.sh` post-install step:
+**Recommended**: Option B — grant `CAP_DAC_READ_SEARCH` via the systemd unit file. This is the minimal privilege needed to restore correct fd→inode→process mapping in `/proc/[pid]/fd/`.
 
-```bash
-sudo setcap cap_dac_read_search+ep /usr/local/bin/bat-probe
+**Implementation**: The probe's systemd unit (`probe/dist/bat-probe.service`) currently has `NoNewPrivileges=true`, which blocks file-based capabilities (`setcap`). Instead, use systemd's `AmbientCapabilities` directive, which injects the capability at service start without requiring `setcap` on the binary:
+
+```ini
+# probe/dist/bat-probe.service — changes:
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+# Keep NoNewPrivileges=true — AmbientCapabilities is applied before
+# NoNewPrivileges takes effect, so both can coexist.
 ```
 
-This capability only allows reading directory entries in `/proc/[pid]/fd/` — it does not grant write access, ptrace, or any other privilege. The probe's existing systemd hardening (`NoNewPrivileges=true`, `ProtectSystem=strict`) remains in effect.
-
-> Note: `NoNewPrivileges=true` in the systemd unit would prevent `setcap` from taking effect. The unit file must use `AmbientCapabilities=CAP_DAC_READ_SEARCH` instead, or remove `NoNewPrivileges=true`.
+The `install.sh` script must deploy the updated unit file. No `setcap` command needed — systemd handles capability injection.
 
 **Rejected alternative** (Option D — port-only matching without process name): Too many false positives on generic ports. Port 80/443 could be Nginx, Apache, Caddy, or a random app; port 3000 could be Grafana, Umami, or any Node.js app; port 9000 could be ClickHouse or Portainer. Without process-name confirmation, this would systematically produce incorrect software identifications.
 
@@ -381,12 +384,14 @@ export interface WebsiteDiscoveryData {
 
 | File | Change |
 |------|--------|
-| `probe/src/collectors/tier2/software.rs` | Add ~10 new `SoftwareSignature` entries; add `"proxy"` category; add `match_by_docker_images()` (stretch); fix `match_by_ports` to work without process names |
+| `probe/src/collectors/tier2/software.rs` | Add ~10 new `SoftwareSignature` entries; add `"proxy"` category; add `match_by_docker_images()` (stretch) |
 | `probe/src/collectors/tier2/websites.rs` | **NEW** — Nginx/Apache vhost parser, `collect_websites()` |
 | `probe/src/collectors/tier2/mod.rs` | Export `websites` module |
 | `probe/src/collectors/tier2/docker.rs` | Export container list for software cross-reference (stretch) |
 | `probe/src/payload.rs` | Add `websites: Option<WebsiteDiscoveryData>` to `Tier2Payload` |
 | `probe/src/main.rs` | Call `collect_websites()` in `collect_tier2()`, pass result to payload |
+| `probe/dist/bat-probe.service` | Add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to restore port→process mapping |
+| `probe/install.sh` | Deploy updated unit file |
 
 ### Shared (TypeScript)
 
@@ -452,7 +457,7 @@ export interface WebsiteDiscoveryData {
 | # | Scope | Description | Status |
 |---|-------|-------------|--------|
 | 1 | probe | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | |
-| 2 | probe | Fix port detection: grant `CAP_DAC_READ_SEARCH` via systemd `AmbientCapabilities`, update `install.sh` and unit file | |
+| 2 | probe | Fix port detection: add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit file, deploy via `install.sh` | |
 | 3 | shared | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types | |
 | 4 | probe | Add `websites.rs` — Nginx vhost block parser with `collect_websites()` | |
 | 5 | probe | Add Apache vhost parser to `websites.rs` | |
