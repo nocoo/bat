@@ -317,7 +317,10 @@ export default function HostDetailPage() {
 								rangeSeconds={rangeSeconds}
 							/>
 							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<TopProcessesTable data={metricsResponse.data} />
+							<TopProcessesTable
+								data={metricsResponse.data}
+								resolution={metricsResponse.resolution}
+							/>
 						</div>
 
 						{/* Right column — snapshot / non-time-series */}

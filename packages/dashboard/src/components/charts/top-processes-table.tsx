@@ -7,7 +7,7 @@ import {
 	transformTopProcessesData,
 } from "@/lib/transforms";
 import type { TopProcessEntry } from "@/lib/transforms";
-import type { MetricsDataPoint } from "@bat/shared";
+import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -92,7 +92,10 @@ function SortTh({
 	);
 }
 
-export function TopProcessesTable({ data }: { data: MetricsDataPoint[] }) {
+export function TopProcessesTable({
+	data,
+	resolution,
+}: { data: MetricsDataPoint[]; resolution?: MetricsResolution }) {
 	const processes = useMemo(() => transformTopProcessesData(data), [data]);
 	const [sortKey, setSortKey] = useState<SortKey>("cpu_pct");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
@@ -124,10 +127,16 @@ export function TopProcessesTable({ data }: { data: MetricsDataPoint[] }) {
 	};
 
 	if (processes.length === 0) {
+		const isHourly = resolution === "hourly";
 		return (
 			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
-				<div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
-					No process data
+				<div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-1">
+					<span>
+						{isHourly
+							? "Process snapshots are not available in aggregated views"
+							: "No process data"}
+					</span>
+					{isHourly && <span className="text-xs">Switch to 1h or 6h to see live process data</span>}
 				</div>
 			</div>
 		);
