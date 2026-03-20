@@ -33,6 +33,16 @@
 		}
 	},
 	"files": {
-		"ignore": ["node_modules", "dist", ".turbo", ".next", "coverage", ".wrangler", "probe/target"]
+		"ignore": [
+			"node_modules",
+			"dist",
+			".turbo",
+			".next",
+			"coverage",
+			".wrangler",
+			"probe/target",
+			".agents",
+			".claude/skills"
+		]
 	}
 }
