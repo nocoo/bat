@@ -288,13 +288,9 @@ Implemented in `packages/worker/src/routes/monitoring.test.ts` — 36 tests, 100
 2. ~~E2E-style tests: seed D1 with hosts + alerts + tags + port_allowlist → assert response shapes, keyword presence, tier correctness.~~ ✅
 3. Added `0010_tags.sql` migration to `mock-d1.ts` for tag query support.
 
-### Phase 4: Uptime Kuma sync script
+### Phase 4: ~~Uptime Kuma sync script~~ — Skipped
 
-1. Create a one-shot bun script (extend `socketio-client.mjs` pattern) that:
-   - Fetches `/api/monitoring/hosts` and `/api/monitoring/groups`.
-   - Diffs against current Uptime Kuma `monitorList`.
-   - Creates missing monitors, removes stale ones.
-2. Document the sync workflow in CLAUDE.md.
+Decided not to implement automatic sync. Monitor creation/update in Uptime Kuma will be done manually via the `uptime-kuma` skill as needed. The monitoring API endpoints provide the data; humans decide which monitors to create.
 
 ### No new migrations needed
 
