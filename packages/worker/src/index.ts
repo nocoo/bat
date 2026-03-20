@@ -10,6 +10,12 @@ import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
 import { liveRoute } from "./routes/live.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
+import {
+	monitoringAlertsRoute,
+	monitoringGroupsRoute,
+	monitoringHostDetailRoute,
+	monitoringHostsRoute,
+} from "./routes/monitoring.js";
 import { tier2IngestRoute } from "./routes/tier2-ingest.js";
 import { hostTier2Route } from "./routes/tier2-read.js";
 import {
@@ -46,6 +52,12 @@ app.get("/api/hosts/:id", hostDetailRoute);
 app.get("/api/alerts", alertsListRoute);
 app.get("/api/events", eventsListRoute);
 app.get("/api/fleet/status", fleetStatusRoute);
+
+// Monitoring routes (Uptime Kuma integration — read key)
+app.get("/api/monitoring/hosts/:id", monitoringHostDetailRoute);
+app.get("/api/monitoring/hosts", monitoringHostsRoute);
+app.get("/api/monitoring/groups", monitoringGroupsRoute);
+app.get("/api/monitoring/alerts", monitoringAlertsRoute);
 app.get("/api/webhooks", webhooksListRoute);
 app.post("/api/webhooks", webhooksCreateRoute);
 app.delete("/api/webhooks/:id", webhooksDeleteRoute);
