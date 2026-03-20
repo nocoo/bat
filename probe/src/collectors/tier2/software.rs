@@ -399,6 +399,18 @@ static REGISTRY: &[SoftwareSignature] = &[
             dpkg_names: &[],
         },
     },
+    SoftwareSignature {
+        id: "portainer",
+        name: "Portainer",
+        category: "container",
+        detect: DetectRules {
+            ports: &[(9000, "portainer"), (9443, "portainer")],
+            process_names: &["portainer"],
+            systemd_units: &[],
+            binary_names: &[],
+            dpkg_names: &[],
+        },
+    },
     // --- Monitoring & observability ---
     SoftwareSignature {
         id: "prometheus",
@@ -448,6 +460,30 @@ static REGISTRY: &[SoftwareSignature] = &[
             dpkg_names: &["zabbix-agent"],
         },
     },
+    SoftwareSignature {
+        id: "uptime_kuma",
+        name: "Uptime Kuma",
+        category: "monitoring",
+        detect: DetectRules {
+            ports: &[(3001, "node")],
+            process_names: &[],
+            systemd_units: &["uptime-kuma"],
+            binary_names: &[],
+            dpkg_names: &[],
+        },
+    },
+    SoftwareSignature {
+        id: "umami",
+        name: "Umami",
+        category: "monitoring",
+        detect: DetectRules {
+            ports: &[(3000, "node")],
+            process_names: &[],
+            systemd_units: &[],
+            binary_names: &[],
+            dpkg_names: &[],
+        },
+    },
     // --- Security ---
     SoftwareSignature {
         id: "crowdsec",
@@ -483,6 +519,67 @@ static REGISTRY: &[SoftwareSignature] = &[
             systemd_units: &["openvpn"],
             binary_names: &["openvpn"],
             dpkg_names: &["openvpn"],
+        },
+    },
+    // --- Proxies & tunnels ---
+    SoftwareSignature {
+        id: "frps",
+        name: "frp Server",
+        category: "proxy",
+        detect: DetectRules {
+            ports: &[(7000, "frps"), (7500, "frps")],
+            process_names: &["frps"],
+            systemd_units: &["frps"],
+            binary_names: &["frps"],
+            dpkg_names: &[],
+        },
+    },
+    SoftwareSignature {
+        id: "frpc",
+        name: "frp Client",
+        category: "proxy",
+        detect: DetectRules {
+            ports: &[],
+            process_names: &["frpc"],
+            systemd_units: &["frpc"],
+            binary_names: &["frpc"],
+            dpkg_names: &[],
+        },
+    },
+    SoftwareSignature {
+        id: "xray",
+        name: "Xray",
+        category: "proxy",
+        detect: DetectRules {
+            ports: &[],
+            process_names: &["xray"],
+            systemd_units: &["xray"],
+            binary_names: &["xray"],
+            dpkg_names: &[],
+        },
+    },
+    SoftwareSignature {
+        id: "v2ray",
+        name: "V2Ray",
+        category: "proxy",
+        detect: DetectRules {
+            ports: &[],
+            process_names: &["v2ray"],
+            systemd_units: &["v2ray"],
+            binary_names: &["v2ray"],
+            dpkg_names: &[],
+        },
+    },
+    SoftwareSignature {
+        id: "clash",
+        name: "Clash",
+        category: "proxy",
+        detect: DetectRules {
+            ports: &[(7890, "clash"), (9090, "clash")],
+            process_names: &["clash"],
+            systemd_units: &["clash"],
+            binary_names: &["clash"],
+            dpkg_names: &[],
         },
     },
     // --- Infrastructure ---
@@ -556,6 +653,18 @@ static REGISTRY: &[SoftwareSignature] = &[
             systemd_units: &[],
             binary_names: &["certbot"],
             dpkg_names: &["certbot"],
+        },
+    },
+    SoftwareSignature {
+        id: "n8n",
+        name: "n8n",
+        category: "infra",
+        detect: DetectRules {
+            ports: &[(5678, "node")],
+            process_names: &[],
+            systemd_units: &["n8n"],
+            binary_names: &[],
+            dpkg_names: &[],
         },
     },
 ];
@@ -1304,10 +1413,10 @@ wg-quick@wg0.service                   enabled         enabled
 
     #[test]
     fn registry_has_expected_count() {
-        // ~40 entries per docs/12
+        // ~50 entries: 41 original + 9 new (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer)
         assert!(
-            REGISTRY.len() >= 35,
-            "registry should have ≥35 entries, got {}",
+            REGISTRY.len() >= 44,
+            "registry should have ≥44 entries, got {}",
             REGISTRY.len()
         );
     }
@@ -1318,5 +1427,93 @@ wg-quick@wg0.service                   enabled         enabled
         for sig in REGISTRY {
             assert!(ids.insert(sig.id), "duplicate registry id: {}", sig.id);
         }
+    }
+
+    // --- New registry entries ---
+
+    #[test]
+    fn match_ports_finds_frps() {
+        let ports = vec![ListeningPort {
+            port: 7000,
+            bind: "0.0.0.0".to_string(),
+            protocol: "tcp".to_string(),
+            pid: Some(200),
+            process: Some("frps".to_string()),
+        }];
+        let hits = match_by_ports(&ports, REGISTRY);
+        assert!(hits.contains_key("frps"));
+        assert_eq!(hits["frps"], vec![7000]);
+    }
+
+    #[test]
+    fn match_processes_finds_xray() {
+        let procs: HashSet<String> = ["xray"].iter().map(|s| s.to_string()).collect();
+        let hits = match_by_processes(&procs, REGISTRY);
+        assert!(hits.contains("xray"));
+    }
+
+    #[test]
+    fn match_systemd_finds_frpc() {
+        let output = "frpc.service                           enabled         enabled\n";
+        let hits = match_by_systemd_units(output, REGISTRY);
+        assert!(hits.contains("frpc"));
+    }
+
+    #[test]
+    fn match_ports_finds_portainer() {
+        let ports = vec![ListeningPort {
+            port: 9000,
+            bind: "0.0.0.0".to_string(),
+            protocol: "tcp".to_string(),
+            pid: Some(300),
+            process: Some("portainer".to_string()),
+        }];
+        let hits = match_by_ports(&ports, REGISTRY);
+        assert!(hits.contains_key("portainer"));
+    }
+
+    #[test]
+    fn match_ports_finds_n8n() {
+        let ports = vec![ListeningPort {
+            port: 5678,
+            bind: "0.0.0.0".to_string(),
+            protocol: "tcp".to_string(),
+            pid: Some(400),
+            process: Some("node".to_string()),
+        }];
+        let hits = match_by_ports(&ports, REGISTRY);
+        assert!(hits.contains_key("n8n"));
+    }
+
+    #[test]
+    fn match_systemd_finds_uptime_kuma() {
+        let output = "uptime-kuma.service                    enabled         enabled\n";
+        let hits = match_by_systemd_units(output, REGISTRY);
+        assert!(hits.contains("uptime_kuma"));
+    }
+
+    #[test]
+    fn registry_has_proxy_category() {
+        let proxy_entries: Vec<_> = REGISTRY.iter().filter(|s| s.category == "proxy").collect();
+        assert_eq!(proxy_entries.len(), 5, "expected 5 proxy entries");
+        let ids: Vec<&str> = proxy_entries.iter().map(|s| s.id).collect();
+        assert!(ids.contains(&"frps"));
+        assert!(ids.contains(&"frpc"));
+        assert!(ids.contains(&"xray"));
+        assert!(ids.contains(&"v2ray"));
+        assert!(ids.contains(&"clash"));
+    }
+
+    #[test]
+    fn match_ports_finds_clash() {
+        let ports = vec![ListeningPort {
+            port: 7890,
+            bind: "0.0.0.0".to_string(),
+            protocol: "tcp".to_string(),
+            pid: Some(500),
+            process: Some("clash".to_string()),
+        }];
+        let hits = match_by_ports(&ports, REGISTRY);
+        assert!(hits.contains_key("clash"));
     }
 }
