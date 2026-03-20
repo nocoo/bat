@@ -1,5 +1,52 @@
 # Changelog
 
+## v0.9.0 (2026-03-20)
+
+### Features
+
+- **Website discovery** (docs/15) — When Nginx or Apache is detected, parse vhost configs to extract served domains. New WebsitesPanel on host detail page with SSL indicators and web server badges
+- **Enhanced software registry** — 9 new software entries: frps, frpc, Xray, V2Ray, Clash, Uptime Kuma, Umami, n8n, Portainer. New `proxy` category for tunneling software
+- **Docker image → software mapping** — 6th detection layer cross-references running container images against a known-image registry (Uptime Kuma, n8n, Portainer, Watchtower, Umami), with version extraction from image tags
+- **Port detection restored** — Add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit, restoring socket→PID→process mapping for the `bat` user
+
+### Fixes
+
+- **Docker image dedup** — `match_by_docker_images()` now deduplicates within its own results, preventing duplicate software entries when multiple containers share the same image
+- **Apache inline comments** — Apache vhost parser now strips inline comments (e.g. `ServerName example.com # primary`), matching Nginx parser behavior
+
+### Database
+
+- Migration `0016_websites.sql` — Add `websites_json` column to tier2_snapshots table
+
+### Tests
+
+- Websites JSON round-trip assertions for worker ingest and read paths
+- 33 new probe tests: Nginx/Apache vhost parsing, domain validation, dedup, Docker image matching
+- Rust coverage: 87.29% (≥85% threshold)
+
+## v0.8.0 (2026-03-20)
+
+### Features
+
+- **Top processes** (docs/14) — Two-phase procfs collection capturing top 50 CPU/memory consumers per sample. New TopProcessesTable on host detail page with sortable columns
+- **Tier 2 interval reduction** — Tier 2 collection interval reduced from 6 hours to 30 minutes for faster software/security discovery
+- **Remove updates collector** — Drop package update monitoring and related alert rules (too noisy, low signal)
+
+### Fixes
+
+- **Top processes tracking** — Track `prev_states` for ALL PIDs (not just top N), fixing invisible CPU-spiking processes that only appear after crossing the threshold
+- **Hourly empty state** — Distinguish hourly-no-data from missing process data in dashboard, showing contextual empty state instead of misleading message
+- **Stale status data** — Add `cache: no-store` to proxy fetch preventing CDN-cached stale host status
+- **Webhook cascade** — Prevent webhook deletion from cascading to events; fix rate-limit and idempotency bugs
+
+### Dashboard
+
+- Upgrade host card badges to basalt soft/tinted style with hash-based coloring
+
+### Database
+
+- Migration `0015_top_processes.sql` — Add `top_processes_json` column to metrics_raw table
+
 ## v0.7.0 (2026-03-19)
 
 ### Features
