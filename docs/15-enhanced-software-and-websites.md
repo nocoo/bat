@@ -456,16 +456,16 @@ export interface WebsiteDiscoveryData {
 
 | # | Scope | Description | Status |
 |---|-------|-------------|--------|
-| 1 | probe | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | |
-| 2 | probe | Fix port detection: add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit file, deploy via `install.sh` | |
-| 3 | shared | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types | |
-| 4 | probe | Add `websites.rs` — Nginx vhost block parser with `collect_websites()` | |
-| 5 | probe | Add Apache vhost parser to `websites.rs` | |
-| 6 | probe | Wire `collect_websites()` into `collect_tier2()` and `Tier2Payload` | |
-| 7 | worker | D1 migration `0016_websites.sql` + ingest/read `websites_json` column in `tier2-metrics.ts` | |
-| 8 | dashboard | Add `"proxy"` category to labels/order; add `WebsitesPanel` component with best-effort footer | |
-| 9 | dashboard | Wire `WebsitesPanel` into host detail page | |
-| 10 | probe (stretch) | Add Docker image → software mapping layer | |
+| 1 | probe | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | ✅ `09eecb3` |
+| 2 | probe | Fix port detection: add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit file, deploy via `install.sh` | ✅ `6c8f70a` |
+| 3 | shared | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types | ✅ `eb8e6c5` (merged with #7 & #8) |
+| 4 | probe | Add `websites.rs` — Nginx vhost block parser with `collect_websites()` | ✅ `f093e3c` (merged #4+#5+#6) |
+| 5 | probe | Add Apache vhost parser to `websites.rs` | ✅ (in `f093e3c`) |
+| 6 | probe | Wire `collect_websites()` into `collect_tier2()` and `Tier2Payload` | ✅ (in `f093e3c`) |
+| 7 | worker | D1 migration `0016_websites.sql` + ingest/read `websites_json` column in `tier2-metrics.ts` | ✅ (in `eb8e6c5`) |
+| 8 | dashboard | Add `"proxy"` category to labels/order; add `WebsitesPanel` component with best-effort footer | ✅ `d8062dc` (merged with #9) |
+| 9 | dashboard | Wire `WebsitesPanel` into host detail page | ✅ (in `d8062dc`) |
+| 10 | probe (stretch) | Add Docker image → software mapping layer | ✅ `27d5532` |
 
 ---
 
