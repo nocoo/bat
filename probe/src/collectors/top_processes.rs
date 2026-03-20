@@ -438,12 +438,28 @@ pub fn collect_top_processes(
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    // Take top N
+    // Build prev_states for ALL scanned PIDs (cpu_ticks baseline only, no IO read).
+    // This ensures processes not in top N still accumulate a delta baseline, so they
+    // can be ranked correctly if they spike on the next cycle.
+    let mut new_prev_states: HashMap<u32, PrevProcStat> = HashMap::with_capacity(phase1.len());
+    for (stat, _) in &phase1 {
+        new_prev_states.insert(
+            stat.pid,
+            PrevProcStat {
+                cpu_ticks: stat.utime + stat.stime,
+                starttime: stat.starttime,
+                majflt: stat.majflt,
+                read_bytes: 0,
+                write_bytes: 0,
+            },
+        );
+    }
+
+    // Take top N for Phase 2 enrichment
     phase1.truncate(TOP_N);
 
-    // Phase 2: enrich with cmdline + io
+    // Phase 2: enrich top N with cmdline + io
     let mut snapshots = Vec::with_capacity(phase1.len());
-    let mut new_prev_states: HashMap<u32, PrevProcStat> = HashMap::with_capacity(pids.len());
 
     for (stat, _) in &phase1 {
         let cmd = read_cmdline(stat.pid);
@@ -474,23 +490,10 @@ pub fn collect_top_processes(
             passwd_map,
         );
 
+        // Overwrite the cpu-only baseline with full IO data for top N
         new_prev_states.insert(stat.pid, extract_prev_state(stat, io.as_ref()));
         snapshots.push(snapshot);
     }
-
-    // Also update prev_states for PIDs NOT in top N (they still need delta tracking)
-    // But only keep ones that still exist in current scan
-    for (stat, _) in phase1.iter().skip(TOP_N) {
-        let io = read_proc_io(stat.pid);
-        new_prev_states.insert(stat.pid, extract_prev_state(stat, io.as_ref()));
-    }
-    // Keep prev states for non-top pids that were in phase1
-    // (phase1 is already truncated, so we need to also track the rest from the full scan)
-    // Actually, we already truncated phase1. For pids not in top N, we still need
-    // their prev state. Let's iterate all pids from the scan.
-    // Since phase1 is truncated, we need to re-scan for prev state.
-    // Simpler approach: just keep top N in prev_states — first cycle for
-    // others will show cpu_pct=None which is acceptable.
 
     *prev_states = new_prev_states;
 
