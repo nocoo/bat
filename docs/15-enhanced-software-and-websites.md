@@ -90,23 +90,42 @@ When Nginx or Apache is detected on a host, parse their virtual host configurati
 
 ### 3.2 Collection Strategy (Probe)
 
+This is a **best-effort parser**, not a full config syntax analyzer. Nginx and Apache configs support `include` directives, nested blocks, conditionals, and Lua/mod_rewrite that a regex-based parser cannot fully resolve. The goal is to extract domain names from the ~90% of standard vhost configurations that follow common patterns, and silently skip configurations that are too complex.
+
+**Nginx parser** — per-block state machine:
+
 ```
-If Nginx detected:
-  1. Read /etc/nginx/nginx.conf
-  2. Read /etc/nginx/sites-enabled/* and /etc/nginx/conf.d/*.conf
-  3. Extract server_name directives (regex: `server_name\s+(.+);`)
-  4. Filter out: _, localhost, empty, IP addresses, commented lines
-
-If Apache detected:
-  1. Read /etc/apache2/sites-enabled/*.conf (Debian)
-     OR /etc/httpd/conf.d/*.conf (RHEL/CentOS)
-  2. Extract ServerName and ServerAlias directives
-  3. Same filtering as above
+1. Read /etc/nginx/sites-enabled/* and /etc/nginx/conf.d/*.conf
+   (NOT nginx.conf itself — it typically only has include directives and http{} globals)
+2. For each file, track state per server{} block:
+   - On `server {`  → enter block, reset ssl=false
+   - On `listen ... ssl` or `listen 443` → mark ssl=true for current block
+   - On `server_name <names>;` → record names for current block
+   - On `}` at top-level nesting → emit (names, ssl) pair, exit block
+3. Filter each name: skip _, localhost, empty, IP-like (regex: ^\d+\.\d+\.\d+\.\d+$)
+4. Do NOT follow include directives (would require recursive resolution)
 ```
 
-**Permission model**: Nginx/Apache config files are world-readable by default (`644`). The probe running as `bat` user can read them without sudo. If a file isn't readable, silently skip it.
+**Apache parser** — per-VirtualHost state machine:
 
-**Deduplication**: Multiple server blocks may reference the same domain (HTTP redirect → HTTPS). Deduplicate by domain name. Preserve the association with which web server serves it.
+```
+1. Read /etc/apache2/sites-enabled/*.conf (Debian)
+   OR /etc/httpd/conf.d/*.conf (RHEL/CentOS)
+2. Track state per <VirtualHost> block:
+   - On `<VirtualHost *:443>` or `SSLEngine on` → mark ssl=true
+   - On `ServerName <name>` → record primary domain
+   - On `ServerAlias <names>` → record additional domains
+   - On `</VirtualHost>` → emit and reset
+3. Same name filtering as Nginx
+```
+
+**Limitations** (documented, accepted):
+- Does not follow `include` directives — sites defined in non-standard paths will be missed
+- Cannot parse Lua-generated or dynamically-templated configs
+- SSL detection is heuristic: `listen 443`, `listen ... ssl`, `SSLEngine on`
+- Brace/block counting is naive — deeply nested `if{}` blocks inside `server{}` may confuse the parser
+
+**Permission model**: Nginx/Apache config files are world-readable by default (`644`). The probe running as `bat` user reads them without sudo. If a file isn't readable, it is silently skipped. **This is a best-effort scan of standard config paths only** — the dashboard should present results accordingly (see §3.6).
 
 ### 3.3 Data Structure
 
@@ -150,6 +169,8 @@ New file: `probe/src/collectors/tier2/websites.rs`
 ```rust
 /// Collect website domains from Nginx and Apache configs.
 /// Only runs if `detected_software` contains "nginx" or "apache".
+/// Best-effort: reads standard config paths, skips unreadable files,
+/// does not follow include directives.
 pub fn collect_websites(detected_ids: &[String]) -> Option<WebsiteDiscoveryData> {
     let has_nginx = detected_ids.iter().any(|id| id == "nginx");
     let has_apache = detected_ids.iter().any(|id| id == "apache");
@@ -166,53 +187,78 @@ pub fn collect_websites(detected_ids: &[String]) -> Option<WebsiteDiscoveryData>
         sites.extend(parse_apache_sites());
     }
 
-    // Deduplicate by domain
+    // Deduplicate by domain (keep ssl=true if any block serves it with SSL)
     sites.sort_by(|a, b| a.domain.cmp(&b.domain));
-    sites.dedup_by(|a, b| a.domain == b.domain);
+    sites.dedup_by(|a, b| {
+        if a.domain == b.domain {
+            b.ssl = b.ssl || a.ssl; // merge: if either has SSL, keep SSL
+            true
+        } else {
+            false
+        }
+    });
 
     Some(WebsiteDiscoveryData { sites })
 }
 ```
 
-**Nginx parser**:
+**Nginx parser** — block-tracking state machine:
 
 ```rust
 fn parse_nginx_sites() -> Vec<DiscoveredWebsite> {
     let mut sites = Vec::new();
-    let paths = collect_nginx_config_paths();  // /etc/nginx/sites-enabled/*, /etc/nginx/conf.d/*.conf
+    // Scan standard config dirs — do NOT follow include directives
+    let paths = glob_config_files(&[
+        "/etc/nginx/sites-enabled/*",
+        "/etc/nginx/conf.d/*.conf",
+    ]);
 
     for path in paths {
         let content = match std::fs::read_to_string(&path) {
             Ok(c) => c,
             Err(_) => continue,  // permission denied or missing → skip
         };
-        sites.extend(extract_nginx_server_names(&content));
+        sites.extend(extract_nginx_server_blocks(&content));
     }
     sites
 }
 
-fn extract_nginx_server_names(content: &str) -> Vec<DiscoveredWebsite> {
-    // Parse server blocks, track listen directives for SSL detection
-    // Regex: server_name\s+([^;]+);
-    // Filter: skip _, localhost, IP-like patterns, commented lines
+/// Parse server{} blocks from Nginx config content.
+/// Tracks brace nesting to associate server_name with listen directives.
+fn extract_nginx_server_blocks(content: &str) -> Vec<DiscoveredWebsite> {
+    // State machine:
+    // - Track brace depth; server{} starts at depth 1
+    // - Within a server block, collect `listen` directives for SSL detection
+    // - Collect `server_name` directive for domain names
+    // - On block close, emit (names × ssl) pairs
+    // - Skip commented lines (leading #)
 }
 ```
 
-**Apache parser** (similar pattern):
+**Apache parser** — VirtualHost block tracking:
 
 ```rust
 fn parse_apache_sites() -> Vec<DiscoveredWebsite> {
-    // Read /etc/apache2/sites-enabled/*.conf OR /etc/httpd/conf.d/*.conf
-    // Extract ServerName and ServerAlias
-    // SSL detection: <VirtualHost *:443> or SSLEngine on
+    // Scan standard config dirs for both Debian and RHEL layouts
+    let paths = glob_config_files(&[
+        "/etc/apache2/sites-enabled/*.conf",
+        "/etc/httpd/conf.d/*.conf",
+    ]);
+    // For each file, track <VirtualHost> blocks
+    // Extract ServerName, ServerAlias, SSL detection (*:443 or SSLEngine on)
 }
 ```
 
 ### 3.5 Worker Storage
 
-Website data travels in the existing Tier 2 payload. No new D1 column needed — encode as JSON within the existing `tier2_json` blob (or add `websites_json TEXT` column to `tier2_snapshots` if we want to query by domain).
+Website data travels in the existing Tier 2 payload. The current storage model uses **per-section columns** in `tier2_snapshots` (e.g., `ports_json`, `software_json`, `docker_json` — each a nullable TEXT column holding JSON). Following this pattern, we add a new column:
 
-**Decision**: Store in `tier2_json` blob alongside software/docker/ports/etc. This avoids a migration and keeps the tier2 data model consistent.
+```sql
+-- migrations/0016_websites.sql
+ALTER TABLE tier2_snapshots ADD COLUMN websites_json TEXT;
+```
+
+The insert and read queries in `packages/worker/src/services/tier2-metrics.ts` (`insertTier2Snapshot` / `getLatestTier2Snapshot`) must be updated to include the new column, following the same `JSON.stringify()` / `safeParse()` pattern as `software_json`.
 
 ### 3.6 Dashboard — Websites Panel
 
@@ -236,6 +282,7 @@ Design:
 - Domain names are plain text (not links — we don't know the full URL path)
 - Sorted alphabetically
 - Only renders if `tier2?.websites?.sites.length > 0`
+- Footer note in muted text: "Discovered from standard Nginx/Apache config paths" — signals to the user that this is best-effort, not exhaustive
 
 ---
 
@@ -262,12 +309,17 @@ Without the ability to map socket → PID → process name, `ListeningPort.proce
 | C. Parse `/proc/net/tcp` inode → match from `/proc/[pid]/net/tcp6` per-pid | Works per-process | Complex, still needs /proc/[pid] access |
 | D. Hybrid: read `/proc/net/tcp` for ports, match against known port→software mapping without process name | No extra privileges | Less accurate (port 80 could be any web server) |
 
-**Recommended**: Option D (hybrid) — enhance `match_by_ports` to also match by port number alone against the registry, without requiring process name. If a port is in the registry's known ports list, it's a strong signal even without process name confirmation. This eliminates the permission problem entirely.
+**Recommended**: Option B — grant `CAP_DAC_READ_SEARCH` to the bat-probe binary. This is the minimal privilege escalation needed to restore correct fd→inode→process mapping. Add to `install.sh` post-install step:
 
-Fallback: if we need process-name accuracy, use Option B — add `CAP_DAC_READ_SEARCH` capability to the bat-probe binary:
 ```bash
 sudo setcap cap_dac_read_search+ep /usr/local/bin/bat-probe
 ```
+
+This capability only allows reading directory entries in `/proc/[pid]/fd/` — it does not grant write access, ptrace, or any other privilege. The probe's existing systemd hardening (`NoNewPrivileges=true`, `ProtectSystem=strict`) remains in effect.
+
+> Note: `NoNewPrivileges=true` in the systemd unit would prevent `setcap` from taking effect. The unit file must use `AmbientCapabilities=CAP_DAC_READ_SEARCH` instead, or remove `NoNewPrivileges=true`.
+
+**Rejected alternative** (Option D — port-only matching without process name): Too many false positives on generic ports. Port 80/443 could be Nginx, Apache, Caddy, or a random app; port 3000 could be Grafana, Umami, or any Node.js app; port 9000 could be ClickHouse or Portainer. Without process-name confirmation, this would systematically produce incorrect software identifications.
 
 ---
 
@@ -310,7 +362,7 @@ source: "port" | "process" | "systemd" | "binary" | "package" | "docker";  // ad
 ```typescript
 export interface DiscoveredWebsite {
   domain: string;
-  web_server: "nginx" | "apache" | "caddy";
+  web_server: "nginx" | "apache";
   ssl: boolean;
 }
 
@@ -318,6 +370,8 @@ export interface WebsiteDiscoveryData {
   sites: DiscoveredWebsite[];
 }
 ```
+
+> Note: Caddy uses a Caddyfile format with implicit HTTPS. If Caddy vhost parsing is needed in the future, add `"caddy"` to the union type then. This version only covers Nginx and Apache.
 
 ---
 
@@ -345,8 +399,12 @@ export interface WebsiteDiscoveryData {
 
 | File | Change |
 |------|--------|
-| `packages/worker/src/services/tier2-ingest.ts` | Handle `websites` in tier2 payload (store in tier2_json blob) |
-| `packages/worker/src/services/tier2-read.ts` | Return `websites` from tier2 snapshot |
+| `packages/worker/migrations/0016_websites.sql` | **NEW** — `ALTER TABLE tier2_snapshots ADD COLUMN websites_json TEXT` |
+| `packages/worker/src/services/tier2-metrics.ts` | Add `websites_json` to `insertTier2Snapshot()` INSERT and `getLatestTier2Snapshot()` SELECT; `JSON.stringify()` / `safeParse()` |
+| `packages/worker/src/routes/tier2-ingest.ts` | Pass `payload.websites` through to `insertTier2Snapshot()` |
+| `packages/worker/src/routes/tier2-read.ts` | Include `websites` in API response from `getLatestTier2Snapshot()` result |
+| `packages/worker/src/test-helpers/mock-d1.ts` | Add migration path for 0016 |
+| `packages/worker/test/e2e/wrangler.test.ts` | Add `"migrations/0016_websites.sql"` to E2E migration list |
 
 ### Dashboard (TypeScript/React)
 
@@ -394,15 +452,15 @@ export interface WebsiteDiscoveryData {
 | # | Scope | Description | Status |
 |---|-------|-------------|--------|
 | 1 | probe | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | |
-| 2 | probe | Fix `match_by_ports` to support port-only matching (no process name required) | |
+| 2 | probe | Fix port detection: grant `CAP_DAC_READ_SEARCH` via systemd `AmbientCapabilities`, update `install.sh` and unit file | |
 | 3 | shared | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types | |
-| 4 | probe | Add `websites.rs` — Nginx vhost parser with `collect_websites()` | |
+| 4 | probe | Add `websites.rs` — Nginx vhost block parser with `collect_websites()` | |
 | 5 | probe | Add Apache vhost parser to `websites.rs` | |
 | 6 | probe | Wire `collect_websites()` into `collect_tier2()` and `Tier2Payload` | |
-| 7 | worker | Ingest and return `websites` in tier2 flow | |
-| 8 | dashboard | Add `"proxy"` category to labels/order; add `WebsitesPanel` component | |
-| 9 | probe (stretch) | Add Docker image → software mapping layer | |
-| 10 | dashboard | Add `"proxy"` category to labels/order, wire WebsitesPanel into host detail | |
+| 7 | worker | D1 migration `0016_websites.sql` + ingest/read `websites_json` column in `tier2-metrics.ts` | |
+| 8 | dashboard | Add `"proxy"` category to labels/order; add `WebsitesPanel` component with best-effort footer | |
+| 9 | dashboard | Wire `WebsitesPanel` into host detail page | |
+| 10 | probe (stretch) | Add Docker image → software mapping layer | |
 
 ---
 
