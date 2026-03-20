@@ -148,6 +148,35 @@ This returns past release records including worker version IDs, R2 paths, VPS up
 - Auto-deploy from git push is **unreliable** — may not trigger. Fallback: `railway up --detach -s 201dad47-1d69-4222-821a-4756d3d211ce`
 - Dashboard URL: `https://bat.hexly.ai`
 
+## Uptime Kuma Monitoring
+
+Bat services are monitored via the `uptime-kuma` skill. Config lives at `.claude/skills/uptime-kuma/config.json` (gitignored).
+
+### Usage
+
+**Read-only (Prometheus metrics via curl):**
+```bash
+CONFIG="$(cat .claude/skills/uptime-kuma/config.json)"
+BASE_URL=$(echo "$CONFIG" | jq -r '.base_url')
+API_KEY=$(echo "$CONFIG" | jq -r '.api_key')
+curl -sf -u ":$API_KEY" "$BASE_URL/metrics" | grep "^monitor_status{"
+```
+
+**Write operations (Socket.IO via bun):**
+```bash
+cp .claude/skills/uptime-kuma/scripts/socketio-client.mjs /tmp/uk-task.mjs
+sd 'skills/uptime-kuma/config.json' "$(pwd)/.claude/skills/uptime-kuma/config.json" /tmp/uk-task.mjs
+# Edit /tmp/uk-task.mjs, then: bun run /tmp/uk-task.mjs
+```
+
+Requires `socket.io-client` (`bun add -d socket.io-client`). When curl times out, prefer Socket.IO (WebSocket transport works through Cloudflare).
+
+### When to use
+
+- **Post-deploy verification**: confirm bat worker and VPS monitors are UP after release
+- **Adding monitors**: new bat services should get keyword monitors targeting `/api/live`
+- **Incident triage**: check DOWN monitors to correlate with bat alerts
+
 ## Retrospective
 
 - **E2E test migration list must be manually updated**: `packages/worker/test/e2e/wrangler.test.ts` has a hardcoded migration list. When adding new migrations, also add them to this list — otherwise E2E tests fail with 500 on routes that touch new columns, and `git push` is blocked by the pre-push hook.

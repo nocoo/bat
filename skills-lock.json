@@ -1,0 +1,10 @@
+{
+	"version": 1,
+	"skills": {
+		"uptime-kuma": {
+			"source": "nocoo/uptime-kuma-skill",
+			"sourceType": "github",
+			"computedHash": "5afa5daa852c48fcbdd8bb7e1500fe876ce0bbdea17e825cc26daec501abbe1b"
+		}
+	}
+}
