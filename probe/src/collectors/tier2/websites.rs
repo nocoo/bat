@@ -209,10 +209,13 @@ pub fn extract_apache_vhosts(content: &str) -> Vec<DiscoveredWebsite> {
     for raw_line in content.lines() {
         let line = raw_line.trim();
 
-        // Skip comments
+        // Skip full-line comments
         if line.starts_with('#') {
             continue;
         }
+
+        // Strip inline comments
+        let line = line.split('#').next().unwrap_or(line).trim();
 
         // Detect VirtualHost open
         if line.starts_with("<VirtualHost") {
@@ -691,6 +694,33 @@ http {
         let config = r#"
 <VirtualHost 10.0.0.1:443>
     ServerName example.com
+</VirtualHost>
+"#;
+        let sites = extract_apache_vhosts(config);
+        assert_eq!(sites.len(), 1);
+        assert!(sites[0].ssl);
+    }
+
+    #[test]
+    fn apache_inline_comment_stripped() {
+        let config = r#"
+<VirtualHost *:80>
+    ServerName example.com # primary domain
+    ServerAlias www.example.com # redirect target
+</VirtualHost>
+"#;
+        let sites = extract_apache_vhosts(config);
+        assert_eq!(sites.len(), 2);
+        assert_eq!(sites[0].domain, "example.com");
+        assert_eq!(sites[1].domain, "www.example.com");
+    }
+
+    #[test]
+    fn apache_ssl_engine_inline_comment() {
+        let config = r#"
+<VirtualHost *:80>
+    ServerName secure.example.com
+    SSLEngine on # enable SSL
 </VirtualHost>
 "#;
         let sites = extract_apache_vhosts(config);
