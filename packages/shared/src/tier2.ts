@@ -102,14 +102,15 @@ export type SoftwareCategory =
 	| "monitoring"
 	| "security"
 	| "infra"
-	| "container";
+	| "container"
+	| "proxy";
 
 export interface DetectedSoftware {
 	id: string; // "nginx", "postgres", "redis"
 	name: string; // "Nginx", "PostgreSQL", "Redis"
 	category: SoftwareCategory;
 	version: string | null;
-	source: "port" | "process" | "systemd" | "binary" | "package";
+	source: "port" | "process" | "systemd" | "binary" | "package" | "docker";
 	running: boolean;
 	listening_ports: number[];
 }
@@ -118,6 +119,18 @@ export interface SoftwareDiscoveryData {
 	detected: DetectedSoftware[];
 	scan_duration_ms: number;
 	version_duration_ms: number;
+}
+
+// --- Website Discovery (2.8) ---
+
+export interface DiscoveredWebsite {
+	domain: string;
+	web_server: "nginx" | "apache";
+	ssl: boolean;
+}
+
+export interface WebsiteDiscoveryData {
+	sites: DiscoveredWebsite[];
 }
 
 // --- Tier 2 Payload (Probe → Worker) ---
@@ -132,6 +145,7 @@ export interface Tier2Payload {
 	docker?: DockerStatusData;
 	disk_deep?: DiskDeepScanData;
 	software?: SoftwareDiscoveryData;
+	websites?: WebsiteDiscoveryData;
 	// Host inventory slow-drift fields
 	timezone?: string;
 	dns_resolvers?: string[];
@@ -149,6 +163,7 @@ export interface Tier2Snapshot {
 	docker: DockerStatusData | null;
 	disk_deep: DiskDeepScanData | null;
 	software: SoftwareDiscoveryData | null;
+	websites: WebsiteDiscoveryData | null;
 	// Host inventory slow-drift fields
 	timezone: string | null;
 	dns_resolvers: string[] | null;

@@ -43,6 +43,7 @@ const MIGRATION_TOP_PROCESSES_PATH = resolve(
 	import.meta.dir,
 	"../../migrations/0015_top_processes.sql",
 );
+const MIGRATION_WEBSITES_PATH = resolve(import.meta.dir, "../../migrations/0016_websites.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -237,6 +238,15 @@ export function createMockD1(): D1Database {
 	// Apply top_processes migration
 	const topProcessesSchema = readFileSync(MIGRATION_TOP_PROCESSES_PATH, "utf-8");
 	for (const stmt of topProcessesSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply websites migration
+	const websitesSchema = readFileSync(MIGRATION_WEBSITES_PATH, "utf-8");
+	for (const stmt of websitesSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {

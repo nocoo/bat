@@ -88,6 +88,7 @@ export {
 // Tier 2 payload types
 export type {
 	DetectedSoftware,
+	DiscoveredWebsite,
 	DiskDeepScanData,
 	DockerContainer,
 	DockerImagesInfo,
@@ -103,6 +104,7 @@ export type {
 	Tier2Payload,
 	Tier2Snapshot,
 	TopDir,
+	WebsiteDiscoveryData,
 } from "./tier2.js";
 
 // Event and webhook types
