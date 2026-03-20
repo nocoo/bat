@@ -411,6 +411,18 @@ static REGISTRY: &[SoftwareSignature] = &[
             dpkg_names: &[],
         },
     },
+    SoftwareSignature {
+        id: "watchtower",
+        name: "Watchtower",
+        category: "container",
+        detect: DetectRules {
+            ports: &[],
+            process_names: &["watchtower"],
+            systemd_units: &[],
+            binary_names: &[],
+            dpkg_names: &[],
+        },
+    },
     // --- Monitoring & observability ---
     SoftwareSignature {
         id: "prometheus",
@@ -1101,6 +1113,76 @@ async fn probe_versions(detected: &mut [DetectedSoftware]) {
     .await;
 }
 
+// ---------------------------------------------------------------------------
+// Docker image → software mapping (Layer 6)
+// ---------------------------------------------------------------------------
+
+/// Known Docker image patterns mapped to software IDs.
+/// Pattern is matched against the image name (before the tag).
+static DOCKER_IMAGE_REGISTRY: &[(&str, &str)] = &[
+    ("louislam/uptime-kuma", "uptime_kuma"),
+    ("n8nio/n8n", "n8n"),
+    ("portainer/portainer", "portainer"),
+    ("containrrr/watchtower", "watchtower"),
+    ("umami-software/umami", "umami"),
+];
+
+/// A Docker container for matching purposes.
+pub struct DockerContainerRef {
+    pub image: String,
+    pub state: String,
+}
+
+/// Match running Docker container images against the known-image registry.
+/// Returns detected software entries with `source: "docker"`.
+///
+/// Only checks containers — does not run Docker commands itself.
+/// Extracts version from image tag when available (e.g., `n8nio/n8n:1.76.1` → `1.76.1`).
+pub fn match_by_docker_images(
+    containers: &[DockerContainerRef],
+    already_detected: &HashSet<String>,
+) -> Vec<DetectedSoftware> {
+    let mut results = Vec::new();
+
+    for container in containers {
+        // Split image into name and tag
+        let (image_name, tag) = match container.image.rsplit_once(':') {
+            Some((name, tag)) => (name, Some(tag)),
+            None => (container.image.as_str(), None),
+        };
+
+        for &(pattern, software_id) in DOCKER_IMAGE_REGISTRY {
+            if image_name.starts_with(pattern) && !already_detected.contains(software_id) {
+                let sig = REGISTRY.iter().find(|s| s.id == software_id);
+                let name = sig.map_or(software_id, |s| s.name);
+                let category = sig.map_or("infra", |s| s.category);
+
+                // Extract version from tag (skip "latest" and digest-like tags)
+                let version = tag.and_then(|t| {
+                    if t == "latest" || t.starts_with("sha256") || t.is_empty() {
+                        None
+                    } else {
+                        Some(t.to_string())
+                    }
+                });
+
+                results.push(DetectedSoftware {
+                    id: software_id.to_string(),
+                    name: name.to_string(),
+                    category: category.to_string(),
+                    version,
+                    source: "docker".to_string(),
+                    running: container.state == "running",
+                    listening_ports: Vec::new(),
+                });
+                break;
+            }
+        }
+    }
+
+    results
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1515,5 +1597,97 @@ wg-quick@wg0.service                   enabled         enabled
         }];
         let hits = match_by_ports(&ports, REGISTRY);
         assert!(hits.contains_key("clash"));
+    }
+
+    // --- Docker image matching ---
+
+    #[test]
+    fn docker_image_matches_uptime_kuma() {
+        let containers = vec![DockerContainerRef {
+            image: "louislam/uptime-kuma:1.23.11".to_string(),
+            state: "running".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "uptime_kuma");
+        assert_eq!(results[0].source, "docker");
+        assert!(results[0].running);
+        assert_eq!(results[0].version, Some("1.23.11".to_string()));
+    }
+
+    #[test]
+    fn docker_image_matches_n8n_with_version() {
+        let containers = vec![DockerContainerRef {
+            image: "n8nio/n8n:1.76.1".to_string(),
+            state: "running".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "n8n");
+        assert_eq!(results[0].version, Some("1.76.1".to_string()));
+    }
+
+    #[test]
+    fn docker_image_latest_tag_no_version() {
+        let containers = vec![DockerContainerRef {
+            image: "portainer/portainer:latest".to_string(),
+            state: "running".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "portainer");
+        assert!(results[0].version.is_none());
+    }
+
+    #[test]
+    fn docker_image_skips_already_detected() {
+        let containers = vec![DockerContainerRef {
+            image: "n8nio/n8n:1.76.1".to_string(),
+            state: "running".to_string(),
+        }];
+        let mut detected = HashSet::new();
+        detected.insert("n8n".to_string());
+        let results = match_by_docker_images(&containers, &detected);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn docker_image_exited_not_running() {
+        let containers = vec![DockerContainerRef {
+            image: "containrrr/watchtower:latest".to_string(),
+            state: "exited".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "watchtower");
+        assert!(!results[0].running);
+    }
+
+    #[test]
+    fn docker_image_unknown_image_ignored() {
+        let containers = vec![DockerContainerRef {
+            image: "mycompany/custom-app:v2".to_string(),
+            state: "running".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn docker_image_no_tag() {
+        let containers = vec![DockerContainerRef {
+            image: "umami-software/umami".to_string(),
+            state: "running".to_string(),
+        }];
+        let detected = HashSet::new();
+        let results = match_by_docker_images(&containers, &detected);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "umami");
+        assert!(results[0].version.is_none());
     }
 }

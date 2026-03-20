@@ -503,7 +503,27 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
     );
 
     // Software discovery — reuses raw ports data
-    let software = collectors::tier2::software::collect_software_discovery(Some(&ports_raw)).await;
+    let mut software =
+        collectors::tier2::software::collect_software_discovery(Some(&ports_raw)).await;
+
+    // Docker image → software mapping (Layer 6)
+    // Cross-reference running Docker containers against known image patterns
+    if let Some(ref docker_info) = docker {
+        let already_detected: std::collections::HashSet<String> =
+            software.detected.iter().map(|s| s.id.clone()).collect();
+        let container_refs: Vec<collectors::tier2::software::DockerContainerRef> = docker_info
+            .containers
+            .iter()
+            .map(|c| collectors::tier2::software::DockerContainerRef {
+                image: c.image.clone(),
+                state: c.state.clone(),
+            })
+            .collect();
+        let docker_hits =
+            collectors::tier2::software::match_by_docker_images(&container_refs, &already_detected);
+        software.detected.extend(docker_hits);
+        software.detected.sort_by(|a, b| a.id.cmp(&b.id));
+    }
 
     // Website discovery — only runs if nginx/apache detected
     let detected_ids: Vec<String> = software.detected.iter().map(|s| s.id.clone()).collect();
