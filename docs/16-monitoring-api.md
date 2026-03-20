@@ -259,37 +259,31 @@ bat (group)
 
 ## Implementation Plan
 
-### Phase 1: Core endpoints (Worker)
+### Phase 1: ~~Core endpoints (Worker)~~ ✅
 
-1. Add route file `packages/worker/src/routes/monitoring.ts`.
-2. **Query strategy** — follow the existing pattern in `fleet-status.ts` and `hosts.ts`: **separate queries, assemble in code**. No multi-table JOINs that risk cartesian blowup.
-   - Query 1: `SELECT host_id, hostname, last_seen FROM hosts WHERE is_active = 1`
-   - Query 2: `SELECT host_id, severity, rule_id, message, value, triggered_at FROM alert_states WHERE host_id IN (?...)`
-   - Query 3: `SELECT host_id, port FROM port_allowlist WHERE host_id IN (?...)`
-   - Query 4 (tag endpoints only): `SELECT ht.host_id, t.name FROM host_tags ht JOIN tags t ON ht.tag_id = t.id WHERE ht.host_id IN (?...)`
-   - Query 5 (single-host `/hosts/:id` only): `SELECT uptime_seconds FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`
-   - Computed fields:
-     - `duration_seconds` in `/alerts`: `Math.floor(Date.now() / 1000) - triggered_at`
-     - `uptime_seconds` in `/hosts/:id`: from latest metrics_raw row (same pattern as `host-detail.ts`)
-     - `alert_count` / `by_tier` / `by_severity`: aggregated in code from the query results
-   - Assemble: build per-host Maps, call `deriveHostStatus()` per host, aggregate by tag for groups.
-3. `GET /api/monitoring/hosts` — host list with tier + alerts.
-4. `GET /api/monitoring/hosts/:id` — single host with tags.
-5. `GET /api/monitoring/alerts` — alert_states enriched with hostname and tags.
-6. `GET /api/monitoring/groups` — group by tag, derive worst-tier per group. Untagged hosts → `"(untagged)"` group.
-7. Auth: `BAT_READ_KEY` (reuse existing `apiKeyAuth` middleware).
-8. Response headers: `Cache-Control: private, no-store`.
-9. Register routes in `index.ts` under the existing read routes block.
+Implemented in `packages/worker/src/routes/monitoring.ts`, registered in `index.ts`.
+
+1. ~~Add route file `packages/worker/src/routes/monitoring.ts`.~~ ✅
+2. ~~**Query strategy** — separate queries, assemble in code.~~ ✅
+3. ~~`GET /api/monitoring/hosts` — host list with tier + alerts.~~ ✅
+4. ~~`GET /api/monitoring/hosts/:id` — single host with tags.~~ ✅
+5. ~~`GET /api/monitoring/alerts` — alert_states enriched with hostname and tags.~~ ✅
+6. ~~`GET /api/monitoring/groups` — group by tag, worst-tier, (untagged) fallback.~~ ✅
+7. ~~Auth: `BAT_READ_KEY`.~~ ✅
+8. ~~Response headers: `Cache-Control: private, no-store`.~~ ✅
+9. ~~Register routes in `index.ts`.~~ ✅
 
 ### Phase 2: ~~Update 11-host-tags.md~~ ✅
 
 Already applied — see [11-host-tags.md § Architecture](./11-host-tags.md#architecture).
 
-### Phase 3: Tests
+### Phase 3: ~~Tests~~ ✅
 
-1. Unit tests for group aggregation and `(untagged)` fallback logic.
-2. E2E tests: seed D1 with hosts + alerts + tags + port_allowlist → assert response shapes, keyword presence, and tier correctness (especially port_allowlist suppression).
-3. Add migration entries to E2E `wrangler.test.ts` migration list if new migrations are needed (see retrospective).
+Implemented in `packages/worker/src/routes/monitoring.test.ts` — 36 tests, 100% line coverage on `monitoring.ts`.
+
+1. ~~Unit tests for group aggregation and `(untagged)` fallback logic.~~ ✅
+2. ~~E2E-style tests: seed D1 with hosts + alerts + tags + port_allowlist → assert response shapes, keyword presence, tier correctness.~~ ✅
+3. Added `0010_tags.sql` migration to `mock-d1.ts` for tag query support.
 
 ### Phase 4: Uptime Kuma sync script
 
