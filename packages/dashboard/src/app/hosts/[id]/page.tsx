@@ -149,6 +149,7 @@ const CATEGORY_LABELS: Record<SoftwareCategory, string> = {
 	security: "Security",
 	infra: "Infrastructure",
 	container: "Containers",
+	proxy: "Proxies & Tunnels",
 };
 
 const CATEGORY_ORDER: SoftwareCategory[] = [
@@ -158,6 +159,7 @@ const CATEGORY_ORDER: SoftwareCategory[] = [
 	"queue",
 	"runtime",
 	"container",
+	"proxy",
 	"monitoring",
 	"security",
 	"infra",
