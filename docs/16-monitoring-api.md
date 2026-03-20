@@ -220,7 +220,7 @@ However, this design introduces **Worker read access to `tags` and `host_tags`**
 
 - **Justification**: the monitoring API runs on the Worker (Cloudflare Workers) where D1 is a native binding — no REST roundtrip needed. Duplicating this in the Dashboard would require the Dashboard to proxy Uptime Kuma requests, adding unnecessary latency and complexity.
 - **Scope**: read-only SELECT on `tags` and `host_tags`. No INSERT/UPDATE/DELETE.
-- **11-host-tags.md update**: amend the "Worker never touch tags" statement to "Worker never **writes** tags; read access is permitted for monitoring aggregation endpoints."
+- **11-host-tags.md update**: ✅ Done — amended to "Worker has read-only access to tags for monitoring aggregation; never writes them."
 
 ---
 
@@ -281,9 +281,9 @@ bat (group)
 8. Response headers: `Cache-Control: private, no-store`.
 9. Register routes in `index.ts` under the existing read routes block.
 
-### Phase 2: Update 11-host-tags.md
+### Phase 2: ~~Update 11-host-tags.md~~ ✅
 
-Amend the architecture decision to reflect Worker read access to tags (see section above).
+Already applied — see [11-host-tags.md § Architecture](./11-host-tags.md#architecture).
 
 ### Phase 3: Tests
 

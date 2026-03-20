@@ -27,7 +27,7 @@ Allow users to tag hosts with arbitrary labels (e.g. `production`, `us-east`, `d
 
 ### Key decision: Dashboard → D1 direct, no Worker involvement
 
-Tags are **user-initiated state** — only the Dashboard reads and writes them. The Probe and Worker never touch tags. Therefore:
+Tags are **user-initiated state** — only the Dashboard reads and writes them. The Probe never touches tags. The Worker has **read-only** access to `tags` and `host_tags` for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)), but never writes them. Therefore:
 
 - **Dashboard connects to D1 directly** via [Cloudflare D1 REST API](https://developers.cloudflare.com/d1/platform/client-api/).
 - **No Worker routes** for tags. No new API keys. No proxy layer.
