@@ -376,6 +376,8 @@ pub struct Tier2Payload {
     pub disk_deep: Option<Tier2DiskDeep>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub software: Option<Tier2Software>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub websites: Option<Tier2Websites>,
     // --- Host inventory tier 2 fields ---
     #[serde(skip_serializing_if = "Option::is_none")]
     pub timezone: Option<String>,
@@ -506,6 +508,18 @@ pub struct Tier2Software {
     pub detected: Vec<Tier2DetectedSoftware>,
     pub scan_duration_ms: u64,
     pub version_duration_ms: u64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2DiscoveredWebsite {
+    pub domain: String,
+    pub web_server: String,
+    pub ssl: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct Tier2Websites {
+    pub sites: Vec<Tier2DiscoveredWebsite>,
 }
 
 #[cfg(test)]
@@ -857,6 +871,7 @@ mod tests {
                 }],
             }),
             software: None,
+            websites: None,
             timezone: Some("UTC".into()),
             dns_resolvers: Some(vec!["1.1.1.1".into(), "8.8.8.8".into()]),
             dns_search: Some(vec!["example.com".into()]),
@@ -918,6 +933,7 @@ mod tests {
             docker: None,
             disk_deep: None,
             software: None,
+            websites: None,
             timezone: None,
             dns_resolvers: None,
             dns_search: None,

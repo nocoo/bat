@@ -505,6 +505,10 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
     // Software discovery — reuses raw ports data
     let software = collectors::tier2::software::collect_software_discovery(Some(&ports_raw)).await;
 
+    // Website discovery — only runs if nginx/apache detected
+    let detected_ids: Vec<String> = software.detected.iter().map(|s| s.id.clone()).collect();
+    let websites = collectors::tier2::websites::collect_websites(&detected_ids);
+
     let ports_payload = Some(orchestrate::convert_ports(ports_raw));
 
     // Tier 2 inventory: timezone + DNS (fast synchronous reads)
@@ -524,6 +528,7 @@ async fn collect_tier2(host_id: &str) -> payload::Tier2Payload {
         docker.map(orchestrate::convert_docker),
         Some(orchestrate::convert_disk_deep(disk_deep)),
         Some(orchestrate::convert_software(software)),
+        websites.map(orchestrate::convert_websites),
         timezone,
         dns_resolvers,
         dns_search,

@@ -7,10 +7,10 @@ use crate::collectors::network::NetCounters;
 use crate::payload::{
     ConntrackMetrics, CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics,
     MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, SnmpMetrics, SocketMetrics,
-    SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiskDeep, Tier2Docker,
-    Tier2DockerContainer, Tier2DockerImages, Tier2FailedService, Tier2LargeFile,
-    Tier2ListeningPort, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software, Tier2Systemd,
-    Tier2TopDir, TopProcess, UdpMetrics,
+    SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiscoveredWebsite,
+    Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages, Tier2FailedService,
+    Tier2LargeFile, Tier2ListeningPort, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software,
+    Tier2Systemd, Tier2TopDir, Tier2Websites, TopProcess, UdpMetrics,
 };
 
 /// Compute CPU usage delta from optional previous and current jiffies.
@@ -632,6 +632,7 @@ use crate::collectors::tier2::ports::ListeningPort;
 use crate::collectors::tier2::security::SecurityPostureInfo;
 use crate::collectors::tier2::software::SoftwareDiscoveryInfo;
 use crate::collectors::tier2::systemd::SystemdServicesInfo;
+use crate::collectors::tier2::websites::WebsiteDiscoveryData;
 
 /// Convert collector ports to payload ports.
 pub fn convert_ports(ports: Vec<ListeningPort>) -> Tier2Ports {
@@ -753,6 +754,21 @@ pub fn convert_software(info: SoftwareDiscoveryInfo) -> Tier2Software {
     }
 }
 
+/// Convert collector website discovery data to payload websites.
+pub fn convert_websites(data: WebsiteDiscoveryData) -> Tier2Websites {
+    Tier2Websites {
+        sites: data
+            .sites
+            .into_iter()
+            .map(|s| Tier2DiscoveredWebsite {
+                domain: s.domain,
+                web_server: s.web_server,
+                ssl: s.ssl,
+            })
+            .collect(),
+    }
+}
+
 /// Build a [`Tier2Payload`] from collected tier 2 data.
 #[allow(clippy::too_many_arguments)]
 pub fn build_tier2_payload(
@@ -765,6 +781,7 @@ pub fn build_tier2_payload(
     docker: Option<Tier2Docker>,
     disk_deep: Option<Tier2DiskDeep>,
     software: Option<Tier2Software>,
+    websites: Option<Tier2Websites>,
     timezone: Option<String>,
     dns_resolvers: Option<Vec<String>>,
     dns_search: Option<Vec<String>>,
@@ -779,6 +796,7 @@ pub fn build_tier2_payload(
         docker,
         disk_deep,
         software,
+        websites,
         timezone,
         dns_resolvers,
         dns_search,
@@ -1340,6 +1358,7 @@ mod tests {
             None,
             None,
             None,
+            None,
             Some("UTC".to_string()),
             Some(vec!["1.1.1.1".to_string()]),
             Some(vec![]),
@@ -1349,6 +1368,7 @@ mod tests {
         assert_eq!(payload.timestamp, 1_700_000_000);
         assert!(payload.ports.is_some());
         assert!(payload.software.is_none());
+        assert!(payload.websites.is_none());
         assert_eq!(payload.timezone, Some("UTC".to_string()));
         assert_eq!(payload.dns_resolvers, Some(vec!["1.1.1.1".to_string()]));
         assert_eq!(payload.dns_search, Some(vec![]));
