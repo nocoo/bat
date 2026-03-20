@@ -82,7 +82,7 @@ List all onboarded hosts with their current health tier and alert summary.
 | `tier` | string | (all) | Filter: `healthy`, `warning`, `critical`, `offline` |
 | `tag` | string | (all) | Filter by tag name (multiple allowed, AND logic) |
 
-**Uptime Kuma usage:** keyword monitor on `"tier":"healthy"` per host. For fleet-level liveness, use the existing `GET /api/live` (public, no auth) or `GET /api/fleet/status` (auth, returns `"status":"healthy"/"degraded"/"critical"`).
+**Uptime Kuma usage:** this endpoint is for **discovery and fleet overview** — the sync script reads it to enumerate hosts and create per-host monitors. It is **not** suitable as a keyword monitor target (matching `"tier":"healthy"` against a list would false-positive on any single healthy host). For per-host monitoring use `/api/monitoring/hosts/:id`. For fleet-level liveness use the existing `GET /api/live` (public, no auth) or `GET /api/fleet/status` (auth, returns `"status":"healthy"/"degraded"/"critical"`).
 
 ---
 
@@ -233,8 +233,10 @@ The `uptime-kuma` skill (`.agents/skills/uptime-kuma/`) can automate monitor lif
 1. Query `GET /api/monitoring/hosts` to discover all bat hosts.
 2. Query `GET /api/monitoring/groups` to discover tag-based groups.
 3. Via Socket.IO, create/update Uptime Kuma monitors:
-   - **Per-host monitor**: keyword type, URL = `/api/monitoring/hosts/:hid`, keyword = `"tier":"healthy"`, parent = corresponding group.
-   - **Per-group monitor**: Uptime Kuma group type, children = host monitors sharing that tag.
+   - **Per-group monitor**: Uptime Kuma `group` type, one per bat tag.
+   - **Per-host monitor**: keyword type, URL = `/api/monitoring/hosts/:hid`, keyword = `"tier":"healthy"`.
+     - **Multi-tag hosts**: Uptime Kuma monitors have exactly one `parent`. Pick the **first tag alphabetically** as the parent group. The monitor's `name` or `description` can list all tags for visibility, but the parent is singular and deterministic.
+     - **Untagged hosts**: parent = the `(untagged)` Uptime Kuma group.
    - **Fleet-wide alert monitor**: keyword type, URL = `/api/monitoring/alerts`, keyword = `"alert_count":0`.
 4. Remove monitors for retired hosts (`is_active = 0`).
 
@@ -262,9 +264,14 @@ bat (group)
 1. Add route file `packages/worker/src/routes/monitoring.ts`.
 2. **Query strategy** — follow the existing pattern in `fleet-status.ts` and `hosts.ts`: **separate queries, assemble in code**. No multi-table JOINs that risk cartesian blowup.
    - Query 1: `SELECT host_id, hostname, last_seen FROM hosts WHERE is_active = 1`
-   - Query 2: `SELECT host_id, severity, rule_id, message FROM alert_states WHERE host_id IN (?...)`
+   - Query 2: `SELECT host_id, severity, rule_id, message, value, triggered_at FROM alert_states WHERE host_id IN (?...)`
    - Query 3: `SELECT host_id, port FROM port_allowlist WHERE host_id IN (?...)`
    - Query 4 (tag endpoints only): `SELECT ht.host_id, t.name FROM host_tags ht JOIN tags t ON ht.tag_id = t.id WHERE ht.host_id IN (?...)`
+   - Query 5 (single-host `/hosts/:id` only): `SELECT uptime_seconds FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`
+   - Computed fields:
+     - `duration_seconds` in `/alerts`: `Math.floor(Date.now() / 1000) - triggered_at`
+     - `uptime_seconds` in `/hosts/:id`: from latest metrics_raw row (same pattern as `host-detail.ts`)
+     - `alert_count` / `by_tier` / `by_severity`: aggregated in code from the query results
    - Assemble: build per-host Maps, call `deriveHostStatus()` per host, aggregate by tag for groups.
 3. `GET /api/monitoring/hosts` — host list with tier + alerts.
 4. `GET /api/monitoring/hosts/:id` — single host with tags.
