@@ -151,7 +151,7 @@ Hosts with **no tags** are collected into a synthetic `"(untagged)"` group so th
 
 **Group tier derivation:** worst-of among members (offline > critical > warning > healthy), using `deriveHostStatus` with port_allowlist (see Tiered Health Model below).
 
-**Uptime Kuma usage:** one keyword monitor per group checking `"tier":"healthy"`. The `uptime-kuma` skill can auto-create a monitor group per tag.
+**Uptime Kuma usage:** this endpoint is for **discovery and sync** — the sync script reads it to enumerate groups and create corresponding Uptime Kuma group-type monitors. It is **not** suitable as a keyword monitor target (same list-matching false-positive problem as `/api/monitoring/hosts`). Group health is derived from the per-host monitors beneath each Uptime Kuma group — if any child monitor goes DOWN, the group reflects it automatically via Uptime Kuma's built-in group status aggregation.
 
 ---
 
