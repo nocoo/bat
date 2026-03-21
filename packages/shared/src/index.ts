@@ -71,6 +71,7 @@ export type {
 	HostOverviewItem,
 	HostStatus,
 	HostTag,
+	MaintenanceWindow,
 	MetricsDataPoint,
 	MetricsQueryResponse,
 	MetricsResolution,
@@ -123,3 +124,10 @@ export {
 	EVENT_TAGS_MAX_COUNT,
 	EVENT_TITLE_MAX_LENGTH,
 } from "./events.js";
+
+// Maintenance window utilities
+export {
+	isInMaintenanceWindow,
+	isValidTimeHHMM,
+	toUtcHHMM,
+} from "./maintenance.js";

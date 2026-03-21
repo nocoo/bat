@@ -30,6 +30,7 @@ export interface HealthResponse {
 	healthy: number;
 	warning: number;
 	critical: number;
+	maintenance: number;
 	checked_at: number;
 }
 

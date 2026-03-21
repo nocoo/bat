@@ -41,7 +41,12 @@ export const API_ROUTES = {
 
 // --- Response DTOs ---
 
-export type HostStatus = "healthy" | "warning" | "critical" | "offline";
+export type HostStatus =
+	| "healthy"
+	| "warning"
+	| "critical"
+	| "offline"
+	| "maintenance";
 
 /** Sparkline data point — one hour of aggregated data */
 export interface SparklinePoint {
@@ -81,6 +86,10 @@ export interface HostOverviewItem {
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
 	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
 	net_sparkline: SparklinePoint[] | null; // 24h hourly Network usage (normalized 0–100)
+	// Maintenance window (UTC "HH:MM", nullable)
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+	maintenance_reason: string | null;
 }
 
 /** GET /api/hosts/:id → HostDetailItem */
@@ -265,3 +274,12 @@ export interface AllowedPort {
 
 /** Maximum allowed-port entries per host */
 export const MAX_ALLOWED_PORTS_PER_HOST = 50;
+
+// --- Maintenance window types (docs/17-maintenance-window.md) ---
+
+/** Maintenance window DTO — returned by GET /api/hosts/:id/maintenance */
+export interface MaintenanceWindow {
+	start: string; // "HH:MM" UTC
+	end: string; // "HH:MM" UTC
+	reason: string; // may be ""
+}
