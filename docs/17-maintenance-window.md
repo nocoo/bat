@@ -195,6 +195,7 @@ All routes that return alerts must JOIN `hosts` and exclude maintenance hosts in
 | `GET /api/alerts` (`alertsListRoute`) | Returns all alerts for active hosts | Filter out alerts where host is currently in maintenance |
 | `GET /api/monitoring/alerts` (`monitoringAlertsRoute`) | Same SQL, adds tags + severity filter | Same filtering, also exclude from `alert_count` and `by_severity` tallies |
 | `GET /api/hosts` (`hostsListRoute`) | Counts alerts per host for `alert_count` | Set `alert_count: 0` for maintenance hosts |
+| `GET /api/hosts/:id` (`hostDetailRoute`) | Returns single host with `alert_count` from raw `alerts.length` | Set `alert_count: 0` for maintenance hosts (status already derived via `deriveHostStatus`) |
 | `GET /api/monitoring/hosts` (`monitoringHostsRoute`) | Lists hosts with tier + alerts | Tier = `"maintenance"`, empty alerts array |
 | `GET /api/monitoring/hosts/:id` | Single host with alerts | Tier = `"maintenance"`, empty alerts array |
 
@@ -214,8 +215,12 @@ const visibleAlerts = alerts.filter(a => {
     return true;
 });
 
-// For host list routes — zero out alert_count for maintenance hosts:
+// For host list/detail routes — zero out alert_count for maintenance hosts:
 const alertCount = isInMaintenance ? 0 : alertCountMap.get(host.host_id) ?? 0;
+
+// For host detail route (single host, alerts already fetched):
+// alert_count is derived from raw alerts.length — override to 0 during maintenance.
+// deriveHostStatus() already returns "maintenance", so status is correct.
 ```
 
 ### Status derivation
