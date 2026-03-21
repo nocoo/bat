@@ -39,8 +39,17 @@ check_rust_coverage() {
     return 0
   fi
 
-  echo "→ probe (Rust): running cargo llvm-cov..."
-  if ! cargo llvm-cov --fail-under-lines "$RUST_THRESHOLD" --manifest-path probe/Cargo.toml 2>&1 | tail -3; then
+  # Prefer nightly for coverage(off) attribute support
+  local toolchain=""
+  if rustup run nightly rustc --version &>/dev/null; then
+    toolchain="+nightly"
+  else
+    echo "⚠ probe: nightly toolchain not found, falling back to stable (coverage(off) annotations ignored)"
+  fi
+
+  echo "→ probe (Rust): running cargo ${toolchain:-stable} llvm-cov..."
+  # shellcheck disable=SC2086
+  if ! cargo $toolchain llvm-cov --fail-under-lines "$RUST_THRESHOLD" --manifest-path probe/Cargo.toml 2>&1 | tail -3; then
     echo "✘ probe: line coverage < ${RUST_THRESHOLD}% threshold"
     return 1
   fi
