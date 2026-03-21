@@ -249,8 +249,8 @@ export interface HostTag {
 	color: number;
 }
 
-/** Tag name constraints: 1-32 chars, lowercase, a-z 0-9 - _ */
-export const TAG_NAME_REGEX = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+/** Tag name max length (1-32 chars, any script including CJK) */
+export const TAG_MAX_LENGTH = 32;
 
 /** Maximum tags per host */
 export const MAX_TAGS_PER_HOST = 10;

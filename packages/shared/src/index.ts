@@ -84,7 +84,7 @@ export {
 	MAX_ALLOWED_PORTS_PER_HOST,
 	MAX_TAGS_PER_HOST,
 	TAG_COLOR_COUNT,
-	TAG_NAME_REGEX,
+	TAG_MAX_LENGTH,
 } from "./api.js";
 
 // Tier 2 payload types

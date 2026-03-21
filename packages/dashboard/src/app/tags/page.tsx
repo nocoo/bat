@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/lib/hooks";
 import { TAG_COLORS } from "@/lib/palette";
-import { TAG_COLOR_COUNT, TAG_NAME_REGEX } from "@bat/shared";
+import { TAG_COLOR_COUNT, TAG_MAX_LENGTH } from "@bat/shared";
 import type { TagItem } from "@bat/shared";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -34,8 +34,8 @@ export default function TagsPage() {
 	const [editName, setEditName] = useState("");
 
 	const handleCreate = useCallback(async () => {
-		const name = newName.trim().toLowerCase();
-		if (!TAG_NAME_REGEX.test(name)) return;
+		const name = newName.trim();
+		if (!name || name.length > TAG_MAX_LENGTH) return;
 		setCreating(true);
 		try {
 			await apiRequest("/api/tags", {
@@ -65,8 +65,8 @@ export default function TagsPage() {
 
 	const handleRename = useCallback(
 		async (id: number) => {
-			const name = editName.trim().toLowerCase();
-			if (!TAG_NAME_REGEX.test(name)) return;
+			const name = editName.trim();
+			if (!name || name.length > TAG_MAX_LENGTH) return;
 			try {
 				await apiRequest(`/api/tags/${id}`, {
 					method: "PUT",
@@ -127,7 +127,7 @@ export default function TagsPage() {
 							>
 								<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
 								<input
-									placeholder="New tag name (a-z, 0-9, -, _)"
+									placeholder="New tag name…"
 									value={newName}
 									onChange={(e) => setNewName(e.target.value)}
 									className="h-8 text-sm flex-1 rounded-md border border-input bg-background px-3 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -136,7 +136,7 @@ export default function TagsPage() {
 								<Button
 									type="submit"
 									size="sm"
-									disabled={creating || !TAG_NAME_REGEX.test(newName.trim().toLowerCase())}
+									disabled={creating || !newName.trim() || newName.trim().length > TAG_MAX_LENGTH}
 								>
 									{creating ? "Creating..." : "Create"}
 								</Button>

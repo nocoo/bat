@@ -188,7 +188,7 @@ This keeps the Worker completely unaware of tags.
 ## Design Decisions
 
 - **Tag limit per host**: 10 max. Dashboard validates on assignment; returns 422 if exceeded.
-- **Tag name constraints**: 1–32 characters, lowercase, allowed chars: `a-z`, `0-9`, `-`, `_`. Validated at creation time. This avoids encoding issues and ensures clean display. Names are stored COLLATE NOCASE but normalized to lowercase on insert.
+- **Tag name constraints**: 1–32 characters, any script including CJK. Validated at creation time. Names are stored COLLATE NOCASE for uniqueness.
 - **Color assignment**: auto-assign `(SELECT COALESCE(MAX(color), -1) + 1) % 10` on create (round-robin through 10 palette slots). User can override via PUT.
 - **No Worker changes**: Tag CRUD routes live in the Worker alongside hosts/alerts/webhooks, using the same `BAT_WRITE_KEY`/`BAT_READ_KEY` auth model. Dashboard is a thin proxy.
 - **D1 REST API latency**: Dashboard (Railway, US) → D1 REST API (Cloudflare) adds ~50–100ms per query. Acceptable for tag operations which are infrequent user actions, not high-frequency data paths.
