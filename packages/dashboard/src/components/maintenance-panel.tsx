@@ -85,6 +85,7 @@ export function MaintenancePanel({ hid }: MaintenancePanelProps) {
 			});
 			await mutate();
 			await globalMutate("hosts");
+			await globalMutate("alerts");
 			setEditing(false);
 		} catch (e) {
 			setError((e as Error).message);
@@ -100,6 +101,7 @@ export function MaintenancePanel({ hid }: MaintenancePanelProps) {
 			});
 			await mutate();
 			await globalMutate("hosts");
+			await globalMutate("alerts");
 		} catch (e) {
 			setError((e as Error).message);
 		}
