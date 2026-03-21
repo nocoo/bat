@@ -25,56 +25,14 @@ Allow users to tag hosts with arbitrary labels (e.g. `production`, `us-east`, `d
 
 ## Architecture
 
-### Key decision: Dashboard → D1 direct, no Worker involvement
+### Key decision: Dashboard → Worker proxy (all D1 access through Worker)
 
-Tags are **user-initiated state** — only the Dashboard reads and writes them. The Probe never touches tags. The Worker has **read-only** access to `tags` and `host_tags` for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)), but never writes them. Therefore:
+Tags are **user-initiated state** — the Dashboard reads and writes them via Worker routes. The Probe never touches tags. The Worker has full CRUD access to `tags` and `host_tags` tables, including read-only access for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)).
 
-- **Dashboard connects to D1 directly** via [Cloudflare D1 REST API](https://developers.cloudflare.com/d1/platform/client-api/).
-- **No Worker routes** for tags. No new API keys. No proxy layer.
-- All tag CRUD happens in Dashboard Next.js API routes, protected by NextAuth session.
-- The Worker's hosts list query does NOT include tags — the Dashboard enriches the response client-side or in its own API route by querying D1 separately.
-
-This keeps the existing security model untouched:
-- `BAT_WRITE_KEY` stays probe-only.
-- `BAT_READ_KEY` stays read-only.
-- Tag mutations are gated by NextAuth session (Google OAuth), not by API key.
-
-### D1 REST API access
-
-Dashboard env vars (Railway):
-```
-CF_API_TOKEN=<token with D1 read/write permission>
-CF_ACCOUNT_ID=<cloudflare account id>
-CF_D1_DATABASE_ID=<bat-db database id>
-```
-
-D1 client helper (`packages/dashboard/src/lib/d1.ts`):
-```typescript
-interface D1Result<T> {
-  results: T[];
-  success: boolean;
-  meta: { changes: number; last_row_id: number; rows_read: number; rows_written: number };
-}
-
-export async function d1Query<T = Record<string, unknown>>(
-  sql: string,
-  params?: unknown[],
-): Promise<D1Result<T>> {
-  const res = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/d1/database/${CF_D1_DATABASE_ID}/query`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${CF_API_TOKEN}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ sql, params }),
-    },
-  );
-  const json = await res.json();
-  return json.result[0];
-}
-```
+- **Dashboard proxies all tag operations through the Worker** — same pattern as hosts, alerts, webhooks, and maintenance.
+- Tag mutations use `BAT_WRITE_KEY`; reads use `BAT_READ_KEY`.
+- All tag operations are protected by NextAuth session on the Dashboard side.
+- The Worker's hosts list query does NOT include tags — the Dashboard enriches the response client-side by querying `/api/tags/by-hosts` separately.
 
 ---
 
@@ -108,9 +66,9 @@ CREATE INDEX idx_host_tags_tag ON host_tags(tag_id);
 
 ---
 
-## Dashboard API Routes
+## API Routes
 
-All tag operations are Dashboard-side Next.js API routes that query D1 directly. Protected by NextAuth session — unauthenticated requests get 401.
+Tag CRUD is handled by Worker routes (`packages/worker/src/routes/tags.ts`). Dashboard routes are thin proxies (auth check + forward to Worker). Protected by NextAuth session — unauthenticated requests get 401.
 
 ### Tag CRUD (`/api/tags`)
 
@@ -142,11 +100,14 @@ All tag operations are Dashboard-side Next.js API routes that query D1 directly.
 
 ### Implementation pattern
 
-Each route handler:
+Each Worker route handler:
+1. Validate input (name format, tag exists, host exists, limit not exceeded)
+2. Execute D1 query via `c.env.DB` native binding
+3. Return JSON response
+
+Dashboard route handlers:
 1. Verify NextAuth session → 401 if missing
-2. Validate input (name format, tag exists, host exists, limit not exceeded)
-3. Call `d1Query()` with parameterized SQL
-4. Return JSON response
+2. Proxy to Worker via `proxyToWorker()` / `proxyToWorkerWithBody()`
 
 ---
 
@@ -179,7 +140,7 @@ The hosts page currently fetches host data from Worker via `GET /api/hosts` (pro
 
 **Approach**: The hosts page makes two parallel requests:
 1. `GET /api/hosts` → Worker (via existing proxy) → host list with metrics
-2. `GET /api/tags/by-hosts` → Dashboard D1 direct → `{ [host_id]: HostTag[] }`
+2. `GET /api/tags/by-hosts` → Worker (via proxy) → `{ [host_id]: HostTag[] }`
 
 New Dashboard route `/api/tags/by-hosts/route.ts`:
 ```sql
@@ -209,19 +170,18 @@ This keeps the Worker completely unaware of tags.
 
 ### Host card changes
 
-- Below subtitle line, render tags as `<TagChip />` components. The tags come from the page-level ViewModel — the hosts page merges `GET /api/hosts` (Worker) and `GET /api/tags/by-hosts` (D1 direct) into a combined view. `HostOverviewItem` itself does NOT contain tags.
+- Below subtitle line, render tags as `<TagChip />` components. The tags come from the page-level ViewModel — the hosts page merges `GET /api/hosts` (Worker) and `GET /api/tags/by-hosts` (Worker) into a combined view. `HostOverviewItem` itself does NOT contain tags.
 - Add `+` icon button that opens `TagSelector` popover.
 - Card width may need slight increase to accommodate chips.
 
 ---
 
-## Commits (estimated 5)
+## Commits (estimated 4)
 
 1. `feat: add tags migration (0010)` — SQL migration file
-2. `feat: add D1 REST API client to dashboard` — `lib/d1.ts` helper, env vars
-3. `feat: add tag CRUD and assignment API routes` — all Dashboard API routes for tags
-4. `feat: add tags management page` — `/tags` page with create/rename/recolor/delete
-5. `feat: add tag display and quick-tag to host cards` — host card chips, filter bar, `/api/tags/by-hosts` route
+2. `feat: add tag CRUD routes to worker` — Worker routes for all tag operations
+3. `feat: add tags management page` — `/tags` page with create/rename/recolor/delete
+4. `feat: add tag display and quick-tag to host cards` — host card chips, filter bar, `/api/tags/by-hosts` route
 
 ---
 
@@ -230,5 +190,5 @@ This keeps the Worker completely unaware of tags.
 - **Tag limit per host**: 10 max. Dashboard validates on assignment; returns 422 if exceeded.
 - **Tag name constraints**: 1–32 characters, lowercase, allowed chars: `a-z`, `0-9`, `-`, `_`. Validated at creation time. This avoids encoding issues and ensures clean display. Names are stored COLLATE NOCASE but normalized to lowercase on insert.
 - **Color assignment**: auto-assign `(SELECT COALESCE(MAX(color), -1) + 1) % 10` on create (round-robin through 10 palette slots). User can override via PUT.
-- **No Worker changes**: Worker is completely unaware of tags. This avoids introducing new auth tiers, keeps the Worker's attack surface unchanged, and simplifies the architecture.
+- **No Worker changes**: Tag CRUD routes live in the Worker alongside hosts/alerts/webhooks, using the same `BAT_WRITE_KEY`/`BAT_READ_KEY` auth model. Dashboard is a thin proxy.
 - **D1 REST API latency**: Dashboard (Railway, US) → D1 REST API (Cloudflare) adds ~50–100ms per query. Acceptable for tag operations which are infrequent user actions, not high-frequency data paths.

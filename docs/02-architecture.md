@@ -29,24 +29,21 @@ Replace Netdata (120-243MB RSS) across 6 VPS hosts with a purpose-built monitori
                                   └──────────────┘   │  Railway     │
                                                      └──────────────┘
 
-Dashboard has two data paths:
-  1. Proxy path: Dashboard /api/* → Worker /api/* (BAT_READ_KEY) for metrics & hosts
-  2. D1 direct path: Dashboard /api/* → D1 REST API (CF_API_TOKEN) for user-state data (tags, etc.)
+Dashboard has one data path:
+  1. Proxy path: Dashboard /api/* → Worker /api/* (BAT_READ_KEY / BAT_WRITE_KEY) for all data
 
 Dashboard auth model:
   - User authenticates with Google OAuth on Dashboard (cookie stays on Dashboard domain)
-  - Dashboard API Routes (Next.js /api/*) act as a server-side proxy to Worker for metrics data
-  - Dashboard API Routes query D1 directly via Cloudflare D1 REST API for user-initiated state (tags)
-  - Dashboard server holds BAT_READ_KEY (for Worker proxy) and CF_API_TOKEN (for D1 direct)
+  - Dashboard API Routes (Next.js /api/*) act as a server-side proxy to Worker for all data
+  - Dashboard server holds BAT_READ_KEY (for reads) and BAT_WRITE_KEY (for mutations)
   - Browser never talks to Worker or D1 directly — no cross-domain cookie issue
 ```
 
 ### Data flow summary
 
 1. **Probe → Worker** (write path): Probe POSTs metrics/identity JSON with `BAT_WRITE_KEY`. Worker validates, stores in D1, evaluates alert rules. See [04-probe.md](./04-probe.md) for Probe internals, [05-worker.md](./05-worker.md) for Worker ingest logic.
-2. **Dashboard → Worker** (read path): Dashboard API Routes proxy browser requests to Worker with `BAT_READ_KEY`. Worker queries D1, returns JSON. See [06-dashboard.md](./06-dashboard.md) for proxy architecture.
-3. **Dashboard → D1** (user-state path): Dashboard API Routes query D1 directly via [Cloudflare D1 REST API](https://developers.cloudflare.com/d1/platform/client-api/) using `CF_API_TOKEN`. Used for user-initiated state (tags, future user preferences) that the Worker/Probe never touch. See [06-dashboard.md § D1 Direct Access](./06-dashboard.md) and [11-host-tags.md](./11-host-tags.md).
-4. **Uptime Kuma → Worker** (health path): Public `GET /api/health` returns aggregate status (200/503). No API key required. See [05-worker.md § Health endpoint](./05-worker.md).
+2. **Dashboard → Worker** (read path): Dashboard API Routes proxy browser requests to Worker with `BAT_READ_KEY` or `BAT_WRITE_KEY` (for mutations). Worker queries D1, returns JSON. See [06-dashboard.md](./06-dashboard.md) for proxy architecture.
+3. **Uptime Kuma → Worker** (health path): Public `GET /api/health` returns aggregate status (200/503). No API key required. See [05-worker.md § Health endpoint](./05-worker.md).
 
 ---
 
@@ -57,8 +54,7 @@ Dashboard auth model:
 | Probe language | Rust | Single static binary, < 15MB RSS, < 10MB disk |
 | Transport | HTTPS POST JSON | CF Worker native, ~1KB/report, simple |
 | Auth (probe→worker) | Write API Key | `Authorization: Bearer <BAT_WRITE_KEY>`, stored as Worker secret. Only accepted on write routes (`/api/ingest`, `/api/identity`) |
-| Auth (dashboard→worker) | Read API Key proxy | Dashboard API Routes hold `BAT_READ_KEY`, proxy to Worker. Only accepted on read routes (`/api/hosts`, `/api/hosts/:id/metrics`, `/api/alerts`). Read key cannot forge metrics or manipulate alerts |
-| Auth (dashboard→D1) | CF API Token | Dashboard queries D1 directly via Cloudflare D1 REST API for user-state data (tags). Mutations gated by NextAuth session, not by Worker API key. See [11-host-tags.md](./11-host-tags.md) |
+| Auth (dashboard→worker) | Read/Write API Key proxy | Dashboard API Routes hold `BAT_READ_KEY` and `BAT_WRITE_KEY`, proxy to Worker. Read key for read routes, write key for mutations (tags, maintenance, webhooks, port allowlist) |
 | Server | CF Worker + D1 | Serverless, free tier sufficient for 6 hosts |
 | Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges. Schema details in [03-data-structures.md](./03-data-structures.md) |
 | Dashboard | Next.js 16 + Bun (from Surety template) | Clone auth, UI, deployment from `../surety`. Details in [06-dashboard.md](./06-dashboard.md) |
@@ -147,7 +143,7 @@ bat/
 │           │   ├── globals.css     # Basalt design tokens
 │           │   ├── page.tsx        # → /hosts redirect
 │           │   ├── login/page.tsx  # Google login (from Surety)
-│           │   ├── api/            # Server-side proxy + D1 direct routes
+│           │   ├── api/            # Server-side proxy routes (all go through Worker)
 │           │   │   ├── hosts/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts
 │           │   │   ├── hosts/[id]/
@@ -157,17 +153,17 @@ bat/
 │           │   │   ├── hosts/[id]/tier2/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/hosts/:id/tier2
 │           │   │   ├── hosts/[id]/tags/
-│           │   │   │   └── route.ts        # D1 direct: GET/POST/PUT host tags
+│           │   │   │   └── route.ts        # Proxy → Worker GET/POST/PUT host tags
 │           │   │   ├── hosts/[id]/tags/[tagId]/
-│           │   │   │   └── route.ts        # D1 direct: DELETE tag from host
+│           │   │   │   └── route.ts        # Proxy → Worker DELETE tag from host
 │           │   │   ├── alerts/
 │           │   │   │   └── route.ts        # Proxy → Worker GET /api/alerts
 │           │   │   ├── tags/
-│           │   │   │   └── route.ts        # D1 direct: GET/POST tags
+│           │   │   │   └── route.ts        # Proxy → Worker GET/POST tags
 │           │   │   ├── tags/[id]/
-│           │   │   │   └── route.ts        # D1 direct: PUT/DELETE tag
+│           │   │   │   └── route.ts        # Proxy → Worker PUT/DELETE tag
 │           │   │   └── tags/by-hosts/
-│           │   │       └── route.ts        # D1 direct: GET all host→tag mappings
+│           │   │       └── route.ts        # Proxy → Worker GET all host→tag mappings
 │           │   ├── hosts/
 │           │   │   ├── page.tsx    # Overview: host grid with status
 │           │   │   └── [id]/
@@ -211,21 +207,19 @@ Worker middleware checks `Authorization: Bearer <key>` and matches against the a
 
 Dashboard (Next.js) exposes its own `/api/*` routes to the browser. These routes serve two purposes:
 
-**1. Worker proxy** (metrics, hosts, alerts): Routes forward requests to Worker with API key.
-**2. D1 direct** (tags, user-state): Routes query D1 via Cloudflare REST API.
+**1. Worker proxy** (all routes): Dashboard API routes forward requests to Worker with API key (read or write).
 
-Both paths require an authenticated NextAuth session:
+All paths require an authenticated NextAuth session:
 
 1. Check the user's NextAuth session (Google OAuth cookie, same domain)
 2. If authenticated:
-   - **Proxy routes**: forward to Worker with `Authorization: Bearer <BAT_READ_KEY>`
-   - **D1 direct routes**: query D1 REST API with `CF_API_TOKEN`
+   - **Read routes**: forward to Worker with `Authorization: Bearer <BAT_READ_KEY>`
+   - **Write routes**: forward to Worker with `Authorization: Bearer <BAT_WRITE_KEY>`
 3. Return response to browser
 
 ```
-Worker proxy:  Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
-D1 direct:     Browser ──cookie──→ Dashboard /api/tags  ──CF Token──→ D1 REST API ──→ D1
-                                   (session check)         (server-side, no CORS)
+Worker proxy:  Browser ──cookie──→ Dashboard /api/* ──API Key──→ Worker /api/* ──→ D1
+                                   (session check)    (server-side, no CORS)
 ```
 
 This means:
@@ -262,10 +256,7 @@ cd packages/worker && wrangler deploy
 - Environment variables:
   - `BAT_API_URL` — Worker URL
   - `BAT_READ_KEY` — Read-only API Key for Worker
-  - `BAT_WRITE_KEY` — Write API Key (used only by setup page to generate install commands)
-  - `CF_API_TOKEN` — Cloudflare API token with D1 read/write permission (for tags)
-  - `CF_ACCOUNT_ID` — Cloudflare account ID
-  - `CF_D1_DATABASE_ID` — D1 database ID for bat-db
+  - `BAT_WRITE_KEY` — Write API Key (used by Dashboard write proxy routes for webhook CRUD, maintenance CRUD, tags, port allowlist; also by setup page to generate install commands)
   - `AUTH_SECRET` — NextAuth secret
   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — Google OAuth (matches Surety's `auth.ts` env names)
   - `ALLOWED_EMAILS` — email allowlist
