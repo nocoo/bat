@@ -1,6 +1,6 @@
 // GET /api/hosts — list all active hosts with overview DTO
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
-import { hashHostId } from "@bat/shared";
+import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -21,6 +21,10 @@ interface HostRow {
 	virtualization: string | null;
 	public_ip: string | null;
 	probe_version: string | null;
+	// Maintenance window
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+	maintenance_reason: string | null;
 }
 
 interface LatestMetrics {
@@ -95,7 +99,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	// 1. Get all active hosts
 	const hostsResult = await db
 		.prepare(
-			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, probe_version FROM hosts WHERE is_active = 1",
+			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, probe_version, maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE is_active = 1",
 		)
 		.all<HostRow>();
 	const hosts = hostsResult.results;
@@ -200,11 +204,19 @@ ORDER BY host_id, hour_ts ASC`,
 	}
 
 	// 6. Build response
+	const nowHHMM = toUtcHHMM(now);
 	const items: HostOverviewItem[] = hosts.map((host) => {
 		const metrics = metricsMap.get(host.host_id);
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts);
+		const maintenance =
+			host.maintenance_start && host.maintenance_end
+				? { start: host.maintenance_start, end: host.maintenance_end }
+				: null;
+		const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
+		const inMaintenance =
+			maintenance !== null &&
+			isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 		const netRates = extractNetRates(metrics?.net_json ?? null);
 		const sparklines = sparklinesByHost.get(host.host_id);
@@ -233,7 +245,7 @@ ORDER BY host_id, hour_ts ASC`,
 			mem_used_pct: metrics?.mem_used_pct ?? null,
 			uptime_seconds: metrics?.uptime_seconds ?? null,
 			last_seen: host.last_seen,
-			alert_count: alertCountMap.get(host.host_id) ?? 0,
+			alert_count: inMaintenance ? 0 : (alertCountMap.get(host.host_id) ?? 0),
 			cpu_logical: host.cpu_logical,
 			cpu_physical: host.cpu_physical,
 			mem_total_bytes: host.mem_total_bytes,
@@ -248,6 +260,9 @@ ORDER BY host_id, hour_ts ASC`,
 			cpu_sparkline: sparklines?.cpu.length ? sparklines.cpu : null,
 			mem_sparkline: sparklines?.mem.length ? sparklines.mem : null,
 			net_sparkline: netSparkline,
+			maintenance_start: host.maintenance_start,
+			maintenance_end: host.maintenance_end,
+			maintenance_reason: host.maintenance_reason,
 		};
 	});
 

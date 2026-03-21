@@ -1,6 +1,6 @@
 // Status derivation — shared by hosts list and health endpoint
 import type { HostStatus } from "@bat/shared";
-import { ALERT_THRESHOLDS } from "@bat/shared";
+import { ALERT_THRESHOLDS, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 
 interface AlertRow {
 	severity: string;
@@ -21,17 +21,29 @@ function parsePublicPorts(message: string | null | undefined): number[] {
 
 /**
  * Derive host status from last_seen time and active alerts.
- * Priority: offline > critical > warning > healthy
+ * Priority: maintenance > offline > critical > warning > healthy
  *
  * When `allowedPorts` is provided, a public_port warning whose ports are
  * ALL in the allowed set is treated as info (does not count as warning).
+ *
+ * When `maintenance` is provided and the current time falls within
+ * the window, returns "maintenance" immediately.
  */
 export function deriveHostStatus(
 	lastSeen: number,
 	now: number,
 	alerts: AlertRow[],
 	allowedPorts?: Set<number>,
+	maintenance?: { start: string; end: string } | null,
 ): HostStatus {
+	// Maintenance takes precedence over everything
+	if (maintenance) {
+		const nowHHMM = toUtcHHMM(now);
+		if (isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end)) {
+			return "maintenance";
+		}
+	}
+
 	// Offline if not seen within threshold
 	if (now - lastSeen > ALERT_THRESHOLDS.OFFLINE_SECONDS) {
 		return "offline";

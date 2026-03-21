@@ -1,5 +1,6 @@
 // POST /api/ingest — receive and store metrics from probes
 import type { MetricsPayload } from "@bat/shared";
+import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { evaluateAlerts } from "../services/alerts.js";
 import { ensureHostExists, insertMetricsRaw, updateHostLastSeen } from "../services/metrics.js";
@@ -79,11 +80,17 @@ export async function ingestRoute(c: Context<AppEnv>) {
 
 	const db = c.env.DB;
 
-	// Check if host is retired
+	// Check if host is retired + fetch maintenance window
 	const existing = await db
-		.prepare("SELECT is_active FROM hosts WHERE host_id = ?")
+		.prepare(
+			"SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?",
+		)
 		.bind(body.host_id)
-		.first<{ is_active: number }>();
+		.first<{
+			is_active: number;
+			maintenance_start: string | null;
+			maintenance_end: string | null;
+		}>();
 
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);
@@ -99,7 +106,27 @@ export async function ingestRoute(c: Context<AppEnv>) {
 	// Retried payloads with identical timestamps are no-ops from here.
 	if (inserted) {
 		await updateHostLastSeen(db, body.host_id, workerNow);
-		await evaluateAlerts(db, body.host_id, body, workerNow);
+
+		// Check maintenance window — skip alert evaluation + purge alert_pending
+		const nowHHMM = toUtcHHMM(workerNow);
+		const inMaintenance =
+			existing?.maintenance_start &&
+			existing?.maintenance_end &&
+			isInMaintenanceWindow(
+				nowHHMM,
+				existing.maintenance_start,
+				existing.maintenance_end,
+			);
+
+		if (inMaintenance) {
+			// Purge duration rule timers to prevent stale first_seen accumulation
+			await db
+				.prepare("DELETE FROM alert_pending WHERE host_id = ?")
+				.bind(body.host_id)
+				.run();
+		} else {
+			await evaluateAlerts(db, body.host_id, body, workerNow);
+		}
 	}
 
 	return c.body(null, 204);
