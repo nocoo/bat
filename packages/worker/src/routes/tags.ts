@@ -8,6 +8,9 @@
 // POST   /api/hosts/:id/tags    — add one tag to host
 // PUT    /api/hosts/:id/tags    — replace host's tags (set semantics)
 // DELETE /api/hosts/:id/tags/:tagId — remove one tag from host
+//
+// Note: host-scoped routes accept raw host_id only (not 8-char hid).
+// Dashboard always sends raw host_id for tag/port operations.
 
 import { type HostTag, MAX_TAGS_PER_HOST, TAG_COLOR_COUNT, TAG_NAME_REGEX } from "@bat/shared";
 import type { Context } from "hono";
@@ -144,16 +147,24 @@ export async function tagsUpdateRoute(c: Context<AppEnv, "/api/tags/:id">) {
 	}
 
 	values.push(tagId);
-	const result = await db
-		.prepare(`UPDATE tags SET ${sets.join(", ")} WHERE id = ? RETURNING id, name, color`)
-		.bind(...values)
-		.first<{ id: number; name: string; color: number }>();
 
-	if (!result) {
-		return c.json({ error: "Tag not found" }, 404);
+	try {
+		const result = await db
+			.prepare(`UPDATE tags SET ${sets.join(", ")} WHERE id = ? RETURNING id, name, color`)
+			.bind(...values)
+			.first<{ id: number; name: string; color: number }>();
+
+		if (!result) {
+			return c.json({ error: "Tag not found" }, 404);
+		}
+
+		return c.json(result);
+	} catch (err) {
+		if (err instanceof Error && err.message.includes("UNIQUE")) {
+			return c.json({ error: "Tag with this name already exists" }, 409);
+		}
+		throw err;
 	}
-
-	return c.json(result);
 }
 
 /** DELETE /api/tags/:id */

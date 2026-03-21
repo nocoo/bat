@@ -3,10 +3,22 @@
 // GET    /api/hosts/:id/allowed-ports    — allowed ports for a host
 // POST   /api/hosts/:id/allowed-ports    — add a port to the allowlist
 // DELETE /api/hosts/:id/allowed-ports/:port — remove a port
+//
+// Note: host-scoped routes accept raw host_id only (not 8-char hid).
+// Dashboard always sends raw host_id for tag/port operations.
 
 import { type AllowedPort, MAX_ALLOWED_PORTS_PER_HOST } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
+
+/** Verify host exists. Returns true if found. */
+async function hostExists(db: D1Database, hostId: string): Promise<boolean> {
+	const row = await db
+		.prepare("SELECT host_id FROM hosts WHERE host_id = ? LIMIT 1")
+		.bind(hostId)
+		.first<{ host_id: string }>();
+	return row !== null;
+}
 
 // ---------------------------------------------------------------------------
 // Bulk lookup
@@ -44,6 +56,11 @@ export async function hostAllowedPortsListRoute(
 ) {
 	const db = c.env.DB;
 	const hostId = c.req.param("id");
+
+	// Verify host exists — return 404 instead of empty array for unknown hosts
+	if (!(await hostExists(db, hostId))) {
+		return c.json({ error: "Host not found" }, 404);
+	}
 
 	const result = await db
 		.prepare(
@@ -87,6 +104,11 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 	const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
 	if (reason.length > 200) {
 		return c.json({ error: "reason must be 200 characters or fewer" }, 400);
+	}
+
+	// Verify host exists
+	if (!(await hostExists(db, hostId))) {
+		return c.json({ error: "Host not found" }, 404);
 	}
 
 	// Idempotent: if this port is already allowed, return it directly
