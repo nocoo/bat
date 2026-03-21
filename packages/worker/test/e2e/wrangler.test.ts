@@ -18,10 +18,13 @@ import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
 	AlertItem,
+	AllowedPort,
 	EventItem,
 	HostDetailItem,
 	HostOverviewItem,
+	HostTag,
 	MetricsQueryResponse,
+	TagItem,
 	WebhookConfig,
 } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
@@ -770,6 +773,280 @@ describe("Events & Webhooks E2E", () => {
 				"CF-Connecting-IP": "203.0.113.42",
 			},
 			body: JSON.stringify({ title: "should fail", body: {} }),
+		});
+		expect(res.status).toBe(403);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Tags CRUD E2E
+// ---------------------------------------------------------------------------
+// Tests run in order — later tests depend on state created by earlier ones.
+// Uses "e2e-host-001" created by the identity test above.
+
+describe("Tags CRUD E2E", () => {
+	let tagId: number;
+	let tag2Id: number;
+
+	test("POST /api/tags → 201 (create tag)", async () => {
+		const res = await fetch(`${BASE}/api/tags`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "production", color: 0 }),
+		});
+		expect(res.status).toBe(201);
+		const tag = (await res.json()) as TagItem;
+		expect(tag.name).toBe("production");
+		expect(tag.color).toBe(0);
+		expect(tag.host_count).toBe(0);
+		tagId = tag.id;
+	});
+
+	test("POST /api/tags → 201 (create second tag)", async () => {
+		const res = await fetch(`${BASE}/api/tags`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "staging" }),
+		});
+		expect(res.status).toBe(201);
+		const tag = (await res.json()) as TagItem;
+		expect(tag.name).toBe("staging");
+		tag2Id = tag.id;
+	});
+
+	test("POST /api/tags duplicate name → 409", async () => {
+		const res = await fetch(`${BASE}/api/tags`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "production" }),
+		});
+		expect(res.status).toBe(409);
+	});
+
+	test("POST /api/tags with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/tags`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+			body: JSON.stringify({ name: "should-fail" }),
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("GET /api/tags → lists tags with host_count", async () => {
+		const res = await fetch(`${BASE}/api/tags`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const tags = (await res.json()) as TagItem[];
+		expect(tags.length).toBeGreaterThanOrEqual(2);
+		const prod = tags.find((t) => t.name === "production");
+		expect(prod).toBeDefined();
+		expect(prod?.host_count).toBe(0);
+	});
+
+	test("PUT /api/tags/:id → update name", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "prod", color: 3 }),
+		});
+		expect(res.status).toBe(200);
+		const tag = (await res.json()) as { id: number; name: string; color: number };
+		expect(tag.name).toBe("prod");
+		expect(tag.color).toBe(3);
+	});
+
+	test("PUT /api/tags/:id with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
+			method: "PUT",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+			body: JSON.stringify({ name: "fail" }),
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("POST /api/hosts/:id/tags → 201 (add tag to host)", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ tag_id: tagId }),
+		});
+		expect(res.status).toBe(201);
+		const tag = (await res.json()) as HostTag;
+		expect(tag.name).toBe("prod");
+	});
+
+	test("POST /api/hosts/:id/tags with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+			body: JSON.stringify({ tag_id: tagId }),
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("GET /api/hosts/:id/tags → lists host tags", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const tags = (await res.json()) as HostTag[];
+		expect(tags.length).toBe(1);
+		expect(tags[0].name).toBe("prod");
+	});
+
+	test("GET /api/tags/by-hosts → maps host_id to tags", async () => {
+		const res = await fetch(`${BASE}/api/tags/by-hosts`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const map = (await res.json()) as Record<string, HostTag[]>;
+		expect(map["e2e-host-001"]).toBeDefined();
+		expect(map["e2e-host-001"].length).toBe(1);
+	});
+
+	test("PUT /api/hosts/:id/tags → replace tags", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ tag_ids: [tagId, tag2Id] }),
+		});
+		expect(res.status).toBe(200);
+		const tags = (await res.json()) as HostTag[];
+		expect(tags.length).toBe(2);
+	});
+
+	test("DELETE /api/hosts/:id/tags/:tagId → 204", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags/${tagId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	test("DELETE /api/hosts/:id/tags/:tagId already removed → 404", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/tags/${tagId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("DELETE /api/tags/:id → 204", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	test("DELETE /api/tags/:id already deleted → 404", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("DELETE /api/tags/:id with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tag2Id}`, {
+			method: "DELETE",
+			headers: { Authorization: `Bearer ${READ_KEY}` },
+		});
+		expect(res.status).toBe(403);
+	});
+
+	// Cleanup: delete tag2
+	test("DELETE /api/tags/:id (cleanup tag2) → 204", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tag2Id}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(204);
+	});
+});
+
+// ---------------------------------------------------------------------------
+// Port Allowlist CRUD E2E
+// ---------------------------------------------------------------------------
+// Uses "e2e-host-001" created by the identity test above.
+
+describe("Port Allowlist CRUD E2E", () => {
+	test("POST /api/hosts/:id/allowed-ports → 201 (add port)", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ port: 443, reason: "HTTPS" }),
+		});
+		expect(res.status).toBe(201);
+		const port = (await res.json()) as AllowedPort;
+		expect(port.port).toBe(443);
+		expect(port.reason).toBe("HTTPS");
+	});
+
+	test("POST /api/hosts/:id/allowed-ports → 201 (idempotent)", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ port: 443, reason: "HTTPS again" }),
+		});
+		expect(res.status).toBe(201);
+		const port = (await res.json()) as AllowedPort;
+		expect(port.port).toBe(443);
+		// Original reason preserved (idempotent)
+		expect(port.reason).toBe("HTTPS");
+	});
+
+	test("POST /api/hosts/:id/allowed-ports invalid port → 400", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ port: 0 }),
+		});
+		expect(res.status).toBe(400);
+	});
+
+	test("POST /api/hosts/:id/allowed-ports with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${READ_KEY}`, "Content-Type": "application/json" },
+			body: JSON.stringify({ port: 8080, reason: "test" }),
+		});
+		expect(res.status).toBe(403);
+	});
+
+	test("GET /api/hosts/:id/allowed-ports → lists ports", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports`, {
+			headers: readHeaders(),
+		});
+		expect(res.status).toBe(200);
+		const ports = (await res.json()) as AllowedPort[];
+		expect(ports.length).toBe(1);
+		expect(ports[0].port).toBe(443);
+	});
+
+	test("GET /api/allowed-ports → all ports grouped by host", async () => {
+		const res = await fetch(`${BASE}/api/allowed-ports`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const map = (await res.json()) as Record<string, number[]>;
+		expect(map["e2e-host-001"]).toBeDefined();
+		expect(map["e2e-host-001"]).toContain(443);
+	});
+
+	test("DELETE /api/hosts/:id/allowed-ports/:port → 204", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports/443`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(204);
+	});
+
+	test("DELETE /api/hosts/:id/allowed-ports/:port already removed → 404", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports/443`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("DELETE /api/hosts/:id/allowed-ports/:port with read key → 403", async () => {
+		const res = await fetch(`${BASE}/api/hosts/e2e-host-001/allowed-ports/80`, {
+			method: "DELETE",
+			headers: { Authorization: `Bearer ${READ_KEY}` },
 		});
 		expect(res.status).toBe(403);
 	});
