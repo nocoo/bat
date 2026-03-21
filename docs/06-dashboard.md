@@ -1,13 +1,13 @@
 # 06 — Dashboard
 
-> Next.js 16 dashboard for monitoring visualization. Google OAuth login, server-side proxy to Worker for metrics data, D1 direct access for user-state data (tags), host overview, charts, alerts page, tags management.
+> Next.js 16 dashboard for monitoring visualization. Google OAuth login, server-side proxy to Worker for all data (metrics, hosts, alerts, tags, port allowlist), host overview, charts, alerts page, tags management.
 > Bootstrapped from `../surety` template. Deployed on Railway (Bun standalone Docker).
 >
 > Related documents:
 > - [02-architecture.md](./02-architecture.md) — System overview, auth model, proxy pattern, deployment
 > - [03-data-structures.md](./03-data-structures.md) — Payload types, alert definitions, health response
 > - [05-worker.md](./05-worker.md) — Worker read routes that Dashboard proxies to
-> - [11-host-tags.md](./11-host-tags.md) — Host tagging: D1 direct access pattern, tags API routes
+> - [11-host-tags.md](./11-host-tags.md) — Host tagging: Worker routes, tags API
 
 ---
 
@@ -35,17 +35,15 @@
 
 ## API Architecture
 
-Dashboard API routes serve two purposes:
+Dashboard API routes act as an authenticated proxy — all data flows through the Worker:
 
-1. **Worker proxy** — forward authenticated requests to Worker with `BAT_READ_KEY` for metrics/hosts/alerts data
-2. **D1 direct** — query D1 via Cloudflare REST API with `CF_API_TOKEN` for user-initiated state (tags)
+1. **Worker proxy** — forward authenticated requests to Worker with `BAT_READ_KEY` (reads) or `BAT_WRITE_KEY` (mutations)
 
-Both paths require an authenticated NextAuth session. Unauthenticated requests → 401.
+All paths require an authenticated NextAuth session. Unauthenticated requests → 401.
 
 ```
-Worker proxy:  Browser ──cookie──→ Dashboard /api/hosts ──API Key──→ Worker /api/hosts ──→ D1
-D1 direct:     Browser ──cookie──→ Dashboard /api/tags  ──CF Token──→ D1 REST API ──→ D1
-                                   (session check)         (server-side, no CORS)
+Worker proxy:  Browser ──cookie──→ Dashboard /api/* ──API Key──→ Worker /api/* ──→ D1
+                                   (session check)    (server-side, no CORS)
 ```
 
 See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for full rationale.
@@ -64,6 +62,11 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 | `/api/events` | `GET /api/events` | GET |
 | `/api/webhooks` | `GET /api/webhooks` | GET |
 | `/api/hosts/[id]/maintenance` | `GET /api/hosts/:id/maintenance` | GET |
+| `/api/tags` | `GET /api/tags` | GET |
+| `/api/tags/by-hosts` | `GET /api/tags/by-hosts` | GET |
+| `/api/hosts/[id]/tags` | `GET /api/hosts/:id/tags` | GET |
+| `/api/allowed-ports` | `GET /api/allowed-ports` | GET |
+| `/api/hosts/[id]/allowed-ports` | `GET /api/hosts/:id/allowed-ports` | GET |
 
 #### Write routes (BAT_WRITE_KEY)
 
@@ -74,6 +77,14 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 | `/api/webhooks/[id]/regenerate` | `POST /api/webhooks/:id/regenerate` | POST |
 | `/api/hosts/[id]/maintenance` | `PUT /api/hosts/:id/maintenance` | PUT |
 | `/api/hosts/[id]/maintenance` | `DELETE /api/hosts/:id/maintenance` | DELETE |
+| `/api/tags` | `POST /api/tags` | POST |
+| `/api/tags/[id]` | `PUT /api/tags/:id` | PUT |
+| `/api/tags/[id]` | `DELETE /api/tags/:id` | DELETE |
+| `/api/hosts/[id]/tags` | `POST /api/hosts/:id/tags` | POST |
+| `/api/hosts/[id]/tags` | `PUT /api/hosts/:id/tags` | PUT |
+| `/api/hosts/[id]/tags/[tagId]` | `DELETE /api/hosts/:id/tags/:tagId` | DELETE |
+| `/api/hosts/[id]/allowed-ports` | `POST /api/hosts/:id/allowed-ports` | POST |
+| `/api/hosts/[id]/allowed-ports/[port]` | `DELETE /api/hosts/:id/allowed-ports/:port` | DELETE |
 
 Each proxy route:
 
@@ -87,29 +98,6 @@ Each proxy route:
 **Note**: Dashboard does NOT proxy probe ingest routes (`/api/ingest`, `/api/identity`, `/api/tier2`). Those are only accessible to Probe with `BAT_WRITE_KEY` directly.
 
 **Note**: Dashboard does NOT proxy `/api/health`. The health endpoint is public on the Worker and consumed directly by Uptime Kuma.
-
-### D1 direct routes
-
-Dashboard queries D1 directly via `lib/d1.ts` for user-state data that the Worker/Probe never touch. See [11-host-tags.md](./11-host-tags.md) for full API spec.
-
-| Dashboard route | Method | D1 operation |
-|-----------------|--------|-------------|
-| `/api/tags` | GET | List all tags with host count |
-| `/api/tags` | POST | Create tag |
-| `/api/tags/[id]` | PUT | Update tag (rename/recolor) |
-| `/api/tags/[id]` | DELETE | Delete tag (cascade removes host_tags) |
-| `/api/tags/by-hosts` | GET | All host→tag mappings (for hosts page) |
-| `/api/hosts/[id]/tags` | GET | Tags for a host |
-| `/api/hosts/[id]/tags` | POST | Add tag to host |
-| `/api/hosts/[id]/tags` | PUT | Replace host's tags |
-| `/api/hosts/[id]/tags/[tagId]` | DELETE | Remove tag from host |
-
-Each D1 direct route:
-
-1. Checks the user's NextAuth session → 401 if missing
-2. Validates input (name format, limits, tag/host existence)
-3. Calls `d1Query()` with parameterized SQL
-4. Returns JSON response
 
 ---
 
@@ -243,10 +231,7 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 |----------|---------|
 | `BAT_API_URL` | Worker URL (e.g. `https://bat-worker.xxx.workers.dev`) |
 | `BAT_READ_KEY` | Read-only API Key for Worker proxy routes |
-| `BAT_WRITE_KEY` | Write API Key — used by Dashboard write proxy routes (webhook CRUD, maintenance CRUD) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
-| `CF_API_TOKEN` | Cloudflare API token with D1 read/write permission (for tags, D1 direct access) |
-| `CF_ACCOUNT_ID` | Cloudflare account ID |
-| `CF_D1_DATABASE_ID` | D1 database ID for bat-db |
+| `BAT_WRITE_KEY` | Write API Key — used by Dashboard write proxy routes (webhook CRUD, maintenance CRUD, tags, port allowlist) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
 | `AUTH_SECRET` | NextAuth secret |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
@@ -283,7 +268,7 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 ### L3
 
-D1 direct routes (tags CRUD) contain server-side business logic (validation, D1 queries). These are tested via L1 unit tests with mocked D1 responses — no separate L3 integration suite. Worker API E2E is covered by [05-worker.md § L3](./05-worker.md).
+Dashboard routes are thin proxies (auth check + forward to Worker). Tag and port allowlist business logic is tested via Worker E2E tests in [05-worker.md § L3](./05-worker.md).
 
 ### L4 — BDD E2E (Playwright)
 
