@@ -15,7 +15,7 @@ pnpm biome check .
 
 # Unit tests with coverage (TS + Rust)
 echo "→ unit tests"
-bash scripts/check-coverage.sh 90 85
+bash scripts/check-coverage.sh 90 95
 
 # Rust lint (only if probe/ changed)
 if git diff --cached --name-only | grep -q '^probe/'; then
