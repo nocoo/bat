@@ -7,6 +7,8 @@ import type { AppEnv } from "../types.js";
 interface HostRow {
 	host_id: string;
 	last_seen: number;
+	maintenance_start: string | null;
+	maintenance_end: string | null;
 }
 
 interface AlertRow {
@@ -27,7 +29,7 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 
 	// Get all active hosts
 	const hostsResult = await db
-		.prepare("SELECT host_id, last_seen FROM hosts WHERE is_active = 1")
+		.prepare("SELECT host_id, last_seen, maintenance_start, maintenance_end FROM hosts WHERE is_active = 1")
 		.all<HostRow>();
 	const hosts = hostsResult.results;
 
@@ -39,6 +41,7 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 			healthy: 0,
 			warning: 0,
 			critical: 0,
+			maintenance: 0,
 			checked_at: now,
 		};
 		return c.json(response, 200);
@@ -82,11 +85,16 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 	let healthy = 0;
 	let warning = 0;
 	let critical = 0;
+	let maintenance = 0;
 
 	for (const host of hosts) {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const status: HostStatus = deriveHostStatus(host.last_seen, now, alerts, allowedPorts);
+		const mw =
+			host.maintenance_start && host.maintenance_end
+				? { start: host.maintenance_start, end: host.maintenance_end }
+				: null;
+		const status: HostStatus = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, mw);
 
 		switch (status) {
 			case "healthy":
@@ -98,6 +106,9 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 			case "critical":
 			case "offline":
 				critical++;
+				break;
+			case "maintenance":
+				maintenance++;
 				break;
 		}
 	}
@@ -119,6 +130,7 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 		healthy,
 		warning,
 		critical,
+		maintenance,
 		checked_at: now,
 	};
 

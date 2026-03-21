@@ -1,6 +1,6 @@
 // GET /api/hosts/:id — return full host detail with inventory fields
 import type { HostDetailItem } from "@bat/shared";
-import { hashHostId } from "@bat/shared";
+import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -27,6 +27,10 @@ interface DetailRow {
 	dns_resolvers: string | null;
 	dns_search: string | null;
 	public_ip: string | null;
+	// Maintenance window
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+	maintenance_reason: string | null;
 }
 
 interface LatestMetrics {
@@ -114,7 +118,8 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 			`SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen,
        probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
        virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search, public_ip
+       timezone, dns_resolvers, dns_search, public_ip,
+       maintenance_start, maintenance_end, maintenance_reason
 FROM hosts WHERE host_id = ? AND is_active = 1`,
 		)
 		.bind(hostId)
@@ -152,7 +157,14 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 			? new Set(allowlistResult.results.map((r) => r.port))
 			: undefined;
 
-	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts);
+	const maintenance =
+		host.maintenance_start && host.maintenance_end
+			? { start: host.maintenance_start, end: host.maintenance_end }
+			: null;
+	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
+	const inMaintenance =
+		maintenance !== null &&
+		isInMaintenanceWindow(toUtcHHMM(now), maintenance.start, maintenance.end);
 	const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 	const netRates = extractNetRates(metrics?.net_json ?? null);
 
@@ -170,7 +182,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		mem_used_pct: metrics?.mem_used_pct ?? null,
 		uptime_seconds: metrics?.uptime_seconds ?? null,
 		last_seen: host.last_seen,
-		alert_count: alerts.length,
+		alert_count: inMaintenance ? 0 : alerts.length,
 		cpu_logical: host.cpu_logical,
 		cpu_physical: host.cpu_physical,
 		mem_total_bytes: host.mem_total_bytes,
@@ -192,6 +204,9 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		dns_search: safeParse(host.dns_search),
 		net_interfaces: safeParse(host.net_interfaces),
 		disks: safeParse(host.disks),
+		maintenance_start: host.maintenance_start,
+		maintenance_end: host.maintenance_end,
+		maintenance_reason: host.maintenance_reason,
 	};
 
 	return c.json(item);
