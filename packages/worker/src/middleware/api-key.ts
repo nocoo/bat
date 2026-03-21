@@ -39,6 +39,32 @@ function isWriteRequest(method: string, path: string): boolean {
 	if (/^\/api\/hosts\/[^/]+\/maintenance$/.test(path) && (method === "PUT" || method === "DELETE"))
 		return true;
 
+	// Tag mutations require write key
+	// POST /api/tags — create
+	// PUT /api/tags/:id — update
+	// DELETE /api/tags/:id — delete
+	if (path === "/api/tags" && method === "POST") return true;
+	if (path.startsWith("/api/tags/") && (method === "PUT" || method === "DELETE")) return true;
+
+	// Host tag mutations require write key
+	// POST /api/hosts/:id/tags — add tag
+	// PUT /api/hosts/:id/tags — replace all tags
+	// DELETE /api/hosts/:id/tags/:tagId — remove tag
+	if (
+		/^\/api\/hosts\/[^/]+\/tags(\/[^/]+)?$/.test(path) &&
+		["POST", "PUT", "DELETE"].includes(method)
+	)
+		return true;
+
+	// Port allowlist mutations require write key
+	// POST /api/hosts/:id/allowed-ports — add port
+	// DELETE /api/hosts/:id/allowed-ports/:port — remove port
+	if (
+		/^\/api\/hosts\/[^/]+\/allowed-ports(\/[^/]+)?$/.test(path) &&
+		(method === "POST" || method === "DELETE")
+	)
+		return true;
+
 	return false;
 }
 
