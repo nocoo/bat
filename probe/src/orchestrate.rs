@@ -1759,4 +1759,553 @@ mod tests {
             compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();
         assert!((result[0].io_util_pct - 100.0).abs() < f64::EPSILON);
     }
+
+    #[test]
+    fn compute_disk_io_delta_zero_elapsed() {
+        use collectors::disk_io::DiskIoCounters;
+        let prev = vec![DiskIoCounters {
+            device: "sda".into(),
+            reads_completed: 100,
+            ..Default::default()
+        }];
+        let curr = vec![DiskIoCounters {
+            device: "sda".into(),
+            reads_completed: 200,
+            ..Default::default()
+        }];
+        let result =
+            compute_disk_io_delta(Some(&prev), Some(&curr), Duration::from_secs(0)).unwrap();
+        assert!(result.is_empty());
+    }
+
+    // --- Converter function tests ---
+
+    #[test]
+    fn convert_tcp_maps_all_fields() {
+        use collectors::tcp::TcpState;
+        let state = TcpState {
+            established: 42,
+            time_wait: 10,
+            orphan: 3,
+            allocated: 55,
+            mem_pages: Some(128),
+        };
+        let m = convert_tcp(&state);
+        assert_eq!(m.established, 42);
+        assert_eq!(m.time_wait, 10);
+        assert_eq!(m.orphan, 3);
+        assert_eq!(m.allocated, 55);
+        assert_eq!(m.mem_pages, Some(128));
+    }
+
+    #[test]
+    fn convert_tcp_none_mem_pages() {
+        use collectors::tcp::TcpState;
+        let state = TcpState {
+            established: 0,
+            time_wait: 0,
+            orphan: 0,
+            allocated: 0,
+            mem_pages: None,
+        };
+        let m = convert_tcp(&state);
+        assert_eq!(m.mem_pages, None);
+    }
+
+    #[test]
+    fn convert_fd_maps_all_fields() {
+        use collectors::fd::FdInfo;
+        let info = FdInfo {
+            allocated: 1024,
+            max: 65536,
+        };
+        let m = convert_fd(&info);
+        assert_eq!(m.allocated, 1024);
+        assert_eq!(m.max, 65536);
+    }
+
+    #[test]
+    fn convert_socket_maps_sockets_used() {
+        use collectors::tcp::SockstatExtra;
+        let extra = SockstatExtra {
+            sockets_used: 256,
+            udp_inuse: 0,
+            udp_mem_pages: 0,
+        };
+        let m = convert_socket(&extra);
+        assert_eq!(m.sockets_used, 256);
+    }
+
+    #[test]
+    fn convert_udp_maps_all_fields() {
+        use collectors::tcp::SockstatExtra;
+        let extra = SockstatExtra {
+            sockets_used: 0,
+            udp_inuse: 12,
+            udp_mem_pages: 64,
+        };
+        let m = convert_udp(&extra);
+        assert_eq!(m.inuse, 12);
+        assert_eq!(m.mem_pages, 64);
+    }
+
+    #[test]
+    fn convert_conntrack_maps_all_fields() {
+        use collectors::conntrack::ConntrackState;
+        let state = ConntrackState {
+            count: 1500,
+            max: 65536,
+        };
+        let m = convert_conntrack(&state);
+        assert_eq!(m.count, 1500);
+        assert_eq!(m.max, 65536);
+    }
+
+    // --- Delta/rate function tests ---
+
+    #[test]
+    fn compute_snmp_delta_normal() {
+        use collectors::snmp::SnmpCounters;
+        let prev = SnmpCounters {
+            retrans_segs: 100,
+            active_opens: 200,
+            passive_opens: 300,
+            attempt_fails: 10,
+            estab_resets: 5,
+            in_errs: 2,
+            out_rsts: 8,
+            udp_rcvbuf_errors: 1,
+            udp_sndbuf_errors: 0,
+            udp_in_errors: 3,
+        };
+        let curr = SnmpCounters {
+            retrans_segs: 400,
+            active_opens: 500,
+            passive_opens: 600,
+            attempt_fails: 15,
+            estab_resets: 7,
+            in_errs: 4,
+            out_rsts: 12,
+            udp_rcvbuf_errors: 3,
+            udp_sndbuf_errors: 1,
+            udp_in_errors: 5,
+        };
+        let m = compute_snmp_delta(Some(&prev), Some(&curr), Duration::from_secs(30)).unwrap();
+        // retrans: (400-100)/30 = 10.0
+        assert!((m.retrans_segs_sec.unwrap() - 10.0).abs() < f64::EPSILON);
+        // active_opens: (500-200)/30 = 10.0
+        assert!((m.active_opens_sec.unwrap() - 10.0).abs() < f64::EPSILON);
+        // passive_opens: (600-300)/30 = 10.0
+        assert!((m.passive_opens_sec.unwrap() - 10.0).abs() < f64::EPSILON);
+        // attempt_fails: 15-10 = 5
+        assert_eq!(m.attempt_fails_delta, Some(5));
+        // estab_resets: 7-5 = 2
+        assert_eq!(m.estab_resets_delta, Some(2));
+        // in_errs: 4-2 = 2
+        assert_eq!(m.in_errs_delta, Some(2));
+        // out_rsts: 12-8 = 4
+        assert_eq!(m.out_rsts_delta, Some(4));
+        // udp_rcvbuf: 3-1 = 2
+        assert_eq!(m.udp_rcvbuf_errors_delta, Some(2));
+        // udp_sndbuf: 1-0 = 1
+        assert_eq!(m.udp_sndbuf_errors_delta, Some(1));
+        // udp_in_errors: 5-3 = 2
+        assert_eq!(m.udp_in_errors_delta, Some(2));
+    }
+
+    #[test]
+    fn compute_snmp_delta_none_when_missing() {
+        use collectors::snmp::SnmpCounters;
+        assert!(
+            compute_snmp_delta(
+                None,
+                Some(&SnmpCounters::default()),
+                Duration::from_secs(30)
+            )
+            .is_none()
+        );
+        assert!(
+            compute_snmp_delta(
+                Some(&SnmpCounters::default()),
+                None,
+                Duration::from_secs(30)
+            )
+            .is_none()
+        );
+        assert!(compute_snmp_delta(None, None, Duration::from_secs(30)).is_none());
+    }
+
+    #[test]
+    fn compute_snmp_delta_zero_elapsed() {
+        use collectors::snmp::SnmpCounters;
+        let c = SnmpCounters::default();
+        assert!(compute_snmp_delta(Some(&c), Some(&c), Duration::from_secs(0)).is_none());
+    }
+
+    #[test]
+    fn compute_netstat_delta_normal() {
+        use collectors::netstat::NetstatCounters;
+        let prev = NetstatCounters {
+            listen_overflows: 10,
+            listen_drops: 5,
+            tcp_timeouts: 100,
+            tcp_syn_retrans: 50,
+            tcp_fast_retrans: 20,
+            tcp_ofo_queue: 8,
+            tcp_abort_on_memory: 1,
+            syncookies_sent: 0,
+        };
+        let curr = NetstatCounters {
+            listen_overflows: 15,
+            listen_drops: 7,
+            tcp_timeouts: 130,
+            tcp_syn_retrans: 65,
+            tcp_fast_retrans: 25,
+            tcp_ofo_queue: 12,
+            tcp_abort_on_memory: 2,
+            syncookies_sent: 3,
+        };
+        let m = compute_netstat_delta(Some(&prev), Some(&curr)).unwrap();
+        assert_eq!(m.listen_overflows_delta, Some(5));
+        assert_eq!(m.listen_drops_delta, Some(2));
+        assert_eq!(m.tcp_timeouts_delta, Some(30));
+        assert_eq!(m.tcp_syn_retrans_delta, Some(15));
+        assert_eq!(m.tcp_fast_retrans_delta, Some(5));
+        assert_eq!(m.tcp_ofo_queue_delta, Some(4));
+        assert_eq!(m.tcp_abort_on_memory_delta, Some(1));
+        assert_eq!(m.syncookies_sent_delta, Some(3));
+    }
+
+    #[test]
+    fn compute_netstat_delta_none_when_missing() {
+        use collectors::netstat::NetstatCounters;
+        assert!(compute_netstat_delta(None, Some(&NetstatCounters::default())).is_none());
+        assert!(compute_netstat_delta(Some(&NetstatCounters::default()), None).is_none());
+        assert!(compute_netstat_delta(None, None).is_none());
+    }
+
+    #[test]
+    fn compute_softnet_delta_normal() {
+        use collectors::softnet::SoftnetCounters;
+        let prev = SoftnetCounters {
+            processed: 1000,
+            dropped: 5,
+            time_squeeze: 10,
+        };
+        let curr = SoftnetCounters {
+            processed: 2500,
+            dropped: 8,
+            time_squeeze: 15,
+        };
+        let m = compute_softnet_delta(Some(&prev), Some(&curr)).unwrap();
+        assert_eq!(m.processed_delta, Some(1500));
+        assert_eq!(m.dropped_delta, Some(3));
+        assert_eq!(m.time_squeeze_delta, Some(5));
+    }
+
+    #[test]
+    fn compute_softnet_delta_none_when_missing() {
+        use collectors::softnet::SoftnetCounters;
+        assert!(compute_softnet_delta(None, Some(&SoftnetCounters::default())).is_none());
+        assert!(compute_softnet_delta(Some(&SoftnetCounters::default()), None).is_none());
+        assert!(compute_softnet_delta(None, None).is_none());
+    }
+
+    #[test]
+    fn compute_vmstat_rates_normal() {
+        use collectors::memory::VmstatCounters;
+        let prev = VmstatCounters {
+            oom_kill: Some(0),
+            pswpin: 100,
+            pswpout: 200,
+            pgmajfault: 50,
+            pgpgin: 10000,
+            pgpgout: 20000,
+        };
+        let curr = VmstatCounters {
+            oom_kill: Some(1),
+            pswpin: 400,
+            pswpout: 800,
+            pgmajfault: 110,
+            pgpgin: 16000,
+            pgpgout: 38000,
+        };
+        let r = compute_vmstat_rates(Some(&prev), Some(&curr), Duration::from_secs(30));
+        // pswpin: (400-100)/30 = 10.0
+        assert!((r.swap_in_sec.unwrap() - 10.0).abs() < f64::EPSILON);
+        // pswpout: (800-200)/30 = 20.0
+        assert!((r.swap_out_sec.unwrap() - 20.0).abs() < f64::EPSILON);
+        // pgmajfault: (110-50)/30 = 2.0
+        assert!((r.pgmajfault_sec.unwrap() - 2.0).abs() < f64::EPSILON);
+        // pgpgin: (16000-10000)/30 = 200.0
+        assert!((r.pgpgin_sec.unwrap() - 200.0).abs() < f64::EPSILON);
+        // pgpgout: (38000-20000)/30 = 600.0
+        assert!((r.pgpgout_sec.unwrap() - 600.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compute_vmstat_rates_default_when_missing() {
+        use collectors::memory::VmstatCounters;
+        let c = VmstatCounters::default();
+        let r = compute_vmstat_rates(None, Some(&c), Duration::from_secs(30));
+        assert!(r.swap_in_sec.is_none());
+        assert!(r.swap_out_sec.is_none());
+        assert!(r.pgmajfault_sec.is_none());
+
+        let r2 = compute_vmstat_rates(Some(&c), None, Duration::from_secs(30));
+        assert!(r2.swap_in_sec.is_none());
+
+        let r3 = compute_vmstat_rates(None, None, Duration::from_secs(30));
+        assert!(r3.swap_in_sec.is_none());
+    }
+
+    #[test]
+    fn compute_vmstat_rates_zero_elapsed() {
+        use collectors::memory::VmstatCounters;
+        let c = VmstatCounters {
+            pswpin: 100,
+            ..Default::default()
+        };
+        let r = compute_vmstat_rates(Some(&c), Some(&c), Duration::from_secs(0));
+        // zero elapsed → default rates (all None)
+        assert!(r.swap_in_sec.is_none());
+        assert!(r.pgmajfault_sec.is_none());
+    }
+
+    // --- Top process converter tests ---
+
+    fn make_test_snapshot() -> collectors::top_processes::ProcessSnapshot {
+        collectors::top_processes::ProcessSnapshot {
+            pid: 1234,
+            name: "nginx".to_string(),
+            cmd: "nginx: worker process".to_string(),
+            state: "S".to_string(),
+            ppid: 1,
+            user: "www-data".to_string(),
+            cpu_pct: Some(12.5),
+            mem_rss: 50_000_000,
+            mem_pct: 2.5,
+            mem_virt: 200_000_000,
+            num_threads: 4,
+            uptime_secs: 86400,
+            majflt_rate: Some(0.1),
+            io_read_rate: Some(1024.0),
+            io_write_rate: Some(512.0),
+            processor: 2,
+        }
+    }
+
+    #[test]
+    fn convert_top_process_maps_all_fields() {
+        let snap = make_test_snapshot();
+        let tp = convert_top_process(&snap);
+        assert_eq!(tp.pid, 1234);
+        assert_eq!(tp.name, "nginx");
+        assert_eq!(tp.cmd, "nginx: worker process");
+        assert_eq!(tp.state, "S");
+        assert_eq!(tp.ppid, 1);
+        assert_eq!(tp.user, "www-data");
+        assert!((tp.cpu_pct.unwrap() - 12.5).abs() < f64::EPSILON);
+        assert_eq!(tp.mem_rss, 50_000_000);
+        assert!((tp.mem_pct - 2.5).abs() < f64::EPSILON);
+        assert_eq!(tp.mem_virt, 200_000_000);
+        assert_eq!(tp.num_threads, 4);
+        assert_eq!(tp.uptime, 86400);
+        assert!((tp.majflt_rate.unwrap() - 0.1).abs() < f64::EPSILON);
+        assert!((tp.io_read_rate.unwrap() - 1024.0).abs() < f64::EPSILON);
+        assert!((tp.io_write_rate.unwrap() - 512.0).abs() < f64::EPSILON);
+        assert_eq!(tp.processor, 2);
+    }
+
+    #[test]
+    fn convert_top_processes_multiple() {
+        let snap1 = make_test_snapshot();
+        let mut snap2 = make_test_snapshot();
+        snap2.pid = 5678;
+        snap2.name = "redis-server".to_string();
+        let result = convert_top_processes(&[snap1, snap2]);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].pid, 1234);
+        assert_eq!(result[1].pid, 5678);
+        assert_eq!(result[1].name, "redis-server");
+    }
+
+    #[test]
+    fn convert_top_processes_empty() {
+        let result = convert_top_processes(&[]);
+        assert!(result.is_empty());
+    }
+
+    // --- PSI delta branch test ---
+
+    #[test]
+    fn convert_psi_with_prev_computes_deltas() {
+        use collectors::psi::{PsiData, PsiLine, PsiResource};
+
+        let prev = PsiData {
+            cpu: PsiResource {
+                some: PsiLine {
+                    avg10: 0.0,
+                    avg60: 0.0,
+                    avg300: 0.0,
+                    total: 100_000,
+                },
+                full: PsiLine::default(),
+            },
+            memory: PsiResource {
+                some: PsiLine {
+                    total: 50_000,
+                    ..Default::default()
+                },
+                full: PsiLine {
+                    total: 20_000,
+                    ..Default::default()
+                },
+            },
+            io: PsiResource {
+                some: PsiLine {
+                    total: 30_000,
+                    ..Default::default()
+                },
+                full: PsiLine {
+                    total: 10_000,
+                    ..Default::default()
+                },
+            },
+        };
+
+        let curr = PsiData {
+            cpu: PsiResource {
+                some: PsiLine {
+                    avg10: 5.0,
+                    avg60: 3.0,
+                    avg300: 1.0,
+                    total: 150_000,
+                },
+                full: PsiLine::default(),
+            },
+            memory: PsiResource {
+                some: PsiLine {
+                    total: 80_000,
+                    ..Default::default()
+                },
+                full: PsiLine {
+                    total: 35_000,
+                    ..Default::default()
+                },
+            },
+            io: PsiResource {
+                some: PsiLine {
+                    total: 55_000,
+                    ..Default::default()
+                },
+                full: PsiLine {
+                    total: 18_000,
+                    ..Default::default()
+                },
+            },
+        };
+
+        let psi = convert_psi(&curr, Some(&prev));
+        assert_eq!(psi.cpu_some_total_delta, Some(50_000));
+        assert_eq!(psi.mem_some_total_delta, Some(30_000));
+        assert_eq!(psi.mem_full_total_delta, Some(15_000));
+        assert_eq!(psi.io_some_total_delta, Some(25_000));
+        assert_eq!(psi.io_full_total_delta, Some(8_000));
+        // Also verify avg fields come from curr
+        assert!((psi.cpu_some_avg10 - 5.0).abs() < f64::EPSILON);
+    }
+
+    // --- Tier 2 converter tests ---
+
+    #[test]
+    fn convert_software_maps_all_fields() {
+        use collectors::tier2::software::{DetectedSoftware, SoftwareDiscoveryInfo};
+        let info = SoftwareDiscoveryInfo {
+            detected: vec![
+                DetectedSoftware {
+                    id: "nginx".to_string(),
+                    name: "Nginx".to_string(),
+                    category: "web-server".to_string(),
+                    version: Some("1.24.0".to_string()),
+                    source: "dpkg".to_string(),
+                    running: true,
+                    listening_ports: vec![80, 443],
+                },
+                DetectedSoftware {
+                    id: "redis".to_string(),
+                    name: "Redis".to_string(),
+                    category: "database".to_string(),
+                    version: None,
+                    source: "binary".to_string(),
+                    running: false,
+                    listening_ports: vec![],
+                },
+            ],
+            scan_duration_ms: 150,
+            version_duration_ms: 320,
+        };
+        let result = convert_software(info);
+        assert_eq!(result.detected.len(), 2);
+        assert_eq!(result.detected[0].id, "nginx");
+        assert_eq!(result.detected[0].name, "Nginx");
+        assert_eq!(result.detected[0].category, "web-server");
+        assert_eq!(result.detected[0].version, Some("1.24.0".to_string()));
+        assert_eq!(result.detected[0].source, "dpkg");
+        assert!(result.detected[0].running);
+        assert_eq!(result.detected[0].listening_ports, vec![80, 443]);
+        assert_eq!(result.detected[1].id, "redis");
+        assert_eq!(result.detected[1].version, None);
+        assert!(!result.detected[1].running);
+        assert!(result.detected[1].listening_ports.is_empty());
+        assert_eq!(result.scan_duration_ms, 150);
+        assert_eq!(result.version_duration_ms, 320);
+    }
+
+    #[test]
+    fn convert_software_empty() {
+        use collectors::tier2::software::SoftwareDiscoveryInfo;
+        let info = SoftwareDiscoveryInfo {
+            detected: vec![],
+            scan_duration_ms: 0,
+            version_duration_ms: 0,
+        };
+        let result = convert_software(info);
+        assert!(result.detected.is_empty());
+    }
+
+    #[test]
+    fn convert_websites_maps_all_fields() {
+        use collectors::tier2::websites::{DiscoveredWebsite, WebsiteDiscoveryData};
+        let data = WebsiteDiscoveryData {
+            sites: vec![
+                DiscoveredWebsite {
+                    domain: "example.com".to_string(),
+                    web_server: "nginx".to_string(),
+                    ssl: true,
+                },
+                DiscoveredWebsite {
+                    domain: "test.local".to_string(),
+                    web_server: "apache".to_string(),
+                    ssl: false,
+                },
+            ],
+        };
+        let result = convert_websites(data);
+        assert_eq!(result.sites.len(), 2);
+        assert_eq!(result.sites[0].domain, "example.com");
+        assert_eq!(result.sites[0].web_server, "nginx");
+        assert!(result.sites[0].ssl);
+        assert_eq!(result.sites[1].domain, "test.local");
+        assert_eq!(result.sites[1].web_server, "apache");
+        assert!(!result.sites[1].ssl);
+    }
+
+    #[test]
+    fn convert_websites_empty() {
+        use collectors::tier2::websites::WebsiteDiscoveryData;
+        let data = WebsiteDiscoveryData { sites: vec![] };
+        let result = convert_websites(data);
+        assert!(result.sites.is_empty());
+    }
 }
