@@ -22,11 +22,7 @@ export function isValidTimeHHMM(time: string): boolean {
  * @param start    Window start "HH:MM" UTC
  * @param end      Window end "HH:MM" UTC
  */
-export function isInMaintenanceWindow(
-	nowHHMM: string,
-	start: string,
-	end: string,
-): boolean {
+export function isInMaintenanceWindow(nowHHMM: string, start: string, end: string): boolean {
 	if (start < end) {
 		// Same-day window: start <= now < end
 		return nowHHMM >= start && nowHHMM < end;

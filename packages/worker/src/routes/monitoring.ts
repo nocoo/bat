@@ -360,7 +360,13 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 
 	interface GroupAcc {
 		hosts: GroupHostRef[];
-		byTier: { healthy: number; warning: number; critical: number; offline: number; maintenance: number };
+		byTier: {
+			healthy: number;
+			warning: number;
+			critical: number;
+			offline: number;
+			maintenance: number;
+		};
 		alertCount: number;
 		worstTier: HostStatus;
 	}

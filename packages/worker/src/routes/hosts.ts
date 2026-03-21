@@ -215,8 +215,7 @@ ORDER BY host_id, hour_ts ASC`,
 				: null;
 		const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
 		const inMaintenance =
-			maintenance !== null &&
-			isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
+			maintenance !== null && isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 		const netRates = extractNetRates(metrics?.net_json ?? null);
 		const sparklines = sparklinesByHost.get(host.host_id);

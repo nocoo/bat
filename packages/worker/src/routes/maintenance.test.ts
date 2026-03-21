@@ -1,19 +1,10 @@
 // Maintenance CRUD route tests
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 
-import {
-	maintenanceDeleteRoute,
-	maintenanceGetRoute,
-	maintenanceSetRoute,
-} from "./maintenance.js";
+import { maintenanceDeleteRoute, maintenanceGetRoute, maintenanceSetRoute } from "./maintenance.js";
 
-function makeContext(
-	db: D1Database,
-	method: string,
-	idParam: string,
-	body?: unknown,
-) {
+function makeContext(db: D1Database, method: string, idParam: string, body?: unknown) {
 	return {
 		env: { DB: db },
 		req: {
@@ -27,7 +18,7 @@ function makeContext(
 				headers: { "Content-Type": "application/json" },
 			});
 		},
-	} as any;
+	} as unknown as Parameters<typeof maintenanceGetRoute>[0];
 }
 
 describe("maintenance CRUD routes", () => {
@@ -38,9 +29,7 @@ describe("maintenance CRUD routes", () => {
 		db = createMockD1();
 		// Seed an active host
 		await db
-			.prepare(
-				"INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, 1)",
-			)
+			.prepare("INSERT INTO hosts (host_id, hostname, last_seen, is_active) VALUES (?, ?, ?, 1)")
 			.bind(HOST_ID, "test.example.com", Math.floor(Date.now() / 1000))
 			.run();
 	});
@@ -73,9 +62,7 @@ describe("maintenance CRUD routes", () => {
 
 		test("returns reason as empty string when null", async () => {
 			await db
-				.prepare(
-					"UPDATE hosts SET maintenance_start = ?, maintenance_end = ? WHERE host_id = ?",
-				)
+				.prepare("UPDATE hosts SET maintenance_start = ?, maintenance_end = ? WHERE host_id = ?")
 				.bind("03:00", "05:00", HOST_ID)
 				.run();
 
@@ -108,7 +95,11 @@ describe("maintenance CRUD routes", () => {
 					"SELECT maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE host_id = ?",
 				)
 				.bind(HOST_ID)
-				.first<any>();
+				.first<{
+					maintenance_start: string | null;
+					maintenance_end: string | null;
+					maintenance_reason: string | null;
+				}>();
 			expect(row.maintenance_start).toBe("03:00");
 			expect(row.maintenance_end).toBe("05:00");
 			expect(row.maintenance_reason).toBe("Nightly backup");
@@ -137,7 +128,11 @@ describe("maintenance CRUD routes", () => {
 					"SELECT maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE host_id = ?",
 				)
 				.bind(HOST_ID)
-				.first<any>();
+				.first<{
+					maintenance_start: string | null;
+					maintenance_end: string | null;
+					maintenance_reason: string | null;
+				}>();
 			expect(row.maintenance_start).toBe("22:00");
 			expect(row.maintenance_end).toBe("02:00");
 		});
@@ -198,10 +193,7 @@ describe("maintenance CRUD routes", () => {
 		});
 
 		test("403 for retired host", async () => {
-			await db
-				.prepare("UPDATE hosts SET is_active = 0 WHERE host_id = ?")
-				.bind(HOST_ID)
-				.run();
+			await db.prepare("UPDATE hosts SET is_active = 0 WHERE host_id = ?").bind(HOST_ID).run();
 
 			const c = makeContext(db, "PUT", HOST_ID, {
 				start: "03:00",
@@ -232,7 +224,11 @@ describe("maintenance CRUD routes", () => {
 					"SELECT maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE host_id = ?",
 				)
 				.bind(HOST_ID)
-				.first<any>();
+				.first<{
+					maintenance_start: string | null;
+					maintenance_end: string | null;
+					maintenance_reason: string | null;
+				}>();
 			expect(row.maintenance_start).toBeNull();
 			expect(row.maintenance_end).toBeNull();
 			expect(row.maintenance_reason).toBeNull();
@@ -245,10 +241,7 @@ describe("maintenance CRUD routes", () => {
 		});
 
 		test("403 for retired host", async () => {
-			await db
-				.prepare("UPDATE hosts SET is_active = 0 WHERE host_id = ?")
-				.bind(HOST_ID)
-				.run();
+			await db.prepare("UPDATE hosts SET is_active = 0 WHERE host_id = ?").bind(HOST_ID).run();
 
 			const c = makeContext(db, "DELETE", HOST_ID);
 			const res = await maintenanceDeleteRoute(c);

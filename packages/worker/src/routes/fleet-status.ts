@@ -29,7 +29,9 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 
 	// Get all active hosts
 	const hostsResult = await db
-		.prepare("SELECT host_id, last_seen, maintenance_start, maintenance_end FROM hosts WHERE is_active = 1")
+		.prepare(
+			"SELECT host_id, last_seen, maintenance_start, maintenance_end FROM hosts WHERE is_active = 1",
+		)
 		.all<HostRow>();
 	const hosts = hostsResult.results;
 

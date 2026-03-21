@@ -5,9 +5,10 @@ import { getTimeFormatter, transformDiskIoData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
+import { maintenanceAreas } from "./maintenance-overlay";
 
 const SERIES = [
 	{ key: "read_iops", label: "Read IOPS", color: chart.lime, width: 2 },
@@ -19,9 +20,22 @@ export function DiskIoChart({
 	data,
 	resolution = "raw",
 	rangeSeconds = 3600,
-}: { data: MetricsDataPoint[]; resolution?: "raw" | "hourly"; rangeSeconds?: number }) {
+	maintenanceWindow,
+}: {
+	data: MetricsDataPoint[];
+	resolution?: "raw" | "hourly";
+	rangeSeconds?: number;
+	maintenanceWindow?: { start: string; end: string } | null;
+}) {
 	const chartData = useMemo(() => transformDiskIoData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
+
+	const mwAreas = useMemo(() => {
+		if (!maintenanceWindow || chartData.length === 0) return [];
+		const from = chartData[0]?.ts ?? 0;
+		const to = chartData[chartData.length - 1]?.ts ?? 0;
+		return maintenanceAreas(maintenanceWindow.start, maintenanceWindow.end, from, to);
+	}, [maintenanceWindow, chartData]);
 
 	if (chartData.length === 0) {
 		return (
@@ -65,6 +79,17 @@ export function DiskIoChart({
 					/>
 					<YAxis axisLine={false} tickLine={false} tick={{ fill: chartAxis, fontSize: 11 }} />
 					<Tooltip content={<ChartTooltip />} />
+					{mwAreas.map((area) => (
+						<ReferenceArea
+							key={`mw-${area.x1}`}
+							x1={area.x1}
+							x2={area.x2}
+							fill="currentColor"
+							fillOpacity={0.06}
+							stroke="none"
+							ifOverflow="hidden"
+						/>
+					))}
 					{SERIES.map((s) => (
 						<Line
 							key={s.key}

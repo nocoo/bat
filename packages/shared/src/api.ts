@@ -41,12 +41,7 @@ export const API_ROUTES = {
 
 // --- Response DTOs ---
 
-export type HostStatus =
-	| "healthy"
-	| "warning"
-	| "critical"
-	| "offline"
-	| "maintenance";
+export type HostStatus = "healthy" | "warning" | "critical" | "offline" | "maintenance";
 
 /** Sparkline data point — one hour of aggregated data */
 export interface SparklinePoint {

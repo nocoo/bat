@@ -36,10 +36,7 @@ function isWriteRequest(method: string, path: string): boolean {
 	// PUT /api/hosts/:id/maintenance — set/update
 	// DELETE /api/hosts/:id/maintenance — remove
 	// (GET /api/hosts/:id/maintenance remains read-only → read key)
-	if (
-		/^\/api\/hosts\/[^/]+\/maintenance$/.test(path) &&
-		(method === "PUT" || method === "DELETE")
-	)
+	if (/^\/api\/hosts\/[^/]+\/maintenance$/.test(path) && (method === "PUT" || method === "DELETE"))
 		return true;
 
 	return false;

@@ -82,9 +82,7 @@ export async function ingestRoute(c: Context<AppEnv>) {
 
 	// Check if host is retired + fetch maintenance window
 	const existing = await db
-		.prepare(
-			"SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?",
-		)
+		.prepare("SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?")
 		.bind(body.host_id)
 		.first<{
 			is_active: number;
@@ -112,18 +110,11 @@ export async function ingestRoute(c: Context<AppEnv>) {
 		const inMaintenance =
 			existing?.maintenance_start &&
 			existing?.maintenance_end &&
-			isInMaintenanceWindow(
-				nowHHMM,
-				existing.maintenance_start,
-				existing.maintenance_end,
-			);
+			isInMaintenanceWindow(nowHHMM, existing.maintenance_start, existing.maintenance_end);
 
 		if (inMaintenance) {
 			// Purge duration rule timers to prevent stale first_seen accumulation
-			await db
-				.prepare("DELETE FROM alert_pending WHERE host_id = ?")
-				.bind(body.host_id)
-				.run();
+			await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(body.host_id).run();
 		} else {
 			await evaluateAlerts(db, body.host_id, body, workerNow);
 		}

@@ -5,9 +5,10 @@ import { formatBytesRate, getTimeFormatter, transformNetData } from "@/lib/trans
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Globe } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
+import { maintenanceAreas } from "./maintenance-overlay";
 
 const SERIES = [
 	{ key: "rx_rate", label: "Download", color: chart.lime },
@@ -18,9 +19,22 @@ export function NetworkChart({
 	data,
 	resolution,
 	rangeSeconds = 3600,
-}: { data: MetricsDataPoint[]; resolution: MetricsResolution; rangeSeconds?: number }) {
+	maintenanceWindow,
+}: {
+	data: MetricsDataPoint[];
+	resolution: MetricsResolution;
+	rangeSeconds?: number;
+	maintenanceWindow?: { start: string; end: string } | null;
+}) {
 	const chartData = useMemo(() => transformNetData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
+
+	const mwAreas = useMemo(() => {
+		if (!maintenanceWindow || chartData.length === 0) return [];
+		const from = chartData[0]?.ts ?? 0;
+		const to = chartData[chartData.length - 1]?.ts ?? 0;
+		return maintenanceAreas(maintenanceWindow.start, maintenanceWindow.end, from, to);
+	}, [maintenanceWindow, chartData]);
 
 	if (chartData.length === 0) {
 		return (
@@ -70,6 +84,17 @@ export function NetworkChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<Tooltip content={<ChartTooltip valueFormatter={(v) => formatBytesRate(v)} />} />
+					{mwAreas.map((area) => (
+						<ReferenceArea
+							key={`mw-${area.x1}`}
+							x1={area.x1}
+							x2={area.x2}
+							fill="currentColor"
+							fillOpacity={0.06}
+							stroke="none"
+							ifOverflow="hidden"
+						/>
+					))}
 					{SERIES.map((s) => (
 						<Line
 							key={s.key}

@@ -15,6 +15,7 @@ import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { AppShell } from "@/components/layout";
+import { MaintenancePanel } from "@/components/maintenance-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,7 +32,7 @@ import type { DetectedSoftware, SoftwareCategory } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Box, Info, ShieldAlert } from "lucide-react";
 import { useParams } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 const TIME_RANGES = [
 	{ label: "1h", seconds: 3600 },
@@ -265,6 +266,12 @@ export default function HostDetailPage() {
 		allowedPortsMap[host.host_id] = allowedPorts.map((p) => p.port);
 	}
 
+	// Maintenance window for chart overlays
+	const maintenanceWindow = useMemo(() => {
+		if (!host?.maintenance_start || !host?.maintenance_end) return null;
+		return { start: host.maintenance_start, end: host.maintenance_end };
+	}, [host?.maintenance_start, host?.maintenance_end]);
+
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
 			<div className="space-y-6">
@@ -306,20 +313,38 @@ export default function HostDetailPage() {
 									Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
 								</span>
 							</div>
-							<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<CpuChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
+							/>
+							<MemoryChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
+							/>
 							<NetworkChart
 								data={metricsResponse.data}
 								resolution={metricsResponse.resolution}
 								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
 							/>
-							<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<PsiChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
+							/>
 							<DiskIoChart
 								data={metricsResponse.data}
 								resolution={metricsResponse.resolution}
 								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
 							/>
-							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<TcpChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								maintenanceWindow={maintenanceWindow}
+							/>
 							<TopProcessesTable
 								data={metricsResponse.data}
 								resolution={metricsResponse.resolution}
@@ -408,6 +433,7 @@ export default function HostDetailPage() {
 							)}
 							{host && <HostTagsPanel hostId={host.host_id} />}
 							{host && <AllowedPortsPanel hostId={host.host_id} hostAlerts={hostAlerts} />}
+							{host && <MaintenancePanel hid={hid} />}
 							{tier2?.software && tier2.software.detected.length > 0 && (
 								<SoftwareCard software={tier2.software.detected} />
 							)}
