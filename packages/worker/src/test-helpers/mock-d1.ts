@@ -44,7 +44,10 @@ const MIGRATION_TOP_PROCESSES_PATH = resolve(
 	"../../migrations/0015_top_processes.sql",
 );
 const MIGRATION_WEBSITES_PATH = resolve(import.meta.dir, "../../migrations/0016_websites.sql");
-const MIGRATION_MAINTENANCE_PATH = resolve(import.meta.dir, "../../migrations/0017_maintenance_window.sql");
+const MIGRATION_MAINTENANCE_PATH = resolve(
+	import.meta.dir,
+	"../../migrations/0017_maintenance_window.sql",
+);
 const MIGRATION_TAGS_PATH = resolve(import.meta.dir, "../../migrations/0010_tags.sql");
 
 /**

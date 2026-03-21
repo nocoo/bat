@@ -98,7 +98,13 @@ describe("GET /api/monitoring/hosts", () => {
 		const body = await res.json();
 		expect(body.status).toBe("ok");
 		expect(body.host_count).toBe(0);
-		expect(body.by_tier).toEqual({ healthy: 0, warning: 0, critical: 0, offline: 0, maintenance: 0 });
+		expect(body.by_tier).toEqual({
+			healthy: 0,
+			warning: 0,
+			critical: 0,
+			offline: 0,
+			maintenance: 0,
+		});
 		expect(body.hosts).toEqual([]);
 	});
 
@@ -233,7 +239,13 @@ describe("GET /api/monitoring/hosts", () => {
 		const res = await app.request(new Request("http://localhost/api/monitoring/hosts"));
 		const body = await res.json();
 		expect(body.host_count).toBe(4);
-		expect(body.by_tier).toEqual({ healthy: 1, warning: 1, critical: 1, offline: 1, maintenance: 0 });
+		expect(body.by_tier).toEqual({
+			healthy: 1,
+			warning: 1,
+			critical: 1,
+			offline: 1,
+			maintenance: 0,
+		});
 	});
 });
 
@@ -398,7 +410,13 @@ describe("GET /api/monitoring/groups", () => {
 		expect(body.groups[0].tag).toBe("(untagged)");
 		expect(body.groups[0].host_count).toBe(2);
 		expect(body.groups[0].tier).toBe("healthy");
-		expect(body.groups[0].by_tier).toEqual({ healthy: 2, warning: 0, critical: 0, offline: 0, maintenance: 0 });
+		expect(body.groups[0].by_tier).toEqual({
+			healthy: 2,
+			warning: 0,
+			critical: 0,
+			offline: 0,
+			maintenance: 0,
+		});
 		expect(body.groups[0].alert_count).toBe(0);
 	});
 

@@ -33,9 +33,7 @@ async function resolveHostId(
 }
 
 /** GET /api/hosts/:id/maintenance */
-export async function maintenanceGetRoute(
-	c: Context<AppEnv, "/api/hosts/:id/maintenance">,
-) {
+export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
@@ -67,9 +65,7 @@ export async function maintenanceGetRoute(
 }
 
 /** PUT /api/hosts/:id/maintenance */
-export async function maintenanceSetRoute(
-	c: Context<AppEnv, "/api/hosts/:id/maintenance">,
-) {
+export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
@@ -122,9 +118,7 @@ export async function maintenanceSetRoute(
 }
 
 /** DELETE /api/hosts/:id/maintenance */
-export async function maintenanceDeleteRoute(
-	c: Context<AppEnv, "/api/hosts/:id/maintenance">,
-) {
+export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
