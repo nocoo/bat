@@ -12,7 +12,7 @@
 // Note: host-scoped routes accept raw host_id only (not 8-char hid).
 // Dashboard always sends raw host_id for tag/port operations.
 
-import { type HostTag, MAX_TAGS_PER_HOST, TAG_COLOR_COUNT, TAG_NAME_REGEX } from "@bat/shared";
+import { type HostTag, MAX_TAGS_PER_HOST, TAG_COLOR_COUNT, TAG_MAX_LENGTH } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
@@ -52,10 +52,10 @@ export async function tagsCreateRoute(c: Context<AppEnv>) {
 	}
 
 	const payload = body as Record<string, unknown>;
-	const rawName = typeof payload.name === "string" ? payload.name.trim().toLowerCase() : "";
+	const rawName = typeof payload.name === "string" ? payload.name.trim() : "";
 
-	if (!rawName || !TAG_NAME_REGEX.test(rawName)) {
-		return c.json({ error: "Invalid tag name. Must be 1-32 chars: a-z, 0-9, -, _" }, 400);
+	if (!rawName || rawName.length > TAG_MAX_LENGTH) {
+		return c.json({ error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` }, 400);
 	}
 
 	// Auto-assign color (round-robin) unless specified
@@ -122,9 +122,9 @@ export async function tagsUpdateRoute(c: Context<AppEnv, "/api/tags/:id">) {
 	const values: unknown[] = [];
 
 	if (payload.name !== undefined) {
-		const name = typeof payload.name === "string" ? payload.name.trim().toLowerCase() : "";
-		if (!TAG_NAME_REGEX.test(name)) {
-			return c.json({ error: "Invalid tag name. Must be 1-32 chars: a-z, 0-9, -, _" }, 400);
+		const name = typeof payload.name === "string" ? payload.name.trim() : "";
+		if (!name || name.length > TAG_MAX_LENGTH) {
+			return c.json({ error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` }, 400);
 		}
 		sets.push("name = ?");
 		values.push(name);

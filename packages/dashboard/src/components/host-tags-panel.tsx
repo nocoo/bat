@@ -3,7 +3,7 @@
 import { TagChip } from "@/components/tag-chip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useSingleHostTags, useTags } from "@/lib/hooks";
-import { TAG_NAME_REGEX } from "@bat/shared";
+import { TAG_MAX_LENGTH } from "@bat/shared";
 import type { TagItem } from "@bat/shared";
 import { Plus, Tag } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -56,10 +56,11 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 
 	// Check if input could be a new tag name
 	const canCreateNew = useMemo(() => {
-		const q = inputValue.trim().toLowerCase();
-		if (!q || !TAG_NAME_REGEX.test(q)) return false;
-		// Don't show "create" if a tag with this exact name already exists (even if already assigned)
-		return !allTags?.some((t) => t.name === q);
+		const q = inputValue.trim();
+		if (!q || q.length > TAG_MAX_LENGTH) return false;
+		// Don't show "create" if a tag with this name already exists (case-insensitive, matching DB COLLATE NOCASE)
+		const qLower = q.toLowerCase();
+		return !allTags?.some((t) => t.name.toLowerCase() === qLower);
 	}, [inputValue, allTags]);
 
 	const addTag = useCallback(
@@ -97,8 +98,8 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	);
 
 	const createAndAdd = useCallback(async () => {
-		const name = inputValue.trim().toLowerCase();
-		if (!TAG_NAME_REGEX.test(name)) return;
+		const name = inputValue.trim();
+		if (!name || name.length > TAG_MAX_LENGTH) return;
 
 		setAdding(true);
 		try {
@@ -224,7 +225,7 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 									>
 										<Plus className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
 										<span className="text-muted-foreground">Create</span>
-										<span className="font-medium">{inputValue.trim().toLowerCase()}</span>
+										<span className="font-medium">{inputValue.trim()}</span>
 									</button>
 								)}
 							</div>
