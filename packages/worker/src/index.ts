@@ -9,6 +9,11 @@ import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
 import { liveRoute } from "./routes/live.js";
+import {
+	maintenanceDeleteRoute,
+	maintenanceGetRoute,
+	maintenanceSetRoute,
+} from "./routes/maintenance.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
 import {
 	monitoringAlertsRoute,
@@ -48,6 +53,9 @@ app.post("/api/events", eventsIngestRoute);
 app.get("/api/hosts", hostsListRoute);
 app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 app.get("/api/hosts/:id/tier2", hostTier2Route);
+app.get("/api/hosts/:id/maintenance", maintenanceGetRoute);
+app.put("/api/hosts/:id/maintenance", maintenanceSetRoute);
+app.delete("/api/hosts/:id/maintenance", maintenanceDeleteRoute);
 app.get("/api/hosts/:id", hostDetailRoute);
 app.get("/api/alerts", alertsListRoute);
 app.get("/api/events", eventsListRoute);
