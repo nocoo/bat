@@ -44,6 +44,7 @@ const MIGRATION_TOP_PROCESSES_PATH = resolve(
 	"../../migrations/0015_top_processes.sql",
 );
 const MIGRATION_WEBSITES_PATH = resolve(import.meta.dir, "../../migrations/0016_websites.sql");
+const MIGRATION_MAINTENANCE_PATH = resolve(import.meta.dir, "../../migrations/0017_maintenance_window.sql");
 const MIGRATION_TAGS_PATH = resolve(import.meta.dir, "../../migrations/0010_tags.sql");
 
 /**
@@ -248,6 +249,15 @@ export function createMockD1(): D1Database {
 	// Apply websites migration
 	const websitesSchema = readFileSync(MIGRATION_WEBSITES_PATH, "utf-8");
 	for (const stmt of websitesSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.run(`${stmt};`);
+	}
+
+	// Apply maintenance window migration
+	const maintenanceSchema = readFileSync(MIGRATION_MAINTENANCE_PATH, "utf-8");
+	for (const stmt of maintenanceSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
