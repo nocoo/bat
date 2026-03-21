@@ -4,9 +4,11 @@
 
 ## Overview
 
-Per-host optional daily recurring maintenance window. During the window, alert evaluation is skipped (metrics still ingested), host status shows `"maintenance"`, and charts render a grey semi-transparent overlay.
+Per-host optional daily recurring maintenance window. During the window, alert evaluation is skipped, existing alerts are cleared, host status shows `"maintenance"`, and charts render a grey semi-transparent overlay. Metrics are still ingested — no data loss.
 
 **MVP scope**: each host can have **at most one** daily repeating window defined as `HH:MM → HH:MM` (UTC). Supports cross-midnight ranges (e.g. `23:00 → 02:00`). DB storage and all comparison logic use UTC; Dashboard converts to/from browser local timezone for display and input.
+
+**DST caveat (accepted)**: the window is stored as fixed UTC times. Users in DST-observing timezones will see the local display shift by ±1h on DST transitions. This is intentional — server-side operations (backups, cron) typically run on UTC, so a fixed UTC window matches the actual maintenance schedule. The Dashboard shows both local and UTC times to make this transparent.
 
 ## Motivation
 
@@ -108,13 +110,16 @@ export interface MaintenanceWindow {
 ```
 
 **Validation:**
+- `:id` must resolve to an existing, active host (`is_active = 1`). Return `404` if not found, `403` if retired.
 - `start`, `end`: required, must match `/^\d{2}:\d{2}$/`, valid time (00:00–23:59)
 - `start` ≠ `end` (zero-length window not allowed)
 - `reason`: optional string, max 200 chars
 
 **Response:** `204 No Content`
 
-**Implementation:** single `UPDATE hosts SET maintenance_start = ?, maintenance_end = ?, maintenance_reason = ? WHERE host_id = ?`
+**Implementation:**
+1. `SELECT host_id, is_active FROM hosts WHERE host_id = ?` — 404 if not found, 403 if `is_active = 0`
+2. `UPDATE hosts SET maintenance_start = ?, maintenance_end = ?, maintenance_reason = ? WHERE host_id = ?`
 
 ### GET `/api/hosts/:id/maintenance`
 
@@ -128,15 +133,17 @@ export interface MaintenanceWindow {
 null
 ```
 
+Returns `404` if host not found.
+
 ### DELETE `/api/hosts/:id/maintenance`
 
-Sets all three columns to NULL. Response: `204 No Content`.
+Sets all three columns to NULL. Returns `404` if host not found, `403` if retired. Response on success: `204 No Content`.
 
 ---
 
 ## Worker Behavior Changes
 
-### Ingest — alert suppression
+### Ingest — alert suppression + clearing
 
 `packages/worker/src/routes/ingest.ts`:
 
@@ -146,12 +153,26 @@ Sets all three columns to NULL. Response: `204 No Content`.
      updateHostLastSeen(...)
      check maintenance_start/maintenance_end from hosts row
      if currently in maintenance window:
-       skip evaluateAlerts()       ← only change
+       clearHostAlerts(db, hostId)  ← DELETE from alert_states + alert_pending
+       skip evaluateAlerts()
      else:
        evaluateAlerts(...)
 ```
 
 The host's maintenance columns are already available from the `SELECT is_active` query at the top of ingest — extend it to `SELECT is_active, maintenance_start, maintenance_end`.
+
+**Alert clearing rationale**: if we only skip `evaluateAlerts` without clearing existing alerts, the `/api/monitoring/alerts` endpoint still reports `alert_count > 0` and the fleet alerts Uptime Kuma monitor (`"alert_count":0` keyword) stays DOWN — directly contradicting the "reduce noise" goal. Clearing is safe because:
+- After maintenance ends, the next ingest re-evaluates all rules from scratch
+- Instant rules (duration=0) re-fire immediately if conditions persist
+- Duration rules restart their pending timers, which is correct — the host just came back from maintenance
+
+`clearHostAlerts` is a new helper in `packages/worker/src/services/alerts.ts`:
+```typescript
+export async function clearHostAlerts(db: D1Database, hostId: string): Promise<void> {
+    await db.prepare("DELETE FROM alert_states WHERE host_id = ?").bind(hostId).run();
+    await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(hostId).run();
+}
+```
 
 ### Status derivation
 
@@ -183,6 +204,22 @@ If the host is currently in its maintenance window (determined by `isInMaintenan
 
 `/api/monitoring/hosts/:id` will return `"tier": "maintenance"` when the host is in its window. Uptime Kuma keyword monitors matching `"tier":"healthy"` will go DOWN — this is intentional (operators know it's maintenance, they can configure Uptime Kuma's own maintenance schedule to suppress notifications if desired).
 
+`/api/monitoring/alerts` will return `alert_count: 0` for maintenance hosts (since alerts are cleared on entering maintenance), so the fleet alerts monitor stays clean.
+
+### Fleet status route
+
+`packages/worker/src/routes/fleet-status.ts` — the existing `switch` only handles `healthy | warning | critical | offline`. Add a `"maintenance"` case that counts into a new `maintenance` bucket (or excludes maintenance hosts from degraded/critical rollup, depending on desired fleet semantics).
+
+Chosen behavior: maintenance hosts are **excluded from fleet health derivation** — they don't count toward healthy, warning, or critical. The fleet response gains a `maintenance` count field:
+
+```typescript
+case "maintenance":
+    maintenance++;
+    break;
+```
+
+Fleet `status` is derived from the remaining non-maintenance hosts only. A fleet where all hosts are in maintenance shows `status: "healthy"` with `maintenance: N`.
+
 ### Auth middleware
 
 `packages/worker/src/middleware/api-key.ts` — add maintenance PUT/DELETE as write routes:
@@ -191,6 +228,8 @@ If the host is currently in its maintenance window (determined by `isInMaintenan
 // In isWriteRequest():
 if (path.match(/^\/api\/hosts\/[^/]+\/maintenance$/) && (method === "PUT" || method === "DELETE")) return true;
 ```
+
+**Precedent**: this follows the same pattern as webhook CRUD — Dashboard already holds `BAT_WRITE_KEY` (in `process.env.BAT_WRITE_KEY`) and uses it via `proxyToWorkerWithBody(..., true)` for webhook POST/DELETE/regenerate routes. The maintenance routes use the identical auth chain: Browser → Dashboard (NextAuth session check) → `proxyToWorkerWithBody` with write key → Worker `isWriteRequest` check. No new key exposure — the Dashboard has had write key access since webhooks were added in v0.7.0.
 
 ---
 
@@ -218,9 +257,9 @@ Placed in host detail right column, below AllowedPortsPanel.
 3. **Edit mode**: two `<input type="time">` fields + reason text input + Save/Cancel
 
 **Timezone handling:**
-- Display: convert UTC "HH:MM" → local timezone using `Date` math
+- Display: show local time prominently + "(HH:MM UTC)" secondary label
 - Input: user enters local time → convert to UTC before PUT
-- Show "(UTC)" indicator next to converted times for clarity
+- Both representations visible at all times, so DST shifts are transparent
 
 **Data flow:**
 - Read: `useSWR` → Dashboard proxy `GET /api/hosts/${hid}/maintenance` → Worker
@@ -338,7 +377,9 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 | `packages/worker/src/routes/hosts.ts` | SELECT + derive maintenance status |
 | `packages/worker/src/routes/host-detail.ts` | SELECT + derive maintenance status |
 | `packages/worker/src/routes/monitoring.ts` | maintenance-aware tier |
+| `packages/worker/src/routes/fleet-status.ts` | maintenance count bucket + exclude from fleet health |
 | `packages/worker/src/services/status.ts` | maintenance in deriveHostStatus |
+| `packages/worker/src/services/alerts.ts` | clearHostAlerts helper |
 | `packages/worker/src/index.ts` | register maintenance routes |
 | `packages/worker/src/middleware/api-key.ts` | maintenance mutations as write routes |
 | `packages/worker/test/e2e/wrangler.test.ts` | add 0017 to migration list |
@@ -383,8 +424,16 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 
 ---
 
-## Open Questions
+## Design Decisions (resolved from review)
 
-1. **Existing alerts on entering maintenance**: MVP skips `evaluateAlerts` but does **not** clear existing `alert_states`/`alert_pending`. This means a host entering maintenance may show `"maintenance"` status but still have stale alerts in the alerts table. These will naturally clear on the next ingest after maintenance ends (instant rules clear immediately, duration rules restart their pending timers). Is this acceptable, or should entering maintenance proactively clear alerts?
+1. **Alert clearing on maintenance entry**: ✅ Resolved — entering maintenance clears `alert_states` and `alert_pending` for the host. This ensures `/api/monitoring/alerts` reports `alert_count: 0` and the fleet alerts Uptime Kuma monitor stays green. After maintenance ends, all rules re-evaluate from scratch on the next ingest.
 
-2. **Uptime Kuma coordination**: maintenance → `"tier":"maintenance"` → Uptime Kuma keyword monitor goes DOWN → notification sent. To avoid this, users need to also set a maintenance period in Uptime Kuma. Should bat's maintenance API trigger Uptime Kuma maintenance via the `uptime-kuma` skill? Deferred — manual Uptime Kuma maintenance is sufficient for 6 hosts.
+2. **Uptime Kuma coordination**: Per-host keyword monitors will go DOWN (`"tier":"maintenance"` ≠ `"tier":"healthy"`). This is acceptable — operators can set Uptime Kuma's own maintenance schedule for the corresponding monitors. Automating this is out of scope for MVP.
+
+3. **DST timezone drift**: Accepted behavior. The window is stored as fixed UTC times. Server-side operations (backups, cron) run on UTC, so a fixed UTC window matches the actual maintenance schedule. Dashboard displays both local and UTC time to make this transparent to the user.
+
+4. **Dashboard WRITE_KEY usage**: Not a new security boundary change. Dashboard already holds `BAT_WRITE_KEY` and uses it for webhook CRUD (POST/DELETE/regenerate) since v0.7.0. Maintenance routes follow the identical auth chain.
+
+5. **fleet-status.ts handling**: Maintenance hosts get their own count bucket and are excluded from fleet health derivation, preventing miscounts in the existing `healthy + warning + critical` breakdown.
+
+6. **PUT/DELETE on missing/retired hosts**: Explicit error responses — 404 for missing host, 403 for retired. No silent 204 on nonexistent targets.
