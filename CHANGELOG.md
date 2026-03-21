@@ -1,5 +1,31 @@
 # Changelog
 
+## v0.10.1 (2026-03-21)
+
+### Features
+
+- **Maintenance windows** (docs/17) — Dashboard UI for per-host maintenance windows with time picker, chart overlays (yellow shading), and alert suppression during maintenance periods
+- **Worker maintenance routes** — `GET/PUT/DELETE /api/hosts/:id/maintenance` with maintenance-aware alert evaluation and query-time filtering
+
+### Refactoring
+
+- **Dashboard D1 direct → Worker proxy** — All tag and port allowlist operations now go through Worker routes instead of direct D1 REST API access. Dashboard routes reduced to thin auth+proxy wrappers
+  - 13 new Worker route handlers: 9 tag routes (`routes/tags.ts`) + 4 port allowlist routes (`routes/allowed-ports.ts`)
+  - 8 Dashboard route files converted from `d1Query()` to `proxyToWorker()`/`proxyToWorkerWithBody()`
+  - Deleted `lib/d1.ts` (Cloudflare D1 REST API client), `d1.test.ts`, `tags/route.test.ts`
+  - Removed Dashboard dependency on `CF_ACCOUNT_ID`, `CF_D1_DATABASE_ID`, `CF_API_TOKEN` env vars
+
+### Fixes
+
+- **Tag rename uniqueness** — `PUT /api/tags/:id` now returns 409 on UNIQUE constraint conflict instead of 500
+- **Port allowlist host validation** — `GET/POST /api/hosts/:id/allowed-ports` now verify host exists (404) instead of returning empty arrays or FK-dependent errors
+- **Alerts cache invalidation** — Maintenance mutations now properly invalidate cached alert state
+
+### Tests
+
+- 69 Worker E2E tests (was 39): tags CRUD, port allowlist CRUD, auth 403 checks, rename-duplicate 409, unknown-host 404
+- Probe Rust coverage raised to 95% threshold with 16 new `orchestrate.rs` tests
+
 ## v0.10.0 (2026-03-21)
 
 ### Features
