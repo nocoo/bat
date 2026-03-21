@@ -4,7 +4,7 @@
 
 ## Overview
 
-Per-host optional daily recurring maintenance window. During the window, alert evaluation is skipped, existing alerts are cleared, host status shows `"maintenance"`, and charts render a grey semi-transparent overlay. Metrics are still ingested — no data loss.
+Per-host optional daily recurring maintenance window. During the window, alert evaluation is skipped, existing alerts are hidden from all read paths via query-time filtering, host status shows `"maintenance"`, and charts render a grey semi-transparent overlay. Metrics are still ingested — no data loss.
 
 **MVP scope**: each host can have **at most one** daily repeating window defined as `HH:MM → HH:MM` (UTC). Supports cross-midnight ranges (e.g. `23:00 → 02:00`). DB storage and all comparison logic use UTC; Dashboard converts to/from browser local timezone for display and input.
 
@@ -143,7 +143,17 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
 
 ## Worker Behavior Changes
 
-### Ingest — alert suppression
+### Core principle: query-time filtering, not physical deletion
+
+Maintenance suppression uses **query-time filtering** — alerts are never physically deleted from `alert_states` or `alert_pending`. Instead, every read path that surfaces alerts checks whether the host is currently in maintenance and excludes those alerts from the response.
+
+**Why not physical deletion (cron or ingest-triggered DELETE)?**
+
+A cron-based `clearMaintenanceAlerts()` fails for windows shorter than the cron interval: a 03:10→03:40 window is missed entirely by cron runs at 03:00 and 04:00. Ingest-path deletion only works when the host is online and sending data — which contradicts the primary use case (host is shut down).
+
+Query-time filtering has none of these problems: it's evaluated at the moment the data is read, so it works for any window duration and regardless of host online state. It also preserves alert history — when maintenance ends, pre-existing alerts reappear naturally without needing re-evaluation.
+
+### Ingest — alert suppression (write path)
 
 `packages/worker/src/routes/ingest.ts`:
 
@@ -153,60 +163,49 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
      updateHostLastSeen(...)
      check maintenance_start/maintenance_end from hosts row
      if currently in maintenance window:
-       skip evaluateAlerts()
+       skip evaluateAlerts()       ← no new alerts written
      else:
-       evaluateAlerts(...)
+       evaluateAlerts(...)         ← normal path
 ```
 
 The host's maintenance columns are already available from the `SELECT is_active` query at the top of ingest — extend it to `SELECT is_active, maintenance_start, maintenance_end`.
 
-Note: this only handles the case where the host is actively ingesting during maintenance. For hosts that are offline during maintenance (the primary use case), alert clearing is handled by the scheduled cron — see below.
+This prevents **new** alerts from being created during maintenance. **Existing** alerts remain in `alert_states` but are filtered out by all read paths (see below).
 
-### Scheduled cron — maintenance alert clearing
+### Alert read paths — query-time filtering
 
-`packages/worker/src/index.ts` — `scheduled()` handler, runs every hour alongside `aggregateHour` and `purgeOldData`.
+All routes that return alerts must JOIN `hosts` and exclude maintenance hosts in application code. The existing SQL already JOINs `hosts` for `is_active` and `hostname` — extend to also SELECT `maintenance_start, maintenance_end`, then filter in the application layer using `isInMaintenanceWindow()`.
 
-New function `clearMaintenanceAlerts(db, nowSeconds)` in `packages/worker/src/services/alerts.ts`:
+**Why application-layer, not SQL WHERE?** Cross-midnight window logic (`start > end`) is non-trivial in SQLite. `isInMaintenanceWindow()` is a well-tested shared function — reuse it rather than reimplement in SQL.
+
+**Affected routes:**
+
+| Route | Current behavior | Change |
+|-------|-----------------|--------|
+| `GET /api/alerts` (`alertsListRoute`) | Returns all alerts for active hosts | Filter out alerts where host is currently in maintenance |
+| `GET /api/monitoring/alerts` (`monitoringAlertsRoute`) | Same SQL, adds tags + severity filter | Same filtering, also exclude from `alert_count` and `by_severity` tallies |
+| `GET /api/hosts` (`hostsListRoute`) | Counts alerts per host for `alert_count` | Set `alert_count: 0` for maintenance hosts |
+| `GET /api/monitoring/hosts` (`monitoringHostsRoute`) | Lists hosts with tier + alerts | Tier = `"maintenance"`, empty alerts array |
+| `GET /api/monitoring/hosts/:id` | Single host with alerts | Tier = `"maintenance"`, empty alerts array |
+
+**Pattern** (applied to each route):
 
 ```typescript
-/**
- * Clear alerts for all hosts currently in their maintenance window.
- * Called by the hourly cron to handle offline hosts that cannot
- * trigger clearing via the ingest path.
- */
-export async function clearMaintenanceAlerts(
-  db: D1Database,
-  nowSeconds: number,
-): Promise<void> {
-    const nowHHMM = toUtcHHMM(nowSeconds);
+// After fetching alerts and host rows:
+const nowHHMM = toUtcHHMM(Math.floor(Date.now() / 1000));
 
-    // Find all hosts with an active maintenance window
-    const hosts = await db.prepare(
-        "SELECT host_id, maintenance_start, maintenance_end FROM hosts WHERE maintenance_start IS NOT NULL AND is_active = 1"
-    ).all();
-
-    for (const host of hosts.results) {
-        if (isInMaintenanceWindow(nowHHMM, host.maintenance_start, host.maintenance_end)) {
-            await db.prepare("DELETE FROM alert_states WHERE host_id = ?").bind(host.host_id).run();
-            await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(host.host_id).run();
-        }
+// For alert list routes — filter out maintenance host alerts:
+const visibleAlerts = alerts.filter(a => {
+    const host = hostMap.get(a.host_id);
+    if (host?.maintenance_start && host?.maintenance_end
+        && isInMaintenanceWindow(nowHHMM, host.maintenance_start, host.maintenance_end)) {
+        return false;
     }
-}
-```
+    return true;
+});
 
-**Why cron, not just ingest**: the whole point of maintenance is "the host may be shut down". A stopped host sends no ingest payloads, so ingest-path clearing never fires. The hourly cron runs on the Worker regardless of host state, guaranteeing alerts are cleared within at most 1 hour of the maintenance window starting. For most use cases (planned 2h+ windows), this is well within tolerance.
-
-**Why also ingest-path**: if the host is still running during maintenance (e.g. a backup window, not a shutdown), ingest-path clearing kicks in immediately on the first payload inside the window — no need to wait for the hourly cron.
-
-**Registered in `scheduled()`**:
-
-```typescript
-async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
-    const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
-    await aggregateHour(env.DB, hourTs);
-    await purgeOldData(env.DB, Math.floor(Date.now() / 1000));
-    await clearMaintenanceAlerts(env.DB, Math.floor(Date.now() / 1000));  // ← new
-}
+// For host list routes — zero out alert_count for maintenance hosts:
+const alertCount = isInMaintenance ? 0 : alertCountMap.get(host.host_id) ?? 0;
 ```
 
 ### Status derivation
@@ -239,7 +238,7 @@ If the host is currently in its maintenance window (determined by `isInMaintenan
 
 `/api/monitoring/hosts/:id` will return `"tier": "maintenance"` when the host is in its window. Uptime Kuma keyword monitors matching `"tier":"healthy"` will go DOWN — this is intentional (operators know it's maintenance, they can configure Uptime Kuma's own maintenance schedule to suppress notifications if desired).
 
-`/api/monitoring/alerts` will return `alert_count: 0` for maintenance hosts (since alerts are cleared on entering maintenance), so the fleet alerts monitor stays clean.
+`/api/monitoring/alerts` filters out maintenance host alerts at query time, so `alert_count` accurately reflects only non-maintenance alerts. The fleet alerts Uptime Kuma monitor (`"alert_count":0` keyword) stays green when the only alerts are on maintenance hosts.
 
 ### Fleet status route
 
@@ -425,11 +424,11 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 | `packages/worker/src/routes/ingest.ts` | skip evaluateAlerts during maintenance |
 | `packages/worker/src/routes/hosts.ts` | SELECT + derive maintenance status |
 | `packages/worker/src/routes/host-detail.ts` | SELECT + derive maintenance status |
-| `packages/worker/src/routes/monitoring.ts` | maintenance-aware tier |
+| `packages/worker/src/routes/monitoring.ts` | maintenance-aware tier + query-time alert filtering |
+| `packages/worker/src/routes/alerts.ts` | query-time filter: exclude maintenance host alerts |
 | `packages/worker/src/routes/fleet-status.ts` | maintenance count bucket + exclude from fleet health |
 | `packages/worker/src/services/status.ts` | maintenance in deriveHostStatus |
-| `packages/worker/src/services/alerts.ts` | clearMaintenanceAlerts helper |
-| `packages/worker/src/index.ts` | register maintenance routes + cron handler |
+| `packages/worker/src/index.ts` | register maintenance routes |
 | `packages/worker/src/middleware/api-key.ts` | maintenance mutations as write routes |
 | `packages/shared/src/alerts.ts` | HealthResponse + maintenance count field |
 | `docs/03-data-structures.md` | HealthResponse type update |
@@ -462,9 +461,11 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 ### E2E tests
 
 - CRUD: PUT → GET → PUT (update) → GET → DELETE → GET (null)
-- Ingest during maintenance: seed window → ingest → verify no alert_states written
+- Ingest during maintenance: seed window → ingest → verify no new alert_states written
 - Ingest outside maintenance: same host → ingest → verify alerts evaluated
 - Status derivation: host in maintenance → hostsListRoute returns `"maintenance"` status
+- Query-time alert filtering: seed alert_states for maintenance host → GET /api/alerts → verify those alerts are excluded from response
+- Monitoring alerts filtering: same seed → GET /api/monitoring/alerts → verify alert_count excludes maintenance host
 
 ### Manual verification
 
@@ -478,11 +479,11 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 
 ## Design Decisions (resolved from review)
 
-1. **Alert clearing during maintenance**: ✅ Resolved — **dual-path clearing** ensures alerts are removed regardless of whether the host is online:
-   - **Ingest path**: if a host sends data while in its maintenance window, `evaluateAlerts` is skipped (no new alerts produced). Alert clearing also happens here for immediate effect.
-   - **Hourly cron path**: `clearMaintenanceAlerts()` runs in the Worker's `scheduled()` handler, scanning all hosts with active maintenance windows and deleting their `alert_states` + `alert_pending`. This handles the primary use case — host is offline/shut down during maintenance and sends no ingest payloads.
-   - **Worst-case latency**: alerts cleared within 1 hour of window start (cron interval). Acceptable for planned maintenance windows that are typically 2+ hours.
-   - **Post-maintenance recovery**: after the window ends, the next ingest re-evaluates all rules from scratch. Instant rules re-fire immediately if conditions persist; duration rules restart their pending timers.
+1. **Alert suppression during maintenance**: ✅ Resolved — **query-time filtering** on all read paths, not physical deletion.
+   - **Write path (ingest)**: `evaluateAlerts()` is skipped, preventing new alerts from being created.
+   - **Read paths (alerts list, monitoring alerts, host overview, fleet status)**: alerts for hosts currently in maintenance are filtered out in application code using `isInMaintenanceWindow()`. No physical DELETE from `alert_states` or `alert_pending`.
+   - **Why not physical deletion?** A cron-based approach fails for windows shorter than the cron interval (e.g. 03:10→03:40 missed by hourly cron at 03:00 and 04:00). An ingest-based approach fails for offline hosts. Query-time filtering works for any window duration and regardless of host online state.
+   - **Post-maintenance recovery**: when the window ends, pre-existing alerts in `alert_states` reappear naturally on the next read. New alerts are evaluated on the next ingest. Duration rules whose pending timers are stale will naturally re-trigger if conditions persist.
 
 2. **Uptime Kuma coordination**: Per-host keyword monitors will go DOWN (`"tier":"maintenance"` ≠ `"tier":"healthy"`). This is acceptable — operators can set Uptime Kuma's own maintenance schedule for the corresponding monitors. Automating this is out of scope for MVP.
 
