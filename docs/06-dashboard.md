@@ -52,6 +52,8 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 
 ### Worker proxy routes
 
+#### Read routes (BAT_READ_KEY)
+
 | Dashboard route | Proxies to Worker | Method |
 |-----------------|-------------------|--------|
 | `/api/hosts` | `GET /api/hosts` | GET |
@@ -59,15 +61,30 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 | `/api/hosts/[id]/metrics` | `GET /api/hosts/:id/metrics` | GET |
 | `/api/hosts/[id]/tier2` | `GET /api/hosts/:id/tier2` | GET |
 | `/api/alerts` | `GET /api/alerts` | GET |
+| `/api/events` | `GET /api/events` | GET |
+| `/api/webhooks` | `GET /api/webhooks` | GET |
+| `/api/hosts/[id]/maintenance` | `GET /api/hosts/:id/maintenance` | GET |
+
+#### Write routes (BAT_WRITE_KEY)
+
+| Dashboard route | Proxies to Worker | Method |
+|-----------------|-------------------|--------|
+| `/api/webhooks` | `POST /api/webhooks` | POST |
+| `/api/webhooks/[id]` | `DELETE /api/webhooks/:id` | DELETE |
+| `/api/webhooks/[id]/regenerate` | `POST /api/webhooks/:id/regenerate` | POST |
+| `/api/hosts/[id]/maintenance` | `PUT /api/hosts/:id/maintenance` | PUT |
+| `/api/hosts/[id]/maintenance` | `DELETE /api/hosts/:id/maintenance` | DELETE |
 
 Each proxy route:
 
 1. Checks the user's NextAuth session (Google OAuth cookie, same domain)
 2. If unauthenticated → return `401`
-3. Forward request to `BAT_API_URL` + path with `Authorization: Bearer <BAT_READ_KEY>`
+3. Forward request to `BAT_API_URL` + path with `Authorization: Bearer <key>`
+   - Read routes use `BAT_READ_KEY` via `proxyToWorker()`
+   - Write routes use `BAT_WRITE_KEY` via `proxyToWorkerWithBody(..., useWriteKey: true)`
 4. Return Worker response to browser (pass through status code + JSON body)
 
-**Note**: Dashboard does NOT proxy write routes (`/api/ingest`, `/api/identity`, `/api/tier2`). Those are only accessible to Probe with `BAT_WRITE_KEY`.
+**Note**: Dashboard does NOT proxy probe ingest routes (`/api/ingest`, `/api/identity`, `/api/tier2`). Those are only accessible to Probe with `BAT_WRITE_KEY` directly.
 
 **Note**: Dashboard does NOT proxy `/api/health`. The health endpoint is public on the Worker and consumed directly by Uptime Kuma.
 
@@ -226,7 +243,7 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 |----------|---------|
 | `BAT_API_URL` | Worker URL (e.g. `https://bat-worker.xxx.workers.dev`) |
 | `BAT_READ_KEY` | Read-only API Key for Worker proxy routes |
-| `BAT_WRITE_KEY` | Write API Key (used only by setup page to generate install commands) |
+| `BAT_WRITE_KEY` | Write API Key — used by Dashboard write proxy routes (webhook CRUD, maintenance CRUD) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
 | `CF_API_TOKEN` | Cloudflare API token with D1 read/write permission (for tags, D1 direct access) |
 | `CF_ACCOUNT_ID` | Cloudflare account ID |
 | `CF_D1_DATABASE_ID` | D1 database ID for bat-db |
