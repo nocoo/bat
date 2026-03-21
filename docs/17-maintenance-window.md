@@ -143,7 +143,7 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
 
 ## Worker Behavior Changes
 
-### Ingest — alert suppression + clearing
+### Ingest — alert suppression
 
 `packages/worker/src/routes/ingest.ts`:
 
@@ -153,7 +153,6 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
      updateHostLastSeen(...)
      check maintenance_start/maintenance_end from hosts row
      if currently in maintenance window:
-       clearHostAlerts(db, hostId)  ← DELETE from alert_states + alert_pending
        skip evaluateAlerts()
      else:
        evaluateAlerts(...)
@@ -161,16 +160,52 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
 
 The host's maintenance columns are already available from the `SELECT is_active` query at the top of ingest — extend it to `SELECT is_active, maintenance_start, maintenance_end`.
 
-**Alert clearing rationale**: if we only skip `evaluateAlerts` without clearing existing alerts, the `/api/monitoring/alerts` endpoint still reports `alert_count > 0` and the fleet alerts Uptime Kuma monitor (`"alert_count":0` keyword) stays DOWN — directly contradicting the "reduce noise" goal. Clearing is safe because:
-- After maintenance ends, the next ingest re-evaluates all rules from scratch
-- Instant rules (duration=0) re-fire immediately if conditions persist
-- Duration rules restart their pending timers, which is correct — the host just came back from maintenance
+Note: this only handles the case where the host is actively ingesting during maintenance. For hosts that are offline during maintenance (the primary use case), alert clearing is handled by the scheduled cron — see below.
 
-`clearHostAlerts` is a new helper in `packages/worker/src/services/alerts.ts`:
+### Scheduled cron — maintenance alert clearing
+
+`packages/worker/src/index.ts` — `scheduled()` handler, runs every hour alongside `aggregateHour` and `purgeOldData`.
+
+New function `clearMaintenanceAlerts(db, nowSeconds)` in `packages/worker/src/services/alerts.ts`:
+
 ```typescript
-export async function clearHostAlerts(db: D1Database, hostId: string): Promise<void> {
-    await db.prepare("DELETE FROM alert_states WHERE host_id = ?").bind(hostId).run();
-    await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(hostId).run();
+/**
+ * Clear alerts for all hosts currently in their maintenance window.
+ * Called by the hourly cron to handle offline hosts that cannot
+ * trigger clearing via the ingest path.
+ */
+export async function clearMaintenanceAlerts(
+  db: D1Database,
+  nowSeconds: number,
+): Promise<void> {
+    const nowHHMM = toUtcHHMM(nowSeconds);
+
+    // Find all hosts with an active maintenance window
+    const hosts = await db.prepare(
+        "SELECT host_id, maintenance_start, maintenance_end FROM hosts WHERE maintenance_start IS NOT NULL AND is_active = 1"
+    ).all();
+
+    for (const host of hosts.results) {
+        if (isInMaintenanceWindow(nowHHMM, host.maintenance_start, host.maintenance_end)) {
+            await db.prepare("DELETE FROM alert_states WHERE host_id = ?").bind(host.host_id).run();
+            await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(host.host_id).run();
+        }
+    }
+}
+```
+
+**Why cron, not just ingest**: the whole point of maintenance is "the host may be shut down". A stopped host sends no ingest payloads, so ingest-path clearing never fires. The hourly cron runs on the Worker regardless of host state, guaranteeing alerts are cleared within at most 1 hour of the maintenance window starting. For most use cases (planned 2h+ windows), this is well within tolerance.
+
+**Why also ingest-path**: if the host is still running during maintenance (e.g. a backup window, not a shutdown), ingest-path clearing kicks in immediately on the first payload inside the window — no need to wait for the hourly cron.
+
+**Registered in `scheduled()`**:
+
+```typescript
+async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
+    const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
+    await aggregateHour(env.DB, hourTs);
+    await purgeOldData(env.DB, Math.floor(Date.now() / 1000));
+    await clearMaintenanceAlerts(env.DB, Math.floor(Date.now() / 1000));  // ← new
 }
 ```
 
@@ -219,6 +254,20 @@ case "maintenance":
 ```
 
 Fleet `status` is derived from the remaining non-maintenance hosts only. A fleet where all hosts are in maintenance shows `status: "healthy"` with `maintenance: N`.
+
+**Type update**: `HealthResponse` in `packages/shared/src/alerts.ts` (and its documentation in `docs/03-data-structures.md`) must add the `maintenance: number` field:
+
+```typescript
+interface HealthResponse {
+  status: "healthy" | "degraded" | "critical" | "empty";
+  total_hosts: number;
+  healthy: number;
+  warning: number;
+  critical: number;
+  maintenance: number;  // ← new
+  checked_at: number;
+}
+```
 
 ### Auth middleware
 
@@ -379,9 +428,12 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 | `packages/worker/src/routes/monitoring.ts` | maintenance-aware tier |
 | `packages/worker/src/routes/fleet-status.ts` | maintenance count bucket + exclude from fleet health |
 | `packages/worker/src/services/status.ts` | maintenance in deriveHostStatus |
-| `packages/worker/src/services/alerts.ts` | clearHostAlerts helper |
-| `packages/worker/src/index.ts` | register maintenance routes |
+| `packages/worker/src/services/alerts.ts` | clearMaintenanceAlerts helper |
+| `packages/worker/src/index.ts` | register maintenance routes + cron handler |
 | `packages/worker/src/middleware/api-key.ts` | maintenance mutations as write routes |
+| `packages/shared/src/alerts.ts` | HealthResponse + maintenance count field |
+| `docs/03-data-structures.md` | HealthResponse type update |
+| `docs/06-dashboard.md` | proxy table + BAT_WRITE_KEY description update |
 | `packages/worker/test/e2e/wrangler.test.ts` | add 0017 to migration list |
 | `packages/dashboard/src/app/api/hosts/[id]/maintenance/route.ts` | **NEW** — proxy |
 | `packages/dashboard/src/components/maintenance-panel.tsx` | **NEW** — settings UI |
@@ -426,14 +478,21 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 
 ## Design Decisions (resolved from review)
 
-1. **Alert clearing on maintenance entry**: ✅ Resolved — entering maintenance clears `alert_states` and `alert_pending` for the host. This ensures `/api/monitoring/alerts` reports `alert_count: 0` and the fleet alerts Uptime Kuma monitor stays green. After maintenance ends, all rules re-evaluate from scratch on the next ingest.
+1. **Alert clearing during maintenance**: ✅ Resolved — **dual-path clearing** ensures alerts are removed regardless of whether the host is online:
+   - **Ingest path**: if a host sends data while in its maintenance window, `evaluateAlerts` is skipped (no new alerts produced). Alert clearing also happens here for immediate effect.
+   - **Hourly cron path**: `clearMaintenanceAlerts()` runs in the Worker's `scheduled()` handler, scanning all hosts with active maintenance windows and deleting their `alert_states` + `alert_pending`. This handles the primary use case — host is offline/shut down during maintenance and sends no ingest payloads.
+   - **Worst-case latency**: alerts cleared within 1 hour of window start (cron interval). Acceptable for planned maintenance windows that are typically 2+ hours.
+   - **Post-maintenance recovery**: after the window ends, the next ingest re-evaluates all rules from scratch. Instant rules re-fire immediately if conditions persist; duration rules restart their pending timers.
 
 2. **Uptime Kuma coordination**: Per-host keyword monitors will go DOWN (`"tier":"maintenance"` ≠ `"tier":"healthy"`). This is acceptable — operators can set Uptime Kuma's own maintenance schedule for the corresponding monitors. Automating this is out of scope for MVP.
 
 3. **DST timezone drift**: Accepted behavior. The window is stored as fixed UTC times. Server-side operations (backups, cron) run on UTC, so a fixed UTC window matches the actual maintenance schedule. Dashboard displays both local and UTC time to make this transparent to the user.
 
-4. **Dashboard WRITE_KEY usage**: Not a new security boundary change. Dashboard already holds `BAT_WRITE_KEY` and uses it for webhook CRUD (POST/DELETE/regenerate) since v0.7.0. Maintenance routes follow the identical auth chain.
+4. **Dashboard WRITE_KEY usage**: Not a new security boundary change. Dashboard already holds `BAT_WRITE_KEY` and uses it for webhook CRUD (POST/DELETE/regenerate) since v0.7.0. Maintenance routes follow the identical auth chain. **However**, `docs/06-dashboard.md` still describes `BAT_WRITE_KEY` as "used only by setup page" and the proxy table omits webhook write routes — these are pre-existing documentation gaps. This feature implementation must update `06-dashboard.md`:
+   - Proxy table: add webhook write routes and maintenance write routes
+   - `BAT_WRITE_KEY` description: "Write API Key for probe ingest, webhook CRUD, and maintenance CRUD (proxied via Dashboard with NextAuth session check)"
+   - Note after proxy table: clarify that write proxying requires `useWriteKey: true` in `proxyToWorkerWithBody`
 
-5. **fleet-status.ts handling**: Maintenance hosts get their own count bucket and are excluded from fleet health derivation, preventing miscounts in the existing `healthy + warning + critical` breakdown.
+5. **fleet-status.ts handling**: Maintenance hosts get their own count bucket and are excluded from fleet health derivation. The `HealthResponse` type in `packages/shared/src/alerts.ts` and its documentation in `docs/03-data-structures.md` must both gain the `maintenance: number` field.
 
 6. **PUT/DELETE on missing/retired hosts**: Explicit error responses — 404 for missing host, 403 for retired. No silent 204 on nonexistent targets.
