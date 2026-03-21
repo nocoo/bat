@@ -4,7 +4,7 @@
 
 ## Overview
 
-Per-host optional daily recurring maintenance window. During the window, alert evaluation is skipped, existing alerts are hidden from all read paths via query-time filtering, host status shows `"maintenance"`, and charts render a grey semi-transparent overlay. Metrics are still ingested — no data loss.
+Per-host optional daily recurring maintenance window. During the window: new alert evaluation is skipped on ingest, existing alerts in `alert_states` are filtered out of all read responses (never physically deleted), `alert_pending` entries are purged to prevent stale duration accumulation, host status shows `"maintenance"`, and charts render a grey semi-transparent overlay. Metrics are still ingested — no data loss.
 
 **MVP scope**: each host can have **at most one** daily repeating window defined as `HH:MM → HH:MM` (UTC). Supports cross-midnight ranges (e.g. `23:00 → 02:00`). DB storage and all comparison logic use UTC; Dashboard converts to/from browser local timezone for display and input.
 
@@ -143,15 +143,21 @@ Sets all three columns to NULL. Returns `404` if host not found, `403` if retire
 
 ## Worker Behavior Changes
 
-### Core principle: query-time filtering, not physical deletion
+### Core principle: query-time filtering for alert_states, physical purge for alert_pending
 
-Maintenance suppression uses **query-time filtering** — alerts are never physically deleted from `alert_states` or `alert_pending`. Instead, every read path that surfaces alerts checks whether the host is currently in maintenance and excludes those alerts from the response.
+Maintenance suppression uses a **two-table strategy** because `alert_states` and `alert_pending` have different semantics:
 
-**Why not physical deletion (cron or ingest-triggered DELETE)?**
+- **`alert_states`** (fired alerts) — **query-time filtering, no DELETE**. Every read path checks `isInMaintenanceWindow()` and excludes alerts for maintenance hosts. When maintenance ends, pre-existing alerts reappear naturally without re-evaluation.
 
-A cron-based `clearMaintenanceAlerts()` fails for windows shorter than the cron interval: a 03:10→03:40 window is missed entirely by cron runs at 03:00 and 04:00. Ingest-path deletion only works when the host is online and sending data — which contradicts the primary use case (host is shut down).
+- **`alert_pending`** (duration rule timers) — **physical DELETE on entering maintenance**. Duration rules accumulate time as `elapsed = now - first_seen`. If `alert_pending` rows survive maintenance, the first post-maintenance ingest computes elapsed inclusive of the entire maintenance period, causing false instant-promotion. Purging `alert_pending` forces duration rules to restart their timers from scratch after maintenance.
 
-Query-time filtering has none of these problems: it's evaluated at the moment the data is read, so it works for any window duration and regardless of host online state. It also preserves alert history — when maintenance ends, pre-existing alerts reappear naturally without needing re-evaluation.
+**Why not physical deletion for alert_states too?**
+
+A cron-based `clearMaintenanceAlerts()` fails for windows shorter than the cron interval: a 03:10→03:40 window is missed entirely by cron runs at 03:00 and 04:00. Ingest-path deletion only works when the host is online. Query-time filtering has neither problem — it's evaluated at read time, works for any window duration and regardless of host state.
+
+**Why physical deletion for alert_pending?**
+
+`alert_pending` is never surfaced to any read path — it's internal bookkeeping for the `handleDurationRule` write path. Query-time filtering cannot help here because the stale `first_seen` is consumed by `evaluateAlerts`, not by a read route. The purge happens on the ingest path (first payload inside the window), which is exactly when it's needed — the next `evaluateAlerts` call after maintenance is the one that would mis-compute elapsed time. For offline hosts, there's no ingest and thus no `evaluateAlerts` call, so stale `alert_pending` rows are harmless until the host comes back online and ingests again — at which point the ingest path purges them before `evaluateAlerts` runs.
 
 ### Ingest — alert suppression (write path)
 
@@ -163,14 +169,18 @@ Query-time filtering has none of these problems: it's evaluated at the moment th
      updateHostLastSeen(...)
      check maintenance_start/maintenance_end from hosts row
      if currently in maintenance window:
-       skip evaluateAlerts()       ← no new alerts written
+       purge alert_pending for this host  ← prevent stale duration accumulation
+       skip evaluateAlerts()              ← no new alerts written
      else:
-       evaluateAlerts(...)         ← normal path
+       evaluateAlerts(...)                ← normal path
 ```
 
 The host's maintenance columns are already available from the `SELECT is_active` query at the top of ingest — extend it to `SELECT is_active, maintenance_start, maintenance_end`.
 
-This prevents **new** alerts from being created during maintenance. **Existing** alerts remain in `alert_states` but are filtered out by all read paths (see below).
+**Write-path effects:**
+- `evaluateAlerts()` is skipped → no new `alert_states` or `alert_pending` entries
+- `DELETE FROM alert_pending WHERE host_id = ?` → purges any duration timers that were accumulating before maintenance began, so they don't falsely promote on the first post-maintenance ingest
+- `alert_states` are left untouched (hidden by query-time filtering on read paths)
 
 ### Alert read paths — query-time filtering
 
@@ -238,7 +248,7 @@ If the host is currently in its maintenance window (determined by `isInMaintenan
 
 `/api/monitoring/hosts/:id` will return `"tier": "maintenance"` when the host is in its window. Uptime Kuma keyword monitors matching `"tier":"healthy"` will go DOWN — this is intentional (operators know it's maintenance, they can configure Uptime Kuma's own maintenance schedule to suppress notifications if desired).
 
-`/api/monitoring/alerts` filters out maintenance host alerts at query time, so `alert_count` accurately reflects only non-maintenance alerts. The fleet alerts Uptime Kuma monitor (`"alert_count":0` keyword) stays green when the only alerts are on maintenance hosts.
+`/api/monitoring/alerts` filters out maintenance host alerts at query time, so `alert_count` accurately reflects only non-maintenance hosts. The fleet alerts Uptime Kuma monitor (`"alert_count":0` keyword) stays green when the only active alerts are on maintenance hosts.
 
 ### Fleet status route
 
@@ -479,20 +489,21 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 
 ## Design Decisions (resolved from review)
 
-1. **Alert suppression during maintenance**: ✅ Resolved — **query-time filtering** on all read paths, not physical deletion.
-   - **Write path (ingest)**: `evaluateAlerts()` is skipped, preventing new alerts from being created.
-   - **Read paths (alerts list, monitoring alerts, host overview, fleet status)**: alerts for hosts currently in maintenance are filtered out in application code using `isInMaintenanceWindow()`. No physical DELETE from `alert_states` or `alert_pending`.
-   - **Why not physical deletion?** A cron-based approach fails for windows shorter than the cron interval (e.g. 03:10→03:40 missed by hourly cron at 03:00 and 04:00). An ingest-based approach fails for offline hosts. Query-time filtering works for any window duration and regardless of host online state.
-   - **Post-maintenance recovery**: when the window ends, pre-existing alerts in `alert_states` reappear naturally on the next read. New alerts are evaluated on the next ingest. Duration rules whose pending timers are stale will naturally re-trigger if conditions persist.
+1. **Alert suppression during maintenance**: ✅ Resolved — **two-table strategy**: query-time filtering for `alert_states`, physical purge for `alert_pending`.
+   - **`alert_states` (fired alerts)**: never deleted. Read paths filter them out using `isInMaintenanceWindow()`. When maintenance ends, they reappear on the next read.
+   - **`alert_pending` (duration timers)**: physically deleted on the ingest path (`DELETE FROM alert_pending WHERE host_id = ?`) to prevent stale `first_seen` values from causing false instant-promotion after maintenance. Duration rules restart their timers cleanly post-maintenance.
+   - **Write path (ingest)**: `evaluateAlerts()` is skipped, purge `alert_pending`.
+   - **Why not physical deletion for alert_states?** Cron fails for short windows; ingest-path fails for offline hosts. Query-time filtering works for any duration and any host state.
+   - **Why physical deletion for alert_pending?** `alert_pending.first_seen` is consumed by the write path (`handleDurationRule`), not by read routes. Query-time filtering can't help. But the purge only needs to happen before the next `evaluateAlerts` call — which is on the ingest path, exactly where we do it. Offline hosts don't ingest, so stale rows are harmless until the host comes back.
 
 2. **Uptime Kuma coordination**: Per-host keyword monitors will go DOWN (`"tier":"maintenance"` ≠ `"tier":"healthy"`). This is acceptable — operators can set Uptime Kuma's own maintenance schedule for the corresponding monitors. Automating this is out of scope for MVP.
 
 3. **DST timezone drift**: Accepted behavior. The window is stored as fixed UTC times. Server-side operations (backups, cron) run on UTC, so a fixed UTC window matches the actual maintenance schedule. Dashboard displays both local and UTC time to make this transparent to the user.
 
-4. **Dashboard WRITE_KEY usage**: Not a new security boundary change. Dashboard already holds `BAT_WRITE_KEY` and uses it for webhook CRUD (POST/DELETE/regenerate) since v0.7.0. Maintenance routes follow the identical auth chain. **However**, `docs/06-dashboard.md` still describes `BAT_WRITE_KEY` as "used only by setup page" and the proxy table omits webhook write routes — these are pre-existing documentation gaps. This feature implementation must update `06-dashboard.md`:
-   - Proxy table: add webhook write routes and maintenance write routes
-   - `BAT_WRITE_KEY` description: "Write API Key for probe ingest, webhook CRUD, and maintenance CRUD (proxied via Dashboard with NextAuth session check)"
-   - Note after proxy table: clarify that write proxying requires `useWriteKey: true` in `proxyToWorkerWithBody`
+4. **Dashboard WRITE_KEY usage**: Not a new security boundary change. Dashboard already holds `BAT_WRITE_KEY` and uses it for webhook CRUD (POST/DELETE/regenerate) since v0.7.0. Maintenance routes follow the identical auth chain. `docs/06-dashboard.md` has been updated:
+   - ✅ Proxy table split into read (BAT_READ_KEY) and write (BAT_WRITE_KEY) sections
+   - ✅ `BAT_WRITE_KEY` description updated to include webhook CRUD and maintenance CRUD
+   - ✅ Proxy route description clarifies `proxyToWorkerWithBody(..., useWriteKey: true)` for write routes
 
 5. **fleet-status.ts handling**: Maintenance hosts get their own count bucket and are excluded from fleet health derivation. The `HealthResponse` type in `packages/shared/src/alerts.ts` and its documentation in `docs/03-data-structures.md` must both gain the `maintenance: number` field.
 
