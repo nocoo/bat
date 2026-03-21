@@ -854,6 +854,15 @@ describe("Tags CRUD E2E", () => {
 		expect(tag.color).toBe(3);
 	});
 
+	test("PUT /api/tags/:id rename to existing name → 409", async () => {
+		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "staging" }),
+		});
+		expect(res.status).toBe(409);
+	});
+
 	test("PUT /api/tags/:id with read key → 403", async () => {
 		const res = await fetch(`${BASE}/api/tags/${tagId}`, {
 			method: "PUT",
@@ -998,6 +1007,22 @@ describe("Port Allowlist CRUD E2E", () => {
 			body: JSON.stringify({ port: 0 }),
 		});
 		expect(res.status).toBe(400);
+	});
+
+	test("POST /api/hosts/:id/allowed-ports unknown host → 404", async () => {
+		const res = await fetch(`${BASE}/api/hosts/nonexistent-host/allowed-ports`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ port: 80, reason: "test" }),
+		});
+		expect(res.status).toBe(404);
+	});
+
+	test("GET /api/hosts/:id/allowed-ports unknown host → 404", async () => {
+		const res = await fetch(`${BASE}/api/hosts/nonexistent-host/allowed-ports`, {
+			headers: readHeaders(),
+		});
+		expect(res.status).toBe(404);
 	});
 
 	test("POST /api/hosts/:id/allowed-ports with read key → 403", async () => {
