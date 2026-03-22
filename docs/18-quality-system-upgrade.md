@@ -20,7 +20,7 @@
 
 ---
 
-## Step 1: G1 — Biome strict + lint-staged
+## Step 1: G1 — Biome strict + lint-staged ✅
 
 **Goal**: 0 error + 0 warning, strict rules, incremental lint on staged files only.
 
@@ -100,7 +100,7 @@ git checkout -- packages/shared/src/version.ts
 
 ---
 
-## Step 2: L1 — Fix dashboard coverage gate
+## Step 2: L1 — Fix dashboard coverage gate ✅
 
 **Goal**: `check-coverage.sh` must **fail** (not skip) when dashboard coverage is below 90%.
 
@@ -167,7 +167,7 @@ bash -c 'source scripts/check-coverage.sh; check_ts_coverage "test" ""'
 
 ---
 
-## Step 3: G2 — Security gate (osv-scanner + gitleaks)
+## Step 3: G2 — Security gate (osv-scanner + gitleaks) ✅
 
 **Goal**: Pre-push runs dependency vulnerability scan + secrets leak detection.
 
@@ -280,7 +280,7 @@ cat .husky/pre-push
 
 ---
 
-## Step 4: D1 — Test environment isolation
+## Step 4: D1 — Test environment isolation ✅
 
 **Goal**: `wrangler.toml` has `[env.test]` binding to `bat-db-test`, with isolation verification.
 
@@ -384,7 +384,7 @@ npx wrangler d1 execute bat-db-test --remote --command "SELECT * FROM _test_mark
 
 ---
 
-## Step 5: Hooks — align to six-dimension mapping
+## Step 5: Hooks — align to six-dimension mapping ✅
 
 **Goal**: pre-commit = L1 + G1, pre-push = L2 ‖ G2.
 
@@ -475,7 +475,7 @@ bash .husky/pre-push
 
 ---
 
-## Step 6: Documentation update
+## Step 6: Documentation update ✅
 
 **Goal**: Update docs index and testing doc to reflect six-dimension system.
 
