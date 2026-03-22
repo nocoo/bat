@@ -1,0 +1,5 @@
+[test]
+# Coverage tracks only testable logic layers (lib, hooks, middleware)
+# UI components (components/, app/) are exempt per quality system rules:
+# "UI thin shells (page.tsx / layout.tsx) are exempt from coverage"
+coverageSkipTestFiles = true
