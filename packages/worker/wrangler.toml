@@ -28,3 +28,16 @@ database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+
+# Test environment — E2E testing with isolated resources
+# Usage: wrangler dev --env test (local) or wrangler d1 execute --env test (remote)
+[env.test]
+name = "bat-worker-test"
+
+[[env.test.d1_databases]]
+binding = "DB"
+database_name = "bat-db-test"
+database_id = "04bd8235-5aff-445f-9719-55b2836d83b7"
+
+[env.test.vars]
+ENVIRONMENT = "test"
