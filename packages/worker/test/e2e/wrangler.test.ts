@@ -98,6 +98,7 @@ beforeAll(async () => {
 		"migrations/0015_top_processes.sql",
 		"migrations/0016_websites.sql",
 		"migrations/0017_maintenance_window.sql",
+		"migrations/0018_test_marker.sql",
 	];
 	for (const migration of migrations) {
 		await runCommand(
