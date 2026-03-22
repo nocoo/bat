@@ -1,0 +1,5 @@
+[allowlist]
+paths = [
+  ".agents/skills/uptime-kuma/config.json",
+  ".claude/skills/uptime-kuma/config.json"
+]
