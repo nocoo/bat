@@ -11,10 +11,14 @@
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"test": "turbo test",
+		"security": "bun run scripts/run-security.ts",
 		"prepare": "husky"
 	},
 	"pnpm": {
-		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"]
+		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"],
+		"overrides": {
+			"undici": ">=7.24.0"
+		}
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
