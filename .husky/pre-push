@@ -1,12 +1,32 @@
 #!/usr/bin/env bash
-# pre-push hook: API E2E tests
+# pre-push: L2 (Integration E2E) + G2 (Security gate)
 
 set -euo pipefail
 
-echo "🦇 bat pre-push checks..."
+echo "🦇 bat pre-push — L2 + G2"
 
-# Worker API E2E tests (self-bootstraps its own Wrangler dev server)
-echo "→ API E2E tests"
-pnpm --filter @bat/worker test:e2e
+# Run L2 and G2 in parallel; collect exit codes
+pids=()
 
-echo "✔ pre-push passed"
+echo "→ L2: Worker API E2E tests"
+pnpm --filter @bat/worker test:e2e &
+pids+=($!)
+
+echo "→ G2: Security gate (osv-scanner + gitleaks)"
+bun run scripts/run-security.ts &
+pids+=($!)
+
+# Wait for all; fail if any fails
+failed=0
+for pid in "${pids[@]}"; do
+  if ! wait "$pid"; then
+    failed=1
+  fi
+done
+
+if [ "$failed" -ne 0 ]; then
+  echo "✘ pre-push FAILED"
+  exit 1
+fi
+
+echo "✔ pre-push passed (L2 + G2)"
