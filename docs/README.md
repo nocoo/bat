@@ -21,3 +21,4 @@
 | 15 | [enhanced-software-and-websites](./15-enhanced-software-and-websites.md) | Expand software registry (frp/Xray/n8n/etc.), Docker image→software mapping, Nginx/Apache vhost website discovery |
 | 16 | [monitoring-api](./16-monitoring-api.md) | Monitoring API for Uptime Kuma integration: host health tiers, group aggregation, alert endpoints, auto-onboarding flow |
 | 17 | [maintenance-window](./17-maintenance-window.md) | Per-host daily recurring maintenance window: alert suppression, `maintenance` status, chart grey overlay |
+| 18 | [quality-system-upgrade](./18-quality-system-upgrade.md) | Six-dimension quality system upgrade (L1/L2/L3 + G1/G2 + D1): Tier C → S roadmap, 12 atomic commits |
