@@ -19,7 +19,11 @@
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"husky": "^9.1.0",
+		"lint-staged": "^16.4.0",
 		"turbo": "^2.5.0",
 		"typescript": "^5.8.2"
+	},
+	"lint-staged": {
+		"*.{ts,tsx,js,jsx,json,css}": ["biome check --error-on-warnings --no-errors-on-unmatched"]
 	}
 }
