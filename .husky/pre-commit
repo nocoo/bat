@@ -1,29 +1,28 @@
 #!/usr/bin/env bash
-# pre-commit hook: typecheck + lint + unit tests with coverage
-
+# pre-commit: L1 (Unit tests + coverage) + G1 (Static analysis)
 set -euo pipefail
 
-echo "🦇 bat pre-commit checks..."
+echo "🦇 bat pre-commit — L1 + G1"
 
-# TypeScript typecheck
-echo "→ typecheck"
+# G1: TypeScript typecheck
+echo "→ G1: typecheck"
 pnpm turbo typecheck
 
-# Biome lint
-echo "→ lint"
-pnpm biome check .
+# G1: Biome lint (staged files only via lint-staged)
+echo "→ G1: lint (staged)"
+pnpm lint-staged
 
-# Unit tests with coverage (TS + Rust)
-echo "→ unit tests"
+# L1: Unit tests with coverage (TS ≥90%, Rust ≥95%)
+echo "→ L1: unit tests + coverage"
 bash scripts/check-coverage.sh 90 95
 
-# Rust lint (only if probe/ changed)
+# G1: Rust lint (only if probe/ changed)
 if git diff --cached --name-only | grep -q '^probe/'; then
-  echo "→ rust lint"
+  echo "→ G1: rust lint"
   cd probe
   cargo fmt --check
   cargo clippy -- -D warnings
   cd ..
 fi
 
-echo "✔ pre-commit passed"
+echo "✔ pre-commit passed (L1 + G1)"
