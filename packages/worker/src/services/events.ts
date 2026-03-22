@@ -52,7 +52,9 @@ RETURNING window_count`,
 		.bind(currentMinute, currentMinute, nowSeconds, configId)
 		.first<{ window_count: number }>();
 
-	if (!result) return false;
+	if (!result) {
+		return false;
+	}
 	return result.window_count <= rateLimit;
 }
 
@@ -92,7 +94,9 @@ RETURNING *`,
 		.bind(hostId, token, nowSeconds, nowSeconds)
 		.first<WebhookConfigRow>();
 
-	if (!result) throw new Error("Failed to create webhook config");
+	if (!result) {
+		throw new Error("Failed to create webhook config");
+	}
 	return result;
 }
 

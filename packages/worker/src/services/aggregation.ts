@@ -69,7 +69,9 @@ async function aggregateHostHour(
 		.all<RawRow>();
 
 	const rows = rawResult.results;
-	if (rows.length === 0) return;
+	if (rows.length === 0) {
+		return;
+	}
 
 	const n = rows.length;
 
@@ -184,7 +186,7 @@ async function aggregateHostHour(
   oom_kills_sum,
   fd_allocated_avg, fd_allocated_max, fd_max,
   ext_json
-) VALUES (${Array(60).fill("?").join(", ")})
+) VALUES (${new Array(60).fill("?").join(", ")})
 ON CONFLICT(host_id, hour_ts) DO UPDATE SET
   sample_count = excluded.sample_count,
   cpu_usage_avg = excluded.cpu_usage_avg,
@@ -399,7 +401,9 @@ function buildExtJson(rows: RawRow[]): Record<string, number | null> | null {
 	};
 
 	// Return null if every value is null (no signal expansion data)
-	if (Object.values(ext).every((v) => v === null)) return null;
+	if (Object.values(ext).every((v) => v === null)) {
+		return null;
+	}
 	return ext;
 }
 
@@ -493,14 +497,18 @@ function aggregateDiskIo(rows: RawRow[]): string | null {
 	let hasAny = false;
 
 	for (const row of rows) {
-		if (row.disk_io_json == null) continue;
+		if (row.disk_io_json == null) {
+			continue;
+		}
 		let entries: DiskIoRawEntry[] = [];
 		try {
 			entries = JSON.parse(row.disk_io_json) as DiskIoRawEntry[];
 		} catch {
 			continue;
 		}
-		if (entries.length === 0) continue;
+		if (entries.length === 0) {
+			continue;
+		}
 		hasAny = true;
 		for (const e of entries) {
 			let arr = deviceSamples.get(e.device);
@@ -512,7 +520,9 @@ function aggregateDiskIo(rows: RawRow[]): string | null {
 		}
 	}
 
-	if (!hasAny) return null;
+	if (!hasAny) {
+		return null;
+	}
 
 	// Aggregate per device
 	const result: DiskIoHourlyEntry[] = [];
@@ -645,37 +655,49 @@ interface RawRow {
 }
 
 function avg(values: number[]): number {
-	if (values.length === 0) return 0;
+	if (values.length === 0) {
+		return 0;
+	}
 	return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
 function max(values: number[]): number {
-	if (values.length === 0) return 0;
+	if (values.length === 0) {
+		return 0;
+	}
 	return Math.max(...values);
 }
 
 function min(values: number[]): number {
-	if (values.length === 0) return 0;
+	if (values.length === 0) {
+		return 0;
+	}
 	return Math.min(...values);
 }
 
 /** Avg of non-null values. Returns null if all values are null. */
 function avgNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
-	if (valid.length === 0) return null;
+	if (valid.length === 0) {
+		return null;
+	}
 	return valid.reduce((a, b) => a + b, 0) / valid.length;
 }
 
 /** Max of non-null values. Returns null if all values are null. */
 function maxNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
-	if (valid.length === 0) return null;
+	if (valid.length === 0) {
+		return null;
+	}
 	return Math.max(...valid);
 }
 
 /** Sum of non-null values. Returns null if all values are null. */
 function sumNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
-	if (valid.length === 0) return null;
+	if (valid.length === 0) {
+		return null;
+	}
 	return valid.reduce((a, b) => a + b, 0);
 }

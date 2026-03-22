@@ -77,7 +77,9 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 }
 
 export function formatBootTime(unixSeconds: number | null | undefined): string | null {
-	if (unixSeconds == null) return null;
+	if (unixSeconds == null) {
+		return null;
+	}
 	return new Date(unixSeconds * 1000).toLocaleString();
 }
 
@@ -88,8 +90,12 @@ function formatCpuLabel(
 	logical: number | null | undefined,
 ): string | null {
 	const topology = formatCpuTopology(physical ?? null, logical ?? null);
-	if (!model && !topology) return null;
-	if (!topology) return model ?? null;
+	if (!(model || topology)) {
+		return null;
+	}
+	if (!topology) {
+		return model ?? null;
+	}
 	const suffix =
 		physical != null && logical != null && physical !== logical
 			? `(${physical} cores, ${logical} threads)`
@@ -268,7 +274,9 @@ export default function HostDetailPage() {
 
 	// Maintenance window for chart overlays
 	const maintenanceWindow = useMemo(() => {
-		if (!host?.maintenance_start || !host?.maintenance_end) return null;
+		if (!(host?.maintenance_start && host?.maintenance_end)) {
+			return null;
+		}
 		return { start: host.maintenance_start, end: host.maintenance_end };
 	}, [host?.maintenance_start, host?.maintenance_end]);
 

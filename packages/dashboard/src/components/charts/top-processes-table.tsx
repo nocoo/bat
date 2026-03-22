@@ -35,21 +35,35 @@ function stateColor(state: string): string {
 }
 
 function cpuColor(pct: number | null): string {
-	if (pct == null) return "";
-	if (pct > 80) return "text-destructive";
-	if (pct > 50) return "text-warning";
+	if (pct == null) {
+		return "";
+	}
+	if (pct > 80) {
+		return "text-destructive";
+	}
+	if (pct > 50) {
+		return "text-warning";
+	}
 	return "";
 }
 
 function memPctColor(pct: number): string {
-	if (pct > 30) return "text-destructive";
-	if (pct > 15) return "text-warning";
+	if (pct > 30) {
+		return "text-destructive";
+	}
+	if (pct > 15) {
+		return "text-warning";
+	}
 	return "";
 }
 
 function threadColor(count: number): string {
-	if (count > 100) return "text-destructive";
-	if (count > 50) return "text-warning";
+	if (count > 100) {
+		return "text-destructive";
+	}
+	if (count > 50) {
+		return "text-warning";
+	}
 	return "";
 }
 
@@ -102,7 +116,9 @@ export function TopProcessesTable({
 	const [search, setSearch] = useState("");
 
 	const filtered = useMemo(() => {
-		if (!search) return processes;
+		if (!search) {
+			return processes;
+		}
 		const q = search.toLowerCase();
 		return processes.filter(
 			(p) =>

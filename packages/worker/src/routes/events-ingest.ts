@@ -12,9 +12,13 @@ import { checkRateLimit, findWebhookByToken, insertEvent } from "../services/eve
 import type { AppEnv } from "../types.js";
 
 function extractBearerToken(header: string | undefined): string | null {
-	if (!header) return null;
+	if (!header) {
+		return null;
+	}
 	const parts = header.split(" ");
-	if (parts.length !== 2 || parts[0] !== "Bearer") return null;
+	if (parts.length !== 2 || parts[0] !== "Bearer") {
+		return null;
+	}
 	return parts[1];
 }
 
@@ -43,7 +47,7 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		.bind(config.host_id)
 		.first<{ public_ip: string | null }>();
 
-	if (!host || !host.public_ip) {
+	if (!host?.public_ip) {
 		return c.json({ error: "Host has no public IP registered" }, 403);
 	}
 

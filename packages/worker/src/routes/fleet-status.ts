@@ -112,6 +112,8 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 			case "maintenance":
 				maintenance++;
 				break;
+			default:
+				break;
 		}
 	}
 

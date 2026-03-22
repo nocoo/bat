@@ -10,46 +10,94 @@ const CLOCK_SKEW_MAX_SECONDS = 300;
 
 /** Lightweight validation — checks required fields exist and are correct types */
 function validateMetricsPayload(body: unknown): body is MetricsPayload {
-	if (!body || typeof body !== "object") return false;
+	if (!body || typeof body !== "object") {
+		return false;
+	}
 	const b = body as Record<string, unknown>;
 
 	// Top-level scalars
-	if (typeof b.host_id !== "string" || b.host_id.length === 0) return false;
-	if (typeof b.timestamp !== "number") return false;
-	if (typeof b.interval !== "number") return false;
-	if (typeof b.uptime_seconds !== "number") return false;
+	if (typeof b.host_id !== "string" || b.host_id.length === 0) {
+		return false;
+	}
+	if (typeof b.timestamp !== "number") {
+		return false;
+	}
+	if (typeof b.interval !== "number") {
+		return false;
+	}
+	if (typeof b.uptime_seconds !== "number") {
+		return false;
+	}
 
 	// CPU
-	if (!b.cpu || typeof b.cpu !== "object") return false;
+	if (!b.cpu || typeof b.cpu !== "object") {
+		return false;
+	}
 	const cpu = b.cpu as Record<string, unknown>;
-	if (typeof cpu.load1 !== "number") return false;
-	if (typeof cpu.load5 !== "number") return false;
-	if (typeof cpu.load15 !== "number") return false;
-	if (typeof cpu.usage_pct !== "number") return false;
-	if (typeof cpu.iowait_pct !== "number") return false;
-	if (typeof cpu.steal_pct !== "number") return false;
-	if (typeof cpu.count !== "number") return false;
+	if (typeof cpu.load1 !== "number") {
+		return false;
+	}
+	if (typeof cpu.load5 !== "number") {
+		return false;
+	}
+	if (typeof cpu.load15 !== "number") {
+		return false;
+	}
+	if (typeof cpu.usage_pct !== "number") {
+		return false;
+	}
+	if (typeof cpu.iowait_pct !== "number") {
+		return false;
+	}
+	if (typeof cpu.steal_pct !== "number") {
+		return false;
+	}
+	if (typeof cpu.count !== "number") {
+		return false;
+	}
 
 	// Memory
-	if (!b.mem || typeof b.mem !== "object") return false;
+	if (!b.mem || typeof b.mem !== "object") {
+		return false;
+	}
 	const mem = b.mem as Record<string, unknown>;
-	if (typeof mem.total_bytes !== "number") return false;
-	if (typeof mem.available_bytes !== "number") return false;
-	if (typeof mem.used_pct !== "number") return false;
+	if (typeof mem.total_bytes !== "number") {
+		return false;
+	}
+	if (typeof mem.available_bytes !== "number") {
+		return false;
+	}
+	if (typeof mem.used_pct !== "number") {
+		return false;
+	}
 
 	// Swap
-	if (!b.swap || typeof b.swap !== "object") return false;
+	if (!b.swap || typeof b.swap !== "object") {
+		return false;
+	}
 	const swap = b.swap as Record<string, unknown>;
-	if (typeof swap.total_bytes !== "number") return false;
-	if (typeof swap.used_bytes !== "number") return false;
-	if (typeof swap.used_pct !== "number") return false;
+	if (typeof swap.total_bytes !== "number") {
+		return false;
+	}
+	if (typeof swap.used_bytes !== "number") {
+		return false;
+	}
+	if (typeof swap.used_pct !== "number") {
+		return false;
+	}
 
 	// Disk and net arrays
-	if (!Array.isArray(b.disk)) return false;
-	if (!Array.isArray(b.net)) return false;
+	if (!Array.isArray(b.disk)) {
+		return false;
+	}
+	if (!Array.isArray(b.net)) {
+		return false;
+	}
 
 	// probe_version is optional for backward compatibility
-	if (b.probe_version !== undefined && typeof b.probe_version !== "string") return false;
+	if (b.probe_version !== undefined && typeof b.probe_version !== "string") {
+		return false;
+	}
 
 	return true;
 }

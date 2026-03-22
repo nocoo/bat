@@ -41,7 +41,7 @@ export async function insertMetricsRaw(
    softnet_processed_delta, softnet_dropped_delta, softnet_time_squeeze_delta,
    conntrack_count, conntrack_max,
    top_processes_json)
-VALUES (${Array(98).fill("?").join(", ")})`,
+VALUES (${new Array(98).fill("?").join(", ")})`,
 		)
 		.bind(
 			hostId,

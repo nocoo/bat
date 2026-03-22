@@ -22,7 +22,9 @@ async function apiRequest(url: string, options?: RequestInit) {
 		const body = await res.json().catch(() => ({ error: "Request failed" }));
 		throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
 	}
-	if (res.status === 204) return null;
+	if (res.status === 204) {
+		return null;
+	}
 	return res.json();
 }
 
@@ -35,7 +37,9 @@ export default function TagsPage() {
 
 	const handleCreate = useCallback(async () => {
 		const name = newName.trim();
-		if (!name || name.length > TAG_MAX_LENGTH) return;
+		if (!name || name.length > TAG_MAX_LENGTH) {
+			return;
+		}
 		setCreating(true);
 		try {
 			await apiRequest("/api/tags", {
@@ -66,7 +70,9 @@ export default function TagsPage() {
 	const handleRename = useCallback(
 		async (id: number) => {
 			const name = editName.trim();
-			if (!name || name.length > TAG_MAX_LENGTH) return;
+			if (!name || name.length > TAG_MAX_LENGTH) {
+				return;
+			}
 			try {
 				await apiRequest(`/api/tags/${id}`, {
 					method: "PUT",

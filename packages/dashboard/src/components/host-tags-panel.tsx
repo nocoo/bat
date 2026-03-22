@@ -17,7 +17,9 @@ async function apiRequest(url: string, options?: RequestInit) {
 		const body = await res.json().catch(() => ({ error: "Request failed" }));
 		throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
 	}
-	if (res.status === 204) return null;
+	if (res.status === 204) {
+		return null;
+	}
 	return res.json();
 }
 
@@ -36,7 +38,9 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 
 	// Tags available to add (not already assigned to this host)
 	const availableTags = useMemo(() => {
-		if (!allTags || !hostTags) return allTags ?? [];
+		if (!(allTags && hostTags)) {
+			return allTags ?? [];
+		}
 		const assigned = new Set(hostTags.map((t) => t.id));
 		return allTags.filter((t) => !assigned.has(t.id));
 	}, [allTags, hostTags]);
@@ -44,7 +48,9 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	// Filtered suggestions based on input
 	const suggestions = useMemo(() => {
 		const q = inputValue.trim().toLowerCase();
-		if (!q) return availableTags;
+		if (!q) {
+			return availableTags;
+		}
 		return availableTags.filter((t) => t.name.includes(q));
 	}, [inputValue, availableTags]);
 
@@ -57,7 +63,9 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	// Check if input could be a new tag name
 	const canCreateNew = useMemo(() => {
 		const q = inputValue.trim();
-		if (!q || q.length > TAG_MAX_LENGTH) return false;
+		if (!q || q.length > TAG_MAX_LENGTH) {
+			return false;
+		}
 		// Don't show "create" if a tag with this name already exists (case-insensitive, matching DB COLLATE NOCASE)
 		const qLower = q.toLowerCase();
 		return !allTags?.some((t) => t.name.toLowerCase() === qLower);
@@ -99,7 +107,9 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 
 	const createAndAdd = useCallback(async () => {
 		const name = inputValue.trim();
-		if (!name || name.length > TAG_MAX_LENGTH) return;
+		if (!name || name.length > TAG_MAX_LENGTH) {
+			return;
+		}
 
 		setAdding(true);
 		try {

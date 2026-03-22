@@ -23,8 +23,12 @@ export async function GET(req: Request) {
 	const writeKey = process.env.BAT_WRITE_KEY;
 
 	const missing: string[] = [];
-	if (!workerUrl) missing.push("BAT_API_URL");
-	if (!writeKey) missing.push("BAT_WRITE_KEY");
+	if (!workerUrl) {
+		missing.push("BAT_API_URL");
+	}
+	if (!writeKey) {
+		missing.push("BAT_WRITE_KEY");
+	}
 	if (missing.length > 0) {
 		return Response.json(
 			{ error: `Missing required environment variables: ${missing.join(", ")}` },

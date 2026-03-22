@@ -12,7 +12,9 @@ interface WebhookConfigRowProps {
 }
 
 function maskToken(token: string): string {
-	if (token.length <= 8) return token;
+	if (token.length <= 8) {
+		return token;
+	}
 	return `${token.slice(0, 4)}${"•".repeat(24)}${token.slice(-4)}`;
 }
 

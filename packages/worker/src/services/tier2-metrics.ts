@@ -50,7 +50,9 @@ LIMIT 1`,
 		.bind(hostId)
 		.first<Tier2Row>();
 
-	if (!row) return null;
+	if (!row) {
+		return null;
+	}
 
 	return {
 		host_id: row.host_id,
@@ -84,7 +86,9 @@ interface Tier2Row {
 }
 
 function safeParse<T>(json: string | null): T | null {
-	if (!json) return null;
+	if (!json) {
+		return null;
+	}
 	try {
 		return JSON.parse(json) as T;
 	} catch {

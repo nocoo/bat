@@ -16,16 +16,24 @@ async function apiRequest(url: string, options?: RequestInit) {
 		const body = await res.json().catch(() => ({ error: "Request failed" }));
 		throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
 	}
-	if (res.status === 204) return null;
+	if (res.status === 204) {
+		return null;
+	}
 	return res.json();
 }
 
 /** Format a unix-seconds timestamp as relative time (e.g. "2h ago", "3d ago"). */
 function relativeTime(unixSeconds: number): string {
 	const diff = Math.floor(Date.now() / 1000) - unixSeconds;
-	if (diff < 60) return "just now";
-	if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-	if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+	if (diff < 60) {
+		return "just now";
+	}
+	if (diff < 3600) {
+		return `${Math.floor(diff / 60)}m ago`;
+	}
+	if (diff < 86400) {
+		return `${Math.floor(diff / 3600)}h ago`;
+	}
 	return `${Math.floor(diff / 86400)}d ago`;
 }
 
@@ -33,13 +41,17 @@ function relativeTime(unixSeconds: number): string {
 function extractAlertingPorts(alerts: AlertItem[]): number[] {
 	const ports: number[] = [];
 	for (const alert of alerts) {
-		if (alert.rule_id !== "public_port" || !alert.message) continue;
+		if (alert.rule_id !== "public_port" || !alert.message) {
+			continue;
+		}
 		// Message format: "Unexpected public ports: 8080, 3000"
 		const match = alert.message.match(/Unexpected public ports:\s*(.+)/);
 		if (match?.[1]) {
 			for (const s of match[1].split(",")) {
 				const n = Number(s.trim());
-				if (Number.isInteger(n) && n > 0) ports.push(n);
+				if (Number.isInteger(n) && n > 0) {
+					ports.push(n);
+				}
 			}
 		}
 	}
@@ -104,7 +116,9 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 
 	const handleManualAdd = useCallback(async () => {
 		const port = Number(portInput.trim());
-		if (!Number.isInteger(port) || port < 1 || port > 65535) return;
+		if (!Number.isInteger(port) || port < 1 || port > 65535) {
+			return;
+		}
 		await addPort(port, reasonInput.trim());
 		setPortInput("");
 		setReasonInput("");

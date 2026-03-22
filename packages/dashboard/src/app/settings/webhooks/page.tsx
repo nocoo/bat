@@ -18,7 +18,9 @@ async function apiRequest(url: string, options?: RequestInit) {
 		const body = await res.json().catch(() => ({ error: "Request failed" }));
 		throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
 	}
-	if (res.status === 204) return null;
+	if (res.status === 204) {
+		return null;
+	}
 	return res.json();
 }
 
@@ -38,7 +40,9 @@ export default function WebhookSettingsPage() {
 	const workerUrl = setupConfig?.worker_url ?? "";
 
 	const handleCreate = useCallback(async () => {
-		if (!selectedHostId) return;
+		if (!selectedHostId) {
+			return;
+		}
 		setCreating(true);
 		setActionError(null);
 		try {

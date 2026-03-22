@@ -49,7 +49,9 @@ async function queryActiveHosts(db: D1Database): Promise<HostRow[]> {
 }
 
 async function queryAlerts(db: D1Database, hostIds: string[]): Promise<AlertRow[]> {
-	if (hostIds.length === 0) return [];
+	if (hostIds.length === 0) {
+		return [];
+	}
 	const placeholders = hostIds.map(() => "?").join(", ");
 	const result = await db
 		.prepare(
@@ -61,7 +63,9 @@ async function queryAlerts(db: D1Database, hostIds: string[]): Promise<AlertRow[
 }
 
 async function queryAllowlist(db: D1Database, hostIds: string[]): Promise<AllowedPortRow[]> {
-	if (hostIds.length === 0) return [];
+	if (hostIds.length === 0) {
+		return [];
+	}
 	const placeholders = hostIds.map(() => "?").join(", ");
 	const result = await db
 		.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
@@ -71,7 +75,9 @@ async function queryAllowlist(db: D1Database, hostIds: string[]): Promise<Allowe
 }
 
 async function queryTags(db: D1Database, hostIds: string[]): Promise<TagRow[]> {
-	if (hostIds.length === 0) return [];
+	if (hostIds.length === 0) {
+		return [];
+	}
 	const placeholders = hostIds.map(() => "?").join(", ");
 	const result = await db
 		.prepare(
@@ -151,13 +157,17 @@ function worstTier(a: HostStatus, b: HostStatus): HostStatus {
 
 async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
 	const isHid = /^[0-9a-f]{8}$/.test(id);
-	if (!isHid) return id;
+	if (!isHid) {
+		return id;
+	}
 
 	const result = await db
 		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
 		.all<{ host_id: string }>();
 	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) return row.host_id;
+		if (hashHostId(row.host_id) === id) {
+			return row.host_id;
+		}
 	}
 	return null;
 }
@@ -226,11 +236,15 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 		if (tagsByHost && tagFilters.length > 0) {
 			const hostTags = tagsByHost.get(host.host_id) ?? [];
 			const hasAll = tagFilters.every((t) => hostTags.includes(t));
-			if (!hasAll) continue;
+			if (!hasAll) {
+				continue;
+			}
 		}
 
 		// Tier filtering
-		if (tierFilter && tier !== tierFilter) continue;
+		if (tierFilter && tier !== tierFilter) {
+			continue;
+		}
 
 		byTier[tier]++;
 		hostItems.push({
@@ -474,13 +488,17 @@ ORDER BY a.triggered_at DESC`,
 		const sev = alert.severity as "critical" | "warning" | "info";
 
 		// Severity filter
-		if (severityFilter && alert.severity !== severityFilter) continue;
+		if (severityFilter && alert.severity !== severityFilter) {
+			continue;
+		}
 
 		// Tag filter (AND logic)
 		const hostTags = tagsByHost.get(alert.host_id) ?? [];
 		if (tagFilters.length > 0) {
 			const hasAll = tagFilters.every((t) => hostTags.includes(t));
-			if (!hasAll) continue;
+			if (!hasAll) {
+				continue;
+			}
 		}
 
 		if (sev in bySeverity) {

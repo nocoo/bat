@@ -45,7 +45,9 @@ async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 	while (Date.now() < deadline) {
 		try {
 			const res = await fetch(url);
-			if (res.ok || res.status === 401 || res.status === 503) return;
+			if (res.ok || res.status === 401 || res.status === 503) {
+				return;
+			}
 		} catch {
 			// Server not ready yet
 		}

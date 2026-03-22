@@ -10,7 +10,9 @@ interface TagFilterBarProps {
 }
 
 export function TagFilterBar({ tags, selected, onToggle }: TagFilterBarProps) {
-	if (tags.length === 0) return null;
+	if (tags.length === 0) {
+		return null;
+	}
 
 	return (
 		<div className="flex items-center gap-1.5 flex-wrap" data-testid="tag-filter-bar">
@@ -30,7 +32,9 @@ export function TagFilterBar({ tags, selected, onToggle }: TagFilterBarProps) {
 				<button
 					type="button"
 					onClick={() => {
-						for (const id of selected) onToggle(id);
+						for (const id of selected) {
+							onToggle(id);
+						}
 					}}
 					className="text-[10px] text-muted-foreground hover:text-foreground ml-1 transition-colors"
 				>

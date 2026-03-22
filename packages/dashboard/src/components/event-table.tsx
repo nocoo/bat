@@ -14,9 +14,15 @@ import { Fragment, useState } from "react";
 function formatTime(unixSeconds: number): string {
 	const now = Math.floor(Date.now() / 1000);
 	const delta = now - unixSeconds;
-	if (delta < 60) return "just now";
-	if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
-	if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+	if (delta < 60) {
+		return "just now";
+	}
+	if (delta < 3600) {
+		return `${Math.floor(delta / 60)}m ago`;
+	}
+	if (delta < 86400) {
+		return `${Math.floor(delta / 3600)}h ago`;
+	}
 	return `${Math.floor(delta / 86400)}d ago`;
 }
 

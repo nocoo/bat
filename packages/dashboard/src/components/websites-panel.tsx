@@ -17,7 +17,9 @@ function WebsiteRow({ site }: { site: DiscoveredWebsite }) {
 }
 
 export function WebsitesPanel({ sites }: { sites: DiscoveredWebsite[] }) {
-	if (sites.length === 0) return null;
+	if (sites.length === 0) {
+		return null;
+	}
 
 	const sorted = [...sites].sort((a, b) => a.domain.localeCompare(b.domain));
 

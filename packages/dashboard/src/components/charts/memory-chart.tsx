@@ -35,7 +35,9 @@ export function MemoryChart({
 	const tickFormatter = getTimeFormatter(rangeSeconds);
 
 	const mwAreas = useMemo(() => {
-		if (!maintenanceWindow || chartData.length === 0) return [];
+		if (!maintenanceWindow || chartData.length === 0) {
+			return [];
+		}
 		const from = chartData[0]?.ts ?? 0;
 		const to = chartData[chartData.length - 1]?.ts ?? 0;
 		return maintenanceAreas(maintenanceWindow.start, maintenanceWindow.end, from, to);
