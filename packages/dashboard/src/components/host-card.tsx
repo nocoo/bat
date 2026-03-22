@@ -10,10 +10,14 @@ import Link from "next/link";
 // ---------------------------------------------------------------------------
 
 function formatUptime(seconds: number | null): string {
-	if (seconds === null || seconds <= 0) return "—";
+	if (seconds === null || seconds <= 0) {
+		return "—";
+	}
 	const days = Math.floor(seconds / 86400);
 	const hours = Math.floor((seconds % 86400) / 3600);
-	if (days > 0) return `${days}d ${hours}h`;
+	if (days > 0) {
+		return `${days}d ${hours}h`;
+	}
 	const minutes = Math.floor((seconds % 3600) / 60);
 	return `${hours}h ${minutes}m`;
 }
@@ -21,31 +25,45 @@ function formatUptime(seconds: number | null): string {
 function formatLastSeen(unixSeconds: number): string {
 	const now = Math.floor(Date.now() / 1000);
 	const delta = now - unixSeconds;
-	if (delta < 60) return "just now";
-	if (delta < 3600) return `${Math.floor(delta / 60)}m ago`;
-	if (delta < 86400) return `${Math.floor(delta / 3600)}h ago`;
+	if (delta < 60) {
+		return "just now";
+	}
+	if (delta < 3600) {
+		return `${Math.floor(delta / 60)}m ago`;
+	}
+	if (delta < 86400) {
+		return `${Math.floor(delta / 3600)}h ago`;
+	}
 	return `${Math.floor(delta / 86400)}d ago`;
 }
 
 /** Truncate PRETTY_NAME — "Ubuntu 22.04.3 LTS" → "Ubuntu 22.04" */
 function shortenOs(os: string | null): string | null {
-	if (!os) return null;
+	if (!os) {
+		return null;
+	}
 	const match = os.match(/^(\S+)\s+(\d+\.\d+)/);
 	return match ? `${match[1]} ${match[2]}` : os;
 }
 
 /** Format bytes to human-readable — 8589934592 → "8 GB" */
 function formatMemory(bytes: number | null): string | null {
-	if (bytes === null) return null;
+	if (bytes === null) {
+		return null;
+	}
 	const gb = bytes / (1024 * 1024 * 1024);
-	if (gb >= 1) return `${Math.round(gb)} GB`;
+	if (gb >= 1) {
+		return `${Math.round(gb)} GB`;
+	}
 	const mb = bytes / (1024 * 1024);
 	return `${Math.round(mb)} MB`;
 }
 
 /** Format CPU topology — "4C/8T" or "4C" if no HT */
 function formatCpuTopology(physical: number | null, logical: number | null): string | null {
-	if (physical === null && logical === null) return null;
+	if (physical === null && logical === null) {
+		return null;
+	}
 	if (physical !== null && logical !== null && physical !== logical) {
 		return `${physical}C/${logical}T`;
 	}
@@ -54,7 +72,9 @@ function formatCpuTopology(physical: number | null, logical: number | null): str
 
 /** Format memory as used/total — "4.8 / 8 GB" */
 function formatMemoryUsage(totalBytes: number | null, usedPct: number | null): string | null {
-	if (totalBytes === null || usedPct === null) return null;
+	if (totalBytes === null || usedPct === null) {
+		return null;
+	}
 	const totalGb = totalBytes / (1024 * 1024 * 1024);
 	const usedGb = (totalGb * usedPct) / 100;
 	if (totalGb >= 1) {
@@ -67,17 +87,26 @@ function formatMemoryUsage(totalBytes: number | null, usedPct: number | null): s
 
 /** Format network rate — bytes/sec → human-readable */
 function formatNetRate(bytesPerSec: number | null): string {
-	if (bytesPerSec === null) return "—";
-	if (bytesPerSec >= 1024 * 1024 * 1024)
+	if (bytesPerSec === null) {
+		return "—";
+	}
+	if (bytesPerSec >= 1024 * 1024 * 1024) {
 		return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
-	if (bytesPerSec >= 1024 * 1024) return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
-	if (bytesPerSec >= 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+	}
+	if (bytesPerSec >= 1024 * 1024) {
+		return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+	}
+	if (bytesPerSec >= 1024) {
+		return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+	}
 	return `${Math.round(bytesPerSec)} B/s`;
 }
 
 /** Format disk usage — just percentage string */
 function formatDiskUsage(pct: number | null): string {
-	if (pct === null) return "—";
+	if (pct === null) {
+		return "—";
+	}
 	return `${Math.round(pct)}%`;
 }
 
@@ -85,24 +114,40 @@ function formatDiskUsage(pct: number | null): string {
 function buildSubtitle(host: HostOverviewItem): string | null {
 	const parts: string[] = [];
 	const os = shortenOs(host.os);
-	if (os) parts.push(os);
-	if (host.arch) parts.push(host.arch);
-	if (host.virtualization) parts.push(host.virtualization.toUpperCase());
-	if (host.public_ip) parts.push(host.public_ip);
+	if (os) {
+		parts.push(os);
+	}
+	if (host.arch) {
+		parts.push(host.arch);
+	}
+	if (host.virtualization) {
+		parts.push(host.virtualization.toUpperCase());
+	}
+	if (host.public_ip) {
+		parts.push(host.public_ip);
+	}
 	return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 /** Color class for resource bar based on value threshold */
 function getBarColor(value: number): string {
-	if (value >= 80) return "bg-destructive";
-	if (value >= 60) return "bg-warning";
+	if (value >= 80) {
+		return "bg-destructive";
+	}
+	if (value >= 60) {
+		return "bg-warning";
+	}
 	return "bg-success";
 }
 
 /** Text color class matching bar color */
 function getValueColor(value: number): string {
-	if (value >= 80) return "text-destructive";
-	if (value >= 60) return "text-warning";
+	if (value >= 80) {
+		return "text-destructive";
+	}
+	if (value >= 60) {
+		return "text-warning";
+	}
 	return "text-success";
 }
 
@@ -111,9 +156,15 @@ function getValueColor(value: number): string {
 // ---------------------------------------------------------------------------
 
 function statusDotColor(status: string): string {
-	if (status === "healthy") return "bg-success";
-	if (status === "warning") return "bg-warning";
-	if (status === "critical") return "bg-destructive";
+	if (status === "healthy") {
+		return "bg-success";
+	}
+	if (status === "warning") {
+		return "bg-warning";
+	}
+	if (status === "critical") {
+		return "bg-destructive";
+	}
 	return "bg-muted-foreground";
 }
 
@@ -158,7 +209,9 @@ function ResourceBar({
 
 /** Build an SVG polyline points string from sparkline data, mapping 0–100 → height–0 */
 function toPolyline(data: SparklinePoint[], totalSlots: number, height: number): string {
-	if (data.length === 0) return "";
+	if (data.length === 0) {
+		return "";
+	}
 	return data
 		.map((p, i) => {
 			const x = totalSlots > 1 ? (i / (totalSlots - 1)) * 100 : 50;
@@ -179,7 +232,9 @@ function SparklineChart({
 	net: SparklinePoint[] | null;
 }) {
 	const maxLen = Math.max(cpu?.length ?? 0, mem?.length ?? 0, net?.length ?? 0);
-	if (maxLen === 0) return null;
+	if (maxLen === 0) {
+		return null;
+	}
 
 	const height = 32;
 

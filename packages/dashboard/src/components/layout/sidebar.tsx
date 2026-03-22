@@ -167,7 +167,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 
 						{/* Expand toggle */}
 						<Tooltip>
-							<TooltipTrigger asChild>
+							<TooltipTrigger asChild={true}>
 								<button
 									type="button"
 									onClick={toggle}
@@ -189,7 +189,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 
 								return (
 									<Tooltip key={item.href}>
-										<TooltipTrigger asChild>
+										<TooltipTrigger asChild={true}>
 											<Link
 												href={item.href}
 												onClick={handleNavigate}
@@ -214,7 +214,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 						{/* User avatar + sign out */}
 						<div className="py-3 flex justify-center w-full">
 							<Tooltip>
-								<TooltipTrigger asChild>
+								<TooltipTrigger asChild={true}>
 									<button
 										type="button"
 										onClick={() => signOut({ callbackUrl: "/login" })}
@@ -298,7 +298,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 									<p className="text-xs text-muted-foreground truncate">{userEmail}</p>
 								</div>
 								<Tooltip>
-									<TooltipTrigger asChild>
+									<TooltipTrigger asChild={true}>
 										<button
 											type="button"
 											onClick={() => signOut({ callbackUrl: "/login" })}

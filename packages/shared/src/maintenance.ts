@@ -6,7 +6,9 @@
  * Requires exactly 2-digit hour and 2-digit minute, zero-padded.
  */
 export function isValidTimeHHMM(time: string): boolean {
-	if (!/^\d{2}:\d{2}$/.test(time)) return false;
+	if (!/^\d{2}:\d{2}$/.test(time)) {
+		return false;
+	}
 	const [h, m] = time.split(":").map(Number);
 	return h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }

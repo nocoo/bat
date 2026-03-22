@@ -12,14 +12,18 @@ import type { AppEnv } from "../types.js";
  */
 async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
 	const isHid = /^[0-9a-f]{8}$/.test(id);
-	if (!isHid) return id;
+	if (!isHid) {
+		return id;
+	}
 
 	// Scan active hosts and match by hash
 	const result = await db
 		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
 		.all<{ host_id: string }>();
 	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) return row.host_id;
+		if (hashHostId(row.host_id) === id) {
+			return row.host_id;
+		}
 	}
 	return null;
 }
@@ -29,7 +33,7 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 	const fromStr = c.req.query("from");
 	const toStr = c.req.query("to");
 
-	if (!fromStr || !toStr) {
+	if (!(fromStr && toStr)) {
 		return c.json({ error: "Missing required query params: from, to" }, 400);
 	}
 

@@ -27,7 +27,9 @@ async function resolveHostId(
 		.prepare("SELECT host_id, is_active FROM hosts")
 		.all<{ host_id: string; is_active: number }>();
 	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) return row;
+		if (hashHostId(row.host_id) === id) {
+			return row;
+		}
 	}
 	return null;
 }
@@ -53,7 +55,7 @@ export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 			maintenance_reason: string | null;
 		}>();
 
-	if (!row?.maintenance_start || !row?.maintenance_end) {
+	if (!(row?.maintenance_start && row?.maintenance_end)) {
 		return c.json(null);
 	}
 
@@ -86,7 +88,7 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 
 	const { start, end, reason } = body;
 
-	if (!start || !end) {
+	if (!(start && end)) {
 		return c.json({ error: "start and end are required" }, 400);
 	}
 

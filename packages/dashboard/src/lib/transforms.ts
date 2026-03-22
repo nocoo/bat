@@ -101,11 +101,15 @@ interface DiskJsonEntry {
  * Returns parsed disk entries or empty array on parse failure.
  */
 export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
-	if (data.length === 0) return [];
+	if (data.length === 0) {
+		return [];
+	}
 
 	// Use last data point for current disk status
 	const latest = data[data.length - 1];
-	if (!latest?.disk_json) return [];
+	if (!latest?.disk_json) {
+		return [];
+	}
 
 	try {
 		const entries = JSON.parse(latest.disk_json) as DiskJsonEntry[];
@@ -148,18 +152,32 @@ export function getTimeFormatter(rangeSeconds: number): (ts: number) => string {
 
 /** Format bytes/sec to human readable */
 export function formatBytesRate(bytesPerSec: number): string {
-	if (bytesPerSec < 1024) return `${bytesPerSec.toFixed(0)} B/s`;
-	if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
-	if (bytesPerSec < 1024 * 1024 * 1024) return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+	if (bytesPerSec < 1024) {
+		return `${bytesPerSec.toFixed(0)} B/s`;
+	}
+	if (bytesPerSec < 1024 * 1024) {
+		return `${(bytesPerSec / 1024).toFixed(1)} KB/s`;
+	}
+	if (bytesPerSec < 1024 * 1024 * 1024) {
+		return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+	}
 	return `${(bytesPerSec / (1024 * 1024 * 1024)).toFixed(1)} GB/s`;
 }
 
 /** Format bytes to human readable */
 export function formatBytes(bytes: number): string {
-	if (bytes < 1024) return `${bytes} B`;
-	if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-	if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-	if (bytes < 1024 * 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+	if (bytes < 1024) {
+		return `${bytes} B`;
+	}
+	if (bytes < 1024 * 1024) {
+		return `${(bytes / 1024).toFixed(1)} KB`;
+	}
+	if (bytes < 1024 * 1024 * 1024) {
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+	}
+	if (bytes < 1024 * 1024 * 1024 * 1024) {
+		return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+	}
 	return `${(bytes / (1024 * 1024 * 1024 * 1024)).toFixed(1)} TB`;
 }
 
@@ -174,7 +192,9 @@ export interface PsiChartPoint {
 /** Transform PSI avg60 values for chart display. Returns empty if no PSI data present. */
 export function transformPsiData(data: MetricsDataPoint[]): PsiChartPoint[] {
 	const hasAny = data.some((d) => d.psi_cpu_some_avg60 != null);
-	if (!hasAny) return [];
+	if (!hasAny) {
+		return [];
+	}
 
 	return data.map((d) => ({
 		ts: d.ts,
@@ -224,7 +244,9 @@ export function transformDiskIoData(
 	resolution: "raw" | "hourly" = "raw",
 ): DiskIoChartPoint[] {
 	const hasAny = data.some((d) => d.disk_io_json != null);
-	if (!hasAny) return [];
+	if (!hasAny) {
+		return [];
+	}
 
 	return data.map((d) => {
 		let readIops = 0;
@@ -266,7 +288,9 @@ export interface TcpChartPoint {
 /** Transform TCP connection state data. Returns empty if no TCP data present. */
 export function transformTcpData(data: MetricsDataPoint[]): TcpChartPoint[] {
 	const hasAny = data.some((d) => d.tcp_established != null);
-	if (!hasAny) return [];
+	if (!hasAny) {
+		return [];
+	}
 
 	return data.map((d) => ({
 		ts: d.ts,
@@ -301,7 +325,9 @@ export interface TopProcessEntry {
  * Returns empty array if no data or hourly resolution (not applicable).
  */
 export function transformTopProcessesData(data: MetricsDataPoint[]): TopProcessEntry[] {
-	if (data.length === 0) return [];
+	if (data.length === 0) {
+		return [];
+	}
 
 	// Find last data point that has top_processes_json
 	for (let i = data.length - 1; i >= 0; i--) {
@@ -338,8 +364,12 @@ export function transformTopProcessesData(data: MetricsDataPoint[]): TopProcessE
 
 /** Format seconds into human-readable uptime (e.g. "2d 3h", "15m", "30s") */
 export function formatUptime(seconds: number): string {
-	if (seconds < 60) return `${seconds}s`;
-	if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+	if (seconds < 60) {
+		return `${seconds}s`;
+	}
+	if (seconds < 3600) {
+		return `${Math.floor(seconds / 60)}m`;
+	}
 	if (seconds < 86400) {
 		const h = Math.floor(seconds / 3600);
 		const m = Math.floor((seconds % 3600) / 60);

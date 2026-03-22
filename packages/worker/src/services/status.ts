@@ -10,9 +10,13 @@ interface AlertRow {
 
 /** Parse port numbers from a public_port alert message. */
 function parsePublicPorts(message: string | null | undefined): number[] {
-	if (!message) return [];
+	if (!message) {
+		return [];
+	}
 	const match = message.match(/Unexpected public ports:\s*(.+)/);
-	if (!match?.[1]) return [];
+	if (!match?.[1]) {
+		return [];
+	}
 	return match[1]
 		.split(",")
 		.map((s) => Number(s.trim()))
@@ -51,10 +55,14 @@ export function deriveHostStatus(
 
 	// Check alert severities
 	const hasCritical = alerts.some((a) => a.severity === "critical");
-	if (hasCritical) return "critical";
+	if (hasCritical) {
+		return "critical";
+	}
 
 	const hasWarning = alerts.some((a) => {
-		if (a.severity !== "warning") return false;
+		if (a.severity !== "warning") {
+			return false;
+		}
 		// If this is a public_port alert and we have an allowlist, check if
 		// all ports in the message are allowed — if so, skip this warning.
 		if (a.rule_id === "public_port" && allowedPorts && allowedPorts.size > 0) {
@@ -65,7 +73,9 @@ export function deriveHostStatus(
 		}
 		return true;
 	});
-	if (hasWarning) return "warning";
+	if (hasWarning) {
+		return "warning";
+	}
 
 	return "healthy";
 }

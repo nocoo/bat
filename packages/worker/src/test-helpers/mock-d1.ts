@@ -72,8 +72,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 	async first<T = Record<string, unknown>>(colName?: string): Promise<T | null> {
 		const stmt = this.#db.prepare(this.#sql);
 		const row = stmt.get(...this.#bindings) as Record<string, unknown> | null;
-		if (!row) return null;
-		if (colName) return (row[colName] as T) ?? null;
+		if (!row) {
+			return null;
+		}
+		if (colName) {
+			return (row[colName] as T) ?? null;
+		}
 		return row as T;
 	}
 

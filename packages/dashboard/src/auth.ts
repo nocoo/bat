@@ -94,7 +94,7 @@ function createRealAuth() {
 		callbacks: {
 			async signIn({ user }: { user: { email?: string } }) {
 				const email = user.email?.toLowerCase();
-				if (!email || !allowedEmails.includes(email)) {
+				if (!(email && allowedEmails.includes(email))) {
 					return false;
 				}
 				return true;

@@ -11,14 +11,22 @@ const CLOCK_SKEW_MAX_SECONDS = 300;
 /** Validate the Tier 2 payload — only host_id and timestamp are required,
  *  all section fields are optional. */
 function validateTier2Payload(body: unknown): body is Tier2Payload {
-	if (!body || typeof body !== "object") return false;
+	if (!body || typeof body !== "object") {
+		return false;
+	}
 	const b = body as Record<string, unknown>;
 
-	if (typeof b.host_id !== "string" || b.host_id.length === 0) return false;
-	if (typeof b.timestamp !== "number") return false;
+	if (typeof b.host_id !== "string" || b.host_id.length === 0) {
+		return false;
+	}
+	if (typeof b.timestamp !== "number") {
+		return false;
+	}
 
 	// probe_version is optional
-	if (b.probe_version !== undefined && typeof b.probe_version !== "string") return false;
+	if (b.probe_version !== undefined && typeof b.probe_version !== "string") {
+		return false;
+	}
 
 	// All section fields are optional — no further validation needed
 	return true;

@@ -5,7 +5,9 @@ import type { AppEnv } from "../types.js";
 
 /** Lightweight validation — checks required fields exist and are correct types */
 function validateIdentityPayload(body: unknown): body is IdentityPayload {
-	if (!body || typeof body !== "object") return false;
+	if (!body || typeof body !== "object") {
+		return false;
+	}
 	const b = body as Record<string, unknown>;
 	return (
 		typeof b.host_id === "string" &&

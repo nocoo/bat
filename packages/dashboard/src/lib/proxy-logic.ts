@@ -13,7 +13,7 @@ export async function proxyToWorker(
 	const apiUrl = process.env.BAT_API_URL;
 	const readKey = process.env.BAT_READ_KEY;
 
-	if (!apiUrl || !readKey) {
+	if (!(apiUrl && readKey)) {
 		return Response.json(
 			{ error: "Server misconfigured: missing BAT_API_URL or BAT_READ_KEY" },
 			{ status: 502 },
@@ -64,7 +64,7 @@ export async function proxyToWorkerWithBody(
 	const apiKey = useWriteKey ? process.env.BAT_WRITE_KEY : process.env.BAT_READ_KEY;
 	const keyName = useWriteKey ? "BAT_WRITE_KEY" : "BAT_READ_KEY";
 
-	if (!apiUrl || !apiKey) {
+	if (!(apiUrl && apiKey)) {
 		return Response.json(
 			{ error: `Server misconfigured: missing BAT_API_URL or ${keyName}` },
 			{ status: 502 },

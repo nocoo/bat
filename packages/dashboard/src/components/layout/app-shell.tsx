@@ -74,7 +74,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 							<SheetTitle>Navigation Menu</SheetTitle>
 							<SheetDescription>Browse bat dashboard pages</SheetDescription>
 						</SheetHeader>
-						<Sidebar mobile />
+						<Sidebar mobile={true} />
 					</SheetContent>
 				</Sheet>
 			)}

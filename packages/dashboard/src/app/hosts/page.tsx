@@ -67,9 +67,15 @@ export default function HostsPage() {
 
 	// Filter hosts by selected tags (AND logic)
 	const filteredHosts = useMemo(() => {
-		if (!hosts) return [];
-		if (selectedTagIds.length === 0) return hosts;
-		if (!hostTagsMap) return hosts;
+		if (!hosts) {
+			return [];
+		}
+		if (selectedTagIds.length === 0) {
+			return hosts;
+		}
+		if (!hostTagsMap) {
+			return hosts;
+		}
 
 		return hosts.filter((host) => {
 			const tags = hostTagsMap[host.host_id] ?? [];

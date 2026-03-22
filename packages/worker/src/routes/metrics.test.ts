@@ -19,8 +19,12 @@ function createApp(db: D1Database) {
 
 function get(app: Hono<AppEnv>, hostId: string, from?: number, to?: number) {
 	const params = new URLSearchParams();
-	if (from !== undefined) params.set("from", String(from));
-	if (to !== undefined) params.set("to", String(to));
+	if (from !== undefined) {
+		params.set("from", String(from));
+	}
+	if (to !== undefined) {
+		params.set("to", String(to));
+	}
 	const qs = params.toString();
 	const url = `http://localhost/api/hosts/${hostId}/metrics${qs ? `?${qs}` : ""}`;
 	return app.request(new Request(url));

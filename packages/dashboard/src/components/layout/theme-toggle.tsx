@@ -9,12 +9,16 @@ type Theme = "light" | "dark" | "system";
 const THEME_CHANGE_EVENT = "theme-change";
 
 function getStoredTheme(): Theme {
-	if (typeof window === "undefined") return "system";
+	if (typeof window === "undefined") {
+		return "system";
+	}
 	return (localStorage.getItem("theme") as Theme) || "system";
 }
 
 function getSystemTheme(): "light" | "dark" {
-	if (typeof window === "undefined") return "light";
+	if (typeof window === "undefined") {
+		return "light";
+	}
 	return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
@@ -58,9 +62,13 @@ export function ThemeToggle() {
 
 	const cycleTheme = useCallback(() => {
 		let next: Theme;
-		if (theme === "system") next = "light";
-		else if (theme === "light") next = "dark";
-		else next = "system";
+		if (theme === "system") {
+			next = "light";
+		} else if (theme === "light") {
+			next = "dark";
+		} else {
+			next = "system";
+		}
 		applyTheme(next);
 	}, [theme]);
 

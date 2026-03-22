@@ -16,7 +16,9 @@ async function apiRequest(url: string, options?: RequestInit) {
 		const body = await res.json().catch(() => ({ error: "Request failed" }));
 		throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
 	}
-	if (res.status === 204) return null;
+	if (res.status === 204) {
+		return null;
+	}
 	return res.json();
 }
 

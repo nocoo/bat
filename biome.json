@@ -6,17 +6,39 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"all": true,
 			"correctness": {
 				"noUnusedImports": "error",
-				"noUnusedVariables": "error"
+				"noUnusedVariables": "error",
+				"noNodejsModules": "off",
+				"useImportExtensions": "off",
+				"noUndeclaredDependencies": "off",
+				"noUndeclaredVariables": "off"
 			},
 			"security": {
-				"noDangerouslySetInnerHtml": "warn"
+				"noDangerouslySetInnerHtml": "error"
 			},
 			"style": {
-				"noNonNullAssertion": "warn",
-				"useConst": "error"
+				"noNonNullAssertion": "error",
+				"useConst": "error",
+				"useNamingConvention": "off",
+				"noDefaultExport": "off",
+				"useFilenamingConvention": "off"
+			},
+			"complexity": {
+				"noExcessiveCognitiveComplexity": "off"
+			},
+			"suspicious": {
+				"noConsole": "off",
+				"noReactSpecificProps": "off",
+				"useAwait": "off"
+			},
+			"performance": {
+				"useTopLevelRegex": "off",
+				"noBarrelFile": "off"
+			},
+			"nursery": {
+				"all": false
 			}
 		}
 	},

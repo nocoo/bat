@@ -65,7 +65,9 @@ interface SparklineRow {
 
 /** Parse disk_json to find root mount used_pct */
 function extractRootDiskPct(diskJson: string | null): number | null {
-	if (!diskJson) return null;
+	if (!diskJson) {
+		return null;
+	}
 	try {
 		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
 		const root = disks.find((d) => d.mount === "/");
@@ -77,7 +79,9 @@ function extractRootDiskPct(diskJson: string | null): number | null {
 
 /** Sum net_json rx/tx rates across all interfaces */
 function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
-	if (!netJson) return { rx: null, tx: null };
+	if (!netJson) {
+		return { rx: null, tx: null };
+	}
 	try {
 		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
 		let rx = 0;
@@ -198,9 +202,15 @@ ORDER BY host_id, hour_ts ASC`,
 			entry = { cpu: [], mem: [], net: [] };
 			sparklinesByHost.set(row.host_id, entry);
 		}
-		if (row.cpu !== null) entry.cpu.push({ ts: row.ts, v: row.cpu });
-		if (row.mem !== null) entry.mem.push({ ts: row.ts, v: row.mem });
-		if (row.net !== null) entry.net.push({ ts: row.ts, v: row.net });
+		if (row.cpu !== null) {
+			entry.cpu.push({ ts: row.ts, v: row.cpu });
+		}
+		if (row.mem !== null) {
+			entry.mem.push({ ts: row.ts, v: row.mem });
+		}
+		if (row.net !== null) {
+			entry.net.push({ ts: row.ts, v: row.net });
+		}
 	}
 
 	// 6. Build response
@@ -222,7 +232,7 @@ ORDER BY host_id, hour_ts ASC`,
 
 		// Normalize net sparkline (bytes/sec) to 0–100 using max-normalization
 		let netSparkline: SparklinePoint[] | null = null;
-		if (sparklines?.net.length) {
+		if (sparklines && sparklines.net.length > 0) {
 			const maxNet = Math.max(...sparklines.net.map((p) => p.v));
 			netSparkline =
 				maxNet > 0
@@ -256,8 +266,8 @@ ORDER BY host_id, hour_ts ASC`,
 			disk_root_used_pct: diskRootPct,
 			net_rx_rate: netRates.rx,
 			net_tx_rate: netRates.tx,
-			cpu_sparkline: sparklines?.cpu.length ? sparklines.cpu : null,
-			mem_sparkline: sparklines?.mem.length ? sparklines.mem : null,
+			cpu_sparkline: sparklines && sparklines.cpu.length > 0 ? sparklines.cpu : null,
+			mem_sparkline: sparklines && sparklines.mem.length > 0 ? sparklines.mem : null,
 			net_sparkline: netSparkline,
 			maintenance_start: host.maintenance_start,
 			maintenance_end: host.maintenance_end,

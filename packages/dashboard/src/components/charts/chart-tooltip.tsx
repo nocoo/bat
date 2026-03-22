@@ -29,7 +29,9 @@ export function ChartTooltip({
 	labelFormatter = defaultLabelFormatter,
 	valueFormatter = defaultValueFormatter,
 }: ChartTooltipProps) {
-	if (!active || !payload?.length) return null;
+	if (!(active && payload && payload.length > 0)) {
+		return null;
+	}
 
 	return (
 		<div className="rounded-[var(--radius-widget)] border border-border bg-card p-2.5 shadow-sm">

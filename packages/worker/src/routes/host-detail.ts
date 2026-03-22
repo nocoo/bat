@@ -55,19 +55,25 @@ interface AlertRow {
  */
 async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
 	const isHid = /^[0-9a-f]{8}$/.test(id);
-	if (!isHid) return id;
+	if (!isHid) {
+		return id;
+	}
 
 	const result = await db
 		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
 		.all<{ host_id: string }>();
 	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) return row.host_id;
+		if (hashHostId(row.host_id) === id) {
+			return row.host_id;
+		}
 	}
 	return null;
 }
 
 function safeParse<T>(json: string | null): T | null {
-	if (!json) return null;
+	if (!json) {
+		return null;
+	}
 	try {
 		return JSON.parse(json) as T;
 	} catch {
@@ -77,7 +83,9 @@ function safeParse<T>(json: string | null): T | null {
 
 /** Parse disk_json to find root mount used_pct */
 function extractRootDiskPct(diskJson: string | null): number | null {
-	if (!diskJson) return null;
+	if (!diskJson) {
+		return null;
+	}
 	try {
 		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
 		const root = disks.find((d) => d.mount === "/");
@@ -89,7 +97,9 @@ function extractRootDiskPct(diskJson: string | null): number | null {
 
 /** Sum net_json rx/tx rates across all interfaces */
 function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
-	if (!netJson) return { rx: null, tx: null };
+	if (!netJson) {
+		return { rx: null, tx: null };
+	}
 	try {
 		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
 		let rx = 0;
