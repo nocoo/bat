@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.10.2 (2026-03-23)
+
+### Features
+
+- **Six-dimension quality system** (docs/18) — Upgrade from four-layer testing to six-dimension quality system (L1/L2/L3 + G1/G2 + D1), Tier C → S roadmap with 12 atomic commits
+- **G2 security gate** — Add osv-scanner (dependency CVE scanning for pnpm-lock.yaml + Cargo.lock) and gitleaks (secrets leak detection) as pre-push gate, running in parallel with L2 E2E tests
+- **D1 test isolation** — Wire `bat-db-test` as `[env.test]` D1 binding in wrangler.toml, add `verify-test-bindings.ts` isolation guard and `_test_marker` migration
+- **Unicode tag names** — Allow unicode characters in tag names, enforce length-only constraint
+
+### Refactoring
+
+- **Biome strict mode** — Upgrade from `recommended: true` to `all: true` with explicit opt-outs, achieving zero errors and zero warnings across 47+ files
+- **lint-staged** — Replace full-repo `biome check .` with incremental staged-file-only lint via lint-staged
+- **Coverage gate hardened** — Fix `check-coverage.sh`: fail on missing data (was silently passing), check line coverage instead of function coverage, add dashboard lib-only mode (UI thin shells exempt)
+
+### Fixes
+
+- **11 dependency CVEs** — Upgrade next 16.1.6 → 16.2.1, add pnpm override for undici ≥7.24.0
+- **Dashboard coverage** — Add 82 lib/hooks tests (975 lines) achieving 100% lib coverage for dashboard
+
+### Tests
+
+- Comprehensive dashboard lib + hooks coverage tests (82 tests, 219 assertions) covering all 18 target files
+- Rust coverage maintained at 99.1% (≥95% threshold)
+
 ## v0.10.1 (2026-03-21)
 
 ### Features
