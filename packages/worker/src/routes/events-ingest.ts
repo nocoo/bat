@@ -19,7 +19,7 @@ function extractBearerToken(header: string | undefined): string | null {
 	if (parts.length !== 2 || parts[0] !== "Bearer") {
 		return null;
 	}
-	return parts[1];
+	return parts[1] ?? null;
 }
 
 export async function eventsIngestRoute(c: Context<AppEnv>) {
