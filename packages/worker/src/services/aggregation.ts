@@ -74,6 +74,8 @@ async function aggregateHostHour(
 	}
 
 	const n = rows.length;
+	// Safe: rows.length > 0 guaranteed by early return above
+	const lastRow = rows[rows.length - 1] as RawRow;
 
 	// CPU aggregates
 	const cpuUsageAvg = avg(rows.map((r) => r.cpu_usage_pct));
@@ -85,13 +87,13 @@ async function aggregateHostHour(
 	const cpuLoad15Avg = avg(rows.map((r) => r.cpu_load15));
 
 	// Memory aggregates
-	const memTotal = rows[rows.length - 1].mem_total; // last value
+	const memTotal = lastRow.mem_total; // last value
 	const memAvailableMin = min(rows.map((r) => r.mem_available));
 	const memUsedPctAvg = avg(rows.map((r) => r.mem_used_pct));
 	const memUsedPctMax = max(rows.map((r) => r.mem_used_pct));
 
 	// Swap aggregates
-	const swapTotal = rows[rows.length - 1].swap_total;
+	const swapTotal = lastRow.swap_total;
 	const swapUsedMax = max(rows.map((r) => r.swap_used));
 	const swapUsedPctAvg = avg(rows.map((r) => r.swap_used_pct));
 	const swapUsedPctMax = max(rows.map((r) => r.swap_used_pct));
@@ -100,7 +102,7 @@ async function aggregateHostHour(
 	const uptimeMin = min(rows.map((r) => r.uptime_seconds));
 
 	// Disk: use the last sample's disk_json
-	const diskJson = rows[rows.length - 1].disk_json;
+	const diskJson = lastRow.disk_json;
 
 	// Network: parse net_json, sum across interfaces per sample, then avg/max
 	const netAgg = aggregateNetwork(rows);
@@ -150,7 +152,7 @@ async function aggregateHostHour(
 	// File descriptors: avg + max for allocated, last for max
 	const fdAllocatedAvg = avgNullable(rows.map((r) => r.fd_allocated));
 	const fdAllocatedMax = maxNullable(rows.map((r) => r.fd_allocated));
-	const fdMaxLast = rows[rows.length - 1].fd_max;
+	const fdMaxLast = lastRow.fd_max;
 
 	// --- Signal expansion aggregates (stored as ext_json) ---
 	// D1 has a 100-column-per-table limit; these go into a single JSON column.
@@ -319,6 +321,8 @@ ON CONFLICT(host_id, hour_ts) DO UPDATE SET
  * with the metrics read route, which unpacks ext_json into MetricsDataPoint.
  */
 function buildExtJson(rows: RawRow[]): Record<string, number | null> | null {
+	// Safe: caller guarantees rows.length > 0
+	const lastRow = rows[rows.length - 1] as RawRow;
 	const ext: Record<string, number | null> = {
 		interrupts_sec_avg: avgNullable(rows.map((r) => r.interrupts_sec)),
 		interrupts_sec_max: maxNullable(rows.map((r) => r.interrupts_sec)),
@@ -340,7 +344,7 @@ function buildExtJson(rows: RawRow[]): Record<string, number | null> | null {
 		mem_slab_unreclaim_avg: avgNullable(rows.map((r) => r.mem_slab_unreclaim)),
 		mem_committed_as_avg: avgNullable(rows.map((r) => r.mem_committed_as)),
 		mem_committed_as_max: maxNullable(rows.map((r) => r.mem_committed_as)),
-		mem_commit_limit: rows[rows.length - 1].mem_commit_limit,
+		mem_commit_limit: lastRow.mem_commit_limit,
 		mem_hw_corrupted_max: maxNullable(rows.map((r) => r.mem_hw_corrupted)),
 		swap_in_sec_avg: avgNullable(rows.map((r) => r.swap_in_sec)),
 		swap_in_sec_max: maxNullable(rows.map((r) => r.swap_in_sec)),
@@ -397,7 +401,7 @@ function buildExtJson(rows: RawRow[]): Record<string, number | null> | null {
 		softnet_time_squeeze_delta_sum: sumNullable(rows.map((r) => r.softnet_time_squeeze_delta)),
 		conntrack_count_avg: avgNullable(rows.map((r) => r.conntrack_count)),
 		conntrack_count_max: maxNullable(rows.map((r) => r.conntrack_count)),
-		conntrack_max: rows[rows.length - 1].conntrack_max,
+		conntrack_max: lastRow.conntrack_max,
 	};
 
 	// Return null if every value is null (no signal expansion data)

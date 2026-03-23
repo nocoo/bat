@@ -246,7 +246,7 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 			continue;
 		}
 
-		byTier[tier]++;
+		byTier[tier] = (byTier[tier] ?? 0) + 1;
 		hostItems.push({
 			host_id: host.host_id,
 			hostname: host.hostname,

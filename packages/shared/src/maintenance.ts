@@ -9,7 +9,9 @@ export function isValidTimeHHMM(time: string): boolean {
 	if (!/^\d{2}:\d{2}$/.test(time)) {
 		return false;
 	}
-	const [h, m] = time.split(":").map(Number);
+	const parts = time.split(":");
+	const h = Number(parts[0]);
+	const m = Number(parts[1]);
 	return h >= 0 && h <= 23 && m >= 0 && m <= 59;
 }
 
