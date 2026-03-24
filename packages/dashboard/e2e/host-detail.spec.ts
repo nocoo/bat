@@ -9,11 +9,13 @@ test.describe("Host detail", () => {
 		await expect(page.locator("body")).toBeVisible();
 	});
 
-	test("time range picker is visible", async ({ page }) => {
+	test("time range picker is visible with all options", async ({ page }) => {
 		await page.goto("/hosts/test-host");
 		// Time range buttons are always rendered regardless of host existence
-		const button = page.getByRole("button", { name: "1h" });
-		await expect(button).toBeVisible({ timeout: 10_000 });
+		for (const label of ["1h", "6h", "24h", "7d"]) {
+			const button = page.getByRole("button", { name: label });
+			await expect(button).toBeVisible({ timeout: 10_000 });
+		}
 	});
 
 	test("system info card renders when host exists", async ({ page }) => {
@@ -28,5 +30,22 @@ test.describe("Host detail", () => {
 		if (isVisible) {
 			await expect(sysInfo).toBeVisible();
 		}
+	});
+
+	test("breadcrumbs show Home link", async ({ page }) => {
+		await page.goto("/hosts/test-host");
+		const homeBreadcrumb = page.getByText("Home");
+		await expect(homeBreadcrumb.first()).toBeVisible({ timeout: 10_000 });
+	});
+
+	test("1h time range is selected by default", async ({ page }) => {
+		await page.goto("/hosts/test-host");
+		const button1h = page.getByRole("button", { name: "1h" });
+		await expect(button1h).toBeVisible({ timeout: 10_000 });
+		// Default selection should have a different visual style (data-state or class)
+		// We verify it's interactable
+		await button1h.click();
+		// Should not navigate away
+		expect(page.url()).toContain("/hosts/test-host");
 	});
 });

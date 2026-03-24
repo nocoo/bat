@@ -20,4 +20,20 @@ test.describe("Hosts overview", () => {
 		const content = page.locator('[class*="card"], [class*="skeleton"]');
 		await expect(content.first()).toBeVisible({ timeout: 10_000 });
 	});
+
+	test("shows host cards, empty state, or error state", async ({ page }) => {
+		await page.goto("/hosts");
+		// With real Worker backend, hosts page may show host cards,
+		// empty state ("No hosts registered"), or error state
+		const hostCard = page.locator('[class*="card"]');
+		const emptyState = page.getByText("No hosts registered");
+		const errorState = page.getByText("Failed to load hosts");
+		await expect(hostCard.first().or(emptyState).or(errorState)).toBeVisible({ timeout: 10_000 });
+	});
+
+	test("breadcrumb shows Hosts", async ({ page }) => {
+		await page.goto("/hosts");
+		const breadcrumb = page.getByText("Hosts");
+		await expect(breadcrumb.first()).toBeVisible({ timeout: 10_000 });
+	});
 });
