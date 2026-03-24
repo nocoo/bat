@@ -93,7 +93,6 @@ pub fn read_snmp_from(path: &str) -> Option<SnmpCounters> {
 
 /// Read SNMP counters from `/proc/net/snmp`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_snmp() -> Option<SnmpCounters> {
     read_snmp_from("/proc/net/snmp")
 }

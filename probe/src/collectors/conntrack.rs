@@ -5,7 +5,6 @@
 
 /// Connection tracking state.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ConntrackState {
     pub count: u64,
     pub max: u64,
@@ -27,7 +26,6 @@ pub fn read_conntrack_from(dir: &str) -> Option<ConntrackState> {
 
 /// Read conntrack state from `/proc/sys/net/netfilter/`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_conntrack() -> Option<ConntrackState> {
     read_conntrack_from("/proc/sys/net/netfilter")
 }

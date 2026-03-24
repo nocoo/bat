@@ -17,7 +17,6 @@ pub struct NetCounters {
 
 /// Computed network metrics for a single interface.
 #[derive(Debug)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct NetInfo {
     pub iface: String,
     pub rx_bytes_rate: f64,

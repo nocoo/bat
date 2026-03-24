@@ -5,7 +5,6 @@
 
 /// Raw counters from a single `/proc/diskstats` line.
 #[derive(Debug, Clone, Default)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct DiskIoCounters {
     pub device: String,
     pub reads_completed: u64,

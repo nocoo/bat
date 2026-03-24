@@ -69,7 +69,6 @@ pub fn read_netstat_from(path: &str) -> Option<NetstatCounters> {
 
 /// Read netstat counters from `/proc/net/netstat`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_netstat() -> Option<NetstatCounters> {
     read_netstat_from("/proc/net/netstat")
 }

@@ -1,6 +1,5 @@
 /// Parsed memory values from `/proc/meminfo`, converted to bytes.
 #[derive(Debug)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct MemInfo {
     pub mem_total: u64,
     pub mem_available: u64,

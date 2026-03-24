@@ -8,7 +8,6 @@
 
 /// Parsed averages from a single PSI line (some or full).
 #[derive(Debug, Default)]
-#[allow(dead_code)] // total field used in later commits for delta computation
 pub struct PsiLine {
     pub avg10: f64,
     pub avg60: f64,

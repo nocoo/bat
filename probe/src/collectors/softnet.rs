@@ -49,7 +49,6 @@ pub fn read_softnet_stat_from(path: &str) -> Option<SoftnetCounters> {
 
 /// Read softnet stats from `/proc/net/softnet_stat`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_softnet_stat() -> Option<SoftnetCounters> {
     read_softnet_stat_from("/proc/net/softnet_stat")
 }
