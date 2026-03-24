@@ -225,7 +225,7 @@ describe("Worker L3 E2E — real Wrangler", () => {
 		const res = await fetch(`${BASE}/`);
 		expect(res.status).toBe(200);
 		const text = await res.text();
-		expect(text).toBe("bat-worker ok");
+		expect(text).toBe("bat ok");
 	});
 
 	test("POST /api/identity → 204", async () => {

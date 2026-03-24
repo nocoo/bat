@@ -9,7 +9,8 @@ export default defineConfig({
 		trace: "on-first-retry",
 	},
 	webServer: {
-		command: "E2E_SKIP_AUTH=1 AUTH_SECRET=e2e-secret next dev --port 28787",
+		command:
+			"E2E_SKIP_AUTH=1 AUTH_SECRET=e2e-secret BAT_API_URL=https://bat-ingest-test.worker.hexly.ai next dev --port 28787",
 		port: 28787,
 		timeout: 60_000,
 		reuseExistingServer: !process.env.CI,

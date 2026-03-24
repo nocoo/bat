@@ -6,7 +6,7 @@ describe("proxyToWorker", () => {
 	const originalFetch = globalThis.fetch;
 
 	beforeEach(() => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key-123";
 	});
 
@@ -47,7 +47,7 @@ describe("proxyToWorker", () => {
 
 		const res = await proxyToWorker("/api/hosts");
 		expect(res.status).toBe(200);
-		expect(capturedUrl).toBe("https://bat-worker.test.workers.dev/api/hosts");
+		expect(capturedUrl).toBe("https://bat.test.workers.dev/api/hosts");
 		expect(capturedAuthHeader).toBe("Bearer test-read-key-123");
 		const body = (await res.json()) as Array<{ host_id: string }>;
 		expect(body).toEqual([{ host_id: "h1" }]);
@@ -66,9 +66,7 @@ describe("proxyToWorker", () => {
 
 		const params = new URLSearchParams({ from: "1000", to: "2000" });
 		await proxyToWorker("/api/hosts/h1/metrics", params);
-		expect(capturedUrl).toBe(
-			"https://bat-worker.test.workers.dev/api/hosts/h1/metrics?from=1000&to=2000",
-		);
+		expect(capturedUrl).toBe("https://bat.test.workers.dev/api/hosts/h1/metrics?from=1000&to=2000");
 	});
 
 	test("passes through Worker error status", async () => {
