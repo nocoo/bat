@@ -316,7 +316,7 @@ Cloudflare's infrastructure). We wire it now for completeness.
 # Test environment — E2E testing with isolated resources
 # Usage: wrangler dev --env test (local) or wrangler d1 execute --env test (remote)
 [env.test]
-name = "bat-worker-test"
+name = "bat-test"
 
 [[env.test.d1_databases]]
 binding = "DB"

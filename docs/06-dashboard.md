@@ -229,7 +229,7 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 | Variable | Purpose |
 |----------|---------|
-| `BAT_API_URL` | Worker URL (e.g. `https://bat-worker.xxx.workers.dev`) |
+| `BAT_API_URL` | Worker URL (e.g. `https://bat-ingest.worker.hexly.ai`) |
 | `BAT_READ_KEY` | Read-only API Key for Worker proxy routes |
 | `BAT_WRITE_KEY` | Write API Key — used by Dashboard write proxy routes (webhook CRUD, maintenance CRUD, tags, port allowlist) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
 | `AUTH_SECRET` | NextAuth secret |
