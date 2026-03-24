@@ -42,9 +42,7 @@ function createE2EAuth() {
 function createRealAuth() {
 	// These imports are safe here — NextAuth only throws MissingSecret when
 	// NextAuth() is called, and this function is never called in E2E mode.
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const NextAuth = require("next-auth").default;
-	// eslint-disable-next-line @typescript-eslint/no-require-imports
 	const Google = require("next-auth/providers/google").default;
 
 	const allowedEmails = (process.env.ALLOWED_EMAILS ?? "")
