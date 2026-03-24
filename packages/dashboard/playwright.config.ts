@@ -10,7 +10,7 @@ export default defineConfig({
 	},
 	webServer: {
 		command:
-			"E2E_SKIP_AUTH=1 AUTH_SECRET=e2e-secret BAT_API_URL=https://bat-ingest-test.worker.hexly.ai next dev --port 28787",
+			"E2E_SKIP_AUTH=1 AUTH_SECRET=e2e-secret BAT_API_URL=https://bat-ingest-test.worker.hexly.ai BAT_READ_KEY=a765dcf8ed4727d0f26aa753339c26e1b002ee88fcdcfd84e0b0d4055950a632 next dev --port 28787",
 		port: 28787,
 		timeout: 60_000,
 		reuseExistingServer: !process.env.CI,
