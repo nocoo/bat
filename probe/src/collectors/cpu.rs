@@ -136,10 +136,8 @@ pub struct LoadAvg {
     pub load5: f64,
     pub load15: f64,
     /// Running tasks (numerator of field 3, e.g., "1/234" → 1)
-    #[allow(dead_code)]
     pub tasks_running: Option<u32>,
     /// Total tasks (denominator of field 3, e.g., "1/234" → 234)
-    #[allow(dead_code)]
     pub tasks_total: Option<u32>,
 }
 

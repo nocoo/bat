@@ -112,7 +112,6 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
 
 /// Disk capacity info for a single mount point.
 #[derive(Debug)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct DiskInfo {
     pub mount: String,
     pub total_bytes: u64,

@@ -5,7 +5,6 @@
 
 /// Parsed TCP state from `/proc/net/sockstat`.
 #[derive(Debug)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct TcpState {
     pub established: u32,
     pub time_wait: u32,
@@ -17,7 +16,6 @@ pub struct TcpState {
 
 /// Extra socket stats from `/proc/net/sockstat` beyond TCP.
 #[derive(Debug)]
-#[allow(dead_code)] // Signal expansion fields used in later commits
 pub struct SockstatExtra {
     pub sockets_used: u32,
     pub udp_inuse: u32,
@@ -107,20 +105,6 @@ pub fn parse_sockstat(content: &str) -> Option<(TcpState, Option<SockstatExtra>)
     Some((tcp, extra))
 }
 
-/// Read TCP state from a parameterized path (for testing).
-#[allow(dead_code)]
-pub fn read_tcp_state_from(path: &str) -> Option<TcpState> {
-    let content = std::fs::read_to_string(path).ok()?;
-    parse_sockstat(&content).map(|(tcp, _)| tcp)
-}
-
-/// Read TCP state from `/proc/net/sockstat`.
-#[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
-pub fn read_tcp_state() -> Option<TcpState> {
-    read_tcp_state_from("/proc/net/sockstat")
-}
-
 /// Read full sockstat (TCP + extras) from a parameterized path (for testing).
 pub fn read_sockstat_from(path: &str) -> Option<(TcpState, Option<SockstatExtra>)> {
     let content = std::fs::read_to_string(path).ok()?;
@@ -129,7 +113,6 @@ pub fn read_sockstat_from(path: &str) -> Option<(TcpState, Option<SockstatExtra>
 
 /// Read full sockstat from `/proc/net/sockstat`.
 #[cfg_attr(coverage_nightly, coverage(off))]
-#[allow(dead_code)]
 pub fn read_sockstat() -> Option<(TcpState, Option<SockstatExtra>)> {
     read_sockstat_from("/proc/net/sockstat")
 }
@@ -204,22 +187,6 @@ UDP: inuse 10 mem 2
         assert_eq!(state.established, 6);
         assert_eq!(state.mem_pages, Some(10));
         assert!(extra.is_none());
-    }
-
-    #[test]
-    fn read_tcp_state_from_tempfile() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("sockstat");
-        std::fs::write(&path, PROC_SOCKSTAT).unwrap();
-
-        let state = read_tcp_state_from(path.to_str().unwrap()).unwrap();
-        assert_eq!(state.established, 6);
-        assert_eq!(state.time_wait, 26);
-    }
-
-    #[test]
-    fn read_tcp_state_from_missing_file() {
-        assert!(read_tcp_state_from("/nonexistent/sockstat").is_none());
     }
 
     #[test]
