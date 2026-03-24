@@ -60,7 +60,7 @@ export function getBadgeStyle(text: string): {
 	color: string;
 } {
 	const idx = hashText(text) % BADGE_PALETTE.length;
-	// biome-ignore lint: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
+	// biome-ignore lint/style/noNonNullAssertion: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
 	const token = BADGE_PALETTE[idx]!.bg;
 	return {
 		backgroundColor: `hsl(var(--${token}) / 0.12)`,
@@ -77,7 +77,7 @@ export function getBadgeStyleByIndex(colorIndex: number): {
 	color: string;
 } {
 	const idx = ((colorIndex % BADGE_PALETTE.length) + BADGE_PALETTE.length) % BADGE_PALETTE.length;
-	// biome-ignore lint: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
+	// biome-ignore lint/style/noNonNullAssertion: BADGE_PALETTE is a fixed 10-element array, idx is always 0-9
 	const token = BADGE_PALETTE[idx]!.bg;
 	return {
 		backgroundColor: `hsl(var(--${token}) / 0.12)`,
@@ -102,6 +102,6 @@ export const TAG_COLORS: readonly string[] = [
 /** @deprecated Use getBadgeStyleByIndex instead */
 export function getTagColor(colorIndex: number): string {
 	const idx = ((colorIndex % TAG_COLORS.length) + TAG_COLORS.length) % TAG_COLORS.length;
-	// biome-ignore lint: TAG_COLORS is a fixed 10-element array, idx is always 0-9
+	// biome-ignore lint/style/noNonNullAssertion: TAG_COLORS is a fixed 10-element array, idx is always 0-9
 	return TAG_COLORS[idx]!;
 }
