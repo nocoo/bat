@@ -125,7 +125,6 @@ Probes are deployed on personal VPS fleet. SSH access uses `~/.ssh/id_rsa` key.
 | us.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
 | us2.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
 | blog.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
-| docker.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
 | tongji.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
 
 Upgrade probe on a host:
