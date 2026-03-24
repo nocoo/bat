@@ -14,7 +14,7 @@
 ## Config (`/etc/bat/config.toml`)
 
 ```toml
-worker_url = "https://bat-worker.your.workers.dev"
+worker_url = "https://bat-ingest.worker.hexly.ai"
 write_key = "your-write-key"
 host_id = "jp.nocoo.cloud"    # optional, defaults to hostname
 interval = 30                  # seconds

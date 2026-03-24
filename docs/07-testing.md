@@ -126,7 +126,7 @@ Test resources are physically separated from dev/prod.
 | Resource | Dev/Prod | Test |
 |----------|----------|------|
 | D1 Database | `bat-db` (89d4d080) | `bat-db-test` (04bd8235) |
-| Worker name | `bat-worker` | `bat-worker-test` |
+| Worker name | `bat` | `bat-test` |
 | Environment var | `development` / `production` | `test` |
 
 **Verification**: `bun run scripts/verify-test-bindings.ts` checks all `[env.test]` bindings use `-test` suffixed names.

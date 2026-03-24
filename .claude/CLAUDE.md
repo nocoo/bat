@@ -110,7 +110,7 @@ Next.js standalone `server.js` calls `process.chdir(__dirname)`, so runtime `cwd
 
 ### Infrastructure
 
-- **Worker**: Cloudflare Workers (`bat-worker`), deploy with `npx wrangler deploy --env production`
+- **Worker**: Cloudflare Workers (`bat`), deploy with `npx wrangler deploy --env production`
 - **Database**: Cloudflare D1 (`bat-db`), migrations via `npx wrangler d1 migrations apply bat-db --remote --env production`
 - **Dashboard**: Railway (Docker)
 - **Probe binaries**: R2 bucket `zhe`, public URL prefix `https://s.zhe.to/apps/bat/`
