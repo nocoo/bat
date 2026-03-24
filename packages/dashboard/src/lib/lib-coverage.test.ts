@@ -242,7 +242,7 @@ describe("proxyToWorkerWithBody", () => {
 	const originalFetch = globalThis.fetch;
 
 	beforeEach(() => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		process.env.BAT_WRITE_KEY = "test-write-key";
 	});
@@ -351,7 +351,7 @@ describe("proxyToWorkerWithBody", () => {
 		}) as typeof fetch;
 
 		await proxyToWorkerWithBody("/api/tags/123", "DELETE");
-		expect(capturedUrl).toBe("https://bat-worker.test.workers.dev/api/tags/123");
+		expect(capturedUrl).toBe("https://bat.test.workers.dev/api/tags/123");
 	});
 
 	test("passes through Worker response status and body", async () => {
@@ -428,7 +428,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("forwards search params to Worker URL", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		let capturedUrl = "";
 		globalThis.fetch = (async (input: string | URL | Request) => {
@@ -438,13 +438,11 @@ describe("proxyToWorker — all branches", () => {
 
 		const params = new URLSearchParams({ from: "100", to: "200" });
 		await proxyToWorker("/api/hosts/h1/metrics", params);
-		expect(capturedUrl).toBe(
-			"https://bat-worker.test.workers.dev/api/hosts/h1/metrics?from=100&to=200",
-		);
+		expect(capturedUrl).toBe("https://bat.test.workers.dev/api/hosts/h1/metrics?from=100&to=200");
 	});
 
 	test("sends correct Authorization header", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "secret-123";
 		let capturedAuth = "";
 		globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
@@ -457,7 +455,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("falls back to application/json when Worker omits Content-Type", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		globalThis.fetch = (async () => {
 			return new Response("{}", { status: 200, headers: {} });
@@ -468,7 +466,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("response has Cache-Control: no-store header", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		globalThis.fetch = (async () => {
 			return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
@@ -479,7 +477,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("returns 502 when fetch throws", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		globalThis.fetch = (async () => {
 			throw new Error("Connection refused");
@@ -492,7 +490,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("passes through Worker error status and body", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		globalThis.fetch = (async () => {
 			return new Response(JSON.stringify({ error: "Not found" }), {
@@ -506,7 +504,7 @@ describe("proxyToWorker — all branches", () => {
 	});
 
 	test("handles no search params argument", async () => {
-		process.env.BAT_API_URL = "https://bat-worker.test.workers.dev";
+		process.env.BAT_API_URL = "https://bat.test.workers.dev";
 		process.env.BAT_READ_KEY = "test-read-key";
 		let capturedUrl = "";
 		globalThis.fetch = (async (input: string | URL | Request) => {

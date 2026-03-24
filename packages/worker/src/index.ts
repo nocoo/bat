@@ -55,7 +55,7 @@ const app = new Hono<AppEnv>();
 app.use("/api/*", apiKeyAuth);
 
 // Root health check
-app.get("/", (c) => c.text("bat-worker ok"));
+app.get("/", (c) => c.text("bat ok"));
 
 // Public routes (no auth)
 app.get("/api/live", liveRoute);

@@ -97,7 +97,7 @@ mod tests {
     use super::*;
 
     const VALID_FULL: &str = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 host_id = "jp.nocoo.cloud"
 interval = 60
@@ -111,7 +111,7 @@ exclude_interfaces = ["lo", "docker0"]
 "#;
 
     const VALID_MINIMAL: &str = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 "#;
 
@@ -120,13 +120,13 @@ write_key = "secret-key"
 "#;
 
     const INVALID_MISSING_KEY: &str = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 "#;
 
     #[test]
     fn parse_full_config() {
         let cfg = parse_config(VALID_FULL).unwrap();
-        assert_eq!(cfg.worker_url, "https://bat-worker.example.workers.dev");
+        assert_eq!(cfg.worker_url, "https://bat.example.workers.dev");
         assert_eq!(cfg.write_key, "secret-key");
         assert_eq!(cfg.host_id.as_deref(), Some("jp.nocoo.cloud"));
         assert_eq!(cfg.interval, 60);
@@ -141,7 +141,7 @@ worker_url = "https://bat-worker.example.workers.dev"
     #[test]
     fn parse_minimal_config_defaults() {
         let cfg = parse_config(VALID_MINIMAL).unwrap();
-        assert_eq!(cfg.worker_url, "https://bat-worker.example.workers.dev");
+        assert_eq!(cfg.worker_url, "https://bat.example.workers.dev");
         assert_eq!(cfg.write_key, "secret-key");
         assert!(cfg.host_id.is_none());
         assert_eq!(cfg.interval, 30);
@@ -198,7 +198,7 @@ worker_url = "https://bat-worker.example.workers.dev"
     #[test]
     fn reject_interval_zero() {
         let content = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 interval = 0
 "#;
@@ -212,7 +212,7 @@ interval = 0
         for interval in [1, 5, 9] {
             let content = format!(
                 r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 interval = {interval}
 "#
@@ -229,7 +229,7 @@ interval = {interval}
     #[test]
     fn accept_interval_minimum() {
         let content = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 interval = 10
 "#;
@@ -246,7 +246,7 @@ interval = 10
     #[test]
     fn accept_empty_host_id() {
         let content = r#"
-worker_url = "https://bat-worker.example.workers.dev"
+worker_url = "https://bat.example.workers.dev"
 write_key = "secret-key"
 host_id = ""
 "#;
