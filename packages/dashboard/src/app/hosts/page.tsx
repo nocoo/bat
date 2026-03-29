@@ -101,8 +101,14 @@ export default function HostsPage() {
 						<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
 					)}
 					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-						{filteredHosts.map((host) => (
-							<HostCard key={host.host_id} host={host} tags={hostTagsMap?.[host.host_id]} />
+						{filteredHosts.map((host, index) => (
+							<div
+								key={host.host_id}
+								className="animate-fade-up"
+								style={{ animationDelay: `${index * 60}ms` }}
+							>
+								<HostCard host={host} tags={hostTagsMap?.[host.host_id]} />
+							</div>
 						))}
 					</div>
 					{filteredHosts.length === 0 && selectedTagIds.length > 0 && (

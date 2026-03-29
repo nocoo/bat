@@ -246,7 +246,7 @@ export function TopProcessesTable({
 					<tbody>
 						{sorted.map((p) => (
 							<tr key={p.pid} className="border-b border-border/50 hover:bg-muted/30">
-								<td className="px-2 py-1 font-mono text-muted-foreground">{p.pid}</td>
+								<td className="px-2 py-1 font-mono tabular-nums text-muted-foreground">{p.pid}</td>
 								<td className="px-2 py-1 truncate max-w-[120px]" title={p.cmd}>
 									{p.name}
 								</td>
@@ -256,23 +256,31 @@ export function TopProcessesTable({
 								>
 									{p.state}
 								</td>
-								<td className={`px-2 py-1 text-right font-mono ${cpuColor(p.cpu_pct)}`}>
+								<td
+									className={`px-2 py-1 text-right font-mono tabular-nums ${cpuColor(p.cpu_pct)}`}
+								>
 									{p.cpu_pct != null ? p.cpu_pct.toFixed(1) : "—"}
 								</td>
-								<td className="px-2 py-1 text-right font-mono">{formatBytes(p.mem_rss)}</td>
-								<td className={`px-2 py-1 text-right font-mono ${memPctColor(p.mem_pct)}`}>
+								<td className="px-2 py-1 text-right font-mono tabular-nums">
+									{formatBytes(p.mem_rss)}
+								</td>
+								<td
+									className={`px-2 py-1 text-right font-mono tabular-nums ${memPctColor(p.mem_pct)}`}
+								>
 									{p.mem_pct.toFixed(1)}
 								</td>
-								<td className={`px-2 py-1 text-right font-mono ${threadColor(p.num_threads)}`}>
+								<td
+									className={`px-2 py-1 text-right font-mono tabular-nums ${threadColor(p.num_threads)}`}
+								>
 									{p.num_threads}
 								</td>
-								<td className="px-2 py-1 text-right font-mono text-muted-foreground">
+								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
 									{p.io_read_rate != null ? formatBytesRate(p.io_read_rate) : "—"}
 								</td>
-								<td className="px-2 py-1 text-right font-mono text-muted-foreground">
+								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
 									{p.io_write_rate != null ? formatBytesRate(p.io_write_rate) : "—"}
 								</td>
-								<td className="px-2 py-1 text-right font-mono text-muted-foreground">
+								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
 									{formatUptime(p.uptime)}
 								</td>
 							</tr>
