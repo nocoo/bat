@@ -2,10 +2,47 @@
 
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import LoadingScreen from "@/components/loading-screen";
+import { Github } from "lucide-react";
 import { signIn } from "next-auth/react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+
+function Barcode() {
+	const bars = [
+		{ id: "b0", w: 2 },
+		{ id: "b1", w: 1 },
+		{ id: "b2", w: 3 },
+		{ id: "b3", w: 1 },
+		{ id: "b4", w: 2 },
+		{ id: "b5", w: 1 },
+		{ id: "b6", w: 1 },
+		{ id: "b7", w: 3 },
+		{ id: "b8", w: 1 },
+		{ id: "b9", w: 2 },
+		{ id: "b10", w: 1 },
+		{ id: "b11", w: 3 },
+		{ id: "b12", w: 2 },
+		{ id: "b13", w: 1 },
+		{ id: "b14", w: 1 },
+		{ id: "b15", w: 2 },
+		{ id: "b16", w: 3 },
+		{ id: "b17", w: 1 },
+		{ id: "b18", w: 2 },
+		{ id: "b19", w: 1 },
+	];
+	return (
+		<div className="flex items-stretch gap-[1.5px] h-full">
+			{bars.map((bar, i) => (
+				<div
+					key={bar.id}
+					className="rounded-[0.5px] bg-primary-foreground"
+					style={{ width: `${bar.w * 1.5}px`, opacity: i % 3 === 0 ? 0.9 : 0.5 }}
+				/>
+			))}
+		</div>
+	);
+}
 
 function LoginContent() {
 	const searchParams = useSearchParams();
@@ -16,7 +53,7 @@ function LoginContent() {
 	};
 
 	return (
-		<div className="relative flex min-h-screen items-center justify-center bg-background p-4 overflow-hidden">
+		<div className="relative flex min-h-screen flex-col items-center justify-center bg-background p-4 overflow-hidden">
 			{/* Radial glow */}
 			<div
 				className="pointer-events-none absolute inset-0"
@@ -37,12 +74,21 @@ function LoginContent() {
 			/>
 			{/* Top-right controls */}
 			<div className="absolute top-4 right-4 z-10 flex items-center gap-1">
+				<a
+					href="https://github.com/nocoo/bat"
+					target="_blank"
+					rel="noopener noreferrer"
+					aria-label="GitHub repository"
+					className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+				>
+					<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
+				</a>
 				<ThemeToggle />
 			</div>
-			<div className="flex flex-col items-center">
+			<div className="flex flex-1 flex-col items-center justify-center">
 				{/* Card */}
 				<div
-					className="relative w-80 overflow-hidden rounded-2xl bg-card flex flex-col ring-1 ring-black/[0.08] dark:ring-white/[0.06]"
+					className="relative w-72 aspect-[54/86] overflow-hidden rounded-2xl bg-card flex flex-col ring-1 ring-black/[0.08] dark:ring-white/[0.06]"
 					style={{
 						boxShadow: [
 							"0 1px 2px rgba(0,0,0,0.06)",
@@ -57,6 +103,13 @@ function LoginContent() {
 					{/* Header strip */}
 					<div className="bg-primary px-5 py-4">
 						<div className="flex items-center justify-between">
+							<div
+								className="h-4 w-8 rounded-full bg-background/80"
+								style={{
+									boxShadow:
+										"inset 0 1.5px 3px rgba(0,0,0,0.35), inset 0 -0.5px 1px rgba(255,255,255,0.1)",
+								}}
+							/>
 							<div className="flex items-center gap-2">
 								<Image
 									src="/logo-24.png"
@@ -71,12 +124,21 @@ function LoginContent() {
 								monitoring
 							</span>
 						</div>
+						{/* Barcode row */}
+						<div className="mt-3 flex items-center justify-between">
+							<span className="text-[9px] tabular-nums text-primary-foreground/40">
+								ID-{new Date().getFullYear()}
+							</span>
+							<div className="h-3">
+								<Barcode />
+							</div>
+						</div>
 					</div>
 
 					{/* Content */}
 					<div className="flex flex-col items-center px-6 pt-8 pb-6">
 						{/* Logo */}
-						<div className="h-20 w-20 overflow-hidden rounded-full bg-secondary dark:bg-[#171717] ring-1 ring-border flex items-center justify-center">
+						<div className="h-24 w-24 overflow-hidden rounded-full bg-secondary dark:bg-[#171717] ring-1 ring-border flex items-center justify-center">
 							<Image src="/logo-80.png" alt="bat" width={80} height={80} className="rounded-full" />
 						</div>
 
@@ -135,6 +197,10 @@ function LoginContent() {
 					</div>
 				</div>
 			</div>
+			{/* Site footer */}
+			<footer className="py-4 text-center text-xs text-muted-foreground">
+				bat &copy; {new Date().getFullYear()}
+			</footer>
 		</div>
 	);
 }
