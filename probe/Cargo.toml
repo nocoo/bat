@@ -1,6 +1,6 @@
 [package]
 name = "bat-probe"
-version = "0.10.2"
+version = "0.10.6"
 edition = "2024"
 
 [dependencies]
