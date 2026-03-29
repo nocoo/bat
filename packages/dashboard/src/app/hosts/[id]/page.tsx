@@ -71,7 +71,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 	return (
 		<div className="flex justify-between text-sm">
 			<span className="text-muted-foreground">{label}</span>
-			<span className="font-mono">{value ?? "—"}</span>
+			<span className="font-mono tabular-nums">{value ?? "—"}</span>
 		</div>
 	);
 }

@@ -29,7 +29,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 					<div key={disk.mount} className="space-y-1">
 						<div className="flex items-center justify-between text-sm">
 							<span className="font-mono">{disk.mount}</span>
-							<span className="text-muted-foreground">
+							<span className="text-muted-foreground tabular-nums">
 								{disk.used_pct.toFixed(1)}% — {formatBytes(disk.avail_bytes)} free
 							</span>
 						</div>
