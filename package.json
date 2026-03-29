@@ -1,6 +1,6 @@
 {
 	"name": "bat",
-	"version": "0.10.6",
+	"version": "0.10.7",
 	"private": true,
 	"packageManager": "pnpm@10.28.1",
 	"scripts": {
