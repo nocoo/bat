@@ -1,5 +1,34 @@
 # Changelog
 
+## v0.10.7 (2026-03-30)
+
+### Dashboard
+
+- **Login page redesign** — Card aspect ratio, header strip with barcode decoration, GitHub link, footer
+- **Sidebar collapsible** — Replace native button with Radix Collapsible, refine group header and nav item padding
+- **Version badge** — Replace Badge component with lightweight raw span (text-[10px] pill)
+- **Content page polish** — tabular-nums on all numeric cells (processes table, info rows, disk bars), fade-up entry animation with stagger on host card grid
+- **Docker build** — Add .dockerignore excluding logo.png and *.md
+
+### Refactoring
+
+- Rename worker `bat-worker` → `bat` per D1 isolation spec
+- Remove 15 stale `#[allow(dead_code)]` and 2 dead functions in probe
+- Remove dead ESLint comments (project uses Biome)
+- Narrow blanket biome-ignore to specific `lint/style/noNonNullAssertion`
+- Add 5 TS strict extras to shared/worker tsconfig
+
+### Tests
+
+- Add comprehensive Playwright E2E specs for dashboard (L3)
+- Split Playwright specs into 4 focused files
+- Wire test Worker read key into Playwright E2E config
+
+### Chores
+
+- Sync version to 0.10.6 across all packages (was inconsistent between root and dashboard)
+- Remove retired docker.nocoo.cloud from VPS fleet docs
+
 ## v0.10.2 (2026-03-23)
 
 ### Features
