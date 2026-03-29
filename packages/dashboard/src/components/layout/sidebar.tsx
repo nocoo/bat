@@ -1,7 +1,7 @@
 "use client";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn, getAvatarColor } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
@@ -73,24 +73,20 @@ function NavGroupSection({
 	const [open, setOpen] = useState(group.defaultOpen ?? true);
 
 	return (
-		<div>
+		<Collapsible open={open} onOpenChange={setOpen}>
 			{/* Group header */}
-			<button
-				type="button"
-				onClick={() => setOpen((prev) => !prev)}
-				className="flex w-full items-center justify-between px-3 py-1.5 mb-0.5"
-			>
-				<span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
+			<CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2.5">
+				<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
 					{group.label}
 				</span>
 				<ChevronUp
 					className={cn(
-						"h-3 w-3 text-muted-foreground/50 transition-transform duration-200",
+						"h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
 						!open && "rotate-180",
 					)}
 					strokeWidth={1.5}
 				/>
-			</button>
+			</CollapsibleTrigger>
 
 			{/* Animated group content */}
 			<div
@@ -101,7 +97,7 @@ function NavGroupSection({
 				}}
 			>
 				<div className="min-h-0 overflow-hidden">
-					<div className="flex flex-col gap-0.5">
+					<div className="flex flex-col gap-0.5 px-3">
 						{group.items.map((item) => {
 							const isActive = pathname.startsWith(item.href);
 
@@ -125,7 +121,7 @@ function NavGroupSection({
 					</div>
 				</div>
 			</div>
-		</div>
+		</Collapsible>
 	);
 }
 
@@ -252,12 +248,9 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 										className="rounded-sm"
 									/>
 									<span className="text-lg font-bold tracking-tighter">bat</span>
-									<Badge
-										variant="secondary"
-										className="text-xs px-2 py-0.5 font-normal text-muted-foreground"
-									>
+									<span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
 										v{APP_VERSION}
-									</Badge>
+									</span>
 								</div>
 								<button
 									type="button"
