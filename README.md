@@ -114,7 +114,7 @@ bat/
 ```bash
 pnpm install
 pnpm --filter @bat/worker dev       # Worker: localhost:8787
-pnpm --filter @bat/dashboard dev    # Dashboard: localhost:7020
+pnpm --filter @bat/dashboard dev    # Dashboard: localhost:7025
 cd probe && cargo build --release   # Probe
 ```
 
