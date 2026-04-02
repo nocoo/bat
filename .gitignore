@@ -39,9 +39,6 @@ coverage/
 # Next.js
 .next/
 
-# Bun
-bun.lock
-
 # Playwright
 test-results/
 playwright-report/
