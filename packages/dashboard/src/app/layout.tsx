@@ -15,7 +15,7 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-	metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:7041"),
+	metadataBase: new URL(process.env.NEXTAUTH_URL || "http://localhost:7025"),
 	title: "bat - Infrastructure Monitoring",
 	description: "Infrastructure monitoring dashboard",
 	openGraph: {
