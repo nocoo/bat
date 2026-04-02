@@ -13,9 +13,10 @@ WORKDIR /app
 # Copy lockfile and workspace config
 COPY bun.lock package.json ./
 
-# Copy workspace package.json files (needed for workspace resolution)
+# Copy ALL workspace package.json files (needed for bun.lock resolution)
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/dashboard/package.json ./packages/dashboard/
+COPY packages/worker/package.json ./packages/worker/
 
 # Install dependencies with bun (faster than pnpm)
 RUN bun install --frozen-lockfile
