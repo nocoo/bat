@@ -1,5 +1,22 @@
 # Changelog
 
+## v0.10.8 (2026-04-03)
+
+### Performance
+
+- **Dockerfile optimization** — Switch from pnpm to bun for dependency installation, reducing Railway build time from ~53s to ~33s (-37%)
+
+### Fixes
+
+- **Railway build reliability** — Root cause analysis: builds failed when BuildKit parallelism dropped due to resource constraints. Optimized Dockerfile now completes faster, reducing timeout failures
+- **API key sync issue** — Fixed 403 errors caused by Railway env var desync after failed deployments
+
+### Chores
+
+- Add `workspaces` field to package.json for bun compatibility
+- Add bun.lock to version control (required for Docker builds)
+- Migrate dashboard port 7041 → 7025
+
 ## v0.10.7 (2026-03-30)
 
 ### Dashboard
