@@ -296,7 +296,7 @@
 - Align dashboard card style with pew design (borderless bg-secondary)
 - Align dashboard charts with pew design style
 - Improve responsive layout, eliminate mobile sidebar flash
-- Change dashboard port from 7020 to 7041
+- Change dashboard port from 7020 to 7041, then to 7025
 - Add dev script convenience commands
 
 ## v0.2.1 (2026-03-16)
@@ -323,7 +323,7 @@
 
 - Add CLAUDE.md with version management and release checklist
 - Add probe cross-compile Dockerfile (`probe/Dockerfile.build`)
-- Change dashboard port from 7020 to 7041
+- Change dashboard port from 7020 to 7041, then to 7025
 - Update Dockerfile for probe binary serving
 
 ## v0.2.0 (2026-03-15)

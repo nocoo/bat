@@ -44,7 +44,7 @@ FROM oven/bun:1 AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=7041
+ENV PORT=7025
 
 # Copy built assets and dependencies
 COPY --from=builder /app/packages/dashboard/.next/standalone ./
@@ -54,6 +54,6 @@ COPY --from=builder /app/packages/dashboard/.next/static ./packages/dashboard/.n
 # standalone server.js does process.chdir(__dirname) → cwd becomes /app/packages/dashboard
 COPY probe/install.sh ./packages/dashboard/probe-assets/install.sh
 
-EXPOSE 7041
+EXPOSE 7025
 
 CMD ["bun", "packages/dashboard/server.js"]
