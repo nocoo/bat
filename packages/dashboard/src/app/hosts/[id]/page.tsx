@@ -48,16 +48,16 @@ function TimeRangePicker({
 	onSelect,
 }: { selected: number; onSelect: (seconds: number) => void }) {
 	return (
-		<div className="flex flex-wrap gap-1">
+		<div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
 			{TIME_RANGES.map((range) => (
 				<button
 					key={range.label}
 					type="button"
 					onClick={() => onSelect(range.seconds)}
-					className={`px-2.5 py-1 rounded-md text-sm transition-colors ${
+					className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
 						selected === range.seconds
-							? "bg-primary text-primary-foreground"
-							: "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+							? "bg-card text-foreground shadow-sm"
+							: "text-muted-foreground hover:text-foreground"
 					}`}
 				>
 					{range.label}
