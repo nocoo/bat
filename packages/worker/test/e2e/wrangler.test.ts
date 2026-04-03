@@ -19,7 +19,7 @@ import { join } from "node:path";
 import type {
 	AlertItem,
 	AllowedPort,
-	EventItem,
+	EventsListResponse,
 	HostDetailItem,
 	HostOverviewItem,
 	HostTag,
@@ -642,10 +642,13 @@ describe("Events & Webhooks E2E", () => {
 	test("GET /api/events → lists ingested events", async () => {
 		const res = await fetch(`${BASE}/api/events`, { headers: readHeaders() });
 		expect(res.status).toBe(200);
-		const events = (await res.json()) as EventItem[];
-		expect(events.length).toBeGreaterThanOrEqual(2);
+		const data = (await res.json()) as EventsListResponse;
+		expect(data.items.length).toBeGreaterThanOrEqual(2);
+		expect(data.total).toBeGreaterThanOrEqual(2);
+		expect(data.limit).toBe(30);
+		expect(data.offset).toBe(0);
 		// Most recent first
-		const deploy = events.find((e) => e.title === "Deployment completed");
+		const deploy = data.items.find((e) => e.title === "Deployment completed");
 		expect(deploy).toBeDefined();
 		expect(deploy?.host_id).toBe("e2e-host-inv");
 		expect(deploy?.hostname).toBe("e2e-host-inv.example.com");
@@ -658,9 +661,9 @@ describe("Events & Webhooks E2E", () => {
 			headers: readHeaders(),
 		});
 		expect(res.status).toBe(200);
-		const events = (await res.json()) as EventItem[];
-		expect(events.length).toBeGreaterThanOrEqual(2);
-		for (const event of events) {
+		const data = (await res.json()) as EventsListResponse;
+		expect(data.items.length).toBeGreaterThanOrEqual(2);
+		for (const event of data.items) {
 			expect(event.host_id).toBe("e2e-host-inv");
 		}
 	});
@@ -670,8 +673,9 @@ describe("Events & Webhooks E2E", () => {
 			headers: readHeaders(),
 		});
 		expect(res.status).toBe(200);
-		const events = (await res.json()) as EventItem[];
-		expect(events).toEqual([]);
+		const data = (await res.json()) as EventsListResponse;
+		expect(data.items).toEqual([]);
+		expect(data.total).toBe(0);
 	});
 
 	test("GET /api/events without auth → 401", async () => {

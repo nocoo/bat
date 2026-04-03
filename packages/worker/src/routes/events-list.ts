@@ -1,9 +1,9 @@
-// GET /api/events — list events with optional host_id filter
-import type { EventItem, EventRow } from "@bat/shared";
+// GET /api/events — list events with optional host_id filter and pagination
+import type { EventItem, EventRow, EventsListResponse } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
-const DEFAULT_LIMIT = 100;
+const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 500;
 
 export async function eventsListRoute(c: Context<AppEnv>) {
@@ -29,6 +29,19 @@ export async function eventsListRoute(c: Context<AppEnv>) {
 		}
 	}
 
+	// Query total count
+	let totalResult: D1Result<{ count: number }>;
+	if (hostId) {
+		totalResult = await db
+			.prepare("SELECT COUNT(*) as count FROM events WHERE host_id = ?")
+			.bind(hostId)
+			.all<{ count: number }>();
+	} else {
+		totalResult = await db.prepare("SELECT COUNT(*) as count FROM events").all<{ count: number }>();
+	}
+	const total = totalResult.results[0]?.count ?? 0;
+
+	// Query events
 	let result: D1Result<EventRow>;
 	if (hostId) {
 		result = await db
@@ -60,7 +73,8 @@ LIMIT ? OFFSET ?`,
 		tags: parseTags(row.tags),
 	}));
 
-	return c.json(items);
+	const response: EventsListResponse = { items, total, limit, offset };
+	return c.json(response);
 }
 
 function parseTags(raw: string): string[] {

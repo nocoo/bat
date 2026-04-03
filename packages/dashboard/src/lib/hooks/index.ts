@@ -9,6 +9,6 @@ export { useHostTags } from "./use-host-tags";
 export { useSingleHostTags } from "./use-single-host-tags";
 export { useAllowedPorts } from "./use-allowed-ports";
 export { useAllAllowedPorts } from "./use-all-allowed-ports";
-export { useEvents } from "./use-events";
+export { useEvents, EVENTS_PAGE_SIZE } from "./use-events";
 export { useWebhooks } from "./use-webhooks";
 export { useHostMaintenance } from "./use-host-maintenance";

@@ -114,6 +114,7 @@ export type {
 	EventIngestPayload,
 	EventItem,
 	EventRow,
+	EventsListResponse,
 	WebhookConfig,
 	WebhookConfigRow,
 } from "./events.js";
