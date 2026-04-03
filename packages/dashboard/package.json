@@ -1,6 +1,6 @@
 {
 	"name": "@bat/dashboard",
-	"version": "0.10.8",
+	"version": "0.10.9",
 	"private": true,
 	"scripts": {
 		"dev": "next dev --port 7025",
