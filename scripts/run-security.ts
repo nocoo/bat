@@ -13,7 +13,7 @@ const results: { tool: string; ok: boolean; output: string }[] = [];
 // 1. osv-scanner — scan pnpm-lock.yaml for known CVEs
 console.info("→ G2: osv-scanner (pnpm-lock.yaml)");
 try {
-	const osv = await $`osv-scanner --lockfile=pnpm-lock.yaml`.quiet();
+	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=pnpm-lock.yaml`.quiet();
 	results.push({ tool: "osv-scanner", ok: true, output: osv.text() });
 	console.info("  ✔ osv-scanner (JS): no vulnerabilities found");
 } catch (e: unknown) {
@@ -26,7 +26,7 @@ try {
 // 2. osv-scanner — scan Cargo.lock for Rust CVEs
 console.info("→ G2: osv-scanner (Cargo.lock)");
 try {
-	const osv = await $`osv-scanner --lockfile=probe/Cargo.lock`.quiet();
+	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=probe/Cargo.lock`.quiet();
 	results.push({ tool: "osv-scanner-rust", ok: true, output: osv.text() });
 	console.info("  ✔ osv-scanner (Rust): no vulnerabilities found");
 } catch (e: unknown) {
