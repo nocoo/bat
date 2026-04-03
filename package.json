@@ -1,6 +1,6 @@
 {
 	"name": "bat",
-	"version": "0.10.9",
+	"version": "1.0.0",
 	"private": true,
 	"packageManager": "pnpm@10.28.1",
 	"workspaces": ["packages/*"],

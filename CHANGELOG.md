@@ -1,6 +1,8 @@
 # Changelog
 
-## v0.10.9 (2026-04-04)
+## v1.0.0 (2026-04-04)
+
+🎉 **First stable release!**
 
 ### Dashboard
 
@@ -10,6 +12,7 @@
 
 - Update Next.js 16.2.1 → 16.2.2
 - Add osv-scanner ignore config for upstream vulnerabilities (Next.js GHSA-5f7q-jpqc-wp7h, undici via workerd)
+- Remove blog.nocoo.cloud from VPS fleet (server decommissioned)
 
 ## v0.10.8 (2026-04-03)
 
