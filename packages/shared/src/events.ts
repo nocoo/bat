@@ -66,3 +66,12 @@ export const EVENT_BODY_MAX_BYTES = 16_384; // 16 KB
 export const EVENT_TAGS_MAX_COUNT = 10;
 export const EVENT_TAG_MAX_LENGTH = 50;
 export const EVENT_RETENTION_DAYS = 30;
+
+// --- Paginated response ---
+
+export interface EventsListResponse {
+	items: EventItem[];
+	total: number;
+	limit: number;
+	offset: number;
+}
