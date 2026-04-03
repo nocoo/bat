@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.1 (2026-04-04)
+
+### Dashboard
+
+- **Events pagination** — Add offset-based pagination to Events page with 30 items per page, Previous/Next controls, and total count display
+
+### API
+
+- **Events list pagination** — `GET /api/events` now returns `EventsListResponse` with `items`, `total`, `limit`, `offset` fields
+
 ## v1.0.0 (2026-04-04)
 
 🎉 **First stable release!**
