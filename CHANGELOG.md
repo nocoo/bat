@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.10.9 (2026-04-04)
+
+### Dashboard
+
+- **TimeRangePicker redesign** — Align with Basalt B-4 PeriodSelector spec: segmented control with `bg-secondary` container and `bg-card shadow-sm` selected state
+
+### Chores
+
+- Update Next.js 16.2.1 → 16.2.2
+- Add osv-scanner ignore config for upstream vulnerabilities (Next.js GHSA-5f7q-jpqc-wp7h, undici via workerd)
+
 ## v0.10.8 (2026-04-03)
 
 ### Performance
