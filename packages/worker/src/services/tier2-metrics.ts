@@ -1,15 +1,14 @@
 // Tier 2 metrics insertion and query service
 import type { Tier2Payload, Tier2Snapshot } from "@bat/shared";
 
-/** Insert a Tier 2 snapshot, storing each section as JSON text.
- *  Uses INSERT OR IGNORE to silently skip duplicates (same host_id + ts).
- *  Returns true if a row was actually inserted. */
-export async function insertTier2Snapshot(
+/** Build prepared statement for INSERT OR IGNORE into tier2_snapshots.
+ *  Use with db.batch() for combined operations. */
+export function buildInsertTier2Stmt(
 	db: D1Database,
 	hostId: string,
 	payload: Tier2Payload,
-): Promise<boolean> {
-	const result = await db
+): D1PreparedStatement {
+	return db
 		.prepare(
 			`INSERT OR IGNORE INTO tier2_snapshots
   (host_id, ts, ports_json, systemd_json, security_json, docker_json, disk_deep_json, software_json, websites_json)
@@ -25,8 +24,18 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 			payload.disk_deep ? JSON.stringify(payload.disk_deep) : null,
 			payload.software ? JSON.stringify(payload.software) : null,
 			payload.websites ? JSON.stringify(payload.websites) : null,
-		)
-		.run();
+		);
+}
+
+/** Insert a Tier 2 snapshot, storing each section as JSON text.
+ *  Uses INSERT OR IGNORE to silently skip duplicates (same host_id + ts).
+ *  Returns true if a row was actually inserted. */
+export async function insertTier2Snapshot(
+	db: D1Database,
+	hostId: string,
+	payload: Tier2Payload,
+): Promise<boolean> {
+	const result = await buildInsertTier2Stmt(db, hostId, payload).run();
 	return result.meta.changes > 0;
 }
 

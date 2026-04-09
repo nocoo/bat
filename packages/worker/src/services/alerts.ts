@@ -384,6 +384,11 @@ function evaluateRules(payload: MetricsPayload): AlertEvalResult[] {
 /**
  * Evaluate alerts and update alert_states / alert_pending tables.
  * Called from ingest route after metrics insertion.
+ *
+ * Optimized to use db.batch() for reduced D1 roundtrips:
+ * - Batch 1: Instant rule writes + duration rule clears (no read needed)
+ * - Batch 2: Bulk fetch all pending states for fired duration rules
+ * - Batch 3: Duration rule writes based on fetched state
  */
 export async function evaluateAlerts(
 	db: D1Database,
@@ -393,102 +398,115 @@ export async function evaluateAlerts(
 ): Promise<void> {
 	const results = evaluateRules(payload);
 
+	// Collect statements by category
+	const immediateWrites: D1PreparedStatement[] = [];
+	const firedDurationRules: AlertEvalResult[] = [];
+
 	for (const result of results) {
 		if (result.durationSeconds === 0) {
-			// Instant rule
-			await handleInstantRule(db, hostId, result, now);
-		} else {
-			// Duration rule
-			await handleDurationRule(db, hostId, result, now);
-		}
-	}
-}
-
-async function handleInstantRule(
-	db: D1Database,
-	hostId: string,
-	result: AlertEvalResult,
-	now: number,
-): Promise<void> {
-	if (result.fired) {
-		// UPSERT alert_states
-		await db
-			.prepare(
-				`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
+			// Instant rule - no read needed, collect write statement
+			if (result.fired) {
+				immediateWrites.push(
+					db
+						.prepare(
+							`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
 VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT(host_id, rule_id) DO UPDATE SET
   severity = excluded.severity,
   value = excluded.value,
   triggered_at = excluded.triggered_at,
   message = excluded.message`,
-			)
-			.bind(hostId, result.ruleId, result.severity, result.value, now, result.message)
-			.run();
-	} else {
-		// Clear alert_states
-		await db
-			.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
-			.bind(hostId, result.ruleId)
-			.run();
-	}
-}
-
-async function handleDurationRule(
-	db: D1Database,
-	hostId: string,
-	result: AlertEvalResult,
-	now: number,
-): Promise<void> {
-	if (result.fired) {
-		// Check alert_pending for existing entry
-		const pending = await db
-			.prepare("SELECT first_seen FROM alert_pending WHERE host_id = ? AND rule_id = ?")
-			.bind(hostId, result.ruleId)
-			.first<{ first_seen: number }>();
-
-		if (pending) {
-			// Already tracking — check if duration exceeded
-			const elapsed = now - pending.first_seen;
-			if (elapsed >= result.durationSeconds) {
-				// Promote to alert_states
-				await db
-					.prepare(
-						`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
-VALUES (?, ?, ?, ?, ?, ?)
-ON CONFLICT(host_id, rule_id) DO UPDATE SET
-  severity = excluded.severity,
-  value = excluded.value,
-  triggered_at = excluded.triggered_at,
-  message = excluded.message`,
-					)
-					.bind(hostId, result.ruleId, result.severity, result.value, now, result.message)
-					.run();
+						)
+						.bind(hostId, result.ruleId, result.severity, result.value, now, result.message),
+				);
+			} else {
+				immediateWrites.push(
+					db
+						.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
+						.bind(hostId, result.ruleId),
+				);
 			}
-			// Update last_value in pending
-			await db
-				.prepare("UPDATE alert_pending SET last_value = ? WHERE host_id = ? AND rule_id = ?")
-				.bind(result.value, hostId, result.ruleId)
-				.run();
+		} else if (result.fired) {
+			// Duration rule fired - needs pending state check
+			firedDurationRules.push(result);
 		} else {
-			// First time exceeding threshold — start tracking
-			await db
-				.prepare(
-					`INSERT INTO alert_pending (host_id, rule_id, first_seen, last_value)
-VALUES (?, ?, ?, ?)`,
-				)
-				.bind(hostId, result.ruleId, now, result.value)
-				.run();
+			// Duration rule cleared - no read needed, delete from both tables
+			immediateWrites.push(
+				db
+					.prepare("DELETE FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+					.bind(hostId, result.ruleId),
+			);
+			immediateWrites.push(
+				db
+					.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
+					.bind(hostId, result.ruleId),
+			);
 		}
-	} else {
-		// Condition cleared — remove from both tables
-		await db
-			.prepare("DELETE FROM alert_pending WHERE host_id = ? AND rule_id = ?")
-			.bind(hostId, result.ruleId)
-			.run();
-		await db
-			.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
-			.bind(hostId, result.ruleId)
-			.run();
+	}
+
+	// Batch 1: Execute all immediate writes (instant rules + cleared duration rules)
+	if (immediateWrites.length > 0) {
+		await db.batch(immediateWrites);
+	}
+
+	// Batch 2 & 3: Handle fired duration rules
+	if (firedDurationRules.length > 0) {
+		// Bulk fetch all pending states for this host
+		const pendingRows = await db
+			.prepare("SELECT rule_id, first_seen FROM alert_pending WHERE host_id = ?")
+			.bind(hostId)
+			.all<{ rule_id: string; first_seen: number }>();
+
+		const pendingMap = new Map(pendingRows.results?.map((r) => [r.rule_id, r.first_seen]) ?? []);
+
+		// Collect duration rule writes
+		const durationWrites: D1PreparedStatement[] = [];
+
+		for (const result of firedDurationRules) {
+			const firstSeen = pendingMap.get(result.ruleId);
+
+			if (firstSeen != null) {
+				// Already tracking - check if duration exceeded
+				const elapsed = now - firstSeen;
+				if (elapsed >= result.durationSeconds) {
+					// Promote to alert_states
+					durationWrites.push(
+						db
+							.prepare(
+								`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(host_id, rule_id) DO UPDATE SET
+  severity = excluded.severity,
+  value = excluded.value,
+  triggered_at = excluded.triggered_at,
+  message = excluded.message`,
+							)
+							.bind(hostId, result.ruleId, result.severity, result.value, now, result.message),
+					);
+				}
+				// Update last_value in pending
+				durationWrites.push(
+					db
+						.prepare("UPDATE alert_pending SET last_value = ? WHERE host_id = ? AND rule_id = ?")
+						.bind(result.value, hostId, result.ruleId),
+				);
+			} else {
+				// First time exceeding threshold - start tracking
+				durationWrites.push(
+					db
+						.prepare(
+							`INSERT INTO alert_pending (host_id, rule_id, first_seen, last_value)
+VALUES (?, ?, ?, ?)`,
+						)
+						.bind(hostId, result.ruleId, now, result.value),
+				);
+			}
+		}
+
+		// Batch 3: Execute all duration rule writes
+		if (durationWrites.length > 0) {
+			await db.batch(durationWrites);
+		}
 	}
 }
 
