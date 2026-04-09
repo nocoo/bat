@@ -1,15 +1,14 @@
 // Metrics insertion service — flattens MetricsPayload to D1 row
 import type { MetricsPayload } from "@bat/shared";
 
-/** Insert a raw metrics row into metrics_raw, flattening nested fields.
- *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries.
- *  Returns true if a row was actually inserted, false if it was a duplicate. */
-export async function insertMetricsRaw(
+/** Build prepared statement for INSERT OR IGNORE into metrics_raw.
+ *  Use with db.batch() for combined operations. */
+export function buildInsertMetricsStmt(
 	db: D1Database,
 	hostId: string,
 	payload: MetricsPayload,
-): Promise<boolean> {
-	const result = await db
+): D1PreparedStatement {
+	return db
 		.prepare(
 			`INSERT OR IGNORE INTO metrics_raw
   (host_id, ts, cpu_load1, cpu_load5, cpu_load15, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_count,
@@ -160,9 +159,35 @@ VALUES (${new Array(98).fill("?").join(", ")})`,
 			payload.conntrack?.max ?? null,
 			// Top processes (JSON array)
 			payload.top_processes ? JSON.stringify(payload.top_processes) : null,
-		)
-		.run();
+		);
+}
+
+/** Insert a raw metrics row into metrics_raw, flattening nested fields.
+ *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries.
+ *  Returns true if a row was actually inserted, false if it was a duplicate. */
+export async function insertMetricsRaw(
+	db: D1Database,
+	hostId: string,
+	payload: MetricsPayload,
+): Promise<boolean> {
+	const result = await buildInsertMetricsStmt(db, hostId, payload).run();
 	return result.meta.changes > 0;
+}
+
+/** Build prepared statement for ensuring host exists. */
+export function buildEnsureHostStmt(
+	db: D1Database,
+	hostId: string,
+	hostname: string,
+	now: number,
+): D1PreparedStatement {
+	return db
+		.prepare(
+			`INSERT INTO hosts (host_id, hostname, last_seen)
+VALUES (?, ?, ?)
+ON CONFLICT(host_id) DO NOTHING`,
+		)
+		.bind(hostId, hostname, now);
 }
 
 /** Ensure host record exists (FK target for metrics_raw) without updating last_seen.
@@ -181,6 +206,15 @@ ON CONFLICT(host_id) DO NOTHING`,
 		)
 		.bind(hostId, hostname, now)
 		.run();
+}
+
+/** Build prepared statement for updating host last_seen. */
+export function buildUpdateLastSeenStmt(
+	db: D1Database,
+	hostId: string,
+	now: number,
+): D1PreparedStatement {
+	return db.prepare("UPDATE hosts SET last_seen = ? WHERE host_id = ?").bind(now, hostId);
 }
 
 /** Update host last_seen timestamp. Called only when new metrics are actually inserted. */

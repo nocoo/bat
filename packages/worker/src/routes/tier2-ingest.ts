@@ -1,9 +1,9 @@
 // POST /api/tier2 — receive and store Tier 2 data from probes
 import type { Tier2Payload } from "@bat/shared";
 import type { Context } from "hono";
-import { ensureHostExists, updateHostLastSeen } from "../services/metrics.js";
+import { buildEnsureHostStmt, buildUpdateLastSeenStmt } from "../services/metrics.js";
 import { evaluateTier2Alerts } from "../services/tier2-alerts.js";
-import { insertTier2Snapshot } from "../services/tier2-metrics.js";
+import { buildInsertTier2Stmt } from "../services/tier2-metrics.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -68,19 +68,26 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Ensure host record exists (FK target)
-	await ensureHostExists(db, body.host_id, body.host_id, workerNow);
+	// Batch 1: ensureHostExists + insertTier2Snapshot in single roundtrip
+	const batchResults = await db.batch([
+		buildEnsureHostStmt(db, body.host_id, body.host_id, workerNow),
+		buildInsertTier2Stmt(db, body.host_id, body),
+	]);
+	const snapshotResult = batchResults[1];
 
-	// Insert tier2 snapshot — returns false if duplicate (same host_id + ts)
-	const inserted = await insertTier2Snapshot(db, body.host_id, body);
+	// Check if snapshot was actually inserted (not a duplicate)
+	const inserted = (snapshotResult?.meta?.changes ?? 0) > 0;
 
 	// Only update last_seen and evaluate alerts for genuinely new data
 	if (inserted) {
-		await updateHostLastSeen(db, body.host_id, workerNow);
-		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
-
 		// Merge slow-drift inventory fields into hosts table (2-state wire semantics)
 		const raw = body as unknown as Record<string, unknown>;
+		const inventoryWrites: D1PreparedStatement[] = [];
+
+		// Always update last_seen
+		inventoryWrites.push(buildUpdateLastSeenStmt(db, body.host_id, workerNow));
+
+		// Build dynamic UPDATE for inventory fields if present
 		const clauses: string[] = [];
 		const values: unknown[] = [];
 
@@ -98,11 +105,18 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 		}
 
 		if (clauses.length > 0) {
-			await db
-				.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
-				.bind(...values, body.host_id)
-				.run();
+			inventoryWrites.push(
+				db
+					.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
+					.bind(...values, body.host_id),
+			);
 		}
+
+		// Batch 2: updateLastSeen + inventory updates
+		await db.batch(inventoryWrites);
+
+		// Batch 3: evaluate alerts (uses its own batching internally)
+		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
 	}
 
 	return c.body(null, 204);

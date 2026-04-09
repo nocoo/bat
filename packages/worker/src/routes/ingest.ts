@@ -3,7 +3,11 @@ import type { MetricsPayload } from "@bat/shared";
 import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { evaluateAlerts } from "../services/alerts.js";
-import { ensureHostExists, insertMetricsRaw, updateHostLastSeen } from "../services/metrics.js";
+import {
+	buildEnsureHostStmt,
+	buildInsertMetricsStmt,
+	buildUpdateLastSeenStmt,
+} from "../services/metrics.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -142,17 +146,19 @@ export async function ingestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Ensure host record exists (FK target) without updating last_seen
-	await ensureHostExists(db, body.host_id, body.host_id, workerNow);
+	// Batch 1: ensureHostExists + insertMetricsRaw in single roundtrip
+	const batchResults = await db.batch([
+		buildEnsureHostStmt(db, body.host_id, body.host_id, workerNow),
+		buildInsertMetricsStmt(db, body.host_id, body),
+	]);
+	const metricsResult = batchResults[1];
 
-	// Insert metrics — returns false if this is a duplicate (same host_id + ts)
-	const inserted = await insertMetricsRaw(db, body.host_id, body);
+	// Check if metrics were actually inserted (not a duplicate)
+	const inserted = (metricsResult?.meta?.changes ?? 0) > 0;
 
 	// Only update last_seen and evaluate alerts for genuinely new data.
 	// Retried payloads with identical timestamps are no-ops from here.
 	if (inserted) {
-		await updateHostLastSeen(db, body.host_id, workerNow);
-
 		// Check maintenance window — skip alert evaluation + purge alert_pending
 		const nowHHMM = toUtcHHMM(workerNow);
 		const inMaintenance =
@@ -161,9 +167,14 @@ export async function ingestRoute(c: Context<AppEnv>) {
 			isInMaintenanceWindow(nowHHMM, existing.maintenance_start, existing.maintenance_end);
 
 		if (inMaintenance) {
-			// Purge duration rule timers to prevent stale first_seen accumulation
-			await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(body.host_id).run();
+			// Batch: updateLastSeen + purge alert_pending
+			await db.batch([
+				buildUpdateLastSeenStmt(db, body.host_id, workerNow),
+				db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(body.host_id),
+			]);
 		} else {
+			// Update last_seen first, then evaluate alerts (which uses its own batching)
+			await db.batch([buildUpdateLastSeenStmt(db, body.host_id, workerNow)]);
 			await evaluateAlerts(db, body.host_id, body, workerNow);
 		}
 	}
