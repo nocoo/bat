@@ -59,9 +59,13 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 	#sql: string;
 	#bindings: unknown[] = [];
 
+	// Expose SQL for batch() to determine query type
+	readonly _sql: string;
+
 	constructor(db: Database, sql: string) {
 		this.#db = db;
 		this.#sql = sql;
+		this._sql = sql;
 	}
 
 	bind(...values: unknown[]): D1PreparedStatement {
@@ -296,7 +300,14 @@ export function createMockD1(): D1Database {
 		async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
 			const results: D1Result<T>[] = [];
 			for (const stmt of statements) {
-				results.push(await (stmt as MockD1PreparedStatement).run<T>());
+				// Use all() for SELECT queries, run() for mutations
+				const mockStmt = stmt as MockD1PreparedStatement;
+				const sql = mockStmt._sql;
+				if (sql.trim().toUpperCase().startsWith("SELECT")) {
+					results.push(await mockStmt.all<T>());
+				} else {
+					results.push(await mockStmt.run<T>());
+				}
 			}
 			return results;
 		},
