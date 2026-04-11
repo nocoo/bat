@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.0.3 (2026-04-11)
+
+### Performance
+
+- **D1 rows_read optimization** — Replace window function query in `/api/hosts` with batched per-host LIMIT 1 queries, reducing rows_read from 322,900 to 4 (for 4 hosts)
+- **Revert ineffective batch optimization** — Removed `db.batch()` refactor that didn't reduce D1 billing (D1 bills by rows read/written, not roundtrips)
+
+### Security
+
+- Update hono 4.7.0 → 4.12.12 to fix security vulnerabilities
+- Update Next.js 16.2.2 → 16.2.3 (GHSA-q4gf-8mx6-v5v3)
+
 ## v1.0.1 (2026-04-04)
 
 ### Dashboard
