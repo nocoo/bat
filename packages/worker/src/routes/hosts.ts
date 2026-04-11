@@ -115,23 +115,24 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	const hostIds = hosts.map((h) => h.host_id);
 	const placeholders = hostIds.map(() => "?").join(", ");
 
-	// 2. Latest metrics per host via window function
-	const metricsResult = await db
-		.prepare(
-			`SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
-FROM (
-  SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json,
-    ROW_NUMBER() OVER (PARTITION BY host_id ORDER BY ts DESC) as rn
-  FROM metrics_raw
-  WHERE host_id IN (${placeholders})
-) WHERE rn = 1`,
-		)
-		.bind(...hostIds)
-		.all<LatestMetrics>();
+	// 2. Latest metrics per host — use per-host LIMIT 1 queries to leverage index
+	// This reduces rows_read from O(total_rows) to O(host_count) by avoiding full table scan
+	const metricsQueries = hostIds.map((hostId) =>
+		db
+			.prepare(
+				`SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
+FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
+			)
+			.bind(hostId),
+	);
+	const metricsResults = await db.batch(metricsQueries);
 
 	const metricsMap = new Map<string, LatestMetrics>();
-	for (const m of metricsResult.results) {
-		metricsMap.set(m.host_id, m);
+	for (const result of metricsResults) {
+		const row = result.results?.[0] as LatestMetrics | undefined;
+		if (row) {
+			metricsMap.set(row.host_id, row);
+		}
 	}
 
 	// 3. Alert counts per host
