@@ -122,9 +122,6 @@ function evaluateTier2Rules(
 /**
  * Evaluate Tier 2 alerts and update alert_states / alert_pending tables.
  * Called from tier2-ingest route after snapshot insertion.
- *
- * Optimized to use db.batch() — all Tier 2 rules are instant (no duration),
- * so we can batch all writes in a single roundtrip.
  */
 export async function evaluateTier2Alerts(
 	db: D1Database,
@@ -141,13 +138,58 @@ export async function evaluateTier2Alerts(
 
 	const results = evaluateTier2Rules(payload, perHostAllowed);
 
-	// All Tier 2 rules are instant — collect all writes and batch them
-	const writes: D1PreparedStatement[] = [];
-
 	for (const result of results) {
-		if (result.fired) {
-			writes.push(
-				db
+		if (result.durationSeconds === 0) {
+			await handleInstantRule(db, hostId, result, now);
+		} else {
+			await handleDurationRule(db, hostId, result, now);
+		}
+	}
+}
+
+async function handleInstantRule(
+	db: D1Database,
+	hostId: string,
+	result: AlertEvalResult,
+	now: number,
+): Promise<void> {
+	if (result.fired) {
+		await db
+			.prepare(
+				`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
+VALUES (?, ?, ?, ?, ?, ?)
+ON CONFLICT(host_id, rule_id) DO UPDATE SET
+  severity = excluded.severity,
+  value = excluded.value,
+  triggered_at = excluded.triggered_at,
+  message = excluded.message`,
+			)
+			.bind(hostId, result.ruleId, result.severity, result.value, now, result.message)
+			.run();
+	} else {
+		await db
+			.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, result.ruleId)
+			.run();
+	}
+}
+
+async function handleDurationRule(
+	db: D1Database,
+	hostId: string,
+	result: AlertEvalResult,
+	now: number,
+): Promise<void> {
+	if (result.fired) {
+		const pending = await db
+			.prepare("SELECT first_seen FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, result.ruleId)
+			.first<{ first_seen: number }>();
+
+		if (pending) {
+			const elapsed = now - pending.first_seen;
+			if (elapsed >= result.durationSeconds) {
+				await db
 					.prepare(
 						`INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message)
 VALUES (?, ?, ?, ?, ?, ?)
@@ -157,19 +199,31 @@ ON CONFLICT(host_id, rule_id) DO UPDATE SET
   triggered_at = excluded.triggered_at,
   message = excluded.message`,
 					)
-					.bind(hostId, result.ruleId, result.severity, result.value, now, result.message),
-			);
+					.bind(hostId, result.ruleId, result.severity, result.value, now, result.message)
+					.run();
+			}
+			await db
+				.prepare("UPDATE alert_pending SET last_value = ? WHERE host_id = ? AND rule_id = ?")
+				.bind(result.value, hostId, result.ruleId)
+				.run();
 		} else {
-			writes.push(
-				db
-					.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
-					.bind(hostId, result.ruleId),
-			);
+			await db
+				.prepare(
+					`INSERT INTO alert_pending (host_id, rule_id, first_seen, last_value)
+VALUES (?, ?, ?, ?)`,
+				)
+				.bind(hostId, result.ruleId, now, result.value)
+				.run();
 		}
-	}
-
-	if (writes.length > 0) {
-		await db.batch(writes);
+	} else {
+		await db
+			.prepare("DELETE FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, result.ruleId)
+			.run();
+		await db
+			.prepare("DELETE FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind(hostId, result.ruleId)
+			.run();
 	}
 }
 
