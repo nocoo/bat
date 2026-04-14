@@ -4,7 +4,7 @@
 // Prerequisites:
 //   - wrangler installed (devDependency)
 //
-// Run: pnpm --filter @bat/worker test:e2e
+// Run: bun turbo test:e2e --filter=@bat/worker
 //
 // The test suite:
 //   1. Writes .dev.vars with test secrets

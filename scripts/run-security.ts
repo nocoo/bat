@@ -10,10 +10,10 @@ import { $ } from "bun";
 
 const results: { tool: string; ok: boolean; output: string }[] = [];
 
-// 1. osv-scanner — scan pnpm-lock.yaml for known CVEs
-console.info("→ G2: osv-scanner (pnpm-lock.yaml)");
+// 1. osv-scanner — scan bun.lock for known CVEs
+console.info("→ G2: osv-scanner (bun.lock)");
 try {
-	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=pnpm-lock.yaml`.quiet();
+	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=bun.lock`.quiet();
 	results.push({ tool: "osv-scanner", ok: true, output: osv.text() });
 	console.info("  ✔ osv-scanner (JS): no vulnerabilities found");
 } catch (e: unknown) {

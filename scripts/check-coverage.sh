@@ -122,7 +122,7 @@ echo "---"
 failed=0
 
 # TypeScript packages — run bun test directly in each package dir
-# (pnpm --filter ... test -- --coverage breaks: bun treats --coverage after -- as a file filter)
+# (bun --filter ... test -- --coverage breaks: bun treats --coverage after -- as a file filter)
 for pkg in shared worker dashboard; do
   pkg_dir="packages/${pkg}"
   filter="@bat/${pkg}"

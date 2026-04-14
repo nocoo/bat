@@ -2,7 +2,7 @@
 	"name": "bat",
 	"version": "1.0.3",
 	"private": true,
-	"packageManager": "pnpm@10.28.1",
+	"packageManager": "bun@1.3.11",
 	"workspaces": ["packages/*"],
 	"scripts": {
 		"dev": "turbo dev --filter=@bat/dashboard",
@@ -15,9 +15,7 @@
 		"security": "bun run scripts/run-security.ts",
 		"prepare": "husky"
 	},
-	"pnpm": {
-		"onlyBuiltDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"]
-	},
+	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"],
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"husky": "^9.1.0",
