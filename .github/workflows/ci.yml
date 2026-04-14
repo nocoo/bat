@@ -1,0 +1,43 @@
+# Bat CI — L1 + G1 + G2 via base-ci, L2 local wrangler E2E
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # L1 (Unit tests) + G1 (Typecheck + Lint) + G2 (Gitleaks + OSV)
+  quality:
+    uses: nocoo/base-ci/.github/workflows/bun-quality.yml@v2026
+    with:
+      bun-version: "1.3.11"
+      pre-command: "bun run build"
+      osv-config: "osv-scanner.toml"
+      enable-l2: "false"
+      upload-coverage: "false"
+
+  # L2: Worker E2E — local wrangler miniflare (no external secrets needed)
+  l2-e2e:
+    name: "L2 Worker E2E"
+    needs: [quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build shared
+        run: bun run build
+
+      - name: "L2: Worker E2E tests"
+        run: bun turbo test:e2e --filter=@bat/worker
