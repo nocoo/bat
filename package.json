@@ -12,6 +12,7 @@
 		"lint": "biome check --error-on-warnings .",
 		"lint:fix": "biome check --write .",
 		"test": "turbo test",
+		"test:unit:coverage": "turbo test:unit:coverage",
 		"security": "bun run scripts/run-security.ts",
 		"prepare": "husky"
 	},
