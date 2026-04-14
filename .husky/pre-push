@@ -9,7 +9,7 @@ echo "🦇 bat pre-push — L2 + G2"
 pids=()
 
 echo "→ L2: Worker API E2E tests"
-pnpm --filter @bat/worker test:e2e &
+bun turbo test:e2e --filter=@bat/worker &
 pids+=($!)
 
 echo "→ G2: Security gate (osv-scanner + gitleaks)"

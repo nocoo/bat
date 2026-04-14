@@ -66,6 +66,12 @@
       },
     },
   },
+  "trustedDependencies": [
+    "sharp",
+    "esbuild",
+    "@biomejs/biome",
+    "workerd",
+  ],
   "overrides": {
     "undici": ">=7.24.0",
   },
