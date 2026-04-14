@@ -9,7 +9,7 @@
 		"dev:all": "turbo dev",
 		"build": "turbo build",
 		"typecheck": "turbo typecheck",
-		"lint": "biome check .",
+		"lint": "biome check --error-on-warnings .",
 		"lint:fix": "biome check --write .",
 		"test": "turbo test",
 		"security": "bun run scripts/run-security.ts",
