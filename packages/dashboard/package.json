@@ -8,6 +8,7 @@
 		"start": "next start --port 7025",
 		"typecheck": "tsc --noEmit",
 		"test": "bun test src/",
+		"test:unit:coverage": "bun test --coverage src/",
 		"test:e2e": "npx playwright test",
 		"lint": "biome check ."
 	},
