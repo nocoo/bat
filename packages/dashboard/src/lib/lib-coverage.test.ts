@@ -641,17 +641,20 @@ describe("SWR hooks", () => {
 	});
 
 	describe("useEvents", () => {
-		test("uses 'events' key when no hostId", async () => {
+		test("uses 'events-page-1' key when no hostId", async () => {
 			const { useEvents } = await import("./hooks/use-events");
 			useEvents();
 			const swr = getSwrCall();
-			expect(swr.key).toBe("events");
+			expect(swr.key).toBe("events-page-1");
 			expect(swr.options).toEqual(
 				expect.objectContaining({ refreshInterval: 30_000, keepPreviousData: true }),
 			);
 			const fetcher = swr.fetcher as () => Promise<unknown>;
 			await fetcher();
-			expect(fetchAPICalls[0]).toEqual({ path: "/api/events", params: undefined });
+			expect(fetchAPICalls[0]).toEqual({
+				path: "/api/events",
+				params: { limit: "30", offset: "0" },
+			});
 		});
 
 		test("uses host-specific key and passes host_id param when hostId provided", async () => {
@@ -659,12 +662,12 @@ describe("SWR hooks", () => {
 			fetchAPICalls.length = 0;
 			useEvents("host-xyz");
 			const swr = getSwrCall();
-			expect(swr.key).toBe("events-host-xyz");
+			expect(swr.key).toBe("events-host-xyz-page-1");
 			const fetcher = swr.fetcher as () => Promise<unknown>;
 			await fetcher();
 			expect(fetchAPICalls[0]).toEqual({
 				path: "/api/events",
-				params: { host_id: "host-xyz" },
+				params: { limit: "30", offset: "0", host_id: "host-xyz" },
 			});
 		});
 	});
