@@ -29,6 +29,7 @@
 		"*.{ts,tsx,js,jsx,json,css}": ["biome check --error-on-warnings --no-errors-on-unmatched"]
 	},
 	"overrides": {
-		"undici": ">=7.24.0"
+		"undici": ">=7.24.0",
+		"next": "16.2.3"
 	}
 }
