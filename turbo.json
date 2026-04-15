@@ -11,9 +11,6 @@
 		"test": {
 			"dependsOn": ["^build"]
 		},
-		"test:unit:coverage": {
-			"dependsOn": ["^build"]
-		},
 		"test:e2e": {
 			"dependsOn": ["^build"]
 		},
