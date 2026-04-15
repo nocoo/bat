@@ -100,21 +100,21 @@ bat/
 | Worker | [Hono](https://hono.dev/) · [Cloudflare Workers](https://workers.cloudflare.com/) · [D1](https://developers.cloudflare.com/d1/) |
 | Dashboard | [Next.js 16](https://nextjs.org/) · [React 19](https://react.dev/) · [SWR](https://swr.vercel.app/) · [Recharts](https://recharts.org/) |
 | 认证 | [NextAuth.js](https://next-auth.js.org/) · Google OAuth |
-| 工具链 | [pnpm](https://pnpm.io/) · [Turbo](https://turbo.build/) · [Biome](https://biomejs.dev/) · [Husky](https://typicode.github.io/husky/) |
+| 工具链 | [Bun](https://bun.sh/) · [Turbo](https://turbo.build/) · [Biome](https://biomejs.dev/) · [Husky](https://typicode.github.io/husky/) |
 
 ## 开发
 
 ### 环境要求
 
-- Node.js 22+、pnpm 10+、Rust 1.80+
+- Bun 1.3+、Rust 1.80+
 - Wrangler CLI（Worker 开发）
 
 ### 快速开始
 
 ```bash
-pnpm install
-pnpm --filter @bat/worker dev       # Worker: localhost:8787
-pnpm --filter @bat/dashboard dev    # Dashboard: localhost:7025
+bun install
+bun --filter @bat/worker dev       # Worker: localhost:8787
+bun --filter @bat/dashboard dev    # Dashboard: localhost:7025
 cd probe && cargo build --release   # Probe
 ```
 
@@ -122,10 +122,10 @@ cd probe && cargo build --release   # Probe
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm turbo typecheck` | 全量类型检查 |
-| `pnpm turbo test` | 运行所有测试 |
-| `pnpm lint` | Biome 代码检查 |
-| `pnpm lint:fix` | 自动修复 lint 问题 |
+| `bun turbo typecheck` | 全量类型检查 |
+| `bun turbo test` | 运行所有测试 |
+| `bun run lint` | Biome 代码检查 |
+| `bun run lint:fix` | 自动修复 lint 问题 |
 | `scripts/sync-version.sh` | 同步版本号到所有子包 |
 | `scripts/resize-logos.py` | 从 logo.png 生成所有派生图标 |
 
@@ -147,7 +147,7 @@ cd probe && cargo build --release   # Probe
 | **合计** | **225** | |
 
 ```bash
-pnpm turbo test        # TypeScript 测试
+bun turbo test          # TypeScript 测试
 cd probe && cargo test  # Rust 测试
 ```
 
