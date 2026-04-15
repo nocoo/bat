@@ -207,7 +207,7 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 														}
 													}}
 													disabled={adding}
-													className="h-6 flex-1 rounded border border-input bg-background px-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+													className="h-6 flex-1 rounded border border-border bg-secondary hover:border-foreground/20 px-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
 													maxLength={200}
 												/>
 												<button
@@ -256,7 +256,7 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 							value={portInput}
 							onChange={(e) => setPortInput(e.target.value)}
 							disabled={adding}
-							className="h-8 w-20 rounded-md border border-input bg-background px-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+							className="h-8 w-20 rounded-md border border-border bg-secondary hover:border-foreground/20 px-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 							min={1}
 							max={65535}
 						/>
@@ -272,7 +272,7 @@ export function AllowedPortsPanel({ hostId, hostAlerts }: AllowedPortsPanelProps
 								}
 							}}
 							disabled={adding}
-							className="h-8 flex-1 rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+							className="h-8 flex-1 rounded-md border border-border bg-secondary hover:border-foreground/20 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 							maxLength={200}
 						/>
 						<button
