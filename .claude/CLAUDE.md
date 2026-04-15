@@ -35,6 +35,8 @@
 - Probe: `cargo test`
 - Pre-commit hook runs: typecheck → lint → unit tests → rust checks (clippy + test)
 - Coverage thresholds enforced by `scripts/check-coverage.sh`
+- **CI**: GitHub Actions via `nocoo/base-ci` reusable workflow — L1+G1+G2, plus custom L2 job for local wrangler E2E
+- **Package manager**: bun (declared in `packageManager` field, single `bun.lock` lockfile)
 
 ## Probe Build & Release
 
@@ -177,7 +179,7 @@ Requires `socket.io-client` (`bun add -d socket.io-client`). When curl times out
 
 ## Retrospective
 
-- **bun.lock must be synced after pnpm install**: Railway Docker build uses `bun install --frozen-lockfile` which fails if `bun.lock` is out of sync with `pnpm-lock.yaml`. After running `pnpm install` (e.g., during version bump or dependency update), always run `bun install` to regenerate `bun.lock`, then commit both lockfiles together.
+- **bun is the sole package manager**: pnpm was removed. Only `bun.lock` exists. Husky hooks use `bun turbo` / `bunx`. Docker builds use `oven/bun:1` + `bun install --frozen-lockfile`. Do not introduce pnpm references.
 - **E2E test migration list must be manually updated**: `packages/worker/test/e2e/wrangler.test.ts` has a hardcoded migration list. When adding new migrations, also add them to this list — otherwise E2E tests fail with 500 on routes that touch new columns, and `git push` is blocked by the pre-push hook.
 - **Docker Hub TLS timeout workaround**: `docker build` may fail with TLS handshake timeout to `auth.docker.io`, while `docker pull` succeeds (different auth path). If build fails, try `docker pull rust:1-alpine` first to cache the image, then retry `docker build`.
 - **Cargo cache bust in Docker**: When using a dummy `main.rs` to cache deps, Docker `COPY` preserves original file mtime. If the real source has an older mtime than the cached build artifact, `cargo build` skips recompilation and produces the dummy binary. Fix: `touch src/main.rs` before `cargo build`.
