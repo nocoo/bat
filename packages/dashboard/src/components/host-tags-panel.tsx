@@ -203,7 +203,7 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 									onBlur={handleBlur}
 									onKeyDown={handleKeyDown}
 									disabled={adding}
-									className="h-8 w-full rounded-md border border-input bg-background px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+									className="h-8 w-full rounded-md border border-border bg-secondary hover:border-foreground/20 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 									maxLength={32}
 								/>
 							</div>
