@@ -32,5 +32,8 @@
 	"overrides": {
 		"undici": ">=7.24.0",
 		"next": "16.2.3"
+	},
+	"dependencies": {
+		"hono": "^4.12.14"
 	}
 }
