@@ -182,6 +182,8 @@ function bumpVersion(current: string, bumpArg: string): string {
 			return `${major}.${minor + 1}.0`;
 		case "patch":
 			return `${major}.${minor}.${patch + 1}`;
+		default:
+			throw new Error(`Unexpected bump type: ${bumpArg}`);
 	}
 }
 
@@ -365,6 +367,7 @@ async function main(): Promise<void> {
 	const bumpArg = rawArgs.find((a) => a !== "--dry-run") ?? "patch";
 
 	if (isDryRun) {
+		console.info("🏃 Dry-run mode enabled — no changes will be written.");
 	}
 
 	// Clean working tree
@@ -376,7 +379,7 @@ async function main(): Promise<void> {
 	}
 
 	// On a branch
-	const _branch = await runOrDie(
+	await runOrDie(
 		"git",
 		["symbolic-ref", "--short", "HEAD"],
 		"Detached HEAD — checkout a branch first",
@@ -386,6 +389,7 @@ async function main(): Promise<void> {
 	const ghResult = await run("gh", ["auth", "status"]);
 	const ghAuthed = ghResult.code === 0;
 	if (!ghAuthed) {
+		console.warn("⚠️  gh CLI is not authenticated — GitHub release will be skipped.");
 	}
 
 	// Current version & bump
@@ -394,7 +398,8 @@ async function main(): Promise<void> {
 	const lastTag = await getLastTag();
 
 	if (isDryRun) {
-		for (const _t of VERSION_TARGETS) {
+		for (const t of VERSION_TARGETS) {
+			console.info(`  [dry-run] would update ${t.path}`);
 		}
 	} else {
 		let failures = 0;
@@ -419,12 +424,14 @@ async function main(): Promise<void> {
 
 	const commits = await getCommitsSinceTag(lastTag);
 	if (commits.length === 0) {
+		console.warn("⚠️  No commits found since last tag.");
 	}
 
 	const sections = classifyCommits(commits);
 	const changelogSection = formatChangelogSection(newVersion, sections);
 
 	if (isDryRun) {
+		console.info("[dry-run] Would update CHANGELOG.md");
 	} else {
 		updateChangelog(changelogSection);
 	}
@@ -448,16 +455,19 @@ async function main(): Promise<void> {
 		console.error(`❌ Found stale version "${currentVersion}" in source files:`);
 		console.error(rgResult.stdout.trim());
 		if (isDryRun) {
+			console.warn("   [dry-run] Stale versions detected but continuing.");
 		} else {
 			console.error("   Aborting. Update these files before releasing.");
 			process.exit(1);
 		}
 	} else {
+		console.info("✅ No stale version references found.");
 	}
 
 	const filesToStage = [...VERSION_TARGETS.map((t) => t.path), "bun.lock", "CHANGELOG.md"];
 
 	if (isDryRun) {
+		console.info("[dry-run] Would commit and stage files.");
 	} else {
 		await runOrDie("git", ["add", ...filesToStage], "Failed to stage files");
 		const commitResult = await run("git", ["commit", "-m", `release: v${newVersion}`]);
@@ -471,6 +481,7 @@ async function main(): Promise<void> {
 		}
 	}
 	if (ghAuthed) {
+		console.info("✅ GitHub CLI authenticated.");
 	}
 
 	if (isDryRun) {
@@ -523,6 +534,7 @@ async function main(): Promise<void> {
 		} else {
 			const releaseUrl = releaseResult.stdout.trim();
 			if (releaseUrl) {
+				console.info(`🔗 Release: ${releaseUrl}`);
 			}
 		}
 	}
@@ -530,6 +542,7 @@ async function main(): Promise<void> {
 		const repoUrl = await run("gh", ["repo", "view", "--json", "url", "-q", ".url"]);
 		const repo = repoUrl.stdout.trim();
 		if (repo) {
+			console.info(`📦 Repository: ${repo}`);
 		}
 	}
 }
