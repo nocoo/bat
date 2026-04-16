@@ -14,7 +14,8 @@
 		"test": "turbo test",
 		"test:unit:coverage": "bash scripts/check-coverage.sh 90 95",
 		"security": "bun run scripts/run-security.ts",
-		"prepare": "husky"
+		"prepare": "husky",
+		"release": "bun run scripts/release.ts"
 	},
 	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"],
 	"devDependencies": {
@@ -31,5 +32,8 @@
 	"overrides": {
 		"undici": ">=7.24.0",
 		"next": "16.2.3"
+	},
+	"dependencies": {
+		"hono": "^4.12.14"
 	}
 }
