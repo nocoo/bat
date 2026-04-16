@@ -36,9 +36,12 @@ export interface HealthResponse {
 
 /** GET /api/live — simple liveness response (worker + dashboard) */
 export interface LiveResponse {
-	status: "ok";
+	status: "ok" | "error";
 	version: string;
 	component: string;
+	timestamp: string;
+	uptime: number;
+	database?: { connected: boolean; error?: string };
 }
 
 /**
