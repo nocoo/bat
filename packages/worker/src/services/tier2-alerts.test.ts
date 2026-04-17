@@ -384,4 +384,30 @@ describe("evaluateTier2Alerts (DB integration)", () => {
 			.first();
 		expect(alert).toBeNull();
 	});
+
+	test("per-host port allowlist suppresses public_port firing", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		// Add a per-host allowlist entry for 3306
+		await db
+			.prepare("INSERT INTO port_allowlist (host_id, port) VALUES (?, ?)")
+			.bind("host-001", 3306)
+			.run();
+
+		await evaluateTier2Alerts(
+			db,
+			"host-001",
+			makePayload({
+				ports: {
+					listening: [{ port: 3306, bind: "0.0.0.0", protocol: "tcp", pid: 1, process: "mysql" }],
+				},
+			}),
+			now,
+		);
+
+		const alert = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", "public_port")
+			.first();
+		expect(alert).toBeNull();
+	});
 });

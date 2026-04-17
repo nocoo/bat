@@ -380,6 +380,211 @@ describe("POST /api/ingest", () => {
 		expect(row?.fd_allocated).toBe(1344);
 	});
 
+	describe("payload validation edge cases", () => {
+		test("null body → 400", async () => {
+			const res = await post(app, null);
+			expect(res.status).toBe(400);
+		});
+
+		test("array body → 400", async () => {
+			const res = await post(app, []);
+			expect(res.status).toBe(400);
+		});
+
+		test("missing host_id → 400", async () => {
+			const p = makePayload();
+			const { host_id: _omit, ...rest } = p as Record<string, unknown>;
+			const res = await post(app, rest);
+			expect(res.status).toBe(400);
+		});
+
+		test("empty host_id → 400", async () => {
+			const res = await post(app, makePayload({ host_id: "" }));
+			expect(res.status).toBe(400);
+		});
+
+		test("non-number timestamp → 400", async () => {
+			const res = await post(app, { ...makePayload(), timestamp: "not-a-number" });
+			expect(res.status).toBe(400);
+		});
+
+		test("non-number interval → 400", async () => {
+			const res = await post(app, { ...makePayload(), interval: "30" });
+			expect(res.status).toBe(400);
+		});
+
+		test("non-number uptime_seconds → 400", async () => {
+			const res = await post(app, { ...makePayload(), uptime_seconds: null });
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.load1 missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, load1: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.load5 missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, load5: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.load15 missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, load15: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.usage_pct missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, usage_pct: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.iowait_pct missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, iowait_pct: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.steal_pct missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, steal_pct: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("cpu.count missing → 400", async () => {
+			const p = makePayload();
+			p.cpu = { ...p.cpu, count: undefined } as unknown as typeof p.cpu;
+			const res = await post(app, p);
+			expect(res.status).toBe(400);
+		});
+
+		test("mem null → 400", async () => {
+			const res = await post(app, { ...makePayload(), mem: null });
+			expect(res.status).toBe(400);
+		});
+
+		test("mem.available_bytes missing → 400", async () => {
+			const p = makePayload();
+			const res = await post(app, {
+				...p,
+				mem: { total_bytes: 100, used_pct: 10 },
+			});
+			expect(res.status).toBe(400);
+		});
+
+		test("mem.used_pct missing → 400", async () => {
+			const p = makePayload();
+			const res = await post(app, {
+				...p,
+				mem: { total_bytes: 100, available_bytes: 50 },
+			});
+			expect(res.status).toBe(400);
+		});
+
+		test("swap not object → 400", async () => {
+			const res = await post(app, { ...makePayload(), swap: "bad" });
+			expect(res.status).toBe(400);
+		});
+
+		test("swap.total_bytes missing → 400", async () => {
+			const res = await post(app, {
+				...makePayload(),
+				swap: { used_bytes: 10, used_pct: 5 },
+			});
+			expect(res.status).toBe(400);
+		});
+
+		test("swap.used_bytes missing → 400", async () => {
+			const res = await post(app, {
+				...makePayload(),
+				swap: { total_bytes: 10, used_pct: 5 },
+			});
+			expect(res.status).toBe(400);
+		});
+
+		test("swap.used_pct missing → 400", async () => {
+			const res = await post(app, {
+				...makePayload(),
+				swap: { total_bytes: 10, used_bytes: 5 },
+			});
+			expect(res.status).toBe(400);
+		});
+
+		test("disk not array → 400", async () => {
+			const res = await post(app, { ...makePayload(), disk: "oops" });
+			expect(res.status).toBe(400);
+		});
+
+		test("net not array → 400", async () => {
+			const res = await post(app, { ...makePayload(), net: {} });
+			expect(res.status).toBe(400);
+		});
+
+		test("probe_version wrong type → 400", async () => {
+			const res = await post(app, { ...makePayload(), probe_version: 123 });
+			expect(res.status).toBe(400);
+		});
+
+		test("probe_version valid string accepted", async () => {
+			const res = await post(app, makePayload({ probe_version: "1.2.3" }));
+			expect(res.status).toBe(204);
+		});
+
+		test("maintenance window skips alert evaluation and purges pending", async () => {
+			const now = Math.floor(Date.now() / 1000);
+			// Figure out current UTC HH:MM and create a maintenance window around it
+			const nowHHMM = new Date(now * 1000).toISOString().slice(11, 16);
+			const startHour = Number.parseInt(nowHHMM.slice(0, 2), 10);
+			const start = `${String((startHour + 23) % 24).padStart(2, "0")}:00`;
+			const end = `${String((startHour + 1) % 24).padStart(2, "0")}:59`;
+
+			await db
+				.prepare(
+					"INSERT INTO hosts (host_id, hostname, last_seen, is_active, maintenance_start, maintenance_end) VALUES (?, ?, ?, 1, ?, ?)",
+				)
+				.bind("host-maint", "m", now, start, end)
+				.run();
+
+			// Seed alert_pending row that should be purged
+			await db
+				.prepare(
+					"INSERT INTO alert_pending (host_id, rule_id, first_seen, last_value) VALUES (?, ?, ?, ?)",
+				)
+				.bind("host-maint", "cpu_high", now - 60, 80)
+				.run();
+
+			const payload = makePayload({ host_id: "host-maint", timestamp: now });
+			payload.disk = [
+				{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 1_000_000_000, used_pct: 99 },
+			];
+			const res = await post(app, payload);
+			expect(res.status).toBe(204);
+
+			// alert_pending should be gone
+			const pending = await db
+				.prepare("SELECT COUNT(*) AS cnt FROM alert_pending WHERE host_id = ?")
+				.bind("host-maint")
+				.first<{ cnt: number }>();
+			expect(pending?.cnt).toBe(0);
+
+			// No alert_states row created (maintenance window suppresses evaluation)
+			const alerts = await db
+				.prepare("SELECT COUNT(*) AS cnt FROM alert_states WHERE host_id = ?")
+				.bind("host-maint")
+				.first<{ cnt: number }>();
+			expect(alerts?.cnt).toBe(0);
+		});
+	});
+
 	test("T3 fields null when absent (backward compat)", async () => {
 		const res = await post(app, makePayload());
 		expect(res.status).toBe(204);
