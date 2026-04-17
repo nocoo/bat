@@ -209,4 +209,26 @@ describe("GET /api/hosts/:id/tier2", () => {
 		expect(body.dns_resolvers).toEqual(["1.1.1.1", "8.8.8.8"]);
 		expect(body.dns_search).toEqual(["local.lan"]);
 	});
+
+	test("hid loop iterates across multiple active hosts until match", async () => {
+		for (const id of ["host-a", "host-b", "host-target", "host-d"]) {
+			await seedHost(db, id);
+		}
+		const now = Math.floor(Date.now() / 1000);
+		await seedTier2(db, "host-target", now, {
+			ports: JSON.stringify({ listening: [] }),
+		});
+
+		const hid = hashHostId("host-target");
+		const res = await get(app, hid);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as Tier2Snapshot;
+		expect(body.host_id).toBe("host-target");
+	});
+
+	test("hid format (8-hex) that matches no active host → 404", async () => {
+		await seedHost(db, "host-xyz");
+		const res = await get(app, "deadbeef");
+		expect(res.status).toBe(404);
+	});
 });
