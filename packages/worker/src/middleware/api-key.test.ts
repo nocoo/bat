@@ -114,4 +114,125 @@ describe("apiKeyAuth middleware", () => {
 			expect(res.status).toBe(403);
 		});
 	});
+
+	describe("write-route detection across all mutation paths", () => {
+		function appWithRoutes() {
+			const a = new Hono<AppEnv>();
+			a.use("*", async (c, next) => {
+				c.env = { DB: {} as D1Database, BAT_WRITE_KEY: WRITE_KEY, BAT_READ_KEY: READ_KEY };
+				return next();
+			});
+			a.use("/api/*", apiKeyAuth);
+			// Catch-all handler so 204 means middleware passed
+			a.all("*", (c) => c.body(null, 204));
+			return a;
+		}
+
+		test("malformed Authorization (no Bearer prefix) → 401", async () => {
+			const a = appWithRoutes();
+			const res = await a.request(
+				new Request("http://localhost/api/hosts", {
+					headers: { Authorization: "Basic xyz" },
+				}),
+			);
+			expect(res.status).toBe(401);
+		});
+
+		test("Authorization with only 'Bearer' (no token) → 401", async () => {
+			const a = appWithRoutes();
+			const res = await a.request(
+				new Request("http://localhost/api/hosts", {
+					headers: { Authorization: "Bearer" },
+				}),
+			);
+			expect(res.status).toBe(401);
+		});
+
+		test("POST /api/tier2 is a write route", async () => {
+			const a = appWithRoutes();
+			const ok = await a.request(req("POST", "/api/tier2", WRITE_KEY));
+			expect(ok.status).toBe(204);
+			const bad = await a.request(req("POST", "/api/tier2", READ_KEY));
+			expect(bad.status).toBe(403);
+		});
+
+		test("POST /api/events uses its own auth (bypasses middleware)", async () => {
+			const a = appWithRoutes();
+			const res = await a.request(req("POST", "/api/events"));
+			expect(res.status).toBe(204);
+		});
+
+		test("POST /api/webhooks requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("POST", "/api/webhooks", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("POST", "/api/webhooks", READ_KEY))).status).toBe(403);
+			// GET is read-only → read key OK
+			expect((await a.request(req("GET", "/api/webhooks", READ_KEY))).status).toBe(204);
+		});
+
+		test("DELETE/POST /api/webhooks/:id requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("DELETE", "/api/webhooks/abc", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("POST", "/api/webhooks/abc/regenerate", WRITE_KEY))).status).toBe(
+				204,
+			);
+			expect((await a.request(req("DELETE", "/api/webhooks/abc", READ_KEY))).status).toBe(403);
+		});
+
+		test("PUT/DELETE /api/hosts/:id/maintenance requires write key", async () => {
+			const a = appWithRoutes();
+			expect(
+				(await a.request(req("PUT", "/api/hosts/my-host/maintenance", WRITE_KEY))).status,
+			).toBe(204);
+			expect(
+				(await a.request(req("DELETE", "/api/hosts/my-host/maintenance", WRITE_KEY))).status,
+			).toBe(204);
+			expect((await a.request(req("PUT", "/api/hosts/my-host/maintenance", READ_KEY))).status).toBe(
+				403,
+			);
+			// GET is read-only
+			expect((await a.request(req("GET", "/api/hosts/my-host/maintenance", READ_KEY))).status).toBe(
+				204,
+			);
+		});
+
+		test("POST /api/tags requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("POST", "/api/tags", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("POST", "/api/tags", READ_KEY))).status).toBe(403);
+		});
+
+		test("PUT/DELETE /api/tags/:id requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("PUT", "/api/tags/t1", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("DELETE", "/api/tags/t1", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("PUT", "/api/tags/t1", READ_KEY))).status).toBe(403);
+		});
+
+		test("POST/PUT/DELETE /api/hosts/:id/tags requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("POST", "/api/hosts/h1/tags", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("PUT", "/api/hosts/h1/tags", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("DELETE", "/api/hosts/h1/tags/t1", WRITE_KEY))).status).toBe(204);
+			expect((await a.request(req("POST", "/api/hosts/h1/tags", READ_KEY))).status).toBe(403);
+		});
+
+		test("POST/DELETE /api/hosts/:id/allowed-ports requires write key", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("POST", "/api/hosts/h1/allowed-ports", WRITE_KEY))).status).toBe(
+				204,
+			);
+			expect(
+				(await a.request(req("DELETE", "/api/hosts/h1/allowed-ports/22", WRITE_KEY))).status,
+			).toBe(204);
+			expect((await a.request(req("POST", "/api/hosts/h1/allowed-ports", READ_KEY))).status).toBe(
+				403,
+			);
+		});
+
+		test("unknown read path with write key → 403", async () => {
+			const a = appWithRoutes();
+			expect((await a.request(req("GET", "/api/some-read-path", WRITE_KEY))).status).toBe(403);
+		});
+	});
 });
