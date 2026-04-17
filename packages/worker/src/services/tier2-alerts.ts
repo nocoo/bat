@@ -228,5 +228,5 @@ VALUES (?, ?, ?, ?)`,
 }
 
 // Export for testing
-export { evaluateTier2Rules };
+export { evaluateTier2Rules, handleDurationRule, handleInstantRule };
 export type { AlertEvalResult };
