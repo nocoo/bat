@@ -298,4 +298,81 @@ describe("maintenance CRUD routes", () => {
 			expect(await res.json()).toBeNull();
 		});
 	});
+
+	describe("edge cases", () => {
+		test("resolves hid (8-hex) to host_id for GET", async () => {
+			const { hashHostId } = await import("@bat/shared");
+			await db
+				.prepare("UPDATE hosts SET maintenance_start = ?, maintenance_end = ? WHERE host_id = ?")
+				.bind("01:00", "02:00", HOST_ID)
+				.run();
+
+			const hid = hashHostId(HOST_ID);
+			const c = makeContext(db, "GET", hid);
+			const res = await maintenanceGetRoute(c);
+			expect(res.status).toBe(200);
+			const data = await res.json();
+			expect(data.start).toBe("01:00");
+		});
+
+		test("resolves hid (8-hex) to host_id for PUT", async () => {
+			const { hashHostId } = await import("@bat/shared");
+			const hid = hashHostId(HOST_ID);
+			const c = makeContext(db, "PUT", hid, { start: "10:00", end: "11:00" });
+			const res = await maintenanceSetRoute(c);
+			expect(res.status).toBe(204);
+		});
+
+		test("hid (8-hex) that matches no host → 404", async () => {
+			const c = makeContext(db, "GET", "deadbeef");
+			const res = await maintenanceGetRoute(c);
+			expect(res.status).toBe(404);
+		});
+
+		test("invalid JSON body → 400", async () => {
+			const c = {
+				env: { DB: db },
+				req: {
+					param: (key: string) => (key === "id" ? HOST_ID : ""),
+					method: "PUT",
+					json: () => Promise.reject(new Error("bad json")),
+				},
+				json: (data: unknown, status?: number) =>
+					new Response(JSON.stringify(data), {
+						status: status ?? 200,
+						headers: { "Content-Type": "application/json" },
+					}),
+			} as unknown as Parameters<typeof maintenanceSetRoute>[0];
+			const res = await maintenanceSetRoute(c);
+			expect(res.status).toBe(400);
+			const body = (await res.json()) as { error: string };
+			expect(body.error).toContain("Invalid JSON");
+		});
+
+		test("missing start → 400", async () => {
+			const c = makeContext(db, "PUT", HOST_ID, { end: "05:00" });
+			const res = await maintenanceSetRoute(c);
+			expect(res.status).toBe(400);
+			const body = (await res.json()) as { error: string };
+			expect(body.error).toContain("required");
+		});
+
+		test("missing end → 400", async () => {
+			const c = makeContext(db, "PUT", HOST_ID, { start: "03:00" });
+			const res = await maintenanceSetRoute(c);
+			expect(res.status).toBe(400);
+		});
+
+		test("reason non-string (number) → 400", async () => {
+			const c = makeContext(db, "PUT", HOST_ID, {
+				start: "03:00",
+				end: "05:00",
+				reason: 123,
+			});
+			const res = await maintenanceSetRoute(c);
+			expect(res.status).toBe(400);
+			const body = (await res.json()) as { error: string };
+			expect(body.error).toContain("string");
+		});
+	});
 });
