@@ -308,9 +308,10 @@ describe("GET /api/hosts", () => {
 		expect(host?.net_tx_rate).toBe(600);
 	});
 
-	test("port allowlist groups multiple ports per host", async () => {
+	test("port allowlist suppresses public_port warning → status healthy", async () => {
 		const now = Math.floor(Date.now() / 1000);
 		await insertHost(db, "host-ports", "ports-host", now);
+		// Per-host allowlist covers ports 22 and 443
 		await db
 			.prepare("INSERT INTO port_allowlist (host_id, port) VALUES (?, ?)")
 			.bind("host-ports", 22)
@@ -319,11 +320,44 @@ describe("GET /api/hosts", () => {
 			.prepare("INSERT INTO port_allowlist (host_id, port) VALUES (?, ?)")
 			.bind("host-ports", 443)
 			.run();
+		// Active public_port warning whose ports are all allowlisted
+		await db
+			.prepare(
+				"INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind("host-ports", "public_port", "warning", 2, now, "Unexpected public ports: 22, 443")
+			.run();
 
 		const res = await get(app);
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as HostOverviewItem[];
 		expect(body).toHaveLength(1);
+		const host = body[0];
+		expect(host.host_id).toBe("host-ports");
+		// Alert is present in the DB, but status derivation suppresses it via allowlist
+		expect(host.alert_count).toBe(1);
+		expect(host.status).toBe("healthy");
+	});
+
+	test("port allowlist does NOT suppress public_port warning when message contains non-allowlisted port", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "host-ports2", "ports-host2", now);
+		await db
+			.prepare("INSERT INTO port_allowlist (host_id, port) VALUES (?, ?)")
+			.bind("host-ports2", 22)
+			.run();
+		// 3306 is NOT on the allowlist → warning should stand
+		await db
+			.prepare(
+				"INSERT INTO alert_states (host_id, rule_id, severity, value, triggered_at, message) VALUES (?, ?, ?, ?, ?, ?)",
+			)
+			.bind("host-ports2", "public_port", "warning", 1, now, "Unexpected public ports: 3306")
+			.run();
+
+		const res = await get(app);
+		const body = (await res.json()) as HostOverviewItem[];
+		const host = body.find((h) => h.host_id === "host-ports2");
+		expect(host?.status).toBe("warning");
 	});
 
 	test("sparkline data populated from metrics_hourly", async () => {
