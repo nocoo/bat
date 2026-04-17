@@ -317,4 +317,103 @@ describe("GET /api/hosts/:id/metrics", () => {
 		expect(body.data[1].ts).toBe(now - 300);
 		expect(body.data[2].ts).toBe(now - 100);
 	});
+
+	test("from/to not numeric → 400", async () => {
+		const url = "http://localhost/api/hosts/host-001/metrics?from=abc&to=xyz";
+		const res = await app.request(new Request(url));
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("valid numbers");
+	});
+
+	test("unknown hid (8-hex) → 404", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		const res = await get(app, "deadbeef", now - 3600, now);
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as { error: string };
+		expect(body.error).toContain("Host not found");
+	});
+
+	test("hid (8-hex) resolves to matching host_id", async () => {
+		const { hashHostId } = await import("@bat/shared");
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "my-host.example.com", now);
+		await insertRawMetrics(db, "my-host.example.com", now - 60, 15, 20);
+
+		const hid = hashHostId("my-host.example.com");
+		const res = await get(app, hid, now - 3600, now);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as MetricsQueryResponse;
+		expect(body.host_id).toBe("my-host.example.com");
+		expect(body.data.length).toBeGreaterThan(0);
+	});
+
+	test("hourly ext_json unpacks into flat fields", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "host-ext", now);
+		const hourTs = now - 7200;
+		// Range > AUTO_RESOLUTION_THRESHOLD_SECONDS (7 days) → hourly resolution
+		const from = now - 14 * 86400;
+
+		const ext = JSON.stringify({
+			interrupts_sec_avg: 150.5,
+			softirq_net_rx_sec_avg: 25.1,
+			tasks_running_avg: 3,
+			mem_buffers_avg: 1024,
+			conntrack_count_avg: 200,
+			conntrack_max: 65536,
+			snmp_in_errs_delta_sum: 7,
+		});
+		await db
+			.prepare(
+				`INSERT INTO metrics_hourly (host_id, hour_ts, sample_count, cpu_usage_avg, cpu_usage_max,
+       cpu_iowait_avg, cpu_steal_avg, cpu_load1_avg, cpu_load5_avg, cpu_load15_avg,
+       mem_total, mem_available_min, mem_used_pct_avg, mem_used_pct_max,
+       swap_total, swap_used_max, swap_used_pct_avg, swap_used_pct_max,
+       uptime_min, disk_json, ext_json)
+     VALUES (?, ?, 120, 10, 15, 1, 0, 0.5, 0.3, 0.2, 8000000000, 3500000000, 20, 25, 2000000000, 100000000, 5, 8, 86000, '[]', ?)`,
+			)
+			.bind("host-ext", hourTs, ext)
+			.run();
+
+		const res = await get(app, "host-ext", from, now);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as MetricsQueryResponse;
+		expect(body.resolution).toBe("hourly");
+		expect(body.data.length).toBe(1);
+		const dp = body.data[0] as unknown as Record<string, unknown>;
+		expect(dp.interrupts_sec).toBe(150.5);
+		expect(dp.softirq_net_rx_sec).toBe(25.1);
+		expect(dp.tasks_running).toBe(3);
+		expect(dp.mem_buffers).toBe(1024);
+		expect(dp.conntrack_count).toBe(200);
+		expect(dp.conntrack_max).toBe(65536);
+		expect(dp.snmp_in_errs_delta).toBe(7);
+	});
+
+	test("hourly malformed ext_json → ext fields null", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "host-badext", now);
+		const hourTs = now - 7200;
+		const from = now - 14 * 86400;
+
+		await db
+			.prepare(
+				`INSERT INTO metrics_hourly (host_id, hour_ts, sample_count, cpu_usage_avg, cpu_usage_max,
+       cpu_iowait_avg, cpu_steal_avg, cpu_load1_avg, cpu_load5_avg, cpu_load15_avg,
+       mem_total, mem_available_min, mem_used_pct_avg, mem_used_pct_max,
+       swap_total, swap_used_max, swap_used_pct_avg, swap_used_pct_max,
+       uptime_min, disk_json, ext_json)
+     VALUES (?, ?, 120, 10, 15, 1, 0, 0.5, 0.3, 0.2, 8000000000, 3500000000, 20, 25, 2000000000, 100000000, 5, 8, 86000, '[]', ?)`,
+			)
+			.bind("host-badext", hourTs, "{not valid json")
+			.run();
+
+		const res = await get(app, "host-badext", from, now);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as MetricsQueryResponse;
+		const dp = body.data[0] as unknown as Record<string, unknown>;
+		expect(dp.interrupts_sec).toBeNull();
+		expect(dp.conntrack_count).toBeNull();
+	});
 });
