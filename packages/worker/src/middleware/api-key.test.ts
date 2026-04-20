@@ -19,6 +19,15 @@ function createApp() {
 		return next();
 	});
 
+	// Simulate accessAuth middleware setting the context flag
+	// when Cf-Access-Jwt-Assertion header is present
+	app.use("/api/*", async (c, next) => {
+		if (c.req.header("Cf-Access-Jwt-Assertion")) {
+			c.set("accessAuthenticated", true);
+		}
+		return next();
+	});
+
 	// Apply middleware to all /api/* routes
 	app.use("/api/*", apiKeyAuth);
 
@@ -250,18 +259,18 @@ describe("apiKeyAuth middleware", () => {
 	});
 
 	describe("browser endpoint with Access JWT", () => {
-		test("GET /api/hosts accepts Access JWT without API key", async () => {
+		test("GET /api/hosts accepts verified Access JWT without API key", async () => {
 			const res = await app.request(
 				req("GET", "/api/hosts", {
 					host: "bat.hexly.ai",
-					accessJwt: "valid-jwt-token",
+					accessJwt: "valid-jwt-token", // triggers accessAuthenticated context flag
 				}),
 			);
-			// Should pass through without 401/403
+			// Should pass through without 401/403 because context flag is set
 			expect(res.status).toBe(200);
 		});
 
-		test("GET /api/alerts accepts Access JWT without API key", async () => {
+		test("GET /api/alerts accepts verified Access JWT without API key", async () => {
 			const res = await app.request(
 				req("GET", "/api/alerts", {
 					host: "bat.hexly.ai",
@@ -269,6 +278,31 @@ describe("apiKeyAuth middleware", () => {
 				}),
 			);
 			expect(res.status).toBe(200);
+		});
+
+		test("GET /api/hosts rejects forged header without context flag", async () => {
+			// Create app without the mock accessAuth middleware
+			const appNoAccessAuth = new Hono<AppEnv>();
+			appNoAccessAuth.use("*", async (c, next) => {
+				c.env = {
+					DB: {} as D1Database,
+					BAT_WRITE_KEY: WRITE_KEY,
+					BAT_READ_KEY: READ_KEY,
+				};
+				return next();
+			});
+			// No middleware to set accessAuthenticated
+			appNoAccessAuth.use("/api/*", apiKeyAuth);
+			appNoAccessAuth.get("/api/hosts", (c) => c.json([]));
+
+			const res = await appNoAccessAuth.request(
+				req("GET", "/api/hosts", {
+					host: "bat.hexly.ai",
+					accessJwt: "forged-jwt-token", // header present but no context flag
+				}),
+			);
+			// Should require API key since context flag is not set
+			expect(res.status).toBe(401);
 		});
 
 		test("GET /api/monitoring/hosts still requires API key even with Access JWT", async () => {

@@ -122,7 +122,7 @@ describe("accessAuth middleware", () => {
 			expect(body.error).toBe("Invalid Access JWT");
 		});
 
-		test("falls back to API key auth when Access is not configured", async () => {
+		test("returns 500 when Access is not configured (fail closed)", async () => {
 			const app = createTestApp({
 				// No CF_ACCESS_TEAM_DOMAIN or CF_ACCESS_AUD
 			});
@@ -131,11 +131,13 @@ describe("accessAuth middleware", () => {
 				method: "GET",
 				headers: { host: "bat.hexly.ai" },
 			});
-			// Should pass through without 401/403
-			expect(res.status).toBe(200);
+			// Should fail closed with 500, not pass through
+			expect(res.status).toBe(500);
+			const body = await res.json();
+			expect(body.error).toContain("Access authentication not configured");
 		});
 
-		test("falls back when only team domain is configured", async () => {
+		test("returns 500 when only team domain is configured", async () => {
 			const app = createTestApp({
 				CF_ACCESS_TEAM_DOMAIN: "test.cloudflareaccess.com",
 				// No CF_ACCESS_AUD
@@ -145,7 +147,7 @@ describe("accessAuth middleware", () => {
 				method: "GET",
 				headers: { host: "bat.hexly.ai" },
 			});
-			expect(res.status).toBe(200);
+			expect(res.status).toBe(500);
 		});
 	});
 });

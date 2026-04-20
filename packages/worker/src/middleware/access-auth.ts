@@ -2,7 +2,7 @@
 // Verifies Cloudflare Access JWT using jose library
 // - localhost: skip JWT verification (local dev / E2E tests)
 // - bat-ingest.*: skip (handled by apiKeyAuth)
-// - bat.*: require valid Access JWT
+// - bat.*: require valid Access JWT, set context flag on success
 
 import type { Context, Next } from "hono";
 import { createRemoteJWKSet, jwtVerify } from "jose";
@@ -44,10 +44,16 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 	const teamDomain = c.env.CF_ACCESS_TEAM_DOMAIN;
 	const aud = c.env.CF_ACCESS_AUD;
 
-	// If Access is not configured, fall back to API key auth
-	// This allows gradual migration and testing
+	// Fail closed: if Access is not configured on browser endpoint, reject
+	// This prevents the fallback-to-apiKeyAuth path that could be bypassed
+	// with a forged Cf-Access-Jwt-Assertion header
 	if (!(teamDomain && aud)) {
-		return next();
+		return c.json(
+			{
+				error: "Access authentication not configured. Set CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD.",
+			},
+			500,
+		);
 	}
 
 	const jwt = c.req.header("Cf-Access-Jwt-Assertion");
@@ -64,6 +70,10 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 	} catch {
 		return c.json({ error: "Invalid Access JWT" }, 403);
 	}
+
+	// Set context flag: JWT signature verified successfully
+	// apiKeyAuth checks this flag, not the raw header
+	c.set("accessAuthenticated", true);
 
 	return next();
 }
