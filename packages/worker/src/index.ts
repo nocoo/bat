@@ -29,6 +29,7 @@ import {
 	monitoringHostDetailRoute,
 	monitoringHostsRoute,
 } from "./routes/monitoring.js";
+import { setupRoute } from "./routes/setup.js";
 import {
 	hostTagsAddRoute,
 	hostTagsListRoute,
@@ -74,6 +75,7 @@ app.post("/api/tier2", tier2IngestRoute);
 app.post("/api/events", eventsIngestRoute);
 
 // Read routes (dashboard → worker)
+app.get("/api/setup", setupRoute);
 app.get("/api/hosts", hostsListRoute);
 app.get("/api/hosts/:id/metrics", hostMetricsRoute);
 app.get("/api/hosts/:id/tier2", hostTier2Route);
