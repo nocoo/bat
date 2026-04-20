@@ -12,7 +12,7 @@ crons = ["0 * * * *"]
 directory = "./static"
 binding = "ASSETS"
 # API routes handled by Worker first, everything else goes to static assets
-run_worker_first = ["/api/*", "/"]
+run_worker_first = ["/api/*"]
 # SPA fallback: 404 returns index.html for client-side routing
 not_found_handling = "single-page-application"
 
@@ -34,7 +34,7 @@ name = "bat"
 [env.production.assets]
 directory = "./static"
 binding = "ASSETS"
-run_worker_first = ["/api/*", "/"]
+run_worker_first = ["/api/*"]
 not_found_handling = "single-page-application"
 
 [[env.production.d1_databases]]

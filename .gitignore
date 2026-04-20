@@ -49,3 +49,4 @@ playwright/.cache/
 *.log
 packages/worker/static/*
 !packages/worker/static/.gitkeep
+.superset/
