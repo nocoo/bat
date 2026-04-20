@@ -8,7 +8,7 @@
 > - [03-data-structures.md](./03-data-structures.md) — Shared types (Phase 1)
 > - [04-probe.md](./04-probe.md) — Probe implementation (Phase 3)
 > - [05-worker.md](./05-worker.md) — Worker implementation (Phase 2)
-> - [06-dashboard.md](./06-dashboard.md) — Dashboard implementation (Phase 4)
+> - [06-ui.md](./06-ui.md) — UI SPA (Phase 4)
 > - [07-testing.md](./07-testing.md) — Testing strategy, Husky hooks
 
 ---

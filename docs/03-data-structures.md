@@ -1,7 +1,7 @@
 # 03 — Data Structures
 
 > D1 schema, migration strategy, communication payload types, and alert rule definitions.
-> All data structures referenced by [04-probe.md](./04-probe.md), [05-worker.md](./05-worker.md), and [06-dashboard.md](./06-dashboard.md) are defined here as the single source of truth.
+> All data structures referenced by [04-probe.md](./04-probe.md), [05-worker.md](./05-worker.md), and [06-ui.md](./06-ui.md) are defined here as the single source of truth.
 >
 > Related documents:
 > - [01-metrics-catalogue.md](./01-metrics-catalogue.md) — What the Probe collects (metrics definitions, Tier 1 + Tier 2 catalogue)
