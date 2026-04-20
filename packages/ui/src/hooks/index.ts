@@ -13,3 +13,4 @@ export { useEvents, EVENTS_PAGE_SIZE } from "./use-events";
 export { useWebhooks } from "./use-webhooks";
 export { useHostMaintenance } from "./use-host-maintenance";
 export { useIsMobile } from "./use-mobile";
+export { useMe } from "./use-me";

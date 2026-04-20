@@ -22,6 +22,7 @@ import {
 	maintenanceGetRoute,
 	maintenanceSetRoute,
 } from "./routes/maintenance.js";
+import { meRoute } from "./routes/me.js";
 import { hostMetricsRoute } from "./routes/metrics.js";
 import {
 	monitoringAlertsRoute,
@@ -67,6 +68,9 @@ app.get("/", (c) => c.text("bat ok"));
 
 // Public routes (no auth)
 app.get("/api/live", liveRoute);
+
+// User info route (requires auth via Access JWT or localhost bypass)
+app.get("/api/me", meRoute);
 
 // Write routes (probe → worker)
 app.post("/api/identity", identityRoute);
