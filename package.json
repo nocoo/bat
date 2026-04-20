@@ -5,7 +5,7 @@
 	"packageManager": "bun@1.3.11",
 	"workspaces": ["packages/*"],
 	"scripts": {
-		"dev": "turbo dev --filter=@bat/dashboard",
+		"dev": "turbo dev --filter=@bat/ui --filter=@bat/worker",
 		"dev:all": "turbo dev",
 		"build": "turbo build",
 		"typecheck": "turbo typecheck",
