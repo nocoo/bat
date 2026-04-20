@@ -16,6 +16,7 @@ export default defineConfig({
 	},
 	server: {
 		port: 7025,
+		allowedHosts: ["bat.dev.hexly.ai"],
 		// Proxy /api/* to wrangler dev for local development with HMR
 		proxy: {
 			"/api": {
