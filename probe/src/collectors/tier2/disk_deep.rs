@@ -158,7 +158,7 @@ pub async fn collect_disk_deep_scan() -> DiskDeepScanInfo {
         Ok(output) => {
             let mut dirs = parse_du_output(&output);
             // Sort by size descending and take top 10
-            dirs.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            dirs.sort_by_key(|d| std::cmp::Reverse(d.size_bytes));
             dirs.truncate(10);
             dirs
         }
@@ -182,7 +182,7 @@ pub async fn collect_disk_deep_scan() -> DiskDeepScanInfo {
     let large_files = match find_result {
         Ok(output) => {
             let mut files = parse_find_large_files(&output);
-            files.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+            files.sort_by_key(|f| std::cmp::Reverse(f.size_bytes));
             files.truncate(20);
             files
         }
