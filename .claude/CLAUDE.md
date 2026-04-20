@@ -67,7 +67,7 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 ```bash
 bun dev   # 同时启动 @bat/ui (vite dev) + @bat/worker (wrangler dev)
 ```
-- 访问 `localhost:5173`（Vite 端口），有 HMR
+- 访问 `https://bat.dev.hexly.ai`（Caddy 反代 → localhost:7025）
 - `/api/*` 自动代理到 wrangler dev (8787)
 - Auth: localhost 绕过 Access JWT，用 `BAT_READ_KEY`
 

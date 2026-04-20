@@ -15,6 +15,7 @@ export default defineConfig({
 		emptyOutDir: true,
 	},
 	server: {
+		port: 7025,
 		// Proxy /api/* to wrangler dev for local development with HMR
 		proxy: {
 			"/api": {
