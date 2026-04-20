@@ -7,7 +7,7 @@ const MAX_RETRIES: u32 = 5;
 /// Initial backoff delay.
 const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 /// Maximum backoff delay.
-const MAX_BACKOFF: Duration = Duration::from_secs(60);
+const MAX_BACKOFF: Duration = Duration::from_mins(1);
 
 /// Permanent HTTP errors that should not be retried.
 const fn is_permanent_error(status: u16) -> bool {

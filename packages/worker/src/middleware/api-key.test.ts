@@ -194,11 +194,15 @@ describe("apiKeyAuth middleware", () => {
 
 		test("DELETE/POST /api/webhooks/:id requires write key", async () => {
 			const a = appWithRoutes();
-			expect((await a.request(req("DELETE", "/api/webhooks/abc", { key: WRITE_KEY }))).status).toBe(204);
-			expect((await a.request(req("POST", "/api/webhooks/abc/regenerate", { key: WRITE_KEY }))).status).toBe(
+			expect((await a.request(req("DELETE", "/api/webhooks/abc", { key: WRITE_KEY }))).status).toBe(
 				204,
 			);
-			expect((await a.request(req("DELETE", "/api/webhooks/abc", { key: READ_KEY }))).status).toBe(403);
+			expect(
+				(await a.request(req("POST", "/api/webhooks/abc/regenerate", { key: WRITE_KEY }))).status,
+			).toBe(204);
+			expect((await a.request(req("DELETE", "/api/webhooks/abc", { key: READ_KEY }))).status).toBe(
+				403,
+			);
 		});
 
 		test("PUT/DELETE /api/hosts/:id/maintenance requires write key", async () => {
@@ -207,15 +211,16 @@ describe("apiKeyAuth middleware", () => {
 				(await a.request(req("PUT", "/api/hosts/my-host/maintenance", { key: WRITE_KEY }))).status,
 			).toBe(204);
 			expect(
-				(await a.request(req("DELETE", "/api/hosts/my-host/maintenance", { key: WRITE_KEY }))).status,
+				(await a.request(req("DELETE", "/api/hosts/my-host/maintenance", { key: WRITE_KEY })))
+					.status,
 			).toBe(204);
-			expect((await a.request(req("PUT", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status).toBe(
-				403,
-			);
+			expect(
+				(await a.request(req("PUT", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status,
+			).toBe(403);
 			// GET is read-only
-			expect((await a.request(req("GET", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status).toBe(
-				204,
-			);
+			expect(
+				(await a.request(req("GET", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status,
+			).toBe(204);
 		});
 
 		test("POST /api/tags requires write key", async () => {
@@ -233,28 +238,39 @@ describe("apiKeyAuth middleware", () => {
 
 		test("POST/PUT/DELETE /api/hosts/:id/tags requires write key", async () => {
 			const a = appWithRoutes();
-			expect((await a.request(req("POST", "/api/hosts/h1/tags", { key: WRITE_KEY }))).status).toBe(204);
-			expect((await a.request(req("PUT", "/api/hosts/h1/tags", { key: WRITE_KEY }))).status).toBe(204);
-			expect((await a.request(req("DELETE", "/api/hosts/h1/tags/t1", { key: WRITE_KEY }))).status).toBe(204);
-			expect((await a.request(req("POST", "/api/hosts/h1/tags", { key: READ_KEY }))).status).toBe(403);
-		});
-
-		test("POST/DELETE /api/hosts/:id/allowed-ports requires write key", async () => {
-			const a = appWithRoutes();
-			expect((await a.request(req("POST", "/api/hosts/h1/allowed-ports", { key: WRITE_KEY }))).status).toBe(
+			expect((await a.request(req("POST", "/api/hosts/h1/tags", { key: WRITE_KEY }))).status).toBe(
+				204,
+			);
+			expect((await a.request(req("PUT", "/api/hosts/h1/tags", { key: WRITE_KEY }))).status).toBe(
 				204,
 			);
 			expect(
-				(await a.request(req("DELETE", "/api/hosts/h1/allowed-ports/22", { key: WRITE_KEY }))).status,
+				(await a.request(req("DELETE", "/api/hosts/h1/tags/t1", { key: WRITE_KEY }))).status,
 			).toBe(204);
-			expect((await a.request(req("POST", "/api/hosts/h1/allowed-ports", { key: READ_KEY }))).status).toBe(
+			expect((await a.request(req("POST", "/api/hosts/h1/tags", { key: READ_KEY }))).status).toBe(
 				403,
 			);
 		});
 
+		test("POST/DELETE /api/hosts/:id/allowed-ports requires write key", async () => {
+			const a = appWithRoutes();
+			expect(
+				(await a.request(req("POST", "/api/hosts/h1/allowed-ports", { key: WRITE_KEY }))).status,
+			).toBe(204);
+			expect(
+				(await a.request(req("DELETE", "/api/hosts/h1/allowed-ports/22", { key: WRITE_KEY })))
+					.status,
+			).toBe(204);
+			expect(
+				(await a.request(req("POST", "/api/hosts/h1/allowed-ports", { key: READ_KEY }))).status,
+			).toBe(403);
+		});
+
 		test("unknown read path with write key → 403", async () => {
 			const a = appWithRoutes();
-			expect((await a.request(req("GET", "/api/some-read-path", { key: WRITE_KEY }))).status).toBe(403);
+			expect((await a.request(req("GET", "/api/some-read-path", { key: WRITE_KEY }))).status).toBe(
+				403,
+			);
 		});
 	});
 

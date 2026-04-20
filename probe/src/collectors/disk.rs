@@ -80,14 +80,23 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
         let Some(path) = path else { continue };
 
         if let Ok(stat) = nix::sys::statvfs::statvfs(&*path) {
-            let block_size = stat.block_size();
-            let total = u64::from(stat.blocks()) * block_size;
-            let avail = u64::from(stat.blocks_available()) * block_size;
+            // Types vary by platform: u64 on Linux, u32 on macOS.
+            // Use .into() for cross-platform compatibility.
+            #[allow(clippy::useless_conversion)]
+            let block_size: u64 = stat.block_size().into();
+            #[allow(clippy::useless_conversion)]
+            let total: u64 = stat.blocks().into();
+            let total = total * block_size;
+            #[allow(clippy::useless_conversion)]
+            let avail: u64 = stat.blocks_available().into();
+            let avail = avail * block_size;
             let (_used, used_pct) = compute_disk_usage(total, avail);
 
             // Inode stats from same statvfs call
-            let inodes_total_val = u64::from(stat.files());
-            let inodes_avail_val = u64::from(stat.files_available());
+            #[allow(clippy::useless_conversion)]
+            let inodes_total_val: u64 = stat.files().into();
+            #[allow(clippy::useless_conversion)]
+            let inodes_avail_val: u64 = stat.files_available().into();
             let (inodes_total, inodes_avail, inodes_used_pct) = if inodes_total_val > 0 {
                 let (_used, pct) = compute_inode_usage(inodes_total_val, inodes_avail_val);
                 (Some(inodes_total_val), Some(inodes_avail_val), Some(pct))
