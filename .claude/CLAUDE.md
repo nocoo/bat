@@ -63,15 +63,22 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 
 ## Local Development
 
-**方式 1：HMR 开发（推荐日常开发）**
+**方式 1：HMR 开发 + 生产数据（推荐日常开发）**
+```bash
+cd packages/ui && bun run dev   # vite dev server
+```
+- 访问 `https://bat.dev.hexly.ai`（Caddy 反代 → localhost:7025）
+- `/api/*` 自动代理到生产 `bat-ingest.worker.hexly.ai`（获取真实数据）
+- 用户信息显示为匿名（本地无 Access JWT）
+
+**方式 2：本地全栈开发**
 ```bash
 bun dev   # 同时启动 @bat/ui (vite dev) + @bat/worker (wrangler dev)
 ```
-- 访问 `https://bat.dev.hexly.ai`（Caddy 反代 → localhost:7025）
-- `/api/*` 自动代理到 wrangler dev (8787)
-- Auth: localhost 绕过 Access JWT，用 `BAT_READ_KEY`
+- 需要先修改 `packages/ui/vite.config.ts` 的 proxy target 为 `http://localhost:8787`
+- `/api/*` 代理到 wrangler dev (8787)，使用本地 D1 数据库
 
-**方式 2：接近生产的测试**
+**方式 3：接近生产的测试**
 ```bash
 bun turbo build --filter=@bat/ui   # 构建到 worker/static/
 cd packages/worker && bun dev      # wrangler dev 服务静态资源
