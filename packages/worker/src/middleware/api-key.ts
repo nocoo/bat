@@ -112,11 +112,16 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return next();
 	}
 
+	// localhost / *.dev.hexly.ai: skip API key auth entirely (local dev / E2E tests)
+	if (isLocalhost(host)) {
+		return next();
+	}
+
 	// Check if request was authenticated by Access JWT (context flag set by accessAuth)
 	// This flag is only set after successful JWT signature verification
 	// Do NOT check the raw Cf-Access-Jwt-Assertion header - it could be forged
 	const accessAuthenticated = c.get("accessAuthenticated") === true;
-	const isBrowserEndpoint = !(isLocalhost(host) || isMachineEndpoint(host));
+	const isBrowserEndpoint = !isMachineEndpoint(host);
 
 	// For browser endpoint with verified Access JWT, skip API key for non-machine routes
 	if (isBrowserEndpoint && accessAuthenticated && !isMachineReadRoute(path)) {
