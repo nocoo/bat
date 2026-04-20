@@ -25,14 +25,13 @@ Allow users to tag hosts with arbitrary labels (e.g. `production`, `us-east`, `d
 
 ## Architecture
 
-### Key decision: Dashboard → Worker proxy (all D1 access through Worker)
+### Key decision: SPA → Worker direct (all D1 access through Worker)
 
-Tags are **user-initiated state** — the Dashboard reads and writes them via Worker routes. The Probe never touches tags. The Worker has full CRUD access to `tags` and `host_tags` tables, including read-only access for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)).
+Tags are **user-initiated state** — the SPA reads and writes them via Worker routes directly. The Probe never touches tags. The Worker has full CRUD access to `tags` and `host_tags` tables, including read-only access for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)).
 
-- **Dashboard proxies all tag operations through the Worker** — same pattern as hosts, alerts, webhooks, and maintenance.
-- Tag mutations use `BAT_WRITE_KEY`; reads use `BAT_READ_KEY`.
-- All tag operations are protected by NextAuth session on the Dashboard side.
-- The Worker's hosts list query does NOT include tags — the Dashboard enriches the response client-side by querying `/api/tags/by-hosts` separately.
+- **SPA calls Worker tag routes directly** — same pattern as hosts, alerts, webhooks, and maintenance.
+- Browser-facing routes are protected by Cloudflare Access (JWT verification).
+- The Worker's hosts list query does NOT include tags — the SPA enriches the response client-side by querying `/api/tags/by-hosts` separately.
 
 ---
 
@@ -68,7 +67,7 @@ CREATE INDEX idx_host_tags_tag ON host_tags(tag_id);
 
 ## API Routes
 
-Tag CRUD is handled by Worker routes (`packages/worker/src/routes/tags.ts`). Dashboard routes are thin proxies (auth check + forward to Worker). Protected by NextAuth session — unauthenticated requests get 401.
+Tag CRUD is handled by Worker routes (`packages/worker/src/routes/tags.ts`). The SPA calls these routes directly. Protected by Cloudflare Access — unauthenticated requests are blocked at the edge.
 
 ### Tag CRUD (`/api/tags`)
 
@@ -104,10 +103,6 @@ Each Worker route handler:
 1. Validate input (name format, tag exists, host exists, limit not exceeded)
 2. Execute D1 query via `c.env.DB` native binding
 3. Return JSON response
-
-Dashboard route handlers:
-1. Verify NextAuth session → 401 if missing
-2. Proxy to Worker via `proxyToWorker()` / `proxyToWorkerWithBody()`
 
 ---
 
@@ -187,8 +182,7 @@ This keeps the Worker completely unaware of tags.
 
 ## Design Decisions
 
-- **Tag limit per host**: 10 max. Dashboard validates on assignment; returns 422 if exceeded.
+- **Tag limit per host**: 10 max. Worker validates on assignment; returns 422 if exceeded.
 - **Tag name constraints**: 1–32 characters, any script including CJK. Validated at creation time. Names are stored COLLATE NOCASE for uniqueness.
 - **Color assignment**: auto-assign `(SELECT COALESCE(MAX(color), -1) + 1) % 10` on create (round-robin through 10 palette slots). User can override via PUT.
-- **No Worker changes**: Tag CRUD routes live in the Worker alongside hosts/alerts/webhooks, using the same `BAT_WRITE_KEY`/`BAT_READ_KEY` auth model. Dashboard is a thin proxy.
-- **D1 REST API latency**: Dashboard (Railway, US) → D1 REST API (Cloudflare) adds ~50–100ms per query. Acceptable for tag operations which are infrequent user actions, not high-frequency data paths.
+- **Edge latency**: SPA → Worker is same-origin (Cloudflare edge), so tag operations have sub-50ms latency.

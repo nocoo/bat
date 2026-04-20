@@ -1,12 +1,12 @@
 # 05 — CF Worker
 
-> Cloudflare Worker (Hono). Receives metrics from Probe, stores in D1, evaluates alerts, serves health endpoint for Uptime Kuma, and provides authenticated read API for Dashboard.
+> Cloudflare Worker (Hono). Receives metrics from Probe, stores in D1, evaluates alerts, serves health endpoint for Uptime Kuma, and provides authenticated read API for the SPA.
 >
 > Related documents:
 > - [02-architecture.md](./02-architecture.md) — System overview, auth model, deployment
 > - [03-data-structures.md](./03-data-structures.md) — D1 schema, payload types, alert rules, time source policy
 > - [04-probe.md](./04-probe.md) — Probe that sends data to this Worker
-> - [06-dashboard.md](./06-dashboard.md) — Dashboard that reads from this Worker via proxy
+> - [06-ui.md](./06-ui.md) — SPA that reads from this Worker directly
 
 ---
 
