@@ -472,35 +472,36 @@ Application 创建后，记录：
 | 2.2 | 添加 `bat.hexly.ai` 路由（双域名） | ✅ |
 | 2.3 | 本地 `wrangler dev` 验证 | ✅ |
 
-### Phase 3: 构建 UI
+### Phase 3: 构建 UI ✅
 
-| # | 任务 |
-|---|------|
-| 3.1 | 创建 `packages/ui`，配置 Vite 6 + React 19 + Tailwind |
-| 3.2 | 迁移 UI 组件（shadcn/ui, layout, charts） |
-| 3.3 | 迁移页面（去掉 SSR/代理逻辑） |
-| 3.4 | 迁移 SWR hooks（URL 不变） |
-| 3.5 | Setup 页面改造（不返回 write key） |
+| # | 任务 | 状态 |
+|---|------|------|
+| 3.1 | 创建 `packages/ui`，配置 Vite 6 + React 19 + Tailwind | ✅ |
+| 3.2 | 迁移 UI 组件（shadcn/ui, layout, charts） | ✅ |
+| 3.3 | 迁移页面（去掉 SSR/代理逻辑） | ✅ |
+| 3.4 | 迁移 SWR hooks（URL 不变） | ✅ |
+| 3.5 | Setup 页面改造（不返回 write key） | ✅ |
 
 ### Phase 4: 上线
 
-| # | 任务 |
-|---|------|
-| 4.1 | 配置 Cloudflare Access（bat.hexly.ai） |
-| 4.2 | 部署 Worker（含静态资源） |
-| 4.3 | 验证：浏览器入口需登录，API 正常 |
-| 4.4 | 验证：Probe 写入正常（bat-ingest.*） |
-| 4.5 | 验证：Uptime Kuma monitoring API 正常 |
+| # | 任务 | 状态 |
+|---|------|------|
+| 4.1 | 配置 Cloudflare Access（bat.hexly.ai） | ⏳ 手动步骤 |
+| 4.2 | 部署 Worker（含静态资源） | ⏳ |
+| 4.3 | 验证：浏览器入口需登录，API 正常 | ⏳ |
+| 4.4 | 验证：Probe 写入正常（bat-ingest.*） | ⏳ |
+| 4.5 | 验证：Uptime Kuma monitoring API 正常 | ⏳ |
 
-### Phase 5: 清理
+### Phase 5: 清理 ✅
 
-| # | 任务 |
-|---|------|
-| 5.1 | 删除 `packages/dashboard` |
-| 5.2 | 更新 `turbo.json` 和根 `package.json` |
-| 5.3 | 更新 Husky hooks |
-| 5.4 | 关闭 Railway 部署 |
-| 5.5 | 更新 CLAUDE.md 和相关文档 |
+| # | 任务 | 状态 |
+|---|------|------|
+| 5.1 | 删除 `packages/dashboard` | ⏳ 生产验证后 |
+| 5.2 | 更新 `turbo.json` 和根 `package.json` | ✅ |
+| 5.3 | 更新 Husky hooks | ✅ (无需改动) |
+| 5.4 | 关闭 Railway 部署 | ⏳ 生产验证后 |
+| 5.5 | 更新 CLAUDE.md 和相关文档 | ✅ |
+| 5.6 | 更新 `scripts/sync-version.sh` 引用 ui 替代 dashboard | ✅ |
 
 ---
 

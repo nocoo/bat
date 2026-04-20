@@ -13,7 +13,7 @@ fi
 echo "Syncing version: ${VERSION}"
 
 # JS packages
-for pkg in packages/shared packages/worker packages/dashboard; do
+for pkg in packages/shared packages/worker packages/ui; do
   jq --tab --arg v "$VERSION" '.version = $v' "$pkg/package.json" > "$pkg/package.json.tmp"
   mv "$pkg/package.json.tmp" "$pkg/package.json"
   echo "  ✔ $pkg/package.json → $VERSION"
