@@ -464,13 +464,13 @@ Application 创建后，记录：
 | 1.4 | 浏览器读写路由移除 `BAT_READ_KEY` 依赖 | ✅ |
 | 1.5 | `/api/monitoring/*` 保留 `BAT_READ_KEY`（机器路由） | ✅ |
 
-### Phase 2: Worker 静态资源
+### Phase 2: Worker 静态资源 ✅
 
-| # | 任务 |
-|---|------|
-| 2.1 | 配置 `wrangler.toml` 的 `[assets]` |
-| 2.2 | 添加 `bat.hexly.ai` 路由（双域名） |
-| 2.3 | 本地 `wrangler dev` 验证 |
+| # | 任务 | 状态 |
+|---|------|------|
+| 2.1 | 配置 `wrangler.toml` 的 `[assets]` | ✅ |
+| 2.2 | 添加 `bat.hexly.ai` 路由（双域名） | ✅ |
+| 2.3 | 本地 `wrangler dev` 验证 | ✅ |
 
 ### Phase 3: 构建 UI
 
