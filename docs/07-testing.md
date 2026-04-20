@@ -8,7 +8,7 @@
 > - [03-data-structures.md](./03-data-structures.md) — Shared types testing (L1)
 > - [04-probe.md](./04-probe.md) — Probe testing (L1)
 > - [05-worker.md](./05-worker.md) — Worker testing (L1, L2)
-> - [06-ui.md](./06-ui.md) — UI SPA (build only, no tests)
+> - [06-ui.md](./06-ui.md) — UI SPA (L3 Playwright E2E)
 > - [08-commits.md](./08-commits.md) — Atomic commits plan
 > - [18-quality-system-upgrade.md](./18-quality-system-upgrade.md) — Tier C → S upgrade plan
 
@@ -92,11 +92,29 @@ End-to-end tests against a real local Wrangler dev server with a real local D1 d
 
 ## L3 — System/E2E
 
-Browser-level tests using Playwright. Reserved for complex UI interactions that cannot be verified by build-time checks.
+Browser-level tests using Playwright (Chromium). Verifies core UI flows against a local Wrangler dev server with real D1.
 
-**Current status**: Not implemented. The UI is a thin SPA served from Worker static assets — Cloudflare Access handles authentication, and all logic lives in the Worker API (covered by L2).
+**Auth strategy**: Cloudflare Access is external, so localhost bypasses auth. Tests run in "anonymous" mode (`/api/me` returns `authenticated: false`).
 
-L3 may be added if the UI grows complex enough to warrant browser testing (e.g., multi-step forms, complex state management).
+**Port convention**: 27787 (separate from L2's 18787 and dev's 8787/7025).
+
+**Server**: Playwright's `webServer` config starts Wrangler on port 27787 with its own persist dir (`.wrangler/e2e-pw`) to avoid conflicts with L2.
+
+**Test specs** (`packages/ui/tests/`):
+
+| Spec | What |
+|------|------|
+| `hosts.spec.ts` | Hosts list, sidebar nav, routing, empty state |
+| `host-detail.spec.ts` | Breadcrumbs, time range picker, navigation |
+| `tags.spec.ts` | Create input, button state, empty state |
+| `alerts.spec.ts` | Alerts page, table headers, empty state |
+| `events.spec.ts` | Events page, table structure, empty state |
+| `webhooks.spec.ts` | Webhooks settings, host dropdown, empty state |
+| `setup.spec.ts` | Install guide, code blocks, copy buttons, collapsible uninstall |
+
+**Run**: `cd packages/ui && bunx playwright test` (or from root: `bun run test:e2e:pw`)
+
+**CI only**: L3 is too slow for local hooks. Runs as a parallel CI job (`l3-playwright`) with Chromium, report uploaded as artifact.
 
 ---
 
@@ -106,7 +124,7 @@ Dependency vulnerability scanning and secrets leak detection. Runs on every push
 
 | Tool | What | Scope |
 |------|------|-------|
-| osv-scanner | Known CVEs in dependencies | `pnpm-lock.yaml` (JS) + `probe/Cargo.lock` (Rust) |
+| osv-scanner | Known CVEs in dependencies | `bun.lock` (JS) + `probe/Cargo.lock` (Rust) |
 | gitleaks | Secrets/credentials in git history | Commits since upstream (or last 20 if no upstream) |
 
 **Config**: `.gitleaks.toml` (allowlist for known false positives)
@@ -178,9 +196,10 @@ CI mirrors the local hooks but runs in parallel for faster feedback.
 ```yaml
 # .github/workflows/ci.yml
 jobs:
-  quality:     # L1 + G1 + G2 via nocoo/base-ci (secrets: inherit)
-  l2-e2e:      # L2: Worker E2E (parallel, local Wrangler/D1)
-  probe:       # Rust: cargo test + clippy + fmt (parallel)
+  quality:        # L1 + G1 + G2 via nocoo/base-ci (secrets: inherit)
+  l2-e2e:         # L2: Worker E2E (parallel, local Wrangler/D1)
+  l3-playwright:  # L3: Playwright browser E2E (parallel, Chromium)
+  probe:          # Rust: cargo test + clippy + fmt (parallel)
 ```
 
 **Key design decisions**:
