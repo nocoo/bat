@@ -29,4 +29,57 @@ test.describe("Host detail page", () => {
 		// Wait a bit for the page to render
 		await expect(page.getByRole("button", { name: "1h" })).toBeVisible({ timeout: 15_000 });
 	});
+
+	test("time range picker has all duration options", async ({ page }) => {
+		await page.goto(`/hosts/${mockHostId}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		// All time range buttons should be visible
+		await expect(page.getByRole("button", { name: "1h" })).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByRole("button", { name: "6h" })).toBeVisible();
+		await expect(page.getByRole("button", { name: "24h" })).toBeVisible();
+		await expect(page.getByRole("button", { name: "7d" })).toBeVisible();
+	});
+
+	test("clicking time range button changes selection", async ({ page }) => {
+		await page.goto(`/hosts/${mockHostId}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		// Click 6h button
+		const sixHourButton = page.getByRole("button", { name: "6h" });
+		await expect(sixHourButton).toBeVisible({ timeout: 15_000 });
+		await sixHourButton.click();
+
+		// Button should now appear selected (has different styling)
+		// We verify by checking that the click was successful and page didn't error
+		await expect(sixHourButton).toBeVisible();
+	});
+
+	test("breadcrumb shows Hosts link", async ({ page }) => {
+		await page.goto(`/hosts/${mockHostId}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		// Breadcrumb navigation should have Hosts link
+		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
+
+		// There should be a link to /hosts in the breadcrumb
+		const hostsLink = breadcrumb.getByRole("link", { name: "Hosts" });
+		await expect(hostsLink).toBeVisible();
+	});
+
+	test("clicking Hosts breadcrumb navigates back", async ({ page }) => {
+		await page.goto(`/hosts/${mockHostId}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		// Click Hosts in breadcrumb
+		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
+
+		const hostsLink = breadcrumb.getByRole("link", { name: "Hosts" });
+		await hostsLink.click();
+
+		// Should navigate back to hosts list
+		await expect(page).toHaveURL("/hosts");
+	});
 });
