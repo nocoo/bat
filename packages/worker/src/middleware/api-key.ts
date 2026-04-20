@@ -2,15 +2,20 @@
 // Write routes: POST /api/ingest, POST /api/identity, webhook CRUD → BAT_WRITE_KEY
 // Read routes: GET /api/hosts, GET /api/hosts/:id/metrics, GET /api/alerts → BAT_READ_KEY
 // Public routes: GET /api/live → no auth required
+// Access-authenticated routes: browser endpoint with valid Access JWT → no API key required
 
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../types.js";
+import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
 /** Routes that require no authentication */
 const PUBLIC_ROUTES = ["/api/live"];
 
 /** Routes that require write key (BAT_WRITE_KEY) — exact match */
 const WRITE_ROUTES = ["/api/ingest", "/api/identity", "/api/tier2"];
+
+/** Routes that require read key on machine endpoint (BAT_READ_KEY) */
+const MACHINE_READ_ROUTES_PREFIX = "/api/monitoring";
 
 function extractBearerToken(header: string | undefined): string | null {
 	if (!header) {
@@ -88,8 +93,14 @@ function isWriteRequest(method: string, path: string): boolean {
 	return false;
 }
 
+/** Check if route is a machine-only read route requiring BAT_READ_KEY */
+function isMachineReadRoute(path: string): boolean {
+	return path.startsWith(MACHINE_READ_ROUTES_PREFIX);
+}
+
 export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	const path = c.req.path;
+	const host = c.req.header("host") || "";
 
 	// Public routes — no auth
 	if (PUBLIC_ROUTES.includes(path)) {
@@ -101,6 +112,18 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return next();
 	}
 
+	// Check if request has Access JWT (browser endpoint with valid JWT)
+	// If so, skip API key check for non-machine routes
+	const hasAccessJwt = !!c.req.header("Cf-Access-Jwt-Assertion");
+	const isBrowserEndpoint = !(isLocalhost(host) || isMachineEndpoint(host));
+
+	// For browser endpoint with Access JWT, only require API key for machine-specific routes
+	if (isBrowserEndpoint && hasAccessJwt && !isMachineReadRoute(path)) {
+		// Access JWT already validated by accessAuth middleware
+		return next();
+	}
+
+	// From here on, require API key authentication
 	const authHeader = c.req.header("Authorization");
 	const token = extractBearerToken(authHeader);
 

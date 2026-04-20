@@ -15,7 +15,8 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"hono": "^4.7.0"
+		"hono": "^4.7.0",
+		"jose": "^6.2.2"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250313.0",

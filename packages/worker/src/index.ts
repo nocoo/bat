@@ -1,5 +1,7 @@
 import { Hono } from "hono";
+import { accessAuth } from "./middleware/access-auth.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
+import { entryControl } from "./middleware/entry-control.js";
 import { alertsListRoute } from "./routes/alerts.js";
 import {
 	allowedPortsAllRoute,
@@ -51,7 +53,12 @@ import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
 
-// Global middleware
+// Global middleware chain:
+// 1. entryControl: route requests based on hostname (whitelist machine routes)
+// 2. accessAuth: verify Access JWT for browser endpoint
+// 3. apiKeyAuth: verify API key (with Access JWT bypass for browser reads/writes)
+app.use("*", entryControl);
+app.use("/api/*", accessAuth);
 app.use("/api/*", apiKeyAuth);
 
 // Root health check
