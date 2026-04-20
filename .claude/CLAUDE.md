@@ -1,12 +1,46 @@
 # Bat — Project Instructions
 
+## Architecture (Edge Dashboard)
+
+Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Cloudflare                                │
+│                                                                  │
+│  ┌─────────────────────┐      ┌─────────────────────┐           │
+│  │   bat.hexly.ai      │      │ bat-ingest.worker.  │           │
+│  │   (Access 保护)      │      │ hexly.ai (无 Access) │           │
+│  └──────────┬──────────┘      └──────────┬──────────┘           │
+│             │                            │                       │
+│             ▼                            ▼                       │
+│  ┌─────────────────────────────────────────────────────┐        │
+│  │                   Worker (Hono)                      │        │
+│  │  ├── /*              → SPA 静态文件 (packages/ui)    │        │
+│  │  ├── /api/hosts      → 读路由 (Access JWT)          │        │
+│  │  ├── /api/ingest     → 写路由 (BAT_WRITE_KEY)       │        │
+│  │  ├── /api/monitoring → 机器读路由 (BAT_READ_KEY)    │        │
+│  │  └── /api/live       → 公开路由                      │        │
+│  └─────────────────────────────────────────────────────┘        │
+│                              │                                   │
+│                              ▼                                   │
+│                          ┌──────┐                                │
+│                          │  D1  │                                │
+│                          └──────┘                                │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**双入口认证**：
+- `bat.hexly.ai`：浏览器入口，Cloudflare Access 保护，Access JWT 校验
+- `bat-ingest.worker.hexly.ai`：机器入口，白名单路由 + API Key
+
 ## Version Management
 
 - **Single source of truth**: root `package.json` `version` field
 - **Sync script**: `scripts/sync-version.sh` — reads version from root `package.json`, updates:
   - `packages/shared/package.json`
   - `packages/worker/package.json`
-  - `packages/dashboard/package.json`
+  - `packages/ui/package.json`
   - `packages/shared/src/version.ts` (auto-generated, do not edit manually)
   - `probe/Cargo.toml`
 - **When to run**: before each release, edit root `package.json` version then run `scripts/sync-version.sh`
@@ -16,26 +50,25 @@
   - Y+1 (minor, Z reset to 0) when: > 3 days since last bump, or > 500 lines changed
   - User can override; if unspecified, auto-determine
 - **Version surfaces**:
-  - Dashboard sidebar (`v{version}` badge)
+  - UI sidebar (`v{version}` badge)
   - Worker `GET /api/live` → `version` field
-  - Dashboard `GET /api/live` → `version` field
   - Probe payloads: `IdentityPayload.probe_version`, `MetricsPayload.probe_version`
 
 ## API Endpoints
 
-- `/api/live` (GET, public, no auth, Cache-Control: no-store) — replaces former `/api/health`
-  - **Worker**: returns system health status + version + host health statistics
-  - **Dashboard**: returns liveness + version + component name
-- Write routes (probe → worker): `POST /api/ingest`, `POST /api/identity` — require `BAT_WRITE_KEY`
-- Read routes (dashboard → worker): `GET /api/hosts`, `GET /api/hosts/:id/metrics`, `GET /api/alerts` — require `BAT_READ_KEY`
+- `/api/live` (GET, public, no auth, Cache-Control: no-store) — health check + version
+- Write routes (probe → worker): `POST /api/ingest`, `POST /api/identity`, `POST /api/tier2` — require `BAT_WRITE_KEY`
+- Machine read routes: `GET /api/monitoring/*` — require `BAT_READ_KEY` (Uptime Kuma)
+- Browser routes: `GET /api/hosts`, `GET /api/alerts`, etc. — require Access JWT on `bat.hexly.ai`
 
 ## Testing
 
-- Worker/Dashboard: `bun test`
+- Worker: `bun test` (unit), `bun turbo test:e2e --filter=@bat/worker` (E2E)
+- UI: `bun turbo build --filter=@bat/ui` (build only, no tests yet)
 - Probe: `cargo test`
 - Pre-commit hook runs: typecheck → lint → unit tests → rust checks (clippy + test)
 - Coverage thresholds enforced by `scripts/check-coverage.sh`
-- **CI**: GitHub Actions via `nocoo/base-ci` reusable workflow — L1+G1+G2, plus custom L2 job for local wrangler E2E
+- **CI**: GitHub Actions via `nocoo/base-ci` reusable workflow
 - **Package manager**: bun (declared in `packageManager` field, single `bun.lock` lockfile)
 
 ## Probe Build & Release
@@ -75,8 +108,9 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
 ### Release checklist
 
 1. Bump version in root `package.json`, run `scripts/sync-version.sh`, then `cd probe && cargo generate-lockfile`
-2. Build probe binaries for both architectures (see above)
-3. Upload binaries to R2 (`zhe` bucket) — **both** versioned and latest:
+2. Build UI: `cd packages/ui && bun run build`
+3. Build probe binaries for both architectures (see above)
+4. Upload binaries to R2 (`zhe` bucket) — **both** versioned and latest:
    ```bash
    VERSION=$(jq -r .version package.json)
    wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
@@ -86,27 +120,19 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
    ```
    - Public URL prefix: `https://s.zhe.to/apps/bat/`
    - `install.sh` fetches from `latest/` by default — no script changes needed per release
-4. Apply D1 migrations (if any): `cd packages/worker && npx wrangler d1 migrations apply bat-db --remote --env production`
-5. Deploy Worker: `npx wrangler deploy --env production`
-6. Push to git (triggers Railway Dashboard auto-deploy; if not triggered, use `railway up --detach -s 201dad47-1d69-4222-821a-4756d3d211ce`)
+5. Apply D1 migrations (if any): `cd packages/worker && npx wrangler d1 migrations apply bat-db --remote --env production`
+6. Deploy Worker (includes UI): `cd packages/worker && npx wrangler deploy --env production`
 7. Upgrade probes on VPS fleet (see upgrade command below)
 8. Verify:
    - `curl -sI https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64` → 200
    - `curl -s https://bat-ingest.worker.hexly.ai/api/live | jq .version` → new version
-   - `curl -s https://bat.hexly.ai/api/live | jq .version` → new version
-   - D1: `top_processes_json IS NOT NULL` rows appearing with proc_count = 50
+   - Browser: `https://bat.hexly.ai` → Access login → dashboard loads
 
 ### Installation
 
-- Install script: `probe/install.sh`, served via `GET /api/probe/install.sh`
-- Binaries served via `GET /api/probe/bin/:arch` (x86_64 | aarch64)
-- Both public (no auth), excluded from proxy.ts matcher
-- Setup page (`/setup`): auth-protected, shows pre-filled install command
-- Dashboard env vars: `BAT_WRITE_KEY` (for setup page), `PROBE_BIN_DIR` (binary storage path, default `/app/probe-bin`)
-
-### Known pitfall: standalone server cwd
-
-Next.js standalone `server.js` calls `process.chdir(__dirname)`, so runtime `cwd` is `/app/packages/dashboard`, NOT `/app`. Any file assets (e.g. `probe-assets/install.sh`) must be placed relative to that path in the Dockerfile.
+- Install script: `probe/install.sh`
+- Binaries: R2 bucket `https://s.zhe.to/apps/bat/latest/`
+- Setup page (`/setup`): shows install command template with `YOUR_WRITE_KEY` placeholder
 
 ## Deployment
 
@@ -114,8 +140,16 @@ Next.js standalone `server.js` calls `process.chdir(__dirname)`, so runtime `cwd
 
 - **Worker**: Cloudflare Workers (`bat`), deploy with `npx wrangler deploy --env production`
 - **Database**: Cloudflare D1 (`bat-db`), migrations via `npx wrangler d1 migrations apply bat-db --remote --env production`
-- **Dashboard**: Railway (Docker)
+- **UI**: Built into Worker static assets (`packages/worker/static/`)
+- **Auth**: Cloudflare Access on `bat.hexly.ai`
 - **Probe binaries**: R2 bucket `zhe`, public URL prefix `https://s.zhe.to/apps/bat/`
+
+### Cloudflare Access 配置
+
+需要在 Cloudflare Zero Trust 控制台配置：
+1. Access Application: `bat.hexly.ai`
+2. Policy: Allow specific email
+3. Worker secrets: `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`
 
 ### Test hosts
 
@@ -140,13 +174,6 @@ Past deployment records (URLs, version IDs, VPS fleet status, timestamps) are st
 nmem --json m search "bat release 部署" -l deployment -l bat -n 3
 ```
 This returns past release records including worker version IDs, R2 paths, VPS upgrade status, and verification results. Always check memory before deploying to confirm the current fleet and any host-specific notes.
-
-### Railway Dashboard deploy
-
-- Railway project ID: `bb78fd59-0b33-4765-b8ff-9421157eeb82`
-- Railway service ID: `201dad47-1d69-4222-821a-4756d3d211ce`
-- Auto-deploy from git push is **unreliable** — may not trigger. Fallback: `railway up --detach -s 201dad47-1d69-4222-821a-4756d3d211ce`
-- Dashboard URL: `https://bat.hexly.ai`
 
 ## Uptime Kuma Monitoring
 
@@ -186,5 +213,5 @@ Requires `socket.io-client` (`bun add -d socket.io-client`). When curl times out
 - **R2 CDN caching**: Uploading to the same R2 key with updated content may serve stale data due to Cloudflare CDN caching. When updating binaries in-place (e.g. `latest/`), either purge cache, use versioned paths, or SCP directly for immediate updates.
 - **Migration DROP TABLE destroys alert state**: `0003_tier2_tables.sql` uses `DROP TABLE IF EXISTS alert_states` + `CREATE TABLE` to add `'info'` to the CHECK constraint (SQLite doesn't support `ALTER TABLE ... ADD CHECK`). This clears all active alerts on deploy. Tier 1 alerts self-heal on the next 30s ingest, but Tier 2 instant alerts need the next 6h tier2 cycle, and Tier 2 duration alerts (7d threshold) lose their promotion progress entirely. Future migrations should use `CREATE TABLE new → INSERT INTO new SELECT → DROP old → ALTER TABLE new RENAME` to preserve data.
 - **glibc version mismatch from `rust:1-slim`**: The `rust:1-slim` Docker image tracks Debian unstable/testing, so its glibc version drifts upward silently. Binaries compiled against it fail with `GLIBC_2.39 not found` on Debian 12 (glibc 2.36) and older. Fix: use `rust:1-alpine` + musl for fully static binaries with zero host libc dependency. Always verify with `file <binary>` — expect `static-pie linked`.
-- **install.sh global placeholder replacement breaks self-check**: `route.ts` used `/__DASHBOARD_URL__/g` regex to inject the dashboard URL, but this also replaced the literal in the validation check (`== "__DASHBOARD_URL__"`), making it always true and blocking all installs. Fix: use precise string replacement targeting only the assignment line (`DASHBOARD_URL="__DASHBOARD_URL__"`), not a global regex.
 - **D1 migration must be applied before deploying Worker code that references new columns**: Deploying Worker code that queries new columns (e.g. `maintenance_start`) without first applying the migration causes 500 on ALL routes that touch the `hosts` table — including `/api/ingest`, silently dropping all probe data fleet-wide. Always run `npx wrangler d1 migrations apply bat-db --remote --env production` BEFORE `npx wrangler deploy`.
+- **Edge Dashboard 迁移 (2026-04)**：Next.js Dashboard 已迁移到 Cloudflare Workers 边缘部署。packages/dashboard 已废弃（保留在 git 历史），packages/ui 是新的 SPA。Railway 部署不再需要。
