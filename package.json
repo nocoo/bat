@@ -5,19 +5,16 @@
 	"packageManager": "bun@1.3.11",
 	"workspaces": ["packages/*"],
 	"scripts": {
-		"dev": "turbo dev --filter=@bat/ui --filter=@bat/worker",
-		"dev:all": "turbo dev",
-		"build": "turbo build",
+		"dev": "cd packages/ui && bun run dev",
+		"build": "turbo build --filter=@bat/ui",
+		"deploy": "turbo build --filter=@bat/ui && cd packages/worker && npx wrangler deploy --env production",
 		"typecheck": "turbo typecheck",
 		"lint": "biome check --error-on-warnings .",
 		"lint:fix": "biome check --write .",
 		"test": "turbo test",
-		"test:unit:coverage": "bash scripts/check-coverage.sh 90 95",
-		"security": "bun run scripts/run-security.ts",
-		"prepare": "husky",
-		"release": "bun run scripts/release.ts"
+		"prepare": "husky"
 	},
-	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd", "sharp"],
+	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd"],
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"husky": "^9.1.0",
@@ -30,10 +27,6 @@
 		"*.{ts,tsx,js,jsx,json,css}": ["biome check --error-on-warnings --no-errors-on-unmatched"]
 	},
 	"overrides": {
-		"undici": ">=7.24.0",
-		"next": "16.2.3"
-	},
-	"dependencies": {
-		"hono": "^4.12.14"
+		"undici": ">=7.24.0"
 	}
 }

@@ -9,7 +9,7 @@
 | 03 | [data-structures](./03-data-structures.md) | D1 schema, migration strategy, payload types, alert rules |
 | 04 | [probe](./04-probe.md) | Rust probe: collectors, main loop, config, systemd |
 | 05 | [worker](./05-worker.md) | CF Worker: routes, ingest, alerts, health endpoint, aggregation cron |
-| 06 | [dashboard](./06-dashboard.md) | Next.js dashboard: Google OAuth, proxy architecture, charts |
+| 06 | [ui](./06-ui.md) | Vite + React SPA: Cloudflare Access auth, shadcn/ui, charts |
 | 07 | [testing](./07-testing.md) | Four-layer testing strategy, Husky hooks |
 | 08 | [commits](./08-commits.md) | Atomic commits plan (Phase 0–5, 46 commits) |
 | 09 | [tier3-signals](./09-tier3-signals.md) | Tier 3 design rationale: PSI, disk I/O, TCP state, OOM kills, FD usage |
@@ -22,4 +22,9 @@
 | 16 | [monitoring-api](./16-monitoring-api.md) | Monitoring API for Uptime Kuma integration: host health tiers, group aggregation, alert endpoints, auto-onboarding flow |
 | 17 | [maintenance-window](./17-maintenance-window.md) | Per-host daily recurring maintenance window: alert suppression, `maintenance` status, chart grey overlay |
 | 18 | [quality-system-upgrade](./18-quality-system-upgrade.md) | Six-dimension quality system upgrade (L1/L2/L3 + G1/G2 + D1): Tier C → S roadmap, 12 atomic commits |
-| 19 | [edge-dashboard](./19-edge-dashboard.md) | Migrate Next.js Dashboard to Cloudflare Workers edge: Vite + React SPA, CF Access auth, single `wrangler deploy` |
+
+## Archive
+
+Historical design documents moved to `archive/`:
+- `06-dashboard-nextjs.md` — Original Next.js dashboard (replaced by UI)
+- `19-edge-dashboard-migration.md` — Migration plan from Next.js to edge

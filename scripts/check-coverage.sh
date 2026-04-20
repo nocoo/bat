@@ -123,21 +123,13 @@ failed=0
 
 # TypeScript packages — run bun test directly in each package dir
 # (bun --filter ... test -- --coverage breaks: bun treats --coverage after -- as a file filter)
-for pkg in shared worker dashboard; do
+for pkg in shared worker; do
   pkg_dir="packages/${pkg}"
   filter="@bat/${pkg}"
 
-  # Dashboard: only check src/lib/ and src/hooks/ coverage (UI thin shells exempt)
-  if [ "$pkg" = "dashboard" ]; then
-    output=$(cd "$pkg_dir" && bun test --coverage 2>&1) || true
-    if ! check_ts_coverage "$filter" "$output" "lib"; then
-      failed=1
-    fi
-  else
-    output=$(cd "$pkg_dir" && bun test --coverage 2>&1) || true
-    if ! check_ts_coverage "$filter" "$output"; then
-      failed=1
-    fi
+  output=$(cd "$pkg_dir" && bun test --coverage 2>&1) || true
+  if ! check_ts_coverage "$filter" "$output"; then
+    failed=1
   fi
 done
 
