@@ -33,7 +33,9 @@ function isAllowedMachineRoute(method: string, path: string): boolean {
 }
 
 export function isLocalhost(host: string): boolean {
-	return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+	return (
+		host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.endsWith(".dev.hexly.ai") // Caddy local dev via *.dev.hexly.ai
+	);
 }
 
 export function isMachineEndpoint(host: string): boolean {
