@@ -3,7 +3,8 @@
 	"version": "1.0.3",
 	"type": "module",
 	"scripts": {
-		"dev": "vite build --watch",
+		"dev": "vite",
+		"dev:watch": "vite build --watch",
 		"build": "tsc && vite build",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",

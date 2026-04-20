@@ -63,14 +63,21 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 
 ## Local Development
 
+**方式 1：HMR 开发（推荐日常开发）**
 ```bash
-bun dev   # runs @bat/ui (vite build --watch) + @bat/worker (wrangler dev) in parallel
+bun dev   # 同时启动 @bat/ui (vite dev) + @bat/worker (wrangler dev)
 ```
+- 访问 `localhost:5173`（Vite 端口），有 HMR
+- `/api/*` 自动代理到 wrangler dev (8787)
+- Auth: localhost 绕过 Access JWT，用 `BAT_READ_KEY`
 
-- **Access wrangler dev port** (default `localhost:8787`), NOT Vite's port
-- UI changes auto-rebuild to `packages/worker/static/`, wrangler serves them
-- API requests go to the same origin (no proxy needed)
-- Auth: localhost bypasses Access JWT, uses `BAT_READ_KEY` / `BAT_WRITE_KEY`
+**方式 2：接近生产的测试**
+```bash
+bun turbo build --filter=@bat/ui   # 构建到 worker/static/
+cd packages/worker && bun dev      # wrangler dev 服务静态资源
+```
+- 访问 `localhost:8787`（wrangler 端口）
+- 测试 wrangler assets 配置、SPA fallback 等
 
 ## Testing
 
