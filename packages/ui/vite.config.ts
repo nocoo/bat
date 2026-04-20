@@ -17,15 +17,12 @@ export default defineConfig({
 	server: {
 		port: 7025,
 		allowedHosts: ["bat.dev.hexly.ai"],
-		// Proxy /api/* to wrangler dev for local development with HMR
+		// Proxy /api/* to production worker for local development with HMR
+		// Uses bat-ingest endpoint (no Access JWT required, but still needs API key)
 		proxy: {
 			"/api": {
-				target: "http://localhost:8787",
+				target: "https://bat-ingest.worker.hexly.ai",
 				changeOrigin: true,
-				// Preserve localhost as Host header for wrangler to recognize as local dev
-				headers: {
-					Host: "localhost:8787",
-				},
 			},
 		},
 	},
