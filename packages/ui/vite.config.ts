@@ -22,6 +22,10 @@ export default defineConfig({
 			"/api": {
 				target: "http://localhost:8787",
 				changeOrigin: true,
+				// Preserve localhost as Host header for wrangler to recognize as local dev
+				headers: {
+					Host: "localhost:8787",
+				},
 			},
 		},
 	},
