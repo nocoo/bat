@@ -18,6 +18,7 @@ const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> 
 	{ method: "GET", path: "/api/monitoring", prefix: true },
 	// Public routes
 	{ method: "GET", path: "/api/live" },
+	{ method: "GET", path: "/api/me" },
 ];
 
 function isAllowedMachineRoute(method: string, path: string): boolean {

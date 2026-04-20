@@ -9,7 +9,7 @@ import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
 /** Routes that require no authentication */
-const PUBLIC_ROUTES = ["/api/live"];
+const PUBLIC_ROUTES = ["/api/live", "/api/me"];
 
 /** Routes that require write key (BAT_WRITE_KEY) — exact match */
 const WRITE_ROUTES = ["/api/ingest", "/api/identity", "/api/tier2"];
