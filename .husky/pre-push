@@ -1,32 +1,43 @@
-#!/usr/bin/env bash
 # pre-push: L2 (Integration E2E) + G2 (Security gate)
+# Run independent stages in parallel; fail fast on any non-zero exit.
+set -o pipefail
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HOOK_DIR/../scripts/ensure-tools.sh"
+require_tool osv-scanner "dependency audit"
+[ -f bun.lock ] || { echo "❌ bun.lock not found" >&2; exit 1; }
 
-set -euo pipefail
+TMPDIR_HOOK=$(mktemp -d -t bat-prepush-XXXXXX)
+trap 'rm -rf "$TMPDIR_HOOK"' EXIT
 
-echo "🦇 bat pre-push — L2 + G2"
+run_bg() {
+  local name="$1"; shift
+  ( "$@" >"$TMPDIR_HOOK/$name.log" 2>&1; echo $? >"$TMPDIR_HOOK/$name.exit" ) &
+  eval "PID_$name=$!"
+}
 
-# Run L2 and G2 in parallel; collect exit codes
-pids=()
-
-echo "→ L2: Worker API E2E tests"
-bun turbo test:e2e --filter=@bat/worker &
-pids+=($!)
-
-echo "→ G2: Security gate (osv-scanner + gitleaks)"
-bun run scripts/run-security.ts &
-pids+=($!)
-
-# Wait for all; fail if any fails
-failed=0
-for pid in "${pids[@]}"; do
-  if ! wait "$pid"; then
-    failed=1
+wait_stage() {
+  local name="$1" pid_var="PID_$1" pid status
+  pid=${!pid_var}
+  wait "$pid" 2>/dev/null || true
+  status=$(cat "$TMPDIR_HOOK/$name.exit" 2>/dev/null || echo 1)
+  echo "━━━ $name (exit=$status) ━━━"
+  cat "$TMPDIR_HOOK/$name.log"
+  if [ "$status" -ne 0 ]; then
+    echo "❌ pre-push stage '$name' failed" >&2
+    exit "$status"
   fi
-done
+}
 
-if [ "$failed" -ne 0 ]; then
-  echo "✘ pre-push FAILED"
-  exit 1
-fi
+# L2: Worker API E2E tests
+run_bg l2_e2e bun turbo test:e2e --filter=@bat/worker
+
+# G2: Security scanning
+run_bg osv_js   osv-scanner scan --lockfile=bun.lock --config=osv-scanner.toml
+run_bg osv_rust osv-scanner scan --lockfile=probe/Cargo.lock --config=osv-scanner.toml
+
+# Wait in declaration order
+wait_stage l2_e2e
+wait_stage osv_js
+wait_stage osv_rust
 
 echo "✔ pre-push passed (L2 + G2)"
