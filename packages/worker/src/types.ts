@@ -8,4 +8,10 @@ export type Bindings = {
 	CF_ACCESS_AUD?: string; // Access Application audience
 };
 
-export type AppEnv = { Bindings: Bindings };
+// Variables set by middleware, passed through Hono context
+export type Variables = {
+	// Set by accessAuth middleware when JWT signature is verified
+	accessAuthenticated?: boolean;
+};
+
+export type AppEnv = { Bindings: Bindings; Variables: Variables };

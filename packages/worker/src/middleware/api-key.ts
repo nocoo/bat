@@ -112,14 +112,14 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return next();
 	}
 
-	// Check if request has Access JWT (browser endpoint with valid JWT)
-	// If so, skip API key check for non-machine routes
-	const hasAccessJwt = !!c.req.header("Cf-Access-Jwt-Assertion");
+	// Check if request was authenticated by Access JWT (context flag set by accessAuth)
+	// This flag is only set after successful JWT signature verification
+	// Do NOT check the raw Cf-Access-Jwt-Assertion header - it could be forged
+	const accessAuthenticated = c.get("accessAuthenticated") === true;
 	const isBrowserEndpoint = !(isLocalhost(host) || isMachineEndpoint(host));
 
-	// For browser endpoint with Access JWT, only require API key for machine-specific routes
-	if (isBrowserEndpoint && hasAccessJwt && !isMachineReadRoute(path)) {
-		// Access JWT already validated by accessAuth middleware
+	// For browser endpoint with verified Access JWT, skip API key for non-machine routes
+	if (isBrowserEndpoint && accessAuthenticated && !isMachineReadRoute(path)) {
 		return next();
 	}
 
