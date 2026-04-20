@@ -24,4 +24,8 @@ for migration in migrations/0*.sql; do
   bunx wrangler d1 execute bat-db --local --persist-to "$PERSIST_DIR" --file "$migration" 2>/dev/null || true
 done
 
+# Seed test data
+echo "[L3 setup] Seeding test data..."
+bunx wrangler d1 execute bat-db --local --persist-to "$PERSIST_DIR" --file "$SCRIPT_DIR/l3-seed.sql" 2>/dev/null || true
+
 echo "[L3 setup] Database ready."
