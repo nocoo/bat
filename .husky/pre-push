@@ -1,10 +1,18 @@
-# pre-push: L2 (Integration E2E) + G2 (Security gate)
+# pre-push: L2 (Integration E2E) + G2 (Security gate) + D1 (Isolation check)
 # Run independent stages in parallel; fail fast on any non-zero exit.
 set -o pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$HOOK_DIR/../scripts/ensure-tools.sh"
 require_tool osv-scanner "dependency audit"
 [ -f bun.lock ] || { echo "❌ bun.lock not found" >&2; exit 1; }
+
+# D1: Isolation check — MUST pass before E2E tests run
+# This is a fast synchronous check (< 100ms) so no need to parallelize
+echo "━━━ d1_isolation ━━━"
+bun run scripts/verify-test-bindings.ts || {
+  echo "❌ D1 isolation check failed — refusing to run E2E tests" >&2
+  exit 1
+}
 
 TMPDIR_HOOK=$(mktemp -d -t bat-prepush-XXXXXX)
 trap 'rm -rf "$TMPDIR_HOOK"' EXIT
@@ -40,4 +48,4 @@ wait_stage l2_e2e
 wait_stage osv_js
 wait_stage osv_rust
 
-echo "✔ pre-push passed (L2 + G2)"
+echo "✔ pre-push passed (L2 + G2 + D1)"
