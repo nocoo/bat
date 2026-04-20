@@ -454,15 +454,15 @@ Application 创建后，记录：
 
 ## 8. 实施步骤
 
-### Phase 1: Worker 认证改造
+### Phase 1: Worker 认证改造 ✅
 
-| # | 任务 |
-|---|------|
-| 1.1 | 添加 `entryControl` 中间件（白名单机器路由） |
-| 1.2 | 添加 `accessAuth` 中间件（JWT 验证，用 jose 库） |
-| 1.3 | 调整中间件顺序：`entryControl` → `accessAuth` / `apiKeyAuth` |
-| 1.4 | 浏览器读写路由移除 `BAT_READ_KEY` 依赖 |
-| 1.5 | `/api/monitoring/*` 保留 `BAT_READ_KEY`（机器路由） |
+| # | 任务 | 状态 |
+|---|------|------|
+| 1.1 | 添加 `entryControl` 中间件（白名单机器路由） | ✅ |
+| 1.2 | 添加 `accessAuth` 中间件（JWT 验证，用 jose 库） | ✅ |
+| 1.3 | 调整中间件顺序：`entryControl` → `accessAuth` / `apiKeyAuth` | ✅ |
+| 1.4 | 浏览器读写路由移除 `BAT_READ_KEY` 依赖 | ✅ |
+| 1.5 | `/api/monitoring/*` 保留 `BAT_READ_KEY`（机器路由） | ✅ |
 
 ### Phase 2: Worker 静态资源
 

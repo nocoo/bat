@@ -47,3 +47,5 @@ playwright/.cache/
 
 # Misc
 *.log
+packages/worker/static/*
+!packages/worker/static/.gitkeep
