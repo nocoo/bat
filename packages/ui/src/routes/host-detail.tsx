@@ -1,3 +1,13 @@
+import {
+	CpuChart,
+	DiskBars,
+	DiskIoChart,
+	MemoryChart,
+	NetworkChart,
+	PsiChart,
+	TcpChart,
+	TopProcessesTable,
+} from "@/components/charts";
 import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -145,7 +155,7 @@ export function HostDetailPage() {
 					</div>
 				) : metricsResponse ? (
 					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-						{/* Left column — placeholder for charts */}
+						{/* Left column — charts */}
 						<div className="space-y-4">
 							<div className="flex items-baseline justify-between">
 								<h2 className="text-base font-semibold">Metrics</h2>
@@ -153,19 +163,27 @@ export function HostDetailPage() {
 									Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
 								</span>
 							</div>
-							<Card>
-								<CardContent className="py-8 text-center text-muted-foreground">
-									<p>Charts will be migrated in a future update.</p>
-									<p className="text-sm mt-2">
-										{metricsResponse.data.length} data points available
-									</p>
-								</CardContent>
-							</Card>
+							<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<NetworkChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								resolution={metricsResponse.resolution}
+							/>
+							<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<DiskIoChart
+								data={metricsResponse.data}
+								rangeSeconds={rangeSeconds}
+								resolution={metricsResponse.resolution}
+							/>
+							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+							<TopProcessesTable data={metricsResponse.data} />
 						</div>
 
-						{/* Right column — system info */}
+						{/* Right column — system info + disks */}
 						<div className="space-y-4">
 							<h2 className="text-base font-semibold">Overview</h2>
+							<DiskBars data={metricsResponse.data} />
 							{host && (
 								<Card>
 									<CardHeader>
