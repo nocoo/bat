@@ -6,6 +6,16 @@ compatibility_date = "2025-03-14"
 [triggers]
 crons = ["0 * * * *"]
 
+# Static assets configuration (Wrangler v4)
+# SPA served from ./static, API handled by Worker code
+[assets]
+directory = "./static"
+binding = "ASSETS"
+# API routes handled by Worker first, everything else goes to static assets
+run_worker_first = ["/api/*", "/"]
+# SPA fallback: 404 returns index.html for client-side routing
+not_found_handling = "single-page-application"
+
 # Default (development) D1 binding
 [[d1_databases]]
 binding = "DB"
@@ -17,9 +27,15 @@ ENVIRONMENT = "development"
 
 # Production environment overrides
 # Usage: wrangler deploy --env production
-# Secrets (set via `wrangler secret put`): BAT_WRITE_KEY, BAT_READ_KEY
+# Secrets (set via `wrangler secret put`): BAT_WRITE_KEY, BAT_READ_KEY, CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD
 [env.production]
 name = "bat"
+
+[env.production.assets]
+directory = "./static"
+binding = "ASSETS"
+run_worker_first = ["/api/*", "/"]
+not_found_handling = "single-page-application"
 
 [[env.production.d1_databases]]
 binding = "DB"
@@ -29,8 +45,13 @@ database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 [env.production.vars]
 ENVIRONMENT = "production"
 
+# Dual domain routing: machine endpoint + browser endpoint
 [[env.production.routes]]
 pattern = "bat-ingest.worker.hexly.ai"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "bat.hexly.ai"
 custom_domain = true
 
 # Test environment — E2E testing with isolated resources
