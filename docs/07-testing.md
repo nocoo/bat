@@ -1,14 +1,14 @@
 # 07 — Testing & Quality System
 
 > Six-dimension quality system: **three test layers (L1/L2/L3) + two gates (G1/G2) + one isolation (D1)**.
-> Each module document ([04-probe.md](./04-probe.md), [05-worker.md](./05-worker.md), [06-dashboard.md](./06-dashboard.md)) contains its own module-specific test plan. This document defines the shared strategy, dimension definitions, Husky hooks, and cross-module verification.
+> Each module document ([04-probe.md](./04-probe.md), [05-worker.md](./05-worker.md), [06-ui.md](./06-ui.md)) contains its own module-specific test plan. This document defines the shared strategy, dimension definitions, Husky hooks, CI integration, and cross-module verification.
 >
 > Related documents:
 > - [02-architecture.md](./02-architecture.md) — System overview, verification checklist
 > - [03-data-structures.md](./03-data-structures.md) — Shared types testing (L1)
-> - [04-probe.md](./04-probe.md) — Probe testing (L1, L2, L3)
-> - [05-worker.md](./05-worker.md) — Worker testing (L1, L2, L3)
-> - [06-dashboard.md](./06-dashboard.md) — Dashboard testing (L1, L2, L3)
+> - [04-probe.md](./04-probe.md) — Probe testing (L1)
+> - [05-worker.md](./05-worker.md) — Worker testing (L1, L2)
+> - [06-ui.md](./06-ui.md) — UI SPA (build only, no tests)
 > - [08-commits.md](./08-commits.md) — Atomic commits plan
 > - [18-quality-system-upgrade.md](./18-quality-system-upgrade.md) — Tier C → S upgrade plan
 
@@ -46,8 +46,9 @@ Pure logic tests. No network, no database, no UI rendering (except component sna
 |--------|------|----------------|----------------|
 | `@bat/shared` | Bun test | ≥ 90% | Alert rule definitions, threshold constants |
 | `@bat/worker` | Bun test | ≥ 90% | Alert evaluation (6 rules), aggregation SQL, metrics resolution, API key middleware, route handlers |
-| `@bat/dashboard` | Bun test | ≥ 90% (lib/hooks only) | Data transforms, SWR hooks, proxy route handlers; UI thin shells (`page.tsx`, `layout.tsx`) exempt |
 | `probe/` | `cargo llvm-cov` | ≥ 95% | Procfs parsing, delta calc, rate math, config parsing, payload serialization, retry logic |
+
+Note: `@bat/ui` is a thin SPA shell served from Worker static assets. No unit tests — build verification only.
 
 ### Testing conventions
 
@@ -55,7 +56,6 @@ Pure logic tests. No network, no database, no UI rendering (except component sna
 - **Rust**: `#[cfg(test)]` modules inline, or `tests/` directory for integration-style tests
 - **Fixtures**: Embedded strings (not real `/proc` reads) for determinism
 - **Mocks**: Minimal — prefer testing pure functions. Mock HTTP only for sender/retry tests
-- **Dashboard coverage**: Only `src/lib/` and `src/hooks/` count toward threshold (configured in `bunfig.toml`)
 
 ---
 
@@ -86,21 +86,17 @@ End-to-end tests against a real local Wrangler dev server with a real local D1 d
 
 **Setup**: `test:e2e` script self-bootstraps: starts a Wrangler dev server on port 18787, applies migrations to local D1, seeds test data, runs the test suite, and tears down the server on exit. No external server required.
 
-**Run**: `pnpm --filter @bat/worker test:e2e`
+**Run**: `bun turbo test:e2e --filter=@bat/worker`
 
 ---
 
 ## L3 — System/E2E
 
-Browser-level tests using Playwright. Validates the critical user journeys through the Dashboard.
+Browser-level tests using Playwright. Reserved for complex UI interactions that cannot be verified by build-time checks.
 
-**Scope**: 4 core flows. Full test matrix in [06-dashboard.md § L3](./06-dashboard.md).
+**Current status**: Not implemented. The UI is a thin SPA served from Worker static assets — Cloudflare Access handles authentication, and all logic lives in the Worker API (covered by L2).
 
-**Server convention**:
-- Dashboard dev server: port 28787
-- Auth bypass: `E2E_SKIP_AUTH=1` environment variable
-
-**Run**: `pnpm --filter @bat/dashboard test:e2e` (on-demand, not in hooks)
+L3 may be added if the UI grows complex enough to warrant browser testing (e.g., multi-step forms, complex state management).
 
 ---
 
@@ -143,10 +139,10 @@ Runs on every commit. Must pass for commit to succeed.
 
 ```bash
 # G1: TypeScript typecheck
-pnpm turbo typecheck
+bun turbo typecheck
 
 # G1: Biome lint (staged files only via lint-staged)
-pnpm lint-staged
+bunx lint-staged
 
 # L1: Unit tests with coverage (TS ≥90%, Rust ≥95%)
 bash scripts/check-coverage.sh 90 95
@@ -161,7 +157,7 @@ Runs before push. L2 and G2 execute in parallel.
 
 ```bash
 # L2: Worker API E2E (self-bootstraps Wrangler dev server)
-pnpm --filter @bat/worker test:e2e &
+bun turbo test:e2e --filter=@bat/worker &
 
 # G2: Security gate (osv-scanner + gitleaks)
 bun run scripts/run-security.ts &
@@ -171,7 +167,33 @@ bun run scripts/run-security.ts &
 
 ### Coverage enforcement
 
-`scripts/check-coverage.sh` parses Bun test coverage output and fails if any package drops below threshold. Dashboard uses lib-only mode (only `src/lib/` and `src/hooks/` files).
+`scripts/check-coverage.sh` parses Bun test coverage output and fails if any package drops below threshold.
+
+---
+
+## GitHub Actions CI
+
+CI mirrors the local hooks but runs in parallel for faster feedback.
+
+```yaml
+# .github/workflows/ci.yml
+jobs:
+  quality:     # L1 + G1 + G2 via nocoo/base-ci (secrets: inherit)
+  l2-e2e:      # L2: Worker E2E (parallel, local Wrangler/D1)
+  probe:       # Rust: cargo test + clippy + fmt (parallel)
+```
+
+**Key design decisions**:
+
+1. **Parallel execution**: `l2-e2e` and `probe` run in parallel with `quality` (no `needs` dependency) for faster CI (~50% time reduction).
+
+2. **`secrets: inherit`**: Required for G2 security scanning (gitleaks, osv-scanner) to access repo secrets.
+
+3. **Local D1**: L2 E2E uses Wrangler's local miniflare D1 emulation — no cloud secrets needed, fully deterministic.
+
+4. **Rust caching**: `Swatinem/rust-cache` caches cargo artifacts, reducing probe build time from ~2min to ~20s on cache hit.
+
+5. **workflow_dispatch**: Allows manual CI trigger from GitHub UI for debugging.
 
 ---
 
@@ -185,8 +207,8 @@ Beyond per-module testing, these scenarios verify the full system works end-to-e
 | 2 | Probe → Worker identity | Restart Probe, check `hosts` table updated |
 | 3 | Alert evaluation | Send metrics exceeding thresholds, check `alert_states` populated |
 | 4 | Live endpoint | After alerts fire, `curl /api/live` returns correct status + HTTP code |
-| 5 | Dashboard proxy | Login to Dashboard, verify host list loads from Worker via proxy |
-| 6 | Time range switching | Select 7d range in Dashboard, verify hourly resolution data returned |
+| 5 | UI → Worker API | Login to UI, verify host list loads from Worker via SWR |
+| 6 | Time range switching | Select 7d range in UI, verify hourly resolution data returned |
 | 7 | Retired host rejection | Retire a host via D1 console, verify Probe gets 403 |
 | 8 | Aggregation cron | Trigger `__scheduled`, verify `metrics_hourly` populated, old `metrics_raw` purged |
 

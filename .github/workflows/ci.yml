@@ -1,4 +1,4 @@
-# Bat CI — L1 + G1 + G2 via base-ci, L2 local wrangler E2E
+# Bat CI — L1 + G1 + G2 via base-ci, L2 local wrangler E2E, Rust probe tests
 name: CI
 
 on:
@@ -6,9 +6,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
+  # ─────────────────────────────────────────────────────
   # L1 (Unit tests) + G1 (Typecheck + Lint) + G2 (Gitleaks + OSV)
+  # ─────────────────────────────────────────────────────
   quality:
     uses: nocoo/base-ci/.github/workflows/bun-quality.yml@v2026
     with:
@@ -17,11 +20,15 @@ jobs:
       osv-config: "osv-scanner.toml"
       enable-l2: "false"
       upload-coverage: "false"
+    secrets: inherit
 
-  # L2: Worker E2E — local wrangler miniflare (no external secrets needed)
+  # ─────────────────────────────────────────────────────
+  # L2: Worker E2E — local wrangler miniflare
+  # Runs in PARALLEL with quality for faster CI.
+  # No external secrets needed — uses local D1/miniflare.
+  # ─────────────────────────────────────────────────────
   l2-e2e:
     name: "L2 Worker E2E"
-    needs: [quality]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -41,3 +48,35 @@ jobs:
 
       - name: "L2: Worker E2E tests"
         run: bun turbo test:e2e --filter=@bat/worker
+
+  # ─────────────────────────────────────────────────────
+  # Rust Probe: cargo test + clippy
+  # Runs in PARALLEL with quality for faster CI.
+  # ─────────────────────────────────────────────────────
+  probe:
+    name: "Probe (Rust)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: probe
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "probe -> target"
+
+      - name: "L1: Probe unit tests"
+        run: cargo test --all-features
+
+      - name: "G1: Clippy lint"
+        run: cargo clippy -- -D warnings
+
+      - name: "G1: Format check"
+        run: cargo fmt --check
