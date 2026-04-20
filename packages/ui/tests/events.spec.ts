@@ -1,16 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-/**
- * Events page E2E tests.
- *
- * Tests verify the events list page functionality.
- */
 test.describe("Events page", () => {
 	test("page loads with correct breadcrumb", async ({ page }) => {
 		await page.goto("/events");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Breadcrumb should show "Events"
 		await expect(page.getByText("Events").first()).toBeVisible({ timeout: 15_000 });
 	});
 
@@ -18,40 +12,66 @@ test.describe("Events page", () => {
 		await page.goto("/events");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Events link should be in sidebar
 		const eventsLink = page.getByRole("link", { name: "Events" });
 		await expect(eventsLink).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("shows empty state when no events exist", async ({ page }) => {
+	test("displays event table with seeded events", async ({ page }) => {
 		await page.goto("/events");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Should show empty state (database starts empty)
-		await expect(page.getByText("No events yet")).toBeVisible({ timeout: 15_000 });
-		await expect(
-			page.getByText("Events will appear here when hosts send webhook payloads"),
-		).toBeVisible();
+		await expect(page.getByRole("columnheader", { name: "Host" })).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible();
+		await expect(page.getByRole("columnheader", { name: "Tags" })).toBeVisible();
+		await expect(page.getByRole("columnheader", { name: "Time" })).toBeVisible();
 	});
 
-	test("has table structure when data exists", async ({ page }) => {
+	test("shows event rows with titles", async ({ page }) => {
 		await page.goto("/events");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Wait for the page to settle
-		const hasData = await page
-			.getByRole("columnheader", { name: "Host" })
-			.isVisible({ timeout: 5_000 })
-			.catch(() => false);
+		await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible({
+			timeout: 15_000,
+		});
+		await expect(page.getByText("Deploy v2.1.0")).toBeVisible();
+		await expect(page.getByText("Config reload")).toBeVisible();
+	});
 
-		if (hasData) {
-			// If there's data, verify table structure
-			await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible();
-			await expect(page.getByRole("columnheader", { name: "Tags" })).toBeVisible();
-			await expect(page.getByRole("columnheader", { name: "Time" })).toBeVisible();
-		} else {
-			// Empty state should be visible
-			await expect(page.getByText("No events yet")).toBeVisible();
-		}
+	test("shows event host name", async ({ page }) => {
+		await page.goto("/events");
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByRole("columnheader", { name: "Host" })).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText("alpha.test.local").first()).toBeVisible();
+	});
+
+	test("shows event tags", async ({ page }) => {
+		await page.goto("/events");
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByRole("columnheader", { name: "Tags" })).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText("deploy, release")).toBeVisible();
+	});
+
+	test("event host link navigates to host detail", async ({ page }) => {
+		await page.goto("/events");
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByRole("columnheader", { name: "Host" })).toBeVisible({ timeout: 15_000 });
+
+		await page.getByRole("link", { name: "alpha.test.local" }).first().click();
+		await expect(page).toHaveURL(/\/hosts\/f0d3fd30/);
+	});
+
+	test("shows two event rows for seeded data", async ({ page }) => {
+		await page.goto("/events");
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible({
+			timeout: 15_000,
+		});
+
+		const rows = page.locator("tbody tr");
+		await expect(rows).toHaveCount(2);
 	});
 });
