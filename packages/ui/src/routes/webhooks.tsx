@@ -114,7 +114,7 @@ export function WebhooksPage() {
 								<select
 									value={selectedHostId}
 									onChange={(e) => setSelectedHostId(e.target.value)}
-									className="h-8 text-sm flex-1 rounded-md border border-input bg-background px-3 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									className="h-8 text-sm flex-1 rounded-md border border-border bg-background px-3 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 								>
 									<option value="">Select a host...</option>
 									{availableHosts.map((h) => (
