@@ -64,7 +64,8 @@
 			".wrangler",
 			"probe/target",
 			".agents",
-			".claude/skills"
+			".claude/skills",
+			"packages/worker/static"
 		]
 	}
 }
