@@ -1,28 +1,53 @@
-#!/usr/bin/env bash
 # pre-commit: L1 (Unit tests + coverage) + G1 (Static analysis)
-set -euo pipefail
+# Run independent stages in parallel; fail fast on any non-zero exit.
+# Each stage's stdout/stderr is buffered to a tempfile and replayed in order.
+set -o pipefail
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$HOOK_DIR/../scripts/ensure-tools.sh"
+require_tool gitleaks "secrets scanning"
 
-echo "🦇 bat pre-commit — L1 + G1"
+TMPDIR_HOOK=$(mktemp -d -t bat-precommit-XXXXXX)
+trap 'rm -rf "$TMPDIR_HOOK"' EXIT
 
-# G1: TypeScript typecheck
-echo "→ G1: typecheck"
-bun turbo typecheck
+run_bg() {
+  local name="$1"; shift
+  ( "$@" >"$TMPDIR_HOOK/$name.log" 2>&1; echo $? >"$TMPDIR_HOOK/$name.exit" ) &
+  eval "PID_$name=$!"
+}
 
-# G1: Biome lint (staged files only via lint-staged)
-echo "→ G1: lint (staged)"
-bunx lint-staged
+wait_stage() {
+  local name="$1" pid_var="PID_$1" pid status
+  pid=${!pid_var}
+  wait "$pid" 2>/dev/null || true
+  status=$(cat "$TMPDIR_HOOK/$name.exit" 2>/dev/null || echo 1)
+  echo "━━━ $name (exit=$status) ━━━"
+  cat "$TMPDIR_HOOK/$name.log"
+  if [ "$status" -ne 0 ]; then
+    echo "❌ pre-commit stage '$name' failed" >&2
+    exit "$status"
+  fi
+}
 
-# L1: Unit tests with coverage (TS ≥90%, Rust ≥95%)
-echo "→ L1: unit tests + coverage"
-bash scripts/check-coverage.sh 90 95
+# Launch all stages concurrently
+run_bg unit_cov   bash scripts/check-coverage.sh 90 95
+run_bg typecheck  bun turbo typecheck
+run_bg lint       bunx lint-staged
+run_bg gitleaks   gitleaks protect --staged --no-banner
 
-# G1: Rust lint (only if probe/ changed)
+# Rust lint only if probe/ changed
 if git diff --cached --name-only | grep -q '^probe/'; then
-  echo "→ G1: rust lint"
-  cd probe
-  cargo fmt --check
-  cargo clippy -- -D warnings
-  cd ..
+  run_bg rust_lint bash -c 'cd probe && cargo fmt --check && cargo clippy -- -D warnings'
+fi
+
+# Wait in declaration order so logs print deterministically
+wait_stage unit_cov
+wait_stage typecheck
+wait_stage lint
+wait_stage gitleaks
+
+# Wait for rust_lint if it was started
+if [ -n "${PID_rust_lint:-}" ]; then
+  wait_stage rust_lint
 fi
 
 echo "✔ pre-commit passed (L1 + G1)"
