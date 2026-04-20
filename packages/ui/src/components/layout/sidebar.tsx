@@ -1,5 +1,7 @@
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMe } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
 import {
@@ -127,8 +129,40 @@ interface SidebarProps {
 export function Sidebar({ mobile = false }: SidebarProps) {
 	const { pathname } = useLocation();
 	const { collapsed, toggle, setMobileOpen } = useSidebar();
+	const { data: user } = useMe();
 
 	const handleNavigate = () => setMobileOpen(false);
+
+	// Avatar color based on email hash
+	const getAvatarColor = (email: string | null) => {
+		if (!email) {
+			return "bg-muted-foreground";
+		}
+		const colors = [
+			"bg-red-500",
+			"bg-orange-500",
+			"bg-amber-500",
+			"bg-yellow-500",
+			"bg-lime-500",
+			"bg-green-500",
+			"bg-emerald-500",
+			"bg-teal-500",
+			"bg-cyan-500",
+			"bg-sky-500",
+			"bg-blue-500",
+			"bg-indigo-500",
+			"bg-violet-500",
+			"bg-purple-500",
+			"bg-fuchsia-500",
+			"bg-pink-500",
+		];
+		const hash = email.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+		return colors[hash % colors.length];
+	};
+
+	const userEmail = user?.email ?? null;
+	const userName = user?.name ?? userEmail?.split("@")[0] ?? "User";
+	const userInitial = userName.charAt(0).toUpperCase();
 
 	return (
 		<TooltipProvider delayDuration={0}>
@@ -238,11 +272,21 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 							</div>
 						</nav>
 
-						{/* Footer — protected by Cloudflare Access, no user info needed */}
-						<div className="px-4 py-3">
-							<p className="text-xs text-muted-foreground text-center">
-								Protected by Cloudflare Access
-							</p>
+						{/* Footer — user info */}
+						<div className="px-4 py-3 border-t">
+							<div className="flex items-center gap-3">
+								<Avatar className="h-9 w-9 shrink-0">
+									<AvatarFallback className={cn("text-xs text-white", getAvatarColor(userEmail))}>
+										{userInitial}
+									</AvatarFallback>
+								</Avatar>
+								<div className="flex-1 min-w-0">
+									<p className="text-sm font-medium text-foreground truncate">{userName}</p>
+									{userEmail && (
+										<p className="text-xs text-muted-foreground truncate">{userEmail}</p>
+									)}
+								</div>
+							</div>
 						</div>
 					</div>
 				)}
