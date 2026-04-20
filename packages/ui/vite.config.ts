@@ -14,4 +14,13 @@ export default defineConfig({
 		outDir: "../worker/static",
 		emptyOutDir: true,
 	},
+	server: {
+		// Proxy /api/* to wrangler dev for local development with HMR
+		proxy: {
+			"/api": {
+				target: "http://localhost:8787",
+				changeOrigin: true,
+			},
+		},
+	},
 });
