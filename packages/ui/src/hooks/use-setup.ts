@@ -1,10 +1,11 @@
 import useSWR from "swr";
 import { fetchAPI } from "../api";
 
+// Setup config returned by /api/setup
+// Note: write_key is NOT returned by the API for security reasons
+// Users must obtain it manually from Cloudflare console
 interface SetupConfig {
 	worker_url: string;
-	write_key: string;
-	dashboard_url: string;
 }
 
 export function useSetup() {

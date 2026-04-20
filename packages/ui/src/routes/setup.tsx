@@ -36,16 +36,19 @@ export function SetupPage() {
 	const { data: config, error, isLoading } = useSetup();
 	const [uninstallOpen, setUninstallOpen] = useState(false);
 
-	// Use placeholders if config not available (for standalone UI testing)
-	const dashboardUrl = config?.dashboard_url ?? "YOUR_DASHBOARD_URL";
-	const workerUrl = config?.worker_url ?? "YOUR_WORKER_URL";
-	const writeKey = config?.write_key ?? "YOUR_WRITE_KEY";
+	// Worker URL from API, with fallback for loading state
+	const workerUrl = config?.worker_url ?? "https://bat-ingest.worker.hexly.ai";
+	// Write key is NOT returned by API for security — use placeholder
+	const writeKeyPlaceholder = "YOUR_WRITE_KEY";
 
-	const installCmd = `curl -fsSL ${dashboardUrl}/api/probe/install.sh | bash -s -- \\
+	// Install script URL (served from R2, not from this worker)
+	const installScriptUrl = "https://s.zhe.to/apps/bat/latest/install.sh";
+
+	const installCmd = `curl -fsSL ${installScriptUrl} | bash -s -- \\
   --url '${workerUrl}' \\
-  --key '${writeKey}'`;
+  --key '${writeKeyPlaceholder}'`;
 
-	const uninstallCmd = `curl -fsSL ${dashboardUrl}/api/probe/install.sh | bash -s -- --uninstall`;
+	const uninstallCmd = `curl -fsSL ${installScriptUrl} | bash -s -- --uninstall`;
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Setup" }]}>
@@ -93,21 +96,35 @@ export function SetupPage() {
 					{/* Step 1: Install */}
 					<Card>
 						<CardHeader>
-							<CardTitle className="text-base">Step 1 — Run the install command</CardTitle>
+							<CardTitle className="text-base">Step 1 — Get your write key</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<p className="text-sm text-muted-foreground mb-3">
-								Copy and paste this command on your server. It downloads and installs the probe with
-								your pre-filled credentials.
+								Go to Cloudflare Dashboard → Workers &amp; Pages → bat → Settings → Variables, and
+								copy the value of{" "}
+								<code className="text-xs bg-muted px-1 py-0.5 rounded">BAT_WRITE_KEY</code>.
+							</p>
+						</CardContent>
+					</Card>
+
+					{/* Step 2: Install */}
+					<Card>
+						<CardHeader>
+							<CardTitle className="text-base">Step 2 — Run the install command</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p className="text-sm text-muted-foreground mb-3">
+								Replace <code className="text-xs bg-muted px-1 py-0.5 rounded">YOUR_WRITE_KEY</code>{" "}
+								with your actual key, then run on your server:
 							</p>
 							<CodeBlock code={installCmd} language="bash" />
 						</CardContent>
 					</Card>
 
-					{/* Step 2: Verify */}
+					{/* Step 3: Verify */}
 					<Card>
 						<CardHeader>
-							<CardTitle className="text-base">Step 2 — Verify the installation</CardTitle>
+							<CardTitle className="text-base">Step 3 — Verify the installation</CardTitle>
 						</CardHeader>
 						<CardContent>
 							<p className="text-sm text-muted-foreground mb-3">
