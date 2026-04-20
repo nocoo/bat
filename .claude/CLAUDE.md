@@ -61,6 +61,17 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 - Machine read routes: `GET /api/monitoring/*` — require `BAT_READ_KEY` (Uptime Kuma)
 - Browser routes: `GET /api/hosts`, `GET /api/alerts`, etc. — require Access JWT on `bat.hexly.ai`
 
+## Local Development
+
+```bash
+bun dev   # runs @bat/ui (vite build --watch) + @bat/worker (wrangler dev) in parallel
+```
+
+- **Access wrangler dev port** (default `localhost:8787`), NOT Vite's port
+- UI changes auto-rebuild to `packages/worker/static/`, wrangler serves them
+- API requests go to the same origin (no proxy needed)
+- Auth: localhost bypasses Access JWT, uses `BAT_READ_KEY` / `BAT_WRITE_KEY`
+
 ## Testing
 
 - Worker: `bun test` (unit), `bun turbo test:e2e --filter=@bat/worker` (E2E)
