@@ -45,7 +45,6 @@ interface VersionTarget {
 const VERSION_TARGETS: VersionTarget[] = [
 	// package.json files
 	{ path: "package.json", pattern: "json-version" },
-	{ path: "packages/dashboard/package.json", pattern: "json-version" },
 	{ path: "packages/worker/package.json", pattern: "json-version" },
 	{ path: "packages/shared/package.json", pattern: "json-version" },
 	// Source code version constants
