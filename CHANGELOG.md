@@ -1,5 +1,79 @@
 # Changelog
 
+## v1.0.4
+
+### Added
+- Expand Playwright tests from 36 to 69 with seeded data
+- Add D1 seed data for Playwright tests
+- Add D1 isolation check to pre-push gate
+- Expand L3 Playwright tests from 9 to 36
+- Add L3 Playwright E2E tests and update hooks
+- Add /api/me to public routes for local dev
+- Add user info display in sidebar footer
+- Proxy to production API for local dev with HMR
+- Add Vite proxy for HMR development
+- Migrate charts to host detail page
+- Add /api/setup route with secure key handling
+- Migrate dashboard components to standalone SPA package
+- Add static assets config for SPA hosting
+- Add dual-endpoint auth with Access JWT support
+- Upgrade /api/live to surety standard (#10)
+- Add automated release script
+
+### Changed
+- Add edge deployment design and rewrite testing doc
+- Rewrite architecture for edge SPA, clean Next.js references
+- Update L3 section to reflect Playwright implementation
+- Update rustls-webpki to fix vulnerability
+- Adapt E2E tests for SPA and localhost bypass
+- Optimize CI with parallel jobs and Rust probe tests
+- Update local dev workflow to use production API
+- Update root dev script to use @bat/ui instead of @bat/dashboard
+- Update sync-version.sh and mark Phase 5 progress
+- Update turbo config and docs for edge dashboard migration
+- Boost tier2-read coverage to 100%
+- Boost api-key middleware coverage to 100%
+- Boost maintenance route coverage to 100%
+- Boost tier2-alerts service coverage to 99%
+- Boost status service coverage to 100%
+- Boost hosts route coverage to 100%
+- Boost ingest route coverage to 100%
+- Update README to replace pnpm with bun
+- Update CLAUDE.md for bun migration and CI setup
+- Add GitHub Actions workflow with base-ci reusable workflow
+- Add test:unit:coverage scripts for CI compatibility
+- Migrate package manager from pnpm to bun
+- 6DQ L1+G1 compliance (#3)
+
+### Fixed
+- Use non-colliding probe version in seed data
+- Remove stale dashboard/package.json reference
+- Replace border-input/bg-input with basalt tokens
+- Add test:unit:coverage script for base-ci compatibility
+- Address Clippy lint warnings for CI compatibility
+- Correct Rust action and exclude static from lint
+- Correct Rust action name to dtolnay/rust-toolchain
+- Add logo files and fix favicon path
+- Skip API key auth for localhost/dev.hexly.ai
+- Explicitly set Host header in Vite proxy
+- Treat *.dev.hexly.ai as localhost for local dev
+- Allow bat.dev.hexly.ai host in Vite dev server
+- Use correct dev port 7025 for Caddy integration
+- Use vite build --watch for dev mode
+- Fail closed when Access not configured
+- Strengthen hosts allowlist assertion to check derived status
+- Keep tier2-alerts private helpers unexported
+- Upgrade hono to 4.12.14
+- Resolve biome lint warnings in scripts/release.ts
+- Biome auto-fix release.ts
+- Migrate remaining inputs from border-input to border-border
+- Button outline + inline input remove border-input
+- Use check-coverage.sh as CI coverage gate with threshold enforcement
+- Resolve CVEs in next and rand, clean up osv-scanner ignores
+
+### Removed
+- Remove Next.js dashboard, migrate to edge UI
+
 ## v1.0.3 (2026-04-11)
 
 ### Performance
