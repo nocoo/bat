@@ -94,7 +94,7 @@ test.describe("Host detail page", () => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		await expect(page.getByText("1.0.3").first()).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText("0.9.99").first()).toBeVisible({ timeout: 15_000 });
 	});
 
 	test("system info card shows public IP", async ({ page }) => {

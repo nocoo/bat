@@ -4,8 +4,8 @@
 -- Two test hosts with realistic data
 INSERT OR REPLACE INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, public_ip, probe_version)
 VALUES
-  ('pw-host-alpha', 'alpha.test.local', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'Intel Xeon E5-2680 v4', strftime('%s','now') - 86400, strftime('%s','now') - 30, strftime('%s','now') - 3600, 1, 8, 4, 8589934592, 2147483648, 'kvm', '203.0.113.10', '1.0.3'),
-  ('pw-host-beta', 'beta.test.local', 'Debian 12.7', '6.1.0-25-arm64', 'aarch64', 'Ampere Altra Q80-30', strftime('%s','now') - 172800, strftime('%s','now') - 60, strftime('%s','now') - 7200, 1, 4, 4, 4294967296, 0, NULL, '198.51.100.20', '1.0.3');
+  ('pw-host-alpha', 'alpha.test.local', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'Intel Xeon E5-2680 v4', strftime('%s','now') - 86400, strftime('%s','now') - 30, strftime('%s','now') - 3600, 1, 8, 4, 8589934592, 2147483648, 'kvm', '203.0.113.10', '0.9.99'),
+  ('pw-host-beta', 'beta.test.local', 'Debian 12.7', '6.1.0-25-arm64', 'aarch64', 'Ampere Altra Q80-30', strftime('%s','now') - 172800, strftime('%s','now') - 60, strftime('%s','now') - 7200, 1, 4, 4, 4294967296, 0, NULL, '198.51.100.20', '0.9.99');
 
 -- Recent raw metrics for alpha (last hour, every 30s → 2 samples suffice for charts)
 INSERT OR REPLACE INTO metrics_raw (host_id, ts, cpu_load1, cpu_load5, cpu_load15, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_count, mem_total, mem_available, mem_used_pct, swap_total, swap_used, swap_used_pct, disk_json, net_json, uptime_seconds)
