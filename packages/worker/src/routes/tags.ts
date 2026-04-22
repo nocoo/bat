@@ -101,9 +101,7 @@ export function validateHostTagAddBody(body: unknown): HostTagAddBody {
 	return { ok: true, tag_id: payload.tag_id };
 }
 
-export type HostTagReplaceBody =
-	| { ok: true; tag_ids: number[] }
-	| { ok: false; error: string };
+export type HostTagReplaceBody = { ok: true; tag_ids: number[] } | { ok: false; error: string };
 
 /** Validate PUT /api/hosts/:id/tags body (set semantics). */
 export function validateHostTagReplaceBody(body: unknown): HostTagReplaceBody {

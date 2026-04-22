@@ -362,7 +362,13 @@ export interface MonitoringGroup {
 	tag: string;
 	host_count: number;
 	tier: HostStatus;
-	by_tier: { healthy: number; warning: number; critical: number; offline: number; maintenance: number };
+	by_tier: {
+		healthy: number;
+		warning: number;
+		critical: number;
+		offline: number;
+		maintenance: number;
+	};
 	alert_count: number;
 	hosts: { host_id: string; hostname: string }[];
 }
@@ -483,13 +489,19 @@ export function buildMonitoringAlertsResult(
 	const items: MonitoringAlertItem[] = [];
 
 	for (const alert of alerts) {
-		if (filters.severity && alert.severity !== filters.severity) continue;
+		if (filters.severity && alert.severity !== filters.severity) {
+			continue;
+		}
 
 		const hostTags = tagsByHost.get(alert.host_id) ?? [];
-		if (filters.tags.length > 0 && !filters.tags.every((t) => hostTags.includes(t))) continue;
+		if (filters.tags.length > 0 && !filters.tags.every((t) => hostTags.includes(t))) {
+			continue;
+		}
 
 		const sev = alert.severity as "critical" | "warning" | "info";
-		if (sev in by_severity) by_severity[sev]++;
+		if (sev in by_severity) {
+			by_severity[sev]++;
+		}
 
 		items.push({
 			host_id: alert.host_id,

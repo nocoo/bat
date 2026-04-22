@@ -91,7 +91,9 @@ export function useEvents(hostId?: string, page = 1) {
 		limit: String(EVENTS_PAGE_SIZE),
 		offset: String(offset),
 	};
-	if (hostId) params.host_id = hostId;
+	if (hostId) {
+		params.host_id = hostId;
+	}
 	const key = hostId ? `events-${hostId}-page-${page}` : `events-page-${page}`;
 	return useSWR<EventsListResponse>(
 		key,

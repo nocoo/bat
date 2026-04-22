@@ -16,7 +16,9 @@ export class ApiError extends Error {
 
 /** Append `params` to `path` as a query string. Pure / testable. */
 export function buildUrl(path: string, params?: Record<string, string>): string {
-	if (!params) return path;
+	if (!params) {
+		return path;
+	}
 	const qs = new URLSearchParams(params).toString();
 	return qs ? `${path}?${qs}` : path;
 }
@@ -36,7 +38,9 @@ async function request<T>(method: string, path: string, opts: RequestOptions = {
 	if (!res.ok) {
 		throw new ApiError(res.status, `API error: ${res.status}`);
 	}
-	if (res.status === 204) return null as T;
+	if (res.status === 204) {
+		return null as T;
+	}
 	return res.json() as Promise<T>;
 }
 

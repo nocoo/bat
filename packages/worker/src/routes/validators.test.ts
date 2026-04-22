@@ -1,13 +1,13 @@
 // Tests for body-validators + inventory update builders.
 // These are exported from the route files so they can be tested as pure
 // functions (no HTTP fixture needed).
-import { describe, expect, test, test as it } from "bun:test";
+import { describe, expect, test as it, test } from "bun:test";
 import type { IdentityPayload, MetricsPayload, Tier2Payload } from "@bat/shared";
+import { validateAllowedPortBody } from "./allowed-ports";
 import { buildInventoryUpdate, validateIdentityPayload } from "./identity";
 import { validateMetricsPayload } from "./ingest";
-import { validateTier2Payload } from "./tier2-ingest";
-import { validateAllowedPortBody } from "./allowed-ports";
 import { validateMaintenanceBody } from "./maintenance";
+import { validateTier2Payload } from "./tier2-ingest";
 
 // --- validateIdentityPayload ---
 
@@ -445,13 +445,13 @@ describe("validateMaintenanceBody", () => {
 	});
 });
 
-import { validateEventPayload } from "./events-ingest";
 import {
 	EVENT_BODY_MAX_BYTES,
 	EVENT_TAGS_MAX_COUNT,
 	EVENT_TAG_MAX_LENGTH,
 	EVENT_TITLE_MAX_LENGTH,
 } from "@bat/shared";
+import { validateEventPayload } from "./events-ingest";
 
 describe("validateEventPayload", () => {
 	it("accepts minimal valid payload (no tags)", () => {
@@ -466,7 +466,9 @@ describe("validateEventPayload", () => {
 	it("accepts payload with tags", () => {
 		const r = validateEventPayload({ title: "x", body: {}, tags: ["a", "b"] });
 		expect(r.ok).toBe(true);
-		if (r.ok) expect(r.tags).toEqual(["a", "b"]);
+		if (r.ok) {
+			expect(r.tags).toEqual(["a", "b"]);
+		}
 	});
 	it("rejects non-object body input", () => {
 		expect(validateEventPayload(null)).toEqual({ ok: false, error: "Invalid payload" });
@@ -533,7 +535,7 @@ describe("validateEventPayload", () => {
 		});
 	});
 	it("rejects too many tags", () => {
-		const tags = Array(EVENT_TAGS_MAX_COUNT + 1).fill("a");
+		const tags = new Array(EVENT_TAGS_MAX_COUNT + 1).fill("a");
 		expect(validateEventPayload({ title: "x", body: {}, tags })).toEqual({
 			ok: false,
 			error: `tags must have at most ${EVENT_TAGS_MAX_COUNT} items`,
@@ -568,12 +570,8 @@ describe("validateEventPayload", () => {
 	});
 });
 
-import {
-	parseTagId,
-	validateHostTagAddBody,
-	validateHostTagReplaceBody,
-} from "./tags";
 import { MAX_TAGS_PER_HOST } from "@bat/shared";
+import { parseTagId, validateHostTagAddBody, validateHostTagReplaceBody } from "./tags";
 
 describe("parseTagId", () => {
 	it("parses integer", () => expect(parseTagId("7")).toBe(7));
@@ -619,14 +617,14 @@ describe("validateHostTagReplaceBody", () => {
 			error: "tag_ids array is required",
 		}));
 	it("rejects too many tags", () => {
-		const tag_ids = Array(MAX_TAGS_PER_HOST + 1).fill(0).map((_, i) => i);
+		const tag_ids = new Array(MAX_TAGS_PER_HOST + 1).fill(0).map((_, i) => i);
 		expect(validateHostTagReplaceBody({ tag_ids })).toEqual({
 			ok: false,
 			error: `Maximum ${MAX_TAGS_PER_HOST} tags per host`,
 		});
 	});
 	it("accepts exactly MAX tags", () => {
-		const tag_ids = Array(MAX_TAGS_PER_HOST).fill(0).map((_, i) => i);
+		const tag_ids = new Array(MAX_TAGS_PER_HOST).fill(0).map((_, i) => i);
 		expect(validateHostTagReplaceBody({ tag_ids }).ok).toBe(true);
 	});
 	it("rejects non-object body", () =>

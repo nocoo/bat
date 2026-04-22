@@ -136,9 +136,7 @@ describe("buildSubtitle", () => {
 
 	test("returns null when no parts", () => {
 		expect(
-			buildSubtitle(
-				base({ os: null, arch: null, virtualization: null, public_ip: null }),
-			),
+			buildSubtitle(base({ os: null, arch: null, virtualization: null, public_ip: null })),
 		).toBeNull();
 	});
 });

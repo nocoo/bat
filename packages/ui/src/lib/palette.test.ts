@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import {
+	PALETTE_SIZE,
 	chart,
 	chartAxis,
 	chartMuted,
 	getBadgeStyle,
 	getBadgeStyleByIndex,
 	getSwatchColor,
-	PALETTE_SIZE,
 } from "./palette";
 
 describe("chart palette", () => {

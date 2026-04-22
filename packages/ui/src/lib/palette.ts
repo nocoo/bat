@@ -66,8 +66,7 @@ const styleFor = (token: string): BadgeStyle => ({
 });
 
 /** Soft/tinted badge style derived from the text content (deterministic). */
-export const getBadgeStyle = (text: string): BadgeStyle =>
-	styleFor(tokenAt(hashText(text)));
+export const getBadgeStyle = (text: string): BadgeStyle => styleFor(tokenAt(hashText(text)));
 
 /** Soft/tinted badge style derived from a stored palette index. */
 export const getBadgeStyleByIndex = (colorIndex: number): BadgeStyle =>

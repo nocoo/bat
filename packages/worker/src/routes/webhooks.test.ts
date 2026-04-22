@@ -101,8 +101,9 @@ describe("validateWebhookCreateBody", () => {
 		});
 	});
 	test("ignores extra fields (future rate_limit etc.)", () => {
-		expect(
-			validateWebhookCreateBody({ host_id: "web-01", rate_limit: 120, extra: true }),
-		).toEqual({ ok: true, host_id: "web-01" });
+		expect(validateWebhookCreateBody({ host_id: "web-01", rate_limit: 120, extra: true })).toEqual({
+			ok: true,
+			host_id: "web-01",
+		});
 	});
 });

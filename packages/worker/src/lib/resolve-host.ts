@@ -24,10 +24,7 @@ export function isOpaqueHid(id: string): boolean {
  * - If `id` is a hid, scan active hosts and match by `hashHostId`.
  *   Returns `null` when no active host matches.
  */
-export async function resolveHostIdByHash(
-	db: D1Database,
-	id: string,
-): Promise<string | null> {
+export async function resolveHostIdByHash(db: D1Database, id: string): Promise<string | null> {
 	if (!isOpaqueHid(id)) {
 		return id;
 	}

@@ -2,11 +2,11 @@
 import { describe, expect, test } from "bun:test";
 import {
 	EXT_KEY_MAP,
+	type HourlyRow,
+	type RawRow,
 	expandHourlyRow,
 	expandRawRow,
 	parseMetricsRange,
-	type HourlyRow,
-	type RawRow,
 } from "./metrics.js";
 
 describe("expandRawRow", () => {
@@ -135,7 +135,7 @@ describe("parseMetricsRange", () => {
 		const nonNum = parseMetricsRange("a", "b");
 		expect(missing.ok).toBe(false);
 		expect(nonNum.ok).toBe(false);
-		if (!missing.ok && !nonNum.ok) {
+		if (!(missing.ok || nonNum.ok)) {
 			expect(missing.error).not.toBe(nonNum.error);
 		}
 	});

@@ -12,7 +12,8 @@ const originalFetch = globalThis.fetch;
 
 beforeEach(() => {
 	calls = [];
-	nextResponse = () => new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+	nextResponse = () =>
+		new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
 	// biome-ignore lint/suspicious/noExplicitAny: test stub
 	globalThis.fetch = ((url: any, init?: any) => {
 		calls.push({ url: String(url), init });

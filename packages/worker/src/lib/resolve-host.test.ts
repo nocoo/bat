@@ -34,11 +34,9 @@ interface StubRow {
 function makeDb(rows: StubRow[]): D1Database {
 	const db: Partial<D1Database> = {
 		prepare(_sql: string) {
-			// biome-ignore lint/suspicious/noExplicitAny: minimal stub for unit test
 			return {
 				all: async <T = StubRow>() => ({ results: rows as T[], success: true, meta: {} }),
-				// biome-ignore lint/suspicious/noExplicitAny: not used in these tests
-			} as any;
+			} as unknown as D1PreparedStatement;
 		},
 	};
 	return db as D1Database;
@@ -48,9 +46,7 @@ describe("resolveHostIdByHash", () => {
 	test("returns raw id unchanged when it's not an 8-char hex", async () => {
 		const db = makeDb([]);
 		expect(await resolveHostIdByHash(db, "web-01")).toBe("web-01");
-		expect(await resolveHostIdByHash(db, "i-0123456789abcdef0")).toBe(
-			"i-0123456789abcdef0",
-		);
+		expect(await resolveHostIdByHash(db, "i-0123456789abcdef0")).toBe("i-0123456789abcdef0");
 	});
 
 	test("resolves a hid to the matching host_id", async () => {
@@ -76,19 +72,17 @@ describe("resolveHostRecord", () => {
 	function makeRecordDb(rows: Row[]): D1Database {
 		const db: Partial<D1Database> = {
 			prepare(sql: string) {
-				// biome-ignore lint/suspicious/noExplicitAny: minimal stub
 				const isFilter = sql.includes("WHERE host_id = ?");
 				let bound: string | undefined;
-				const stmt: any = {
+				const stmt = {
 					bind: (v: string) => {
 						bound = v;
 						return stmt;
 					},
-					first: async () =>
-						isFilter ? (rows.find((r) => r.host_id === bound) ?? null) : null,
+					first: async () => (isFilter ? (rows.find((r) => r.host_id === bound) ?? null) : null),
 					all: async () => ({ results: rows, success: true, meta: {} }),
 				};
-				return stmt;
+				return stmt as unknown as D1PreparedStatement;
 			},
 		};
 		return db as D1Database;

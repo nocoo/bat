@@ -21,17 +21,15 @@ describe("maintenanceAreas", () => {
 		const out = maintenanceAreas("02:00", "04:00", MIDNIGHT, MIDNIGHT + 3 * DAY);
 		expect(out).toHaveLength(3);
 		expect(out[0]).toEqual({ x1: MIDNIGHT + 2 * HOUR, x2: MIDNIGHT + 4 * HOUR });
-		expect(out[2]).toEqual({ x1: MIDNIGHT + 2 * DAY + 2 * HOUR, x2: MIDNIGHT + 2 * DAY + 4 * HOUR });
+		expect(out[2]).toEqual({
+			x1: MIDNIGHT + 2 * DAY + 2 * HOUR,
+			x2: MIDNIGHT + 2 * DAY + 4 * HOUR,
+		});
 	});
 
 	test("handles cross-midnight windows (end < start)", () => {
 		// 23:00 → 01:00, range covers exactly one such window
-		const out = maintenanceAreas(
-			"23:00",
-			"01:00",
-			MIDNIGHT + 22 * HOUR,
-			MIDNIGHT + 26 * HOUR,
-		);
+		const out = maintenanceAreas("23:00", "01:00", MIDNIGHT + 22 * HOUR, MIDNIGHT + 26 * HOUR);
 		// Window begins at day 0 23:00 and ends at day 1 01:00
 		expect(out).toEqual([{ x1: MIDNIGHT + 23 * HOUR, x2: MIDNIGHT + 25 * HOUR }]);
 	});

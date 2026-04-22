@@ -27,23 +27,37 @@ export function stateColor(state: string): string {
 
 /** Tailwind class for CPU%: severity above 50/80 thresholds, "" otherwise. */
 export function cpuColor(pct: number | null): string {
-	if (pct == null) return "";
-	if (pct > 80) return "text-destructive";
-	if (pct > 50) return "text-warning";
+	if (pct == null) {
+		return "";
+	}
+	if (pct > 80) {
+		return "text-destructive";
+	}
+	if (pct > 50) {
+		return "text-warning";
+	}
 	return "";
 }
 
 /** Tailwind class for per-process memory %: 15/30 thresholds. */
 export function memPctColor(pct: number): string {
-	if (pct > 30) return "text-destructive";
-	if (pct > 15) return "text-warning";
+	if (pct > 30) {
+		return "text-destructive";
+	}
+	if (pct > 15) {
+		return "text-warning";
+	}
 	return "";
 }
 
 /** Tailwind class for thread count: 50/100 thresholds. */
 export function threadColor(count: number): string {
-	if (count > 100) return "text-destructive";
-	if (count > 50) return "text-warning";
+	if (count > 100) {
+		return "text-destructive";
+	}
+	if (count > 50) {
+		return "text-warning";
+	}
 	return "";
 }
 
@@ -65,10 +79,7 @@ export function sortProcesses(
 }
 
 /** Case-insensitive substring filter on name/cmd/user. Empty query returns input. */
-export function filterProcesses(
-	procs: TopProcessEntry[],
-	query: string,
-): TopProcessEntry[] {
+export function filterProcesses(procs: TopProcessEntry[], query: string): TopProcessEntry[] {
 	const q = query.trim().toLowerCase();
 	if (q.length === 0) {
 		return procs;

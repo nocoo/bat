@@ -1,20 +1,20 @@
 import {
-	formatBytes,
-	formatBytesRate,
-	formatUptime,
-	transformTopProcessesData,
-} from "@/lib/transforms";
-import {
+	type SortDir,
+	type SortKey,
 	cpuColor,
 	filterProcesses,
 	memPctColor,
 	nextSortState,
 	sortProcesses,
-	type SortDir,
-	type SortKey,
 	stateColor,
 	threadColor,
 } from "@/lib/top-processes-format";
+import {
+	formatBytes,
+	formatBytesRate,
+	formatUptime,
+	transformTopProcessesData,
+} from "@/lib/transforms";
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";

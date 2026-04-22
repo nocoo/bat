@@ -8,8 +8,12 @@ export function formatCpuLabel(
 	logical: number | null | undefined,
 ): string | null {
 	const topology = formatCpuTopology(physical ?? null, logical ?? null);
-	if (!(model || topology)) return null;
-	if (!topology) return model ?? null;
+	if (!(model || topology)) {
+		return null;
+	}
+	if (!topology) {
+		return model ?? null;
+	}
 	const suffix =
 		physical != null && logical != null && physical !== logical
 			? `(${physical} cores, ${logical} threads)`

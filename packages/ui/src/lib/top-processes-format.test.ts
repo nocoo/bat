@@ -1,6 +1,14 @@
 import { describe, expect, test } from "bun:test";
+import {
+	cpuColor,
+	filterProcesses,
+	memPctColor,
+	nextSortState,
+	sortProcesses,
+	stateColor,
+	threadColor,
+} from "./top-processes-format";
 import type { TopProcessEntry } from "./transforms";
-import { cpuColor, filterProcesses, memPctColor, nextSortState, sortProcesses, stateColor, threadColor } from "./top-processes-format";
 
 const proc = (over: Partial<TopProcessEntry>): TopProcessEntry => ({
 	pid: 0,

@@ -12,13 +12,17 @@ const row = (net_json: string | null, disk_io_json: string | null = null): Parti
 describe("aggregateNetwork", () => {
 	test("sums rx/tx across interfaces and averages across samples", () => {
 		const rows = [
-			row(JSON.stringify([
-				{ iface: "eth0", rx_bytes_rate: 100, tx_bytes_rate: 50, rx_errors: 1, tx_errors: 2 },
-				{ iface: "eth1", rx_bytes_rate: 200, tx_bytes_rate: 100, rx_errors: 0, tx_errors: 0 },
-			])),
-			row(JSON.stringify([
-				{ iface: "eth0", rx_bytes_rate: 400, tx_bytes_rate: 200, rx_errors: 3, tx_errors: 4 },
-			])),
+			row(
+				JSON.stringify([
+					{ iface: "eth0", rx_bytes_rate: 100, tx_bytes_rate: 50, rx_errors: 1, tx_errors: 2 },
+					{ iface: "eth1", rx_bytes_rate: 200, tx_bytes_rate: 100, rx_errors: 0, tx_errors: 0 },
+				]),
+			),
+			row(
+				JSON.stringify([
+					{ iface: "eth0", rx_bytes_rate: 400, tx_bytes_rate: 200, rx_errors: 3, tx_errors: 4 },
+				]),
+			),
 		];
 		// biome-ignore lint/suspicious/noExplicitAny: minimal partial row cast for tests
 		const out = aggregateNetwork(rows as any);
@@ -77,7 +81,7 @@ describe("aggregateDiskIo", () => {
 		// biome-ignore lint/suspicious/noExplicitAny: partial cast
 		const json = aggregateDiskIo(rows as any);
 		expect(json).not.toBeNull();
-		const parsed = JSON.parse(json as string) as Array<Record<string, unknown>>;
+		const parsed = JSON.parse(json as string) as Record<string, unknown>[];
 		expect(parsed).toHaveLength(1);
 		const entry = parsed[0] as Record<string, number | string>;
 		expect(entry.device).toBe("sda");

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { rowToTier2Snapshot, type Tier2Row } from "./tier2-metrics";
+import { type Tier2Row, rowToTier2Snapshot } from "./tier2-metrics";
 
 const emptyRow: Tier2Row = {
 	host_id: "web-01",
