@@ -65,12 +65,12 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 
 **方式 1：本地全栈开发（推荐日常开发）**
 ```bash
-# 一次性：把 packages/ui/vite.config.ts 的 proxy target 改为 http://localhost:8787
-bun dev   # 同时启动 @bat/ui (vite dev, 7025) + @bat/worker (wrangler dev, 8787)
+bun dev   # turbo parallel: @bat/ui (vite, 7025) + @bat/worker (wrangler dev, 8787)
 ```
 - 访问 `http://localhost:7025` 或 `https://bat.dev.hexly.ai`（Caddy 反代 → 7025）
-- `/api/*` 代理到本地 wrangler dev，使用本地 D1 数据库
+- `/api/*` 由 vite proxy 到本地 wrangler dev（8787），使用本地 D1 数据库
 - `entry-control` 中间件对 localhost / `*.dev.hexly.ai` 自动 bypass（见 `packages/worker/src/middleware/entry-control.ts`），浏览器读路由（`/api/hosts` 等）全部可用，无需 Access JWT
+- 启动初期 UI 可能先于 worker 就绪，出现几次 `ECONNREFUSED` 是正常的，等 `⎔ Starting local server... Ready on http://localhost:8787` 出现后自动恢复
 
 **方式 2：接近生产的测试**
 ```bash
