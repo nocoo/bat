@@ -63,28 +63,27 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 
 ## Local Development
 
-**方式 1：HMR 开发 + 生产数据（推荐日常开发）**
+**方式 1：本地全栈开发（推荐日常开发）**
 ```bash
-cd packages/ui && bun run dev   # vite dev server
+# 一次性：把 packages/ui/vite.config.ts 的 proxy target 改为 http://localhost:8787
+bun dev   # 同时启动 @bat/ui (vite dev, 7025) + @bat/worker (wrangler dev, 8787)
 ```
-- 访问 `https://bat.dev.hexly.ai`（Caddy 反代 → localhost:7025）
-- `/api/*` 自动代理到生产 `bat-ingest.worker.hexly.ai`（获取真实数据）
-- 用户信息显示为匿名（本地无 Access JWT）
+- 访问 `http://localhost:7025` 或 `https://bat.dev.hexly.ai`（Caddy 反代 → 7025）
+- `/api/*` 代理到本地 wrangler dev，使用本地 D1 数据库
+- `entry-control` 中间件对 localhost / `*.dev.hexly.ai` 自动 bypass（见 `packages/worker/src/middleware/entry-control.ts`），浏览器读路由（`/api/hosts` 等）全部可用，无需 Access JWT
 
-**方式 2：本地全栈开发**
-```bash
-bun dev   # 同时启动 @bat/ui (vite dev) + @bat/worker (wrangler dev)
-```
-- 需要先修改 `packages/ui/vite.config.ts` 的 proxy target 为 `http://localhost:8787`
-- `/api/*` 代理到 wrangler dev (8787)，使用本地 D1 数据库
-
-**方式 3：接近生产的测试**
+**方式 2：接近生产的测试**
 ```bash
 bun turbo build --filter=@bat/ui   # 构建到 worker/static/
 cd packages/worker && bun dev      # wrangler dev 服务静态资源
 ```
 - 访问 `localhost:8787`（wrangler 端口）
 - 测试 wrangler assets 配置、SPA fallback 等
+
+**⚠️ 不要用生产 `bat-ingest.worker.hexly.ai` 作为 vite proxy target**
+- `bat-ingest` 是机器入口，`entry-control` 白名单只放行 `POST /api/ingest|identity|tier2|events`、`GET /api/monitoring/*`、`GET /api/live|me`
+- `GET /api/hosts`、`/api/alerts` 等浏览器读路由会被 403 拒绝（`Route not allowed on machine endpoint`）
+- 浏览器读路由按架构设计只能走 `bat.hexly.ai` + Access JWT；本机没有 JWT，无法直接走生产
 
 ## Testing
 
