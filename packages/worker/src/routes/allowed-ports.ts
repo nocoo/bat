@@ -65,13 +65,15 @@ export async function allowedPortsAllRoute(c: Context<AppEnv>) {
 }
 
 /**
- * Parse a port number from a route param. Returns `null` when the param
- * is missing, not an integer, or outside the 1–65535 range.
+ * Parse a port number from a route param. Returns `null` only when the
+ * param is missing, empty, or not an integer. Out-of-range integers are
+ * returned as-is so the DELETE handler can fall through to its usual
+ * "not found in allowlist" 404 (preserving pre-refactor wire behaviour).
  */
 export function parsePortParam(raw: string | undefined): number | null {
 	if (!raw) return null;
 	const n = Number.parseInt(raw, 10);
-	if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
+	if (Number.isNaN(n) || !Number.isInteger(n)) return null;
 	return n;
 }
 
