@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.0
+
+### Changed
+- Sync ui + probe versions to 1.0.4 (catch-up before v1.1.0)
+- Log run 50 — parsePortParam wire-semantics fix
+- Switch local dev to full-stack; lift worker coverage to 96%
+- MVVM simplification — reduce complexity_score 18.7% (49 experiments)
+
+### Fixed
+- Cover ui package.json + probe Cargo.{toml,lock}
+- Root bun dev now launches ui + worker in parallel
+- Restore pre-refactor wire semantics for DELETE :port
+
 ## v1.0.4
 
 ### Added
