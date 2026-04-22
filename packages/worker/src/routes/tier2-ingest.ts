@@ -10,7 +10,7 @@ const CLOCK_SKEW_MAX_SECONDS = 300;
 
 /** Validate the Tier 2 payload — only host_id and timestamp are required,
  *  all section fields are optional. */
-function validateTier2Payload(body: unknown): body is Tier2Payload {
+export function validateTier2Payload(body: unknown): body is Tier2Payload {
 	if (!body || typeof body !== "object") {
 		return false;
 	}

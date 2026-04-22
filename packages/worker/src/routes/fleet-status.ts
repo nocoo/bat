@@ -1,8 +1,10 @@
 // GET /api/fleet/status — fleet health overview (requires BAT_READ_KEY)
 import { BAT_VERSION, type HealthResponse, type HostStatus } from "@bat/shared";
 import type { Context } from "hono";
+import { summarizeHostStatuses } from "../lib/fleet-summary.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
+import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./monitoring.js";
 
 interface HostRow {
 	host_id: string;
@@ -60,12 +62,7 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 		.bind(...hostIds)
 		.all<AlertRow>();
 
-	const alertsByHost = new Map<string, AlertRow[]>();
-	for (const a of alertsResult.results) {
-		const existing = alertsByHost.get(a.host_id) ?? [];
-		existing.push(a);
-		alertsByHost.set(a.host_id, existing);
-	}
+	const alertsByHost = buildAlertsByHost(alertsResult.results);
 
 	// Per-host port allowlist for status derivation
 	const allowlistResult = await db
@@ -73,62 +70,19 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 		.bind(...hostIds)
 		.all<AllowedPortRow>();
 
-	const allowedByHost = new Map<string, Set<number>>();
-	for (const row of allowlistResult.results) {
-		let s = allowedByHost.get(row.host_id);
-		if (!s) {
-			s = new Set();
-			allowedByHost.set(row.host_id, s);
-		}
-		s.add(row.port);
-	}
+	const allowedByHost = buildAllowedByHost(allowlistResult.results);
 
-	// Derive status for each host
-	let healthy = 0;
-	let warning = 0;
-	let critical = 0;
-	let maintenance = 0;
-
-	for (const host of hosts) {
+	// Derive status for each host, then summarise into fleet-level counts
+	const statuses: HostStatus[] = hosts.map((host) => {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const mw =
-			host.maintenance_start && host.maintenance_end
-				? { start: host.maintenance_start, end: host.maintenance_end }
-				: null;
-		const status: HostStatus = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, mw);
-
-		switch (status) {
-			case "healthy":
-				healthy++;
-				break;
-			case "warning":
-				warning++;
-				break;
-			case "critical":
-			case "offline":
-				critical++;
-				break;
-			case "maintenance":
-				maintenance++;
-				break;
-			default:
-				break;
-		}
-	}
-
-	// Determine overall status
-	let overallStatus: HealthResponse["status"];
-	if (critical > 0) {
-		overallStatus = "critical";
-	} else if (warning > 0) {
-		overallStatus = "degraded";
-	} else {
-		overallStatus = "healthy";
-	}
+		const mw = getMaintenanceWindow(host);
+		return deriveHostStatus(host.last_seen, now, alerts, allowedPorts, mw);
+	});
+	const { healthy, warning, critical, maintenance, overall } = summarizeHostStatuses(statuses);
 
 	const response: HealthResponse = {
-		status: overallStatus,
+		status: overall,
 		version: BAT_VERSION,
 		total_hosts: hosts.length,
 		healthy,

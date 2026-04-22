@@ -9,7 +9,7 @@ interface AlertRow {
 }
 
 /** Parse port numbers from a public_port alert message. */
-function parsePublicPorts(message: string | null | undefined): number[] {
+export function parsePublicPorts(message: string | null | undefined): number[] {
 	if (!message) {
 		return [];
 	}

@@ -4,13 +4,13 @@
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
-interface AccessJwtPayload {
+export interface AccessJwtPayload {
 	email?: string;
 	name?: string;
 	// other claims omitted
 }
 
-function decodeJwtPayload(jwt: string): AccessJwtPayload | null {
+export function decodeJwtPayload(jwt: string): AccessJwtPayload | null {
 	const parts = jwt.split(".");
 	if (parts.length !== 3 || !parts[1]) {
 		return null;

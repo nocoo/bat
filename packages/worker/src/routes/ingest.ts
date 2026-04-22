@@ -9,7 +9,7 @@ import type { AppEnv } from "../types.js";
 const CLOCK_SKEW_MAX_SECONDS = 300;
 
 /** Lightweight validation — checks required fields exist and are correct types */
-function validateMetricsPayload(body: unknown): body is MetricsPayload {
+export function validateMetricsPayload(body: unknown): body is MetricsPayload {
 	if (!body || typeof body !== "object") {
 		return false;
 	}

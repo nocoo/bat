@@ -29,7 +29,7 @@ function extractBearerToken(header: string | undefined): string | null {
 }
 
 /** Check if a request requires BAT_WRITE_KEY based on method + path */
-function isWriteRequest(method: string, path: string): boolean {
+export function isWriteRequest(method: string, path: string): boolean {
 	// Probe ingest routes
 	if (WRITE_ROUTES.includes(path)) {
 		return true;
@@ -94,7 +94,7 @@ function isWriteRequest(method: string, path: string): boolean {
 }
 
 /** Check if route is a machine-only read route requiring BAT_READ_KEY */
-function isMachineReadRoute(path: string): boolean {
+export function isMachineReadRoute(path: string): boolean {
 	return path.startsWith(MACHINE_READ_ROUTES_PREFIX);
 }
 

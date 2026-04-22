@@ -14,9 +14,9 @@ import {
 	XAxis,
 	YAxis,
 } from "recharts";
+import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
-import { maintenanceAreas } from "./maintenance-overlay";
 
 const GRADIENT_ID = "memoryGradient";
 
@@ -31,42 +31,19 @@ export function MemoryChart({
 }) {
 	const chartData = useMemo(() => transformMemData(data), [data]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
-
-	const mwAreas = useMemo(() => {
-		if (!maintenanceWindow || chartData.length === 0) {
-			return [];
-		}
-		const from = chartData[0]?.ts ?? 0;
-		const to = chartData[chartData.length - 1]?.ts ?? 0;
-		return maintenanceAreas(maintenanceWindow.start, maintenanceWindow.end, from, to);
-	}, [maintenanceWindow, chartData]);
+	const mwAreas = useMaintenanceAreas(chartData, maintenanceWindow);
 
 	if (chartData.length === 0) {
-		return (
-			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
-				<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
-					No memory data
-				</div>
-			</div>
-		);
+		return <ChartEmptyState message="No memory data" />;
 	}
 
 	return (
-		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
-			{/* Header: icon + title + legend */}
-			<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-				<div className="flex items-center gap-2 text-base font-semibold">
-					<HardDrive className="h-4 w-4" />
-					Memory
-				</div>
-				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-					<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-						<span
-							className="inline-block h-2 w-2 rounded-full"
-							style={{ backgroundColor: chart.green }}
-						/>
-						Memory Used
-					</span>
+		<ChartCard>
+			<ChartHeader
+				icon={HardDrive}
+				title="Memory"
+				series={[{ key: "used_pct", label: "Memory Used", color: chart.green }]}
+				extraLegend={
 					<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
 						<span
 							className="inline-block h-2 w-2 rounded-[1px] border border-current opacity-50"
@@ -74,8 +51,8 @@ export function MemoryChart({
 						/>
 						Threshold
 					</span>
-				</div>
-			</div>
+				}
+			/>
 
 			<DashboardResponsiveContainer width="100%" height={256}>
 				<AreaChart data={chartData}>
@@ -129,6 +106,6 @@ export function MemoryChart({
 					/>
 				</AreaChart>
 			</DashboardResponsiveContainer>
-		</div>
+		</ChartCard>
 	);
 }

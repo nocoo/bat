@@ -2,8 +2,11 @@
 import type { HostDetailItem } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { extractNetRates, extractRootDiskPct, safeParse } from "../lib/json-helpers.js";
+import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
+import { getMaintenanceWindow } from "./monitoring.js";
 
 interface DetailRow {
 	host_id: string;
@@ -49,76 +52,11 @@ interface AlertRow {
 	message: string | null;
 }
 
-/**
- * Resolve the route param to a real host_id.
- * If `id` is an 8-char hex hid, scan active hosts to find the match.
- */
-async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
-	const isHid = /^[0-9a-f]{8}$/.test(id);
-	if (!isHid) {
-		return id;
-	}
-
-	const result = await db
-		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
-		.all<{ host_id: string }>();
-	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) {
-			return row.host_id;
-		}
-	}
-	return null;
-}
-
-function safeParse<T>(json: string | null): T | null {
-	if (!json) {
-		return null;
-	}
-	try {
-		return JSON.parse(json) as T;
-	} catch {
-		return null;
-	}
-}
-
-/** Parse disk_json to find root mount used_pct */
-function extractRootDiskPct(diskJson: string | null): number | null {
-	if (!diskJson) {
-		return null;
-	}
-	try {
-		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
-		const root = disks.find((d) => d.mount === "/");
-		return root?.used_pct ?? null;
-	} catch {
-		return null;
-	}
-}
-
-/** Sum net_json rx/tx rates across all interfaces */
-function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
-	if (!netJson) {
-		return { rx: null, tx: null };
-	}
-	try {
-		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
-		let rx = 0;
-		let tx = 0;
-		for (const iface of ifaces) {
-			rx += iface.rx_bytes ?? 0;
-			tx += iface.tx_bytes ?? 0;
-		}
-		return { rx, tx };
-	} catch {
-		return { rx: null, tx: null };
-	}
-}
-
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const idParam = c.req.param("id");
 	const db = c.env.DB;
 
-	const hostId = await resolveHostId(db, idParam);
+	const hostId = await resolveHostIdByHash(db, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -167,10 +105,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 			? new Set(allowlistResult.results.map((r) => r.port))
 			: undefined;
 
-	const maintenance =
-		host.maintenance_start && host.maintenance_end
-			? { start: host.maintenance_start, end: host.maintenance_end }
-			: null;
+	const maintenance = getMaintenanceWindow(host);
 	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
 	const inMaintenance =
 		maintenance !== null &&

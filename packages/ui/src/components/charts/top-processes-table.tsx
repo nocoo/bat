@@ -4,74 +4,20 @@ import {
 	formatUptime,
 	transformTopProcessesData,
 } from "@/lib/transforms";
-import type { TopProcessEntry } from "@/lib/transforms";
+import {
+	cpuColor,
+	filterProcesses,
+	memPctColor,
+	nextSortState,
+	sortProcesses,
+	type SortDir,
+	type SortKey,
+	stateColor,
+	threadColor,
+} from "@/lib/top-processes-format";
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
-
-type SortKey =
-	| "cpu_pct"
-	| "mem_pct"
-	| "mem_rss"
-	| "num_threads"
-	| "io_read_rate"
-	| "io_write_rate"
-	| "uptime";
-type SortDir = "asc" | "desc";
-
-function stateColor(state: string): string {
-	switch (state) {
-		case "R":
-			return "text-emerald-500";
-		case "D":
-			return "text-warning";
-		case "Z":
-			return "text-destructive";
-		default:
-			return "text-muted-foreground";
-	}
-}
-
-function cpuColor(pct: number | null): string {
-	if (pct == null) {
-		return "";
-	}
-	if (pct > 80) {
-		return "text-destructive";
-	}
-	if (pct > 50) {
-		return "text-warning";
-	}
-	return "";
-}
-
-function memPctColor(pct: number): string {
-	if (pct > 30) {
-		return "text-destructive";
-	}
-	if (pct > 15) {
-		return "text-warning";
-	}
-	return "";
-}
-
-function threadColor(count: number): string {
-	if (count > 100) {
-		return "text-destructive";
-	}
-	if (count > 50) {
-		return "text-warning";
-	}
-	return "";
-}
-
-function sortProcesses(procs: TopProcessEntry[], key: SortKey, dir: SortDir): TopProcessEntry[] {
-	return [...procs].sort((a, b) => {
-		const av = a[key] ?? -1;
-		const bv = b[key] ?? -1;
-		return dir === "desc" ? (bv as number) - (av as number) : (av as number) - (bv as number);
-	});
-}
 
 /** Sortable column header with keyboard support */
 function SortTh({
@@ -113,18 +59,7 @@ export function TopProcessesTable({
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
 	const [search, setSearch] = useState("");
 
-	const filtered = useMemo(() => {
-		if (!search) {
-			return processes;
-		}
-		const q = search.toLowerCase();
-		return processes.filter(
-			(p) =>
-				p.name.toLowerCase().includes(q) ||
-				p.cmd.toLowerCase().includes(q) ||
-				p.user.toLowerCase().includes(q),
-		);
-	}, [processes, search]);
+	const filtered = useMemo(() => filterProcesses(processes, search), [processes, search]);
 
 	const sorted = useMemo(
 		() => sortProcesses(filtered, sortKey, sortDir),
@@ -132,12 +67,9 @@ export function TopProcessesTable({
 	);
 
 	const handleSort = (key: SortKey) => {
-		if (key === sortKey) {
-			setSortDir((d) => (d === "desc" ? "asc" : "desc"));
-		} else {
-			setSortKey(key);
-			setSortDir("desc");
-		}
+		const next = nextSortState({ key: sortKey, dir: sortDir }, key);
+		setSortKey(next.key);
+		setSortDir(next.dir);
 	};
 
 	if (processes.length === 0) {

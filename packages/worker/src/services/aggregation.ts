@@ -433,7 +433,7 @@ interface NetAggResult {
  * For each sample: sum rx/tx across all interfaces to get per-sample totals.
  * Then compute avg/max across samples, and sum errors.
  */
-function aggregateNetwork(rows: RawRow[]): NetAggResult {
+export function aggregateNetwork(rows: RawRow[]): NetAggResult {
 	const sampleRxTotals: number[] = [];
 	const sampleTxTotals: number[] = [];
 	let totalRxErrors = 0;
@@ -495,7 +495,7 @@ interface DiskIoHourlyEntry {
  * Groups by device, computes AVG for rate fields and AVG+MAX for io_util_pct.
  * Returns null if all rows have null disk_io_json.
  */
-function aggregateDiskIo(rows: RawRow[]): string | null {
+export function aggregateDiskIo(rows: RawRow[]): string | null {
 	// Collect per-device samples: device → array of raw entries
 	const deviceSamples = new Map<string, DiskIoRawEntry[]>();
 	let hasAny = false;
@@ -658,21 +658,21 @@ interface RawRow {
 	conntrack_max: number | null;
 }
 
-function avg(values: number[]): number {
+export function avg(values: number[]): number {
 	if (values.length === 0) {
 		return 0;
 	}
 	return values.reduce((a, b) => a + b, 0) / values.length;
 }
 
-function max(values: number[]): number {
+export function max(values: number[]): number {
 	if (values.length === 0) {
 		return 0;
 	}
 	return Math.max(...values);
 }
 
-function min(values: number[]): number {
+export function min(values: number[]): number {
 	if (values.length === 0) {
 		return 0;
 	}
@@ -680,7 +680,7 @@ function min(values: number[]): number {
 }
 
 /** Avg of non-null values. Returns null if all values are null. */
-function avgNullable(values: (number | null)[]): number | null {
+export function avgNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
 	if (valid.length === 0) {
 		return null;
@@ -689,7 +689,7 @@ function avgNullable(values: (number | null)[]): number | null {
 }
 
 /** Max of non-null values. Returns null if all values are null. */
-function maxNullable(values: (number | null)[]): number | null {
+export function maxNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
 	if (valid.length === 0) {
 		return null;
@@ -698,7 +698,7 @@ function maxNullable(values: (number | null)[]): number | null {
 }
 
 /** Sum of non-null values. Returns null if all values are null. */
-function sumNullable(values: (number | null)[]): number | null {
+export function sumNullable(values: (number | null)[]): number | null {
 	const valid = values.filter((v): v is number => v != null);
 	if (valid.length === 0) {
 		return null;

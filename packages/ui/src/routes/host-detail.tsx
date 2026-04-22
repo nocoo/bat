@@ -8,7 +8,12 @@ import {
 	TcpChart,
 	TopProcessesTable,
 } from "@/components/charts";
-import { formatCpuTopology, formatMemory, formatUptime } from "@/components/host-card";
+import { formatMemory, formatUptime } from "@/lib/host-card-format";
+import {
+	capitalizeVirt,
+	formatBootTime,
+	formatCpuLabel,
+} from "@/lib/host-detail-format";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,50 +66,7 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 	);
 }
 
-export function formatBootTime(unixSeconds: number | null | undefined): string | null {
-	if (unixSeconds == null) {
-		return null;
-	}
-	return new Date(unixSeconds * 1000).toLocaleString();
-}
-
 /** Format CPU label — "AMD EPYC 7763 (4 cores, 8 threads)" */
-function formatCpuLabel(
-	model: string | null | undefined,
-	physical: number | null | undefined,
-	logical: number | null | undefined,
-): string | null {
-	const topology = formatCpuTopology(physical ?? null, logical ?? null);
-	if (!(model || topology)) {
-		return null;
-	}
-	if (!topology) {
-		return model ?? null;
-	}
-	const suffix =
-		physical != null && logical != null && physical !== logical
-			? `(${physical} cores, ${logical} threads)`
-			: `(${physical ?? logical} cores)`;
-	return model ? `${model} ${suffix}` : suffix;
-}
-
-/** Capitalize virtualization label — "kvm" → "KVM", "bare-metal" → "Bare-Metal" */
-function capitalizeVirt(v: string): string {
-	const map: Record<string, string> = {
-		kvm: "KVM",
-		vmware: "VMware",
-		hyperv: "Hyper-V",
-		aws: "AWS",
-		gce: "GCE",
-		virtualbox: "VirtualBox",
-		xen: "Xen",
-		"bare-metal": "Bare Metal",
-		container: "Container",
-		digitalocean: "DigitalOcean",
-		hetzner: "Hetzner",
-	};
-	return map[v] ?? v;
-}
 
 export function HostDetailPage() {
 	const params = useParams<{ id: string }>();
