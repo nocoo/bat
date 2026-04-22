@@ -10,8 +10,12 @@ function makeContext(db: D1Database, hostId: string, portParam: string) {
 		env: { DB: db },
 		req: {
 			param: (key: string) => {
-				if (key === "id") return hostId;
-				if (key === "port") return portParam;
+				if (key === "id") {
+					return hostId;
+				}
+				if (key === "port") {
+					return portParam;
+				}
 				return "";
 			},
 			method: "DELETE",

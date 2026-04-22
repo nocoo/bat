@@ -10,9 +10,9 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { useAlerts, useHosts } from "@/hooks";
+import { formatTimestamp } from "@/lib/format";
 import { type AlertItem, hashHostId } from "@bat/shared";
 import { AlertTriangle, Bell } from "lucide-react";
-import { formatTimestamp } from "@/lib/format";
 import { Link } from "react-router";
 
 function AlertTable({ alerts }: { alerts: AlertItem[] }) {

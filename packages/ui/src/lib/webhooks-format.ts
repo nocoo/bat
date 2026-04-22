@@ -42,10 +42,7 @@ export function buildCurlCommand(workerUrl: string, token: string): string {
 }
 
 /** Normalize and validate a tag name (name page + inline rename). */
-export function validateTagName(
-	input: string,
-	maxLength: number,
-): { ok: boolean; name: string } {
+export function validateTagName(input: string, maxLength: number): { ok: boolean; name: string } {
 	const name = input.trim();
 	if (name.length === 0 || name.length > maxLength) {
 		return { ok: false, name };

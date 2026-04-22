@@ -24,7 +24,9 @@ export function useMaintenanceAreas(
 	window: MaintenanceWindow | null | undefined,
 ): { x1: number; x2: number }[] {
 	return useMemo(() => {
-		if (!window || chartData.length === 0) return [];
+		if (!window || chartData.length === 0) {
+			return [];
+		}
 		const from = chartData[0]?.ts ?? 0;
 		const to = chartData[chartData.length - 1]?.ts ?? 0;
 		return maintenanceAreas(window.start, window.end, from, to);
@@ -78,10 +80,7 @@ export function ChartHeader({
 			{hasLegend && (
 				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 					{series?.map((s) => (
-						<span
-							key={s.key}
-							className="flex items-center gap-1.5 text-xs text-muted-foreground"
-						>
+						<span key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
 							<span
 								className="inline-block h-2 w-2 rounded-full"
 								style={{ backgroundColor: s.color }}

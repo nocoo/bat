@@ -1,6 +1,13 @@
 // @bat/shared — api.ts tests (hashHostId, route constants)
 import { describe, expect, test } from "bun:test";
-import { API_ROUTES, hashHostId, MAX_ALLOWED_PORTS_PER_HOST, MAX_TAGS_PER_HOST, TAG_COLOR_COUNT, TAG_MAX_LENGTH } from "../api.js";
+import {
+	API_ROUTES,
+	MAX_ALLOWED_PORTS_PER_HOST,
+	MAX_TAGS_PER_HOST,
+	TAG_COLOR_COUNT,
+	TAG_MAX_LENGTH,
+	hashHostId,
+} from "../api.js";
 
 describe("hashHostId", () => {
 	test("returns an 8-char hex string", () => {

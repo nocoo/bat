@@ -3,14 +3,7 @@
 // 641-line integration test; direct tests make their semantics explicit.
 
 import { describe, expect, test } from "bun:test";
-import {
-	avg,
-	avgNullable,
-	max,
-	maxNullable,
-	min,
-	sumNullable,
-} from "./aggregation";
+import { avg, avgNullable, max, maxNullable, min, sumNullable } from "./aggregation";
 
 describe("avg/max/min (non-nullable)", () => {
 	test("return 0 on empty input (defensive default)", () => {

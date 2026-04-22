@@ -28,7 +28,11 @@ const alert = (over: Partial<AlertRow>): AlertRow => ({
 
 describe("buildAlertsByHost", () => {
 	test("groups multiple alerts by host_id", () => {
-		const rows = [alert({ host_id: "a", rule_id: "r1" }), alert({ host_id: "b" }), alert({ host_id: "a", rule_id: "r2" })];
+		const rows = [
+			alert({ host_id: "a", rule_id: "r1" }),
+			alert({ host_id: "b" }),
+			alert({ host_id: "a", rule_id: "r2" }),
+		];
 		const m = buildAlertsByHost(rows);
 		expect(m.size).toBe(2);
 		expect(m.get("a")?.map((a) => a.rule_id)).toEqual(["r1", "r2"]);
@@ -73,7 +77,16 @@ describe("buildTagsByHost", () => {
 
 describe("formatAlerts", () => {
 	test("maps rows to minimal response shape (drops host_id)", () => {
-		const rows = [alert({ host_id: "ignored", rule_id: "cpu_high", severity: "critical", value: 95, message: "hot", triggered_at: 1700 })];
+		const rows = [
+			alert({
+				host_id: "ignored",
+				rule_id: "cpu_high",
+				severity: "critical",
+				value: 95,
+				message: "hot",
+				triggered_at: 1700,
+			}),
+		];
 		expect(formatAlerts(rows)).toEqual([
 			{
 				rule_id: "cpu_high",
@@ -115,37 +128,28 @@ describe("worstTier", () => {
 
 describe("getMaintenanceWindow", () => {
 	test("returns the { start, end } object when both ends are present", () => {
-		expect(
-			getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "03:00" }),
-		).toEqual({ start: "02:00", end: "03:00" });
+		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "03:00" })).toEqual({
+			start: "02:00",
+			end: "03:00",
+		});
 	});
 
 	test("returns null when either endpoint is missing", () => {
-		expect(
-			getMaintenanceWindow({ maintenance_start: null, maintenance_end: "03:00" }),
-		).toBeNull();
-		expect(
-			getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: null }),
-		).toBeNull();
-		expect(
-			getMaintenanceWindow({ maintenance_start: null, maintenance_end: null }),
-		).toBeNull();
+		expect(getMaintenanceWindow({ maintenance_start: null, maintenance_end: "03:00" })).toBeNull();
+		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: null })).toBeNull();
+		expect(getMaintenanceWindow({ maintenance_start: null, maintenance_end: null })).toBeNull();
 	});
 
 	test("treats empty strings as falsy (no window)", () => {
-		expect(
-			getMaintenanceWindow({ maintenance_start: "", maintenance_end: "03:00" }),
-		).toBeNull();
-		expect(
-			getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "" }),
-		).toBeNull();
+		expect(getMaintenanceWindow({ maintenance_start: "", maintenance_end: "03:00" })).toBeNull();
+		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "" })).toBeNull();
 	});
 
 	test("does not validate the HHMM format (that's callers' job)", () => {
 		// Pure coercion helper; lets callers decide whether to validate.
-		expect(
-			getMaintenanceWindow({ maintenance_start: "not-a-time", maintenance_end: "x" }),
-		).toEqual({ start: "not-a-time", end: "x" });
+		expect(getMaintenanceWindow({ maintenance_start: "not-a-time", maintenance_end: "x" })).toEqual(
+			{ start: "not-a-time", end: "x" },
+		);
 	});
 
 	test("ignores extra row fields", () => {
@@ -160,9 +164,9 @@ describe("getMaintenanceWindow", () => {
 });
 
 import {
+	type MonitoringAlertRow,
 	buildMonitoringAlertsResult,
 	filterNonMaintenanceAlerts,
-	type MonitoringAlertRow,
 } from "./monitoring";
 
 const mAlert = (over: Partial<MonitoringAlertRow>): MonitoringAlertRow => ({
@@ -232,21 +236,28 @@ describe("buildMonitoringAlertsResult", () => {
 			mAlert({ severity: "warning" }),
 			mAlert({ severity: "info" }),
 		];
-		const r = buildMonitoringAlertsResult(alerts, new Map(), { severity: undefined, tags: [] }, 1000);
+		const r = buildMonitoringAlertsResult(
+			alerts,
+			new Map(),
+			{ severity: undefined, tags: [] },
+			1000,
+		);
 		expect(r.by_severity).toEqual({ critical: 1, warning: 2, info: 1 });
 		expect(r.alert_count).toBe(4);
 	});
 	test("ignores unknown severities in counts but still includes items", () => {
 		const alerts = [mAlert({ severity: "weird" })];
-		const r = buildMonitoringAlertsResult(alerts, new Map(), { severity: undefined, tags: [] }, 1000);
+		const r = buildMonitoringAlertsResult(
+			alerts,
+			new Map(),
+			{ severity: undefined, tags: [] },
+			1000,
+		);
 		expect(r.by_severity).toEqual({ critical: 0, warning: 0, info: 0 });
 		expect(r.alert_count).toBe(1);
 	});
 	test("filters by severity", () => {
-		const alerts = [
-			mAlert({ severity: "critical" }),
-			mAlert({ severity: "warning" }),
-		];
+		const alerts = [mAlert({ severity: "critical" }), mAlert({ severity: "warning" })];
 		const r = buildMonitoringAlertsResult(
 			alerts,
 			new Map(),
@@ -375,12 +386,7 @@ describe("buildTagGroups", () => {
 		expect(groups[0]?.alert_count).toBe(6);
 	});
 	test("missing tier defaults to healthy", () => {
-		const groups = buildTagGroups(
-			[h("h1")],
-			new Map(),
-			new Map(),
-			new Map([["h1", ["x"]]]),
-		);
+		const groups = buildTagGroups([h("h1")], new Map(), new Map(), new Map([["h1", ["x"]]]));
 		expect(groups[0]?.by_tier.healthy).toBe(1);
 		expect(groups[0]?.alert_count).toBe(0);
 	});

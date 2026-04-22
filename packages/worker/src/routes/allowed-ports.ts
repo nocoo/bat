@@ -71,9 +71,13 @@ export async function allowedPortsAllRoute(c: Context<AppEnv>) {
  * "not found in allowlist" 404 (preserving pre-refactor wire behaviour).
  */
 export function parsePortParam(raw: string | undefined): number | null {
-	if (!raw) return null;
+	if (!raw) {
+		return null;
+	}
 	const n = Number.parseInt(raw, 10);
-	if (Number.isNaN(n) || !Number.isInteger(n)) return null;
+	if (Number.isNaN(n) || !Number.isInteger(n)) {
+		return null;
+	}
 	return n;
 }
 

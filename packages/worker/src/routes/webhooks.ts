@@ -42,9 +42,7 @@ export function parseWebhookId(raw: string | undefined): number | null {
 	return Number.isNaN(n) ? null : n;
 }
 
-export type WebhookCreateBodyResult =
-	| { ok: true; host_id: string }
-	| { ok: false; error: string };
+export type WebhookCreateBodyResult = { ok: true; host_id: string } | { ok: false; error: string };
 
 /** Validate POST /api/webhooks body — requires a non-empty `host_id` string. */
 export function validateWebhookCreateBody(body: unknown): WebhookCreateBodyResult {

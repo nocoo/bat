@@ -11,11 +11,11 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { EVENTS_PAGE_SIZE, useEvents, useHosts } from "@/hooks";
+import { formatTimestamp } from "@/lib/format";
 import { type EventItem, hashHostId } from "@bat/shared";
 import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { formatTimestamp } from "@/lib/format";
 
 function EventTable({ events }: { events: EventItem[] }) {
 	const { data: hosts } = useHosts();

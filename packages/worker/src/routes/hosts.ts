@@ -13,10 +13,7 @@ import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./m
  */
 export function buildSparklinesByHost(
 	rows: SparklineRow[],
-): Map<
-	string,
-	{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
-> {
+): Map<string, { cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }> {
 	const map = new Map<
 		string,
 		{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
@@ -27,9 +24,15 @@ export function buildSparklinesByHost(
 			entry = { cpu: [], mem: [], net: [] };
 			map.set(row.host_id, entry);
 		}
-		if (row.cpu !== null) entry.cpu.push({ ts: row.ts, v: row.cpu });
-		if (row.mem !== null) entry.mem.push({ ts: row.ts, v: row.mem });
-		if (row.net !== null) entry.net.push({ ts: row.ts, v: row.net });
+		if (row.cpu !== null) {
+			entry.cpu.push({ ts: row.ts, v: row.cpu });
+		}
+		if (row.mem !== null) {
+			entry.mem.push({ ts: row.ts, v: row.mem });
+		}
+		if (row.net !== null) {
+			entry.net.push({ ts: row.ts, v: row.net });
+		}
 	}
 	return map;
 }

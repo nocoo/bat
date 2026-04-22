@@ -25,9 +25,7 @@ describe("extractRootDiskPct", () => {
 	});
 
 	test("returns null when there is no root mount", () => {
-		expect(
-			extractRootDiskPct(JSON.stringify([{ mount: "/data", used_pct: 50 }])),
-		).toBeNull();
+		expect(extractRootDiskPct(JSON.stringify([{ mount: "/data", used_pct: 50 }]))).toBeNull();
 	});
 
 	test("returns the root mount's used_pct", () => {
@@ -42,9 +40,7 @@ describe("extractRootDiskPct", () => {
 	});
 
 	test("returns null when used_pct is missing on root", () => {
-		expect(
-			extractRootDiskPct(JSON.stringify([{ mount: "/" }])),
-		).toBeNull();
+		expect(extractRootDiskPct(JSON.stringify([{ mount: "/" }]))).toBeNull();
 	});
 });
 

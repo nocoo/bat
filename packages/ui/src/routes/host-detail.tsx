@@ -8,17 +8,13 @@ import {
 	TcpChart,
 	TopProcessesTable,
 } from "@/components/charts";
-import { formatMemory, formatUptime } from "@/lib/host-card-format";
-import {
-	capitalizeVirt,
-	formatBootTime,
-	formatCpuLabel,
-} from "@/lib/host-detail-format";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHostDetail, useHostMetrics, useHosts } from "@/hooks";
+import { formatMemory, formatUptime } from "@/lib/host-card-format";
+import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Info } from "lucide-react";
 import { useState } from "react";

@@ -130,16 +130,7 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 	}
 
 	// 5. Insert event
-	await insertEvent(
-		db,
-		config.host_id,
-		config.id,
-		title,
-		bodyStr,
-		tags,
-		sourceIp,
-		nowSeconds,
-	);
+	await insertEvent(db, config.host_id, config.id, title, bodyStr, tags, sourceIp, nowSeconds);
 
 	return c.body(null, 204);
 }

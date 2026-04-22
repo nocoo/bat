@@ -192,9 +192,7 @@ describe("transformTopProcessesData", () => {
 	});
 
 	test("uses last point that has top_processes_json", () => {
-		const json = JSON.stringify([
-			{ pid: 1, name: "init", cpu_pct: 0.5, mem_rss: 100, mem_pct: 1 },
-		]);
+		const json = JSON.stringify([{ pid: 1, name: "init", cpu_pct: 0.5, mem_rss: 100, mem_pct: 1 }]);
 		const out = transformTopProcessesData([dp({ ts: 1, top_processes_json: json }), dp({ ts: 2 })]);
 		expect(out).toHaveLength(1);
 		expect(out[0]?.pid).toBe(1);

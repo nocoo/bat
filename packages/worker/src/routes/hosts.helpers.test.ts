@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildSparklinesByHost, normalizeNetSparkline, type SparklineRow } from "./hosts";
+import { type SparklineRow, buildSparklinesByHost, normalizeNetSparkline } from "./hosts";
 
 describe("normalizeNetSparkline", () => {
 	test("returns null for an empty input", () => {
@@ -69,9 +69,18 @@ describe("buildSparklinesByHost", () => {
 			row("db", 1, 5, null, null),
 		]);
 		expect(map.get("web")).toEqual({
-			cpu: [{ ts: 1, v: 10 }, { ts: 2, v: 15 }],
-			mem: [{ ts: 1, v: 20 }, { ts: 2, v: 25 }],
-			net: [{ ts: 1, v: 300 }, { ts: 2, v: 400 }],
+			cpu: [
+				{ ts: 1, v: 10 },
+				{ ts: 2, v: 15 },
+			],
+			mem: [
+				{ ts: 1, v: 20 },
+				{ ts: 2, v: 25 },
+			],
+			net: [
+				{ ts: 1, v: 300 },
+				{ ts: 2, v: 400 },
+			],
 		});
 		expect(map.get("db")).toEqual({
 			cpu: [{ ts: 1, v: 5 }],
@@ -81,21 +90,14 @@ describe("buildSparklinesByHost", () => {
 	});
 
 	test("drops per-sample null values instead of pushing them", () => {
-		const map = buildSparklinesByHost([
-			row("x", 1, null, 10, null),
-			row("x", 2, 5, null, null),
-		]);
+		const map = buildSparklinesByHost([row("x", 1, null, 10, null), row("x", 2, 5, null, null)]);
 		expect(map.get("x")?.cpu).toEqual([{ ts: 2, v: 5 }]);
 		expect(map.get("x")?.mem).toEqual([{ ts: 1, v: 10 }]);
 		expect(map.get("x")?.net).toEqual([]);
 	});
 
 	test("preserves input order within each host", () => {
-		const map = buildSparklinesByHost([
-			row("x", 3, 30),
-			row("x", 1, 10),
-			row("x", 2, 20),
-		]);
+		const map = buildSparklinesByHost([row("x", 3, 30), row("x", 1, 10), row("x", 2, 20)]);
 		expect(map.get("x")?.cpu).toEqual([
 			{ ts: 3, v: 30 },
 			{ ts: 1, v: 10 },

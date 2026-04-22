@@ -9,7 +9,9 @@
  * JSON instead of throwing — callers always treated parse failures the same.
  */
 export function safeParse<T>(json: string | null): T | null {
-	if (!json) return null;
+	if (!json) {
+		return null;
+	}
 	try {
 		return JSON.parse(json) as T;
 	} catch {
@@ -28,7 +30,9 @@ interface DiskJsonEntry {
  */
 export function extractRootDiskPct(diskJson: string | null): number | null {
 	const disks = safeParse<DiskJsonEntry[]>(diskJson);
-	if (!disks) return null;
+	if (!disks) {
+		return null;
+	}
 	const root = disks.find((d) => d.mount === "/");
 	return root?.used_pct ?? null;
 }
@@ -43,11 +47,11 @@ interface NetJsonEntry {
  * Returns `{ rx: null, tx: null }` on empty/invalid input so callers can
  * preserve the "unknown" tri-state in their DTOs.
  */
-export function extractNetRates(
-	netJson: string | null,
-): { rx: number | null; tx: number | null } {
+export function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
 	const ifaces = safeParse<NetJsonEntry[]>(netJson);
-	if (!ifaces) return { rx: null, tx: null };
+	if (!ifaces) {
+		return { rx: null, tx: null };
+	}
 	let rx = 0;
 	let tx = 0;
 	for (const iface of ifaces) {
