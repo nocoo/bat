@@ -12,11 +12,8 @@ import {
 import { useAlerts, useHosts } from "@/hooks";
 import { type AlertItem, hashHostId } from "@bat/shared";
 import { AlertTriangle, Bell } from "lucide-react";
+import { formatTimestamp } from "@/lib/format";
 import { Link } from "react-router";
-
-function formatTimestamp(unixSeconds: number): string {
-	return new Date(unixSeconds * 1000).toLocaleString();
-}
 
 function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 	const { data: hosts } = useHosts();

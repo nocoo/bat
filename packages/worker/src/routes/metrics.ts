@@ -1,58 +1,50 @@
 // GET /api/hosts/:id/metrics — query metrics with auto resolution
 // :id accepts either raw host_id or opaque hid (8-char hash)
 import type { MetricsDataPoint, MetricsQueryResponse } from "@bat/shared";
-import { AUTO_RESOLUTION_THRESHOLD_SECONDS, hashHostId } from "@bat/shared";
+import { AUTO_RESOLUTION_THRESHOLD_SECONDS } from "@bat/shared";
 import type { Context } from "hono";
+import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
 /**
- * Resolve the route param to a real host_id.
- * If `id` is an 8-char hex hid, scan active hosts to find the match.
- * Otherwise assume it's a raw host_id.
+ * Parse the `from` / `to` query-string pair for a metrics range.
+ * Pure: returns `{ ok: true, from, to }` on success, otherwise an error.
  */
-async function resolveHostId(db: D1Database, id: string): Promise<string | null> {
-	const isHid = /^[0-9a-f]{8}$/.test(id);
-	if (!isHid) {
-		return id;
-	}
+export type MetricsRangeResult =
+	| { ok: true; from: number; to: number }
+	| { ok: false; error: string };
 
-	// Scan active hosts and match by hash
-	const result = await db
-		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
-		.all<{ host_id: string }>();
-	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) {
-			return row.host_id;
-		}
+export function parseMetricsRange(
+	fromStr: string | undefined,
+	toStr: string | undefined,
+): MetricsRangeResult {
+	if (!(fromStr && toStr)) {
+		return { ok: false, error: "Missing required query params: from, to" };
 	}
-	return null;
+	const from = Number(fromStr);
+	const to = Number(toStr);
+	if (Number.isNaN(from) || Number.isNaN(to)) {
+		return { ok: false, error: "from and to must be valid numbers" };
+	}
+	return { ok: true, from, to };
 }
 
 export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metrics">) {
 	const idParam = c.req.param("id");
-	const fromStr = c.req.query("from");
-	const toStr = c.req.query("to");
-
-	if (!(fromStr && toStr)) {
-		return c.json({ error: "Missing required query params: from, to" }, 400);
+	const parsedRange = parseMetricsRange(c.req.query("from"), c.req.query("to"));
+	if (!parsedRange.ok) {
+		return c.json({ error: parsedRange.error }, 400);
 	}
-
-	const from = Number(fromStr);
-	const to = Number(toStr);
-
-	if (Number.isNaN(from) || Number.isNaN(to)) {
-		return c.json({ error: "from and to must be valid numbers" }, 400);
-	}
+	const { from, to } = parsedRange;
 
 	const db = c.env.DB;
 
-	const hostId = await resolveHostId(db, idParam);
+	const hostId = await resolveHostIdByHash(db, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	const range = to - from;
-	const useHourly = range > AUTO_RESOLUTION_THRESHOLD_SECONDS;
+	const useHourly = to - from > AUTO_RESOLUTION_THRESHOLD_SECONDS;
 
 	if (useHourly) {
 		// Query hourly aggregated data
@@ -215,12 +207,12 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 // --- ext_json unpacking for both raw and hourly queries ---
 
 /** Row from metrics_raw with signal expansion packed as ext_json */
-interface RawRow extends Record<string, unknown> {
+export interface RawRow extends Record<string, unknown> {
 	ext_json: string | null;
 }
 
 /** Hourly row as returned by SQL (includes ext_json as a TEXT column) */
-interface HourlyRow extends Record<string, unknown> {
+export interface HourlyRow extends Record<string, unknown> {
 	ext_json: string | null;
 }
 
@@ -228,7 +220,7 @@ interface HourlyRow extends Record<string, unknown> {
  * Map from ext_json key (aggregation column name) to MetricsDataPoint field name.
  * Most use the _avg variant as the representative value for hourly resolution.
  */
-const EXT_KEY_MAP: Record<string, string> = {
+export const EXT_KEY_MAP: Record<string, string> = {
 	interrupts_sec_avg: "interrupts_sec",
 	softirq_net_rx_sec_avg: "softirq_net_rx_sec",
 	softirq_block_sec_avg: "softirq_block_sec",
@@ -285,7 +277,7 @@ const EXT_KEY_MAP: Record<string, string> = {
 
 /** Expand a RawRow into a flat MetricsDataPoint by unpacking ext_json.
  * For raw rows, ext_json keys map directly to MetricsDataPoint field names. */
-function expandRawRow(row: RawRow): MetricsDataPoint {
+export function expandRawRow(row: RawRow): MetricsDataPoint {
 	const { ext_json, ...base } = row;
 	const result: Record<string, unknown> = { ...base };
 
@@ -304,7 +296,7 @@ function expandRawRow(row: RawRow): MetricsDataPoint {
 }
 
 /** Expand a HourlyRow into a flat MetricsDataPoint by unpacking ext_json. */
-function expandHourlyRow(row: HourlyRow): MetricsDataPoint {
+export function expandHourlyRow(row: HourlyRow): MetricsDataPoint {
 	// Start with all base columns (excluding ext_json)
 	const { ext_json, ...base } = row;
 	const result: Record<string, unknown> = { ...base };

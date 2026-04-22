@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
 /** Lightweight validation — checks required fields exist and are correct types */
-function validateIdentityPayload(body: unknown): body is IdentityPayload {
+export function validateIdentityPayload(body: unknown): body is IdentityPayload {
 	if (!body || typeof body !== "object") {
 		return false;
 	}
@@ -29,7 +29,7 @@ function validateIdentityPayload(body: unknown): body is IdentityPayload {
  * Build a conditional UPDATE that only sets inventory fields actually present
  * in the payload (2-state wire semantics: present = update, absent = no-op).
  */
-function buildInventoryUpdate(body: Record<string, unknown>): {
+export function buildInventoryUpdate(body: Record<string, unknown>): {
 	clauses: string[];
 	values: unknown[];
 } {

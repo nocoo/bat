@@ -6,13 +6,15 @@ import type { AppEnv } from "../types.js";
 const DEFAULT_LIMIT = 30;
 const MAX_LIMIT = 500;
 
-export async function eventsListRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
-
-	const hostId = c.req.query("host_id");
-	const limitParam = c.req.query("limit");
-	const offsetParam = c.req.query("offset");
-
+/**
+ * Parse optional `limit` / `offset` query-string numbers into a safe
+ * pagination window. Invalid / negative inputs fall back to defaults.
+ * Pure — unit-tested directly.
+ */
+export function parsePagination(
+	limitParam: string | undefined,
+	offsetParam: string | undefined,
+): { limit: number; offset: number } {
 	let limit = DEFAULT_LIMIT;
 	if (limitParam) {
 		const parsed = Number.parseInt(limitParam, 10);
@@ -20,7 +22,6 @@ export async function eventsListRoute(c: Context<AppEnv>) {
 			limit = Math.min(parsed, MAX_LIMIT);
 		}
 	}
-
 	let offset = 0;
 	if (offsetParam) {
 		const parsed = Number.parseInt(offsetParam, 10);
@@ -28,6 +29,14 @@ export async function eventsListRoute(c: Context<AppEnv>) {
 			offset = parsed;
 		}
 	}
+	return { limit, offset };
+}
+
+export async function eventsListRoute(c: Context<AppEnv>) {
+	const db = c.env.DB;
+
+	const hostId = c.req.query("host_id");
+	const { limit, offset } = parsePagination(c.req.query("limit"), c.req.query("offset"));
 
 	// Query total count
 	let totalResult: D1Result<{ count: number }>;
@@ -77,7 +86,7 @@ LIMIT ? OFFSET ?`,
 	return c.json(response);
 }
 
-function parseTags(raw: string): string[] {
+export function parseTags(raw: string): string[] {
 	try {
 		const parsed = JSON.parse(raw);
 		return Array.isArray(parsed) ? parsed : [];

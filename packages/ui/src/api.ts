@@ -1,5 +1,9 @@
-// API client — fetch wrapper for Worker API routes
-// In SPA mode, calls /api/* directly (no proxy needed, same origin)
+// MVVM "Model" layer — thin fetch wrapper around the Worker /api/* routes.
+//
+// All HTTP verbs share a single `request` helper so error handling and
+// JSON encoding live in exactly one place. Splitting GET params into a
+// dedicated argument keeps callers honest about query strings vs. bodies
+// and makes URL construction trivially testable.
 
 export class ApiError extends Error {
 	status: number;
@@ -10,76 +14,39 @@ export class ApiError extends Error {
 	}
 }
 
-export async function fetchAPI<T>(
-	path: string,
-	paramsOrOptions?: Record<string, string> | RequestInit,
-): Promise<T> {
-	// If it looks like RequestInit (has method, body, headers, etc.), treat it as options
-	const isRequestInit =
-		paramsOrOptions &&
-		("method" in paramsOrOptions ||
-			"body" in paramsOrOptions ||
-			"headers" in paramsOrOptions ||
-			"credentials" in paramsOrOptions);
-
-	if (isRequestInit) {
-		const res = await fetch(path, {
-			headers: { "Content-Type": "application/json" },
-			...paramsOrOptions,
-		});
-		if (!res.ok) {
-			throw new ApiError(res.status, `API error: ${res.status}`);
-		}
-		if (res.status === 204) {
-			return null as T;
-		}
-		return res.json() as Promise<T>;
-	}
-
-	// Otherwise treat as query params
-	const url = new URL(path, window.location.origin);
-	if (paramsOrOptions) {
-		for (const [k, v] of Object.entries(paramsOrOptions)) {
-			url.searchParams.set(k, v);
-		}
-	}
-	const res = await fetch(url.toString());
-	if (!res.ok) {
-		throw new ApiError(res.status, `API error: ${res.status}`);
-	}
-	return res.json() as Promise<T>;
+/** Append `params` to `path` as a query string. Pure / testable. */
+export function buildUrl(path: string, params?: Record<string, string>): string {
+	if (!params) return path;
+	const qs = new URLSearchParams(params).toString();
+	return qs ? `${path}?${qs}` : path;
 }
 
-/** POST JSON to API */
-export async function postAPI<T>(path: string, body: unknown): Promise<T> {
-	const res = await fetch(path, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
+interface RequestOptions {
+	body?: unknown;
+	params?: Record<string, string>;
+}
+
+async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+	const hasBody = opts.body !== undefined;
+	const res = await fetch(buildUrl(path, opts.params), {
+		method,
+		headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+		body: hasBody ? JSON.stringify(opts.body) : undefined,
 	});
 	if (!res.ok) {
 		throw new ApiError(res.status, `API error: ${res.status}`);
 	}
+	if (res.status === 204) return null as T;
 	return res.json() as Promise<T>;
 }
 
-/** DELETE to API */
-export async function deleteAPI(path: string): Promise<void> {
-	const res = await fetch(path, { method: "DELETE" });
-	if (!res.ok) {
-		throw new ApiError(res.status, `API error: ${res.status}`);
-	}
-}
+export const getAPI = <T>(path: string, params?: Record<string, string>): Promise<T> =>
+	request<T>("GET", path, { params });
 
-/** PUT JSON to API */
-export async function putAPI<T>(path: string, body: unknown): Promise<T> {
-	const res = await fetch(path, {
-		method: "PUT",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify(body),
-	});
-	if (!res.ok) {
-		throw new ApiError(res.status, `API error: ${res.status}`);
-	}
-	return res.json() as Promise<T>;
-}
+export const postAPI = <T>(path: string, body?: unknown): Promise<T> =>
+	request<T>("POST", path, { body });
+
+export const putAPI = <T>(path: string, body?: unknown): Promise<T> =>
+	request<T>("PUT", path, { body });
+
+export const deleteAPI = (path: string): Promise<void> => request<void>("DELETE", path);

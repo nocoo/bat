@@ -1,5 +1,6 @@
 // Tier 2 metrics insertion and query service
 import type { Tier2Payload, Tier2Snapshot } from "@bat/shared";
+import { safeParse } from "../lib/json-helpers.js";
 
 /** Insert a Tier 2 snapshot, storing each section as JSON text.
  *  Uses INSERT OR IGNORE to silently skip duplicates (same host_id + ts).
@@ -54,6 +55,14 @@ LIMIT 1`,
 		return null;
 	}
 
+	return rowToTier2Snapshot(row);
+}
+
+/**
+ * Pure shaper: parse the JSON columns of a tier2_snapshots row (joined with
+ * hosts) into a `Tier2Snapshot`. Exported for unit tests.
+ */
+export function rowToTier2Snapshot(row: Tier2Row): Tier2Snapshot {
 	return {
 		host_id: row.host_id,
 		ts: row.ts,
@@ -70,7 +79,7 @@ LIMIT 1`,
 	};
 }
 
-interface Tier2Row {
+export interface Tier2Row {
 	host_id: string;
 	ts: number;
 	ports_json: string | null;
@@ -83,15 +92,4 @@ interface Tier2Row {
 	timezone: string | null;
 	dns_resolvers_json: string | null;
 	dns_search_json: string | null;
-}
-
-function safeParse<T>(json: string | null): T | null {
-	if (!json) {
-		return null;
-	}
-	try {
-		return JSON.parse(json) as T;
-	} catch {
-		return null;
-	}
 }

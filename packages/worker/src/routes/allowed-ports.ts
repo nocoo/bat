@@ -11,6 +11,35 @@ import { type AllowedPort, MAX_ALLOWED_PORTS_PER_HOST } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
+/** Validation result for POST /api/hosts/:id/allowed-ports body. */
+export type AllowedPortBody =
+	| { ok: true; port: number; reason: string }
+	| { ok: false; error: string };
+
+/**
+ * Parse + validate the JSON body for adding a port to the allowlist.
+ * Pure (no I/O) so it can be unit-tested directly.
+ */
+export function validateAllowedPortBody(body: unknown): AllowedPortBody {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+	if (
+		typeof payload.port !== "number" ||
+		!Number.isInteger(payload.port) ||
+		payload.port < 1 ||
+		payload.port > 65535
+	) {
+		return { ok: false, error: "port must be an integer 1-65535" };
+	}
+	const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
+	if (reason.length > 200) {
+		return { ok: false, error: "reason must be 200 characters or fewer" };
+	}
+	return { ok: true, port: payload.port, reason };
+}
+
 /** Verify host exists. Returns true if found. */
 async function hostExists(db: D1Database, hostId: string): Promise<boolean> {
 	const row = await db
@@ -32,9 +61,26 @@ export async function allowedPortsAllRoute(c: Context<AppEnv>) {
 		.prepare("SELECT host_id, port FROM port_allowlist ORDER BY host_id, port")
 		.all<{ host_id: string; port: number }>();
 
-	// Group into { [host_id]: number[] }
+	return c.json(groupPortsByHost(result.results));
+}
+
+/**
+ * Parse a port number from a route param. Returns `null` when the param
+ * is missing, not an integer, or outside the 1–65535 range.
+ */
+export function parsePortParam(raw: string | undefined): number | null {
+	if (!raw) return null;
+	const n = Number.parseInt(raw, 10);
+	if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
+	return n;
+}
+
+/** Group `{ host_id, port }` rows into `{ [host_id]: number[] }`. */
+export function groupPortsByHost(
+	rows: { host_id: string; port: number }[],
+): Record<string, number[]> {
 	const map: Record<string, number[]> = {};
-	for (const row of result.results) {
+	for (const row of rows) {
 		const list = map[row.host_id];
 		if (list) {
 			list.push(row.port);
@@ -42,8 +88,7 @@ export async function allowedPortsAllRoute(c: Context<AppEnv>) {
 			map[row.host_id] = [row.port];
 		}
 	}
-
-	return c.json(map);
+	return map;
 }
 
 // ---------------------------------------------------------------------------
@@ -84,27 +129,11 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
+	const validated = validateAllowedPortBody(body);
+	if (!validated.ok) {
+		return c.json({ error: validated.error }, 400);
 	}
-
-	const payload = body as Record<string, unknown>;
-
-	// Validate port
-	if (
-		typeof payload.port !== "number" ||
-		!Number.isInteger(payload.port) ||
-		payload.port < 1 ||
-		payload.port > 65535
-	) {
-		return c.json({ error: "port must be an integer 1-65535" }, 400);
-	}
-
-	// Validate reason
-	const reason = typeof payload.reason === "string" ? payload.reason.trim() : "";
-	if (reason.length > 200) {
-		return c.json({ error: "reason must be 200 characters or fewer" }, 400);
-	}
+	const { port, reason } = validated;
 
 	// Verify host exists
 	if (!(await hostExists(db, hostId))) {
@@ -114,7 +143,7 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 	// Idempotent: if this port is already allowed, return it directly
 	const existing = await db
 		.prepare("SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? AND port = ?")
-		.bind(hostId, payload.port)
+		.bind(hostId, port)
 		.first<AllowedPort>();
 	if (existing) {
 		return c.json(existing, 201);
@@ -132,13 +161,13 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 	// INSERT OR IGNORE (idempotent if port already allowed)
 	await db
 		.prepare("INSERT OR IGNORE INTO port_allowlist (host_id, port, reason) VALUES (?, ?, ?)")
-		.bind(hostId, payload.port, reason)
+		.bind(hostId, port, reason)
 		.run();
 
 	// Return the inserted row
 	const row = await db
 		.prepare("SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? AND port = ?")
-		.bind(hostId, payload.port)
+		.bind(hostId, port)
 		.first<AllowedPort>();
 
 	return c.json(row, 201);
@@ -150,10 +179,9 @@ export async function hostAllowedPortsRemoveRoute(
 ) {
 	const db = c.env.DB;
 	const hostId = c.req.param("id");
-	const portStr = c.req.param("port");
-	const port = Number.parseInt(portStr, 10);
+	const port = parsePortParam(c.req.param("port"));
 
-	if (Number.isNaN(port) || !Number.isInteger(port)) {
+	if (port === null) {
 		return c.json({ error: "Invalid port number" }, 400);
 	}
 

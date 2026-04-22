@@ -2,8 +2,55 @@
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
+import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./monitoring.js";
+
+/**
+ * Pure helper: group sparkline rows into per-host CPU/mem/net arrays,
+ * dropping individual null samples. Exported for unit tests.
+ */
+export function buildSparklinesByHost(
+	rows: SparklineRow[],
+): Map<
+	string,
+	{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
+> {
+	const map = new Map<
+		string,
+		{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
+	>();
+	for (const row of rows) {
+		let entry = map.get(row.host_id);
+		if (!entry) {
+			entry = { cpu: [], mem: [], net: [] };
+			map.set(row.host_id, entry);
+		}
+		if (row.cpu !== null) entry.cpu.push({ ts: row.ts, v: row.cpu });
+		if (row.mem !== null) entry.mem.push({ ts: row.ts, v: row.mem });
+		if (row.net !== null) entry.net.push({ ts: row.ts, v: row.net });
+	}
+	return map;
+}
+
+/**
+ * Pure helper: normalise a raw byte-rate sparkline to a 0–100 scale so
+ * network can share axes with CPU/memory in the UI. Returns `null` when
+ * the input is empty. Exported for unit tests.
+ */
+export function normalizeNetSparkline(
+	points: { ts: number; v: number }[],
+): SparklinePoint[] | null {
+	if (points.length === 0) {
+		return null;
+	}
+	const maxNet = Math.max(...points.map((p) => p.v));
+	if (maxNet > 0) {
+		return points.map((p) => ({ ts: p.ts, v: (p.v / maxNet) * 100 }));
+	}
+	return points.map((p) => ({ ts: p.ts, v: 0 }));
+}
 
 interface HostRow {
 	host_id: string;
@@ -55,45 +102,12 @@ interface AllowedPortRow {
 	port: number;
 }
 
-interface SparklineRow {
+export interface SparklineRow {
 	host_id: string;
 	ts: number;
 	cpu: number | null;
 	mem: number | null;
 	net: number | null;
-}
-
-/** Parse disk_json to find root mount used_pct */
-function extractRootDiskPct(diskJson: string | null): number | null {
-	if (!diskJson) {
-		return null;
-	}
-	try {
-		const disks = JSON.parse(diskJson) as { mount: string; used_pct: number }[];
-		const root = disks.find((d) => d.mount === "/");
-		return root?.used_pct ?? null;
-	} catch {
-		return null;
-	}
-}
-
-/** Sum net_json rx/tx rates across all interfaces */
-function extractNetRates(netJson: string | null): { rx: number | null; tx: number | null } {
-	if (!netJson) {
-		return { rx: null, tx: null };
-	}
-	try {
-		const ifaces = JSON.parse(netJson) as { rx_bytes: number; tx_bytes: number }[];
-		let rx = 0;
-		let tx = 0;
-		for (const iface of ifaces) {
-			rx += iface.rx_bytes ?? 0;
-			tx += iface.tx_bytes ?? 0;
-		}
-		return { rx, tx };
-	} catch {
-		return { rx: null, tx: null };
-	}
 }
 
 export async function hostsListRoute(c: Context<AppEnv>) {
@@ -156,12 +170,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		.bind(...hostIds)
 		.all<AlertRow>();
 
-	const alertsByHost = new Map<string, AlertRow[]>();
-	for (const a of alertsResult.results) {
-		const existing = alertsByHost.get(a.host_id) ?? [];
-		existing.push(a);
-		alertsByHost.set(a.host_id, existing);
-	}
+	const alertsByHost = buildAlertsByHost(alertsResult.results);
 
 	// 4b. Per-host port allowlist for status derivation
 	const allowlistResult = await db
@@ -169,15 +178,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		.bind(...hostIds)
 		.all<AllowedPortRow>();
 
-	const allowedByHost = new Map<string, Set<number>>();
-	for (const row of allowlistResult.results) {
-		let s = allowedByHost.get(row.host_id);
-		if (!s) {
-			s = new Set();
-			allowedByHost.set(row.host_id, s);
-		}
-		s.add(row.port);
-	}
+	const allowedByHost = buildAllowedByHost(allowlistResult.results);
 
 	// 5. Sparkline data — last 24h hourly aggregates
 	const sparklineCutoff = now - 86400;
@@ -193,26 +194,7 @@ ORDER BY host_id, hour_ts ASC`,
 		.bind(...hostIds, sparklineCutoff)
 		.all<SparklineRow>();
 
-	const sparklinesByHost = new Map<
-		string,
-		{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
-	>();
-	for (const row of sparklineResult.results) {
-		let entry = sparklinesByHost.get(row.host_id);
-		if (!entry) {
-			entry = { cpu: [], mem: [], net: [] };
-			sparklinesByHost.set(row.host_id, entry);
-		}
-		if (row.cpu !== null) {
-			entry.cpu.push({ ts: row.ts, v: row.cpu });
-		}
-		if (row.mem !== null) {
-			entry.mem.push({ ts: row.ts, v: row.mem });
-		}
-		if (row.net !== null) {
-			entry.net.push({ ts: row.ts, v: row.net });
-		}
-	}
+	const sparklinesByHost = buildSparklinesByHost(sparklineResult.results);
 
 	// 6. Build response
 	const nowHHMM = toUtcHHMM(now);
@@ -220,10 +202,7 @@ ORDER BY host_id, hour_ts ASC`,
 		const metrics = metricsMap.get(host.host_id);
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const maintenance =
-			host.maintenance_start && host.maintenance_end
-				? { start: host.maintenance_start, end: host.maintenance_end }
-				: null;
+		const maintenance = getMaintenanceWindow(host);
 		const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
 		const inMaintenance =
 			maintenance !== null && isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
@@ -232,14 +211,7 @@ ORDER BY host_id, hour_ts ASC`,
 		const sparklines = sparklinesByHost.get(host.host_id);
 
 		// Normalize net sparkline (bytes/sec) to 0–100 using max-normalization
-		let netSparkline: SparklinePoint[] | null = null;
-		if (sparklines && sparklines.net.length > 0) {
-			const maxNet = Math.max(...sparklines.net.map((p) => p.v));
-			netSparkline =
-				maxNet > 0
-					? sparklines.net.map((p) => ({ ts: p.ts, v: (p.v / maxNet) * 100 }))
-					: sparklines.net.map((p) => ({ ts: p.ts, v: 0 }));
-		}
+		const netSparkline = normalizeNetSparkline(sparklines?.net ?? []);
 
 		return {
 			hid: hashHostId(host.host_id),

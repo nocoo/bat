@@ -15,10 +15,7 @@ import { type EventItem, hashHostId } from "@bat/shared";
 import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-
-function formatTimestamp(unixSeconds: number): string {
-	return new Date(unixSeconds * 1000).toLocaleString();
-}
+import { formatTimestamp } from "@/lib/format";
 
 function EventTable({ events }: { events: EventItem[] }) {
 	const { data: hosts } = useHosts();

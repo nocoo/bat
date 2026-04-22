@@ -159,3 +159,39 @@ describe("deriveHostStatus", () => {
 		expect(status).toBe("healthy");
 	});
 });
+
+import { parsePublicPorts } from "./status";
+
+describe("parsePublicPorts", () => {
+	test("returns empty for null / undefined / empty messages", () => {
+		expect(parsePublicPorts(null)).toEqual([]);
+		expect(parsePublicPorts(undefined)).toEqual([]);
+		expect(parsePublicPorts("")).toEqual([]);
+	});
+
+	test("returns empty when the sentinel prefix is missing", () => {
+		expect(parsePublicPorts("Some unrelated alert")).toEqual([]);
+		expect(parsePublicPorts("public ports: 80")).toEqual([]);
+	});
+
+	test("parses a single port", () => {
+		expect(parsePublicPorts("Unexpected public ports: 8080")).toEqual([8080]);
+	});
+
+	test("parses a comma-separated list with whitespace", () => {
+		expect(parsePublicPorts("Unexpected public ports: 22, 80, 443")).toEqual([22, 80, 443]);
+	});
+
+	test("drops tokens that aren't positive integers", () => {
+		expect(parsePublicPorts("Unexpected public ports: 80, abc, 0, -5, 443")).toEqual([80, 443]);
+	});
+
+	test("drops non-integer numerics (e.g. floats)", () => {
+		expect(parsePublicPorts("Unexpected public ports: 80, 8.5, 443")).toEqual([80, 443]);
+	});
+
+	test("returns empty when the list after the prefix is blank", () => {
+		// Regex requires at least one non-whitespace char after the space; blank → no match
+		expect(parsePublicPorts("Unexpected public ports:    ")).toEqual([]);
+	});
+});

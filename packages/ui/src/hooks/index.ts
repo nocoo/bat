@@ -1,16 +1,17 @@
-export { useHosts } from "./use-hosts";
-export { useHostDetail } from "./use-host-detail";
-export { useHostMetrics } from "./use-host-metrics";
-export { useHostTier2 } from "./use-host-tier2";
-export { useAlerts } from "./use-alerts";
-export { useSetup } from "./use-setup";
-export { useTags } from "./use-tags";
-export { useHostTags } from "./use-host-tags";
-export { useSingleHostTags } from "./use-single-host-tags";
-export { useAllowedPorts } from "./use-allowed-ports";
-export { useAllAllowedPorts } from "./use-all-allowed-ports";
-export { useEvents, EVENTS_PAGE_SIZE } from "./use-events";
-export { useWebhooks } from "./use-webhooks";
-export { useHostMaintenance } from "./use-host-maintenance";
+// Re-export the centralized server-state queries (the MVVM "Model" layer)
+// plus the small UI-side hooks. Keeping a single barrel lets routes/components
+// import from `@/hooks` without caring how the data layer is organized.
+export {
+	EVENTS_PAGE_SIZE,
+	useAlerts,
+	useEvents,
+	useHostDetail,
+	useHostMetrics,
+	useHosts,
+	useHostTags,
+	useMe,
+	useSetup,
+	useTags,
+	useWebhooks,
+} from "./queries";
 export { useIsMobile } from "./use-mobile";
-export { useMe } from "./use-me";

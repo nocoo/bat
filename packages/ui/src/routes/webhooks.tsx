@@ -1,9 +1,14 @@
-import { fetchAPI } from "@/api";
+import { deleteAPI, postAPI } from "@/api";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHosts, useSetup, useWebhooks } from "@/hooks";
-import type { HostOverviewItem, WebhookConfig } from "@bat/shared";
+import {
+	buildCurlCommand,
+	displayWebhookHostname,
+	filterAvailableHosts,
+} from "@/lib/webhooks-format";
+import type { WebhookConfig } from "@bat/shared";
 import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 
@@ -15,10 +20,7 @@ export function WebhooksPage() {
 	const [creating, setCreating] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 
-	// Hosts that don't have a webhook config yet
-	const availableHosts = (hosts ?? []).filter(
-		(h: HostOverviewItem) => !webhooks?.some((w) => w.host_id === h.host_id),
-	);
+	const availableHosts = filterAvailableHosts(hosts, webhooks);
 
 	const workerUrl = setupConfig?.worker_url ?? "";
 
@@ -29,10 +31,7 @@ export function WebhooksPage() {
 		setCreating(true);
 		setActionError(null);
 		try {
-			await fetchAPI("/api/webhooks", {
-				method: "POST",
-				body: JSON.stringify({ host_id: selectedHostId }),
-			});
+			await postAPI("/api/webhooks", { host_id: selectedHostId });
 			setSelectedHostId("");
 			await mutate();
 		} catch (err) {
@@ -46,7 +45,7 @@ export function WebhooksPage() {
 		async (id: number) => {
 			setActionError(null);
 			try {
-				await fetchAPI(`/api/webhooks/${id}/regenerate`, { method: "POST" });
+				await postAPI(`/api/webhooks/${id}/regenerate`);
 				await mutate();
 			} catch (err) {
 				setActionError(err instanceof Error ? err.message : "Failed to regenerate token");
@@ -59,7 +58,7 @@ export function WebhooksPage() {
 		async (id: number) => {
 			setActionError(null);
 			try {
-				await fetchAPI(`/api/webhooks/${id}`, { method: "DELETE" });
+				await deleteAPI(`/api/webhooks/${id}`);
 				await mutate();
 			} catch (err) {
 				setActionError(err instanceof Error ? err.message : "Failed to delete webhook");
@@ -173,13 +172,10 @@ interface WebhookConfigRowProps {
 
 function WebhookConfigRow({ config, workerUrl, onRegenerate, onDelete }: WebhookConfigRowProps) {
 	const { data: hosts } = useHosts();
-	const host = hosts?.find((h) => h.host_id === config.host_id);
+	const displayName = displayWebhookHostname(hosts, config.host_id);
 	const [copied, setCopied] = useState(false);
 
-	const curlCommand = `curl -X POST ${workerUrl}/api/events \\
-  -H "Authorization: Bearer ${config.token}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"type":"test","payload":{}}'`;
+	const curlCommand = buildCurlCommand(workerUrl, config.token);
 
 	const handleCopy = useCallback(async () => {
 		await navigator.clipboard.writeText(curlCommand);
@@ -190,7 +186,7 @@ function WebhookConfigRow({ config, workerUrl, onRegenerate, onDelete }: Webhook
 	return (
 		<div className="py-3 px-1">
 			<div className="flex items-center justify-between mb-2">
-				<span className="font-medium">{host?.hostname ?? config.host_id.slice(0, 8)}</span>
+				<span className="font-medium">{displayName}</span>
 				<div className="flex items-center gap-1">
 					<button
 						type="button"

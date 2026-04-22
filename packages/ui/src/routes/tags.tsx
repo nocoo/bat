@@ -1,4 +1,4 @@
-import { fetchAPI } from "@/api";
+import { deleteAPI, postAPI, putAPI } from "@/api";
 import { AppShell } from "@/components/layout";
 import { TagChip } from "@/components/tag-chip";
 import { Badge } from "@/components/ui/badge";
@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks";
-import { TAG_COLORS } from "@/lib/palette";
+import { getSwatchColor } from "@/lib/palette";
+import { validateTagName } from "@/lib/webhooks-format";
 import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -19,13 +20,13 @@ export function TagsPage() {
 	const [editName, setEditName] = useState("");
 
 	const handleCreate = useCallback(async () => {
-		const name = newName.trim();
-		if (!name || name.length > TAG_MAX_LENGTH) {
+		const v = validateTagName(newName, TAG_MAX_LENGTH);
+		if (!v.ok) {
 			return;
 		}
 		setCreating(true);
 		try {
-			await fetchAPI("/api/tags", { method: "POST", body: JSON.stringify({ name }) });
+			await postAPI("/api/tags", { name: v.name });
 			setNewName("");
 			await mutate();
 		} catch {
@@ -38,7 +39,7 @@ export function TagsPage() {
 	const handleDelete = useCallback(
 		async (id: number) => {
 			try {
-				await fetchAPI(`/api/tags/${id}`, { method: "DELETE" });
+				await deleteAPI(`/api/tags/${id}`);
 				await mutate();
 			} catch {
 				// TODO: toast error
@@ -49,12 +50,12 @@ export function TagsPage() {
 
 	const handleRename = useCallback(
 		async (id: number) => {
-			const name = editName.trim();
-			if (!name || name.length > TAG_MAX_LENGTH) {
+			const v = validateTagName(editName, TAG_MAX_LENGTH);
+			if (!v.ok) {
 				return;
 			}
 			try {
-				await fetchAPI(`/api/tags/${id}`, { method: "PUT", body: JSON.stringify({ name }) });
+				await putAPI(`/api/tags/${id}`, { name: v.name });
 				setEditingId(null);
 				setEditName("");
 				await mutate();
@@ -68,7 +69,7 @@ export function TagsPage() {
 	const handleRecolor = useCallback(
 		async (id: number, color: number) => {
 			try {
-				await fetchAPI(`/api/tags/${id}`, { method: "PUT", body: JSON.stringify({ color }) });
+				await putAPI(`/api/tags/${id}`, { color });
 				await mutate();
 			} catch {
 				// TODO: toast error
@@ -244,7 +245,7 @@ function TagRow({
 								? "ring-2 ring-offset-1 ring-foreground scale-110"
 								: "opacity-60 hover:opacity-100"
 						}`}
-						style={{ backgroundColor: TAG_COLORS[i] }}
+						style={{ backgroundColor: getSwatchColor(i) }}
 						aria-label={`Color ${i}`}
 					/>
 				))}

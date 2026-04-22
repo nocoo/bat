@@ -11,7 +11,7 @@ import type { Context } from "hono";
 import { checkRateLimit, findWebhookByToken, insertEvent } from "../services/events.js";
 import type { AppEnv } from "../types.js";
 
-function extractBearerToken(header: string | undefined): string | null {
+export function extractBearerToken(header: string | undefined): string | null {
 	if (!header) {
 		return null;
 	}
@@ -20,6 +20,58 @@ function extractBearerToken(header: string | undefined): string | null {
 		return null;
 	}
 	return parts[1] ?? null;
+}
+
+export type EventPayloadResult =
+	| { ok: true; title: string; bodyStr: string; tags: string[] }
+	| { ok: false; error: string };
+
+/**
+ * Validate POST /api/events payload (title / body / tags) and return the
+ * serialised body string + normalised tags. Pure function — does not touch
+ * the DB or check rate limits. Mirrors the error messages the route emits.
+ */
+export function validateEventPayload(body: unknown): EventPayloadResult {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+
+	if (typeof payload.title !== "string" || payload.title.length === 0) {
+		return { ok: false, error: "title is required" };
+	}
+	if (payload.title.length > EVENT_TITLE_MAX_LENGTH) {
+		return { ok: false, error: `title must be at most ${EVENT_TITLE_MAX_LENGTH} characters` };
+	}
+
+	if (!payload.body || typeof payload.body !== "object" || Array.isArray(payload.body)) {
+		return { ok: false, error: "body must be a JSON object" };
+	}
+	const bodyStr = JSON.stringify(payload.body);
+	if (new TextEncoder().encode(bodyStr).byteLength > EVENT_BODY_MAX_BYTES) {
+		return { ok: false, error: `body must be at most ${EVENT_BODY_MAX_BYTES} bytes` };
+	}
+
+	let tags: string[] = [];
+	if (payload.tags !== undefined) {
+		if (!Array.isArray(payload.tags)) {
+			return { ok: false, error: "tags must be an array" };
+		}
+		if (payload.tags.length > EVENT_TAGS_MAX_COUNT) {
+			return { ok: false, error: `tags must have at most ${EVENT_TAGS_MAX_COUNT} items` };
+		}
+		for (const tag of payload.tags) {
+			if (typeof tag !== "string" || tag.length === 0 || tag.length > EVENT_TAG_MAX_LENGTH) {
+				return {
+					ok: false,
+					error: `each tag must be a non-empty string of at most ${EVENT_TAG_MAX_LENGTH} chars`,
+				};
+			}
+		}
+		tags = payload.tags as string[];
+	}
+
+	return { ok: true, title: payload.title, bodyStr, tags };
 }
 
 export async function eventsIngestRoute(c: Context<AppEnv>) {
@@ -64,48 +116,11 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
+	const result = validateEventPayload(body);
+	if (!result.ok) {
+		return c.json({ error: result.error }, 400);
 	}
-
-	const payload = body as Record<string, unknown>;
-
-	// title: required, 1-200 chars
-	if (typeof payload.title !== "string" || payload.title.length === 0) {
-		return c.json({ error: "title is required" }, 400);
-	}
-	if (payload.title.length > EVENT_TITLE_MAX_LENGTH) {
-		return c.json({ error: `title must be at most ${EVENT_TITLE_MAX_LENGTH} characters` }, 400);
-	}
-
-	// body: required, valid JSON object, ≤16KB
-	if (!payload.body || typeof payload.body !== "object" || Array.isArray(payload.body)) {
-		return c.json({ error: "body must be a JSON object" }, 400);
-	}
-	const bodyStr = JSON.stringify(payload.body);
-	if (new TextEncoder().encode(bodyStr).byteLength > EVENT_BODY_MAX_BYTES) {
-		return c.json({ error: `body must be at most ${EVENT_BODY_MAX_BYTES} bytes` }, 400);
-	}
-
-	// tags: optional, ≤10 items, each ≤50 chars
-	let tags: string[] = [];
-	if (payload.tags !== undefined) {
-		if (!Array.isArray(payload.tags)) {
-			return c.json({ error: "tags must be an array" }, 400);
-		}
-		if (payload.tags.length > EVENT_TAGS_MAX_COUNT) {
-			return c.json({ error: `tags must have at most ${EVENT_TAGS_MAX_COUNT} items` }, 400);
-		}
-		for (const tag of payload.tags) {
-			if (typeof tag !== "string" || tag.length === 0 || tag.length > EVENT_TAG_MAX_LENGTH) {
-				return c.json(
-					{ error: `each tag must be a non-empty string of at most ${EVENT_TAG_MAX_LENGTH} chars` },
-					400,
-				);
-			}
-		}
-		tags = payload.tags as string[];
-	}
+	const { title, bodyStr, tags } = result;
 
 	// 4. Rate limiting — after payload validation so bad requests don't consume quota
 	const nowSeconds = Math.floor(Date.now() / 1000);
@@ -119,7 +134,7 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		db,
 		config.host_id,
 		config.id,
-		payload.title,
+		title,
 		bodyStr,
 		tags,
 		sourceIp,

@@ -1,37 +1,52 @@
 // Maintenance window CRUD — GET/PUT/DELETE /api/hosts/:id/maintenance
 // Source of truth: docs/17-maintenance-window.md § API
 
-import { hashHostId, isValidTimeHHMM } from "@bat/shared";
+import { isValidTimeHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { resolveHostRecord } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
+export interface MaintenanceBody {
+	start: string;
+	end: string;
+	reason: string | null;
+}
+
+export type MaintenanceBodyResult =
+	| { ok: true; value: MaintenanceBody }
+	| { ok: false; error: string };
+
 /**
- * Resolve the route param to a real host_id.
- * Accepts both raw host_id and 8-char hex hid.
+ * Validate PUT /api/hosts/:id/maintenance body.
+ * Returns `{ok:true, value}` on success or `{ok:false, error}` with the
+ * exact 400 error message the route would have returned.
  */
-async function resolveHostId(
-	db: D1Database,
-	id: string,
-): Promise<{ host_id: string; is_active: number } | null> {
-	const isHid = /^[0-9a-f]{8}$/.test(id);
-
-	if (!isHid) {
-		const row = await db
-			.prepare("SELECT host_id, is_active FROM hosts WHERE host_id = ?")
-			.bind(id)
-			.first<{ host_id: string; is_active: number }>();
-		return row ?? null;
+export function validateMaintenanceBody(body: unknown): MaintenanceBodyResult {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "start and end are required" };
 	}
+	const b = body as { start?: unknown; end?: unknown; reason?: unknown };
+	const { start, end, reason } = b;
 
-	const result = await db
-		.prepare("SELECT host_id, is_active FROM hosts")
-		.all<{ host_id: string; is_active: number }>();
-	for (const row of result.results) {
-		if (hashHostId(row.host_id) === id) {
-			return row;
-		}
+	if (typeof start !== "string" || typeof end !== "string" || !start || !end) {
+		return { ok: false, error: "start and end are required" };
 	}
-	return null;
+	if (!isValidTimeHHMM(start)) {
+		return { ok: false, error: `Invalid start time: ${start}` };
+	}
+	if (!isValidTimeHHMM(end)) {
+		return { ok: false, error: `Invalid end time: ${end}` };
+	}
+	if (start === end) {
+		return { ok: false, error: "start and end must be different" };
+	}
+	if (reason !== undefined && typeof reason !== "string") {
+		return { ok: false, error: "reason must be a string" };
+	}
+	if (typeof reason === "string" && reason.length > 200) {
+		return { ok: false, error: "reason must be 200 characters or fewer" };
+	}
+	return { ok: true, value: { start, end, reason: (reason as string | undefined) ?? null } };
 }
 
 /** GET /api/hosts/:id/maintenance */
@@ -39,7 +54,7 @@ export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostId(db, idParam);
+	const host = await resolveHostRecord(db, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -71,7 +86,7 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostId(db, idParam);
+	const host = await resolveHostRecord(db, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -79,41 +94,24 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 		return c.json({ error: "Host is retired" }, 403);
 	}
 
-	let body: { start?: string; end?: string; reason?: string };
+	let body: unknown;
 	try {
 		body = await c.req.json();
 	} catch {
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	const { start, end, reason } = body;
-
-	if (!(start && end)) {
-		return c.json({ error: "start and end are required" }, 400);
+	const result = validateMaintenanceBody(body);
+	if (!result.ok) {
+		return c.json({ error: result.error }, 400);
 	}
-
-	if (!isValidTimeHHMM(start)) {
-		return c.json({ error: `Invalid start time: ${start}` }, 400);
-	}
-	if (!isValidTimeHHMM(end)) {
-		return c.json({ error: `Invalid end time: ${end}` }, 400);
-	}
-	if (start === end) {
-		return c.json({ error: "start and end must be different" }, 400);
-	}
-
-	if (reason !== undefined && typeof reason !== "string") {
-		return c.json({ error: "reason must be a string" }, 400);
-	}
-	if (reason && reason.length > 200) {
-		return c.json({ error: "reason must be 200 characters or fewer" }, 400);
-	}
+	const { start, end, reason } = result.value;
 
 	await db
 		.prepare(
 			"UPDATE hosts SET maintenance_start = ?, maintenance_end = ?, maintenance_reason = ? WHERE host_id = ?",
 		)
-		.bind(start, end, reason ?? null, host.host_id)
+		.bind(start, end, reason, host.host_id)
 		.run();
 
 	return new Response(null, { status: 204 });
@@ -124,7 +122,7 @@ export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostId(db, idParam);
+	const host = await resolveHostRecord(db, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}

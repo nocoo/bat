@@ -2,6 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMe } from "@/hooks";
+import { getAvatarColor, getDisplayName } from "@/lib/avatar-color";
 import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
 import {
@@ -133,36 +134,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 
 	const handleNavigate = () => setMobileOpen(false);
 
-	// Avatar color based on email hash
-	const getAvatarColor = (email: string | null) => {
-		if (!email) {
-			return "bg-muted-foreground";
-		}
-		const colors = [
-			"bg-red-500",
-			"bg-orange-500",
-			"bg-amber-500",
-			"bg-yellow-500",
-			"bg-lime-500",
-			"bg-green-500",
-			"bg-emerald-500",
-			"bg-teal-500",
-			"bg-cyan-500",
-			"bg-sky-500",
-			"bg-blue-500",
-			"bg-indigo-500",
-			"bg-violet-500",
-			"bg-purple-500",
-			"bg-fuchsia-500",
-			"bg-pink-500",
-		];
-		const hash = email.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
-		return colors[hash % colors.length];
-	};
-
-	const userEmail = user?.email ?? null;
-	const userName = user?.name ?? userEmail?.split("@")[0] ?? "User";
-	const userInitial = userName.charAt(0).toUpperCase();
+	const { name: userName, initial: userInitial, email: userEmail } = getDisplayName(user);
 
 	return (
 		<TooltipProvider delayDuration={0}>

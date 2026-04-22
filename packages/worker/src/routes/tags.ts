@@ -16,6 +16,110 @@ import { type HostTag, MAX_TAGS_PER_HOST, TAG_COLOR_COUNT, TAG_MAX_LENGTH } from
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
+/**
+ * Validate the body of POST /api/tags.
+ * Pure (no I/O). Returns the trimmed name + optional color index, or an
+ * error string ready for a 400 response.
+ */
+export type TagCreateBody =
+	| { ok: true; name: string; color: number | null }
+	| { ok: false; error: string };
+
+export function validateTagCreateBody(body: unknown): TagCreateBody {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+	const name = typeof payload.name === "string" ? payload.name.trim() : "";
+	if (!name || name.length > TAG_MAX_LENGTH) {
+		return { ok: false, error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` };
+	}
+	const color =
+		typeof payload.color === "number" && payload.color >= 0 && payload.color < TAG_COLOR_COUNT
+			? payload.color
+			: null;
+	return { ok: true, name, color };
+}
+
+/**
+ * Validate the body of PUT /api/tags/:id (partial update).
+ * Either field may be omitted, but at least one must be provided.
+ */
+export type TagUpdateBody =
+	| { ok: true; name?: string; color?: number }
+	| { ok: false; error: string };
+
+export function validateTagUpdateBody(body: unknown): TagUpdateBody {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+	const out: { name?: string; color?: number } = {};
+	if (payload.name !== undefined) {
+		const name = typeof payload.name === "string" ? payload.name.trim() : "";
+		if (!name || name.length > TAG_MAX_LENGTH) {
+			return { ok: false, error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` };
+		}
+		out.name = name;
+	}
+	if (payload.color !== undefined) {
+		if (
+			typeof payload.color !== "number" ||
+			payload.color < 0 ||
+			payload.color >= TAG_COLOR_COUNT
+		) {
+			return { ok: false, error: `Color must be 0-${TAG_COLOR_COUNT - 1}` };
+		}
+		out.color = payload.color;
+	}
+	return { ok: true, ...out };
+}
+
+/**
+ * Parse a numeric tag id from a route param. Returns `null` on
+ * missing / non-integer input so callers can emit `400 Invalid tag ID`.
+ */
+export function parseTagId(raw: string | undefined): number | null {
+	if (!raw) {
+		return null;
+	}
+	const n = Number.parseInt(raw, 10);
+	return Number.isNaN(n) ? null : n;
+}
+
+export type HostTagAddBody = { ok: true; tag_id: number } | { ok: false; error: string };
+
+/** Validate POST /api/hosts/:id/tags body. */
+export function validateHostTagAddBody(body: unknown): HostTagAddBody {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+	if (typeof payload.tag_id !== "number") {
+		return { ok: false, error: "tag_id is required" };
+	}
+	return { ok: true, tag_id: payload.tag_id };
+}
+
+export type HostTagReplaceBody =
+	| { ok: true; tag_ids: number[] }
+	| { ok: false; error: string };
+
+/** Validate PUT /api/hosts/:id/tags body (set semantics). */
+export function validateHostTagReplaceBody(body: unknown): HostTagReplaceBody {
+	if (!body || typeof body !== "object") {
+		return { ok: false, error: "Invalid payload" };
+	}
+	const payload = body as Record<string, unknown>;
+	if (!Array.isArray(payload.tag_ids)) {
+		return { ok: false, error: "tag_ids array is required" };
+	}
+	if (payload.tag_ids.length > MAX_TAGS_PER_HOST) {
+		return { ok: false, error: `Maximum ${MAX_TAGS_PER_HOST} tags per host` };
+	}
+	return { ok: true, tag_ids: payload.tag_ids as number[] };
+}
+
 // ---------------------------------------------------------------------------
 // Tag CRUD
 // ---------------------------------------------------------------------------
@@ -47,20 +151,12 @@ export async function tagsCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
+	const validated = validateTagCreateBody(body);
+	if (!validated.ok) {
+		return c.json({ error: validated.error }, 400);
 	}
-
-	const payload = body as Record<string, unknown>;
-	const rawName = typeof payload.name === "string" ? payload.name.trim() : "";
-
-	if (!rawName || rawName.length > TAG_MAX_LENGTH) {
-		return c.json({ error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` }, 400);
-	}
-
-	// Auto-assign color (round-robin) unless specified
-	const colorProvided =
-		typeof payload.color === "number" && payload.color >= 0 && payload.color < TAG_COLOR_COUNT;
+	const { name: rawName, color } = validated;
+	const colorProvided = color !== null;
 
 	try {
 		let row: { id: number; name: string; color: number } | null;
@@ -68,7 +164,7 @@ export async function tagsCreateRoute(c: Context<AppEnv>) {
 		if (colorProvided) {
 			row = await db
 				.prepare("INSERT INTO tags (name, color) VALUES (?, ?) RETURNING id, name, color")
-				.bind(rawName, payload.color)
+				.bind(rawName, color)
 				.first<{ id: number; name: string; color: number }>();
 		} else {
 			row = await db
@@ -98,9 +194,8 @@ export async function tagsCreateRoute(c: Context<AppEnv>) {
 export async function tagsUpdateRoute(c: Context<AppEnv, "/api/tags/:id">) {
 	const db = c.env.DB;
 
-	const idParam = c.req.param("id");
-	const tagId = Number.parseInt(idParam, 10);
-	if (Number.isNaN(tagId)) {
+	const tagId = parseTagId(c.req.param("id"));
+	if (tagId === null) {
 		return c.json({ error: "Invalid tag ID" }, 400);
 	}
 
@@ -111,35 +206,23 @@ export async function tagsUpdateRoute(c: Context<AppEnv, "/api/tags/:id">) {
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
+	const validated = validateTagUpdateBody(body);
+	if (!validated.ok) {
+		return c.json({ error: validated.error }, 400);
 	}
-
-	const payload = body as Record<string, unknown>;
 
 	// Build SET clause dynamically
 	const sets: string[] = [];
 	const values: unknown[] = [];
 
-	if (payload.name !== undefined) {
-		const name = typeof payload.name === "string" ? payload.name.trim() : "";
-		if (!name || name.length > TAG_MAX_LENGTH) {
-			return c.json({ error: `Tag name must be 1-${TAG_MAX_LENGTH} characters` }, 400);
-		}
+	if (validated.name !== undefined) {
 		sets.push("name = ?");
-		values.push(name);
+		values.push(validated.name);
 	}
 
-	if (payload.color !== undefined) {
-		if (
-			typeof payload.color !== "number" ||
-			payload.color < 0 ||
-			payload.color >= TAG_COLOR_COUNT
-		) {
-			return c.json({ error: `Color must be 0-${TAG_COLOR_COUNT - 1}` }, 400);
-		}
+	if (validated.color !== undefined) {
 		sets.push("color = ?");
-		values.push(payload.color);
+		values.push(validated.color);
 	}
 
 	if (sets.length === 0) {
@@ -171,9 +254,8 @@ export async function tagsUpdateRoute(c: Context<AppEnv, "/api/tags/:id">) {
 export async function tagsDeleteRoute(c: Context<AppEnv, "/api/tags/:id">) {
 	const db = c.env.DB;
 
-	const idParam = c.req.param("id");
-	const tagId = Number.parseInt(idParam, 10);
-	if (Number.isNaN(tagId)) {
+	const tagId = parseTagId(c.req.param("id"));
+	if (tagId === null) {
 		return c.json({ error: "Invalid tag ID" }, 400);
 	}
 
@@ -247,13 +329,9 @@ export async function hostTagsAddRoute(c: Context<AppEnv, "/api/hosts/:id/tags">
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
-	}
-
-	const payload = body as Record<string, unknown>;
-	if (typeof payload.tag_id !== "number") {
-		return c.json({ error: "tag_id is required" }, 400);
+	const validated = validateHostTagAddBody(body);
+	if (!validated.ok) {
+		return c.json({ error: validated.error }, 400);
 	}
 
 	// Verify host exists
@@ -277,7 +355,7 @@ export async function hostTagsAddRoute(c: Context<AppEnv, "/api/hosts/:id/tags">
 	// Verify tag exists
 	const tag = await db
 		.prepare("SELECT id, name, color FROM tags WHERE id = ?")
-		.bind(payload.tag_id)
+		.bind(validated.tag_id)
 		.first<{ id: number; name: string; color: number }>();
 	if (!tag) {
 		return c.json({ error: "Tag not found" }, 404);
@@ -286,7 +364,7 @@ export async function hostTagsAddRoute(c: Context<AppEnv, "/api/hosts/:id/tags">
 	// Insert (ignore if already assigned)
 	await db
 		.prepare("INSERT OR IGNORE INTO host_tags (host_id, tag_id) VALUES (?, ?)")
-		.bind(hostId, payload.tag_id)
+		.bind(hostId, validated.tag_id)
 		.run();
 
 	return c.json(tag, 201);
@@ -304,19 +382,13 @@ export async function hostTagsReplaceRoute(c: Context<AppEnv, "/api/hosts/:id/ta
 		return c.json({ error: "Invalid JSON body" }, 400);
 	}
 
-	if (!body || typeof body !== "object") {
-		return c.json({ error: "Invalid payload" }, 400);
+	const validated = validateHostTagReplaceBody(body);
+	if (!validated.ok) {
+		const status = validated.error.startsWith("Maximum") ? 422 : 400;
+		return c.json({ error: validated.error }, status);
 	}
 
-	const payload = body as Record<string, unknown>;
-	if (!Array.isArray(payload.tag_ids)) {
-		return c.json({ error: "tag_ids array is required" }, 400);
-	}
-
-	const tagIds = payload.tag_ids as number[];
-	if (tagIds.length > MAX_TAGS_PER_HOST) {
-		return c.json({ error: `Maximum ${MAX_TAGS_PER_HOST} tags per host` }, 422);
-	}
+	const tagIds = validated.tag_ids;
 
 	// Verify host exists
 	const host = await db
@@ -371,10 +443,9 @@ export async function hostTagsReplaceRoute(c: Context<AppEnv, "/api/hosts/:id/ta
 export async function hostTagsRemoveRoute(c: Context<AppEnv, "/api/hosts/:id/tags/:tagId">) {
 	const db = c.env.DB;
 	const hostId = c.req.param("id");
-	const tagIdParam = c.req.param("tagId");
-	const tagId = Number.parseInt(tagIdParam, 10);
+	const tagId = parseTagId(c.req.param("tagId"));
 
-	if (Number.isNaN(tagId)) {
+	if (tagId === null) {
 		return c.json({ error: "Invalid tag ID" }, 400);
 	}
 
