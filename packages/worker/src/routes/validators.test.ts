@@ -648,12 +648,18 @@ describe("parsePortParam", () => {
 		expect(parsePortParam(undefined)).toBeNull();
 		expect(parsePortParam("")).toBeNull();
 	});
-	it("returns null for out-of-range", () => {
-		expect(parsePortParam("0")).toBeNull();
-		expect(parsePortParam("65536")).toBeNull();
-		expect(parsePortParam("-1")).toBeNull();
-	});
 	it("returns null for non-numeric", () => {
 		expect(parsePortParam("abc")).toBeNull();
+	});
+	// Wire-contract invariant: DELETE /api/hosts/:id/allowed-ports/:port
+	// rejects only non-integer params with 400. Out-of-range integers
+	// (0, negative, >65535) must pass through so the DELETE falls through
+	// to its usual 404 "Port not found in allowlist" response. Tightening
+	// the range here would be a wire-visible behaviour change.
+	it("passes through out-of-range integers (preserves 404 fall-through)", () => {
+		expect(parsePortParam("0")).toBe(0);
+		expect(parsePortParam("65536")).toBe(65536);
+		expect(parsePortParam("-1")).toBe(-1);
+		expect(parsePortParam("999999")).toBe(999999);
 	});
 });
