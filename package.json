@@ -6,6 +6,7 @@
 	"workspaces": ["packages/*"],
 	"scripts": {
 		"dev": "turbo run dev --parallel",
+		"release": "bun scripts/release.ts",
 		"build": "turbo build --filter=@bat/ui",
 		"deploy": "turbo build --filter=@bat/ui && cd packages/worker && npx wrangler deploy --env production",
 		"typecheck": "turbo typecheck",

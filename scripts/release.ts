@@ -39,7 +39,7 @@ interface VersionTarget {
 	/** Relative path from monorepo root */
 	path: string;
 	/** How to find and replace the version string */
-	pattern: "json-version" | "const-version";
+	pattern: "json-version" | "const-version" | "cargo-version";
 }
 
 const VERSION_TARGETS: VersionTarget[] = [
@@ -47,8 +47,11 @@ const VERSION_TARGETS: VersionTarget[] = [
 	{ path: "package.json", pattern: "json-version" },
 	{ path: "packages/worker/package.json", pattern: "json-version" },
 	{ path: "packages/shared/package.json", pattern: "json-version" },
+	{ path: "packages/ui/package.json", pattern: "json-version" },
 	// Source code version constants
 	{ path: "packages/shared/src/version.ts", pattern: "const-version" },
+	// Rust probe
+	{ path: "probe/Cargo.toml", pattern: "cargo-version" },
 ];
 
 const BUMP_TYPES = ["patch", "minor", "major"] as const;
@@ -213,6 +216,15 @@ function updateVersionInFile(
 			return false;
 		}
 		updated = content.replace(pattern, replacement);
+	} else if (target.pattern === "cargo-version") {
+		// Cargo.toml: `version = "x.y.z"` (unquoted key, spaces around =)
+		const escaped = oldVersion.replace(/\./g, "\\.");
+		const re = new RegExp(`^version\\s*=\\s*"${escaped}"`, "m");
+		if (!re.test(content)) {
+			console.error(`  ✗ ${target.path} — version "${oldVersion}" not found`);
+			return false;
+		}
+		updated = content.replace(re, `version = "${newVersion}"`);
 	} else {
 		// const-version: replace quoted version strings like "x.y.z"
 		const escaped = oldVersion.replace(/\./g, "\\.");
@@ -419,6 +431,15 @@ async function main(): Promise<void> {
 			console.error("❌ bun install failed");
 			process.exit(1);
 		}
+		// Sync Rust lockfile so probe/Cargo.lock matches new probe/Cargo.toml version.
+		const cargoResult = await run("cargo", ["generate-lockfile"], {
+			cwd: pathResolve(PROJECT_ROOT, "probe"),
+			inherit: true,
+		});
+		if (cargoResult.code !== 0) {
+			console.error("❌ cargo generate-lockfile failed");
+			process.exit(1);
+		}
 	}
 
 	const commits = await getCommitsSinceTag(lastTag);
@@ -463,7 +484,12 @@ async function main(): Promise<void> {
 		console.info("✅ No stale version references found.");
 	}
 
-	const filesToStage = [...VERSION_TARGETS.map((t) => t.path), "bun.lock", "CHANGELOG.md"];
+	const filesToStage = [
+		...VERSION_TARGETS.map((t) => t.path),
+		"bun.lock",
+		"probe/Cargo.lock",
+		"CHANGELOG.md",
+	];
 
 	if (isDryRun) {
 		console.info("[dry-run] Would commit and stage files.");
