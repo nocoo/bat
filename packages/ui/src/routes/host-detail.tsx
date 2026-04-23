@@ -99,14 +99,14 @@ export function HostDetailPage() {
 							{Array.from({ length: 4 }, (_, i) => (
 								<div
 									key={`chart-skeleton-${i.toString()}`}
-									className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5"
+									className="rounded-card bg-secondary p-4 md:p-5"
 								>
 									<Skeleton className="h-64 w-full" />
 								</div>
 							))}
 						</div>
 						<div className="space-y-4">
-							<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+							<div className="rounded-card bg-secondary p-4 md:p-5">
 								<Skeleton className="h-32 w-full" />
 							</div>
 						</div>
