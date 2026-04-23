@@ -111,7 +111,7 @@ export function TagsPage() {
 									placeholder="New tag name…"
 									value={newName}
 									onChange={(e) => setNewName(e.target.value)}
-									className="h-8 text-sm flex-1 rounded-md border border-border bg-background px-3 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									className="h-8 text-sm flex-1 rounded-md border border-border bg-background px-3 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 									maxLength={32}
 								/>
 								<Button
@@ -206,7 +206,7 @@ function TagRow({
 						<input
 							value={editName}
 							onChange={(e) => onEditNameChange(e.target.value)}
-							className="h-7 text-sm w-40 rounded-md border border-border bg-background px-2 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							className="h-7 text-sm w-40 rounded-md border border-border bg-background px-2 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 							maxLength={32}
 						/>
 						<Button type="submit" size="sm" variant="ghost" className="h-7 text-xs">
