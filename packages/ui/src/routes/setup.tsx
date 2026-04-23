@@ -139,7 +139,7 @@ export function SetupPage() {
 						<button
 							type="button"
 							onClick={() => setUninstallOpen(!uninstallOpen)}
-							className="w-full cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-[var(--radius-card)]"
+							className="w-full cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-card"
 						>
 							<CardHeader>
 								<CardTitle className="text-base flex items-center gap-2">

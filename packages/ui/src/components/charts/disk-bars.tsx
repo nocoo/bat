@@ -8,7 +8,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 
 	if (disks.length === 0) {
 		return (
-			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+			<div className="rounded-card bg-secondary p-4 md:p-5">
 				<div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
 					No disk data
 				</div>
@@ -17,7 +17,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	}
 
 	return (
-		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+		<div className="rounded-card bg-secondary p-4 md:p-5">
 			<div className="mb-3 flex items-center gap-2 text-base font-semibold">
 				<HardDrive className="h-4 w-4" />
 				Disk Usage
