@@ -35,7 +35,7 @@ export function useMaintenanceAreas(
 
 /** Card wrapper used by every chart (consistent padding + radius). */
 export function ChartCard({ children }: { children: ReactNode }) {
-	return <div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">{children}</div>;
+	return <div className="rounded-card bg-secondary p-4 md:p-5">{children}</div>;
 }
 
 /** "No X data" placeholder rendered inside a {@link ChartCard}. */

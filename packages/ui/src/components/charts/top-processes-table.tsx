@@ -75,7 +75,7 @@ export function TopProcessesTable({
 	if (processes.length === 0) {
 		const isHourly = resolution === "hourly";
 		return (
-			<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+			<div className="rounded-card bg-secondary p-4 md:p-5">
 				<div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-1">
 					<span>
 						{isHourly
@@ -91,7 +91,7 @@ export function TopProcessesTable({
 	const thBase = "px-2 py-1.5 text-right font-medium";
 
 	return (
-		<div className="rounded-[var(--radius-card)] bg-secondary p-4 md:p-5">
+		<div className="rounded-card bg-secondary p-4 md:p-5">
 			<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 				<div className="flex items-center gap-2 text-base font-semibold">
 					<Activity className="h-4 w-4" />
@@ -103,7 +103,7 @@ export function TopProcessesTable({
 					placeholder="Filter by name, cmd, user…"
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
-					className="h-7 w-48 rounded border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+					className="h-7 w-48 rounded border border-border bg-background px-2 text-xs hover:border-foreground/20 disabled:hover:border-transparent focus:outline-none focus:ring-1 focus:ring-ring"
 				/>
 			</div>
 
