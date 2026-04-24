@@ -149,7 +149,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 					/* ── Collapsed (icon-only) view ── */
 					<div className="flex h-screen w-[68px] flex-col items-center">
 						{/* Logo */}
-						<div className="flex h-14 w-full items-center justify-center">
+						<div className="flex h-14 w-full items-center justify-start pl-6 pr-3">
 							<img src="/logo-24.png" alt="bat" width={24} height={24} className="rounded-sm" />
 						</div>
 
