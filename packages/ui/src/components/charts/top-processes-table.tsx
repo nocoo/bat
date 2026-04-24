@@ -175,7 +175,7 @@ export function TopProcessesTable({
 					</thead>
 					<tbody>
 						{sorted.map((p) => (
-							<tr key={p.pid} className="border-b border-border/50 hover:bg-muted/30">
+							<tr key={p.pid} className="border-b border-border/50 hover:bg-background/50">
 								<td className="px-2 py-1 font-mono tabular-nums text-muted-foreground">{p.pid}</td>
 								<td className="px-2 py-1 truncate max-w-[120px]" title={p.cmd}>
 									{p.name}
