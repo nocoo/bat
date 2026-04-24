@@ -131,10 +131,12 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
 
 ### Release checklist
 
-1. Bump version in root `package.json`, run `scripts/sync-version.sh`, then `cd probe && cargo generate-lockfile`
-2. Build UI: `cd packages/ui && bun run build`
-3. Build probe binaries for both architectures (see above)
-4. Upload binaries to R2 (`zhe` bucket) — **both** versioned and latest:
+**Worker + UI 部署已自动化**（P0，2026-04）：tag `v*.*.*` push 触发 `.github/workflows/release.yml`，自动跑 build → D1 migrate → wrangler deploy → verify `/api/live`。Probe 二进制 / R2 / VPS 仍手动（待 P1/P2）。
+
+GitHub Secrets 依赖：`CLOUDFLARE_API_TOKEN`（Workers Edit + D1 Edit）、`CLOUDFLARE_ACCOUNT_ID`。
+
+1. **发版（自动）**：`bun run release` — 同步版本号、CHANGELOG、commit、push、tag、GitHub Release。tag push 后 CI 自动部署 Worker+UI。
+2. **Probe 二进制（手动）**：本地 docker 交叉编译（见上），上传 R2：
    ```bash
    VERSION=$(jq -r .version package.json)
    wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
@@ -144,13 +146,13 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
    ```
    - Public URL prefix: `https://s.zhe.to/apps/bat/`
    - `install.sh` fetches from `latest/` by default — no script changes needed per release
-5. Apply D1 migrations (if any): `cd packages/worker && npx wrangler d1 migrations apply bat-db --remote --env production`
-6. Deploy Worker (includes UI): `cd packages/worker && npx wrangler deploy --env production`
-7. Upgrade probes on VPS fleet (see upgrade command below)
-8. Verify:
+3. **VPS 升级（手动）**：见下文 upgrade 命令
+4. **验证**：
+   - GH Actions Run 通过（Worker verify 已在 workflow 内做了一次 `/api/live` 校验）
    - `curl -sI https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64` → 200
-   - `curl -s https://bat-ingest.worker.hexly.ai/api/live | jq .version` → new version
    - Browser: `https://bat.hexly.ai` → Access login → dashboard loads
+
+**故障回滚**：`cd packages/worker && npx wrangler rollback --env production`，或在 Cloudflare 控制台选老版本。
 
 ### Installation
 

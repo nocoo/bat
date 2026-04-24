@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.1
+
+### Changed
+- Apply biome useBlockStatements fixes for base-ci v2026.1
+
+### Fixed
+- Anchor collapsed sidebar logo to prevent jitter
+- Replace bg-muted with B05 background tokens in table components
+- Use rounded-card utility instead of arbitrary value
+- Add hover border to L3 input controls
+
 ## v1.1.0
 
 ### Changed
