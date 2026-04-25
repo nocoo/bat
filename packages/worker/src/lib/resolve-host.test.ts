@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { hashHostId } from "@bat/shared";
 import { isOpaqueHid, resolveHostIdByHash, resolveHostRecord } from "./resolve-host";
 

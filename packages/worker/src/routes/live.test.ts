@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { BAT_VERSION, type LiveResponse } from "@bat/shared";
 import { Hono } from "hono";
 import type { AppEnv } from "../types";

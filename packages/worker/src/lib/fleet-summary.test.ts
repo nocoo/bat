@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { HostStatus } from "@bat/shared";
 import { summarizeHostStatuses } from "./fleet-summary";
 

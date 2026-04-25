@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { deriveHostStatus } from "./status";
 
 // UTC anchor: 2026-04-20T18:00:00Z = 1776708000

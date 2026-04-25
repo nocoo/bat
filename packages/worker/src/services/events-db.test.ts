@@ -1,7 +1,7 @@
 // DB-level integration tests for services/events — exercises the rate limiter,
 // token lookup, event insert, and webhook CRUD helpers against the SQLite-backed
 // mock D1.
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import {
 	checkRateLimit,

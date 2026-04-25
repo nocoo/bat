@@ -1,54 +1,60 @@
-// Mock D1 database backed by bun:sqlite for tests
-import { Database } from "bun:sqlite";
+// Mock D1 database backed by better-sqlite3 for tests
+import BetterSqlite3 from "better-sqlite3";
 import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const MIGRATION_PATH = resolve(import.meta.dir, "../../migrations/0001_initial.sql");
-const MIGRATION_TIER2_PATH = resolve(import.meta.dir, "../../migrations/0003_tier2_tables.sql");
-const MIGRATION_TIER3_PATH = resolve(import.meta.dir, "../../migrations/0004_tier3_columns.sql");
+type Database = BetterSqlite3.Database;
+const Database = BetterSqlite3;
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const MIGRATION_PATH = resolve(__dirname, "../../migrations/0001_initial.sql");
+const MIGRATION_TIER2_PATH = resolve(__dirname, "../../migrations/0003_tier2_tables.sql");
+const MIGRATION_TIER3_PATH = resolve(__dirname, "../../migrations/0004_tier3_columns.sql");
 const MIGRATION_INVENTORY_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0005_host_inventory.sql",
 );
-const MIGRATION_PUBLIC_IP_PATH = resolve(import.meta.dir, "../../migrations/0006_public_ip.sql");
+const MIGRATION_PUBLIC_IP_PATH = resolve(__dirname, "../../migrations/0006_public_ip.sql");
 const MIGRATION_PROBE_VERSION_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0007_probe_version.sql",
 );
 const MIGRATION_SIGNAL_EXPANSION_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0008_signal_expansion.sql",
 );
 const MIGRATION_SIGNAL_EXPANSION_HOURLY_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0009_signal_expansion_hourly.sql",
 );
 const MIGRATION_SOFTWARE_COLUMN_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0011_software_column.sql",
 );
 const MIGRATION_PORT_ALLOWLIST_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0012_port_allowlist.sql",
 );
 const MIGRATION_HOST_EVENTS_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0013_host_events.sql",
 );
 const MIGRATION_EVENTS_FK_SET_NULL_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0014_events_fk_set_null.sql",
 );
 const MIGRATION_TOP_PROCESSES_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0015_top_processes.sql",
 );
-const MIGRATION_WEBSITES_PATH = resolve(import.meta.dir, "../../migrations/0016_websites.sql");
+const MIGRATION_WEBSITES_PATH = resolve(__dirname, "../../migrations/0016_websites.sql");
 const MIGRATION_MAINTENANCE_PATH = resolve(
-	import.meta.dir,
+	__dirname,
 	"../../migrations/0017_maintenance_window.sql",
 );
-const MIGRATION_TAGS_PATH = resolve(import.meta.dir, "../../migrations/0010_tags.sql");
+const MIGRATION_TAGS_PATH = resolve(__dirname, "../../migrations/0010_tags.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -125,9 +131,10 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 
 	async raw<T = unknown[]>(options?: { columnNames?: boolean }): Promise<T[]> {
 		const stmt = this.#db.prepare(this.#sql);
-		const rows = stmt.values(...this.#bindings);
+		stmt.raw(true);
+		const rows = stmt.all(...this.#bindings) as unknown[][];
 		if (options?.columnNames) {
-			const columns = stmt.columnNames;
+			const columns = stmt.columns().map((c) => c.name);
 			return [columns as unknown as T, ...(rows as T[])];
 		}
 		return rows as T[];
@@ -141,12 +148,12 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 export function createMockD1(): D1Database {
 	const db = new Database(":memory:");
 	// WAL mode not needed for in-memory, but matches production
-	db.run("PRAGMA journal_mode = WAL");
-	db.run("PRAGMA foreign_keys = ON");
+	db.exec("PRAGMA journal_mode = WAL");
+	db.exec("PRAGMA foreign_keys = ON");
 
 	// Apply migration schema
 	const schema = readFileSync(MIGRATION_PATH, "utf-8");
-	db.run(schema);
+	db.exec(schema);
 
 	// Apply Tier 2 migration
 	const tier2Schema = readFileSync(MIGRATION_TIER2_PATH, "utf-8");
@@ -155,7 +162,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply Tier 3 migration
@@ -164,7 +171,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply host inventory migration
@@ -173,7 +180,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply public_ip migration
@@ -182,7 +189,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply probe_version migration
@@ -191,7 +198,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply signal expansion migration (metrics_raw)
@@ -200,7 +207,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply signal expansion migration (metrics_hourly)
@@ -209,7 +216,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply software column migration (tier2_snapshots)
@@ -218,7 +225,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply port allowlist migration
@@ -227,7 +234,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply host events migration
@@ -236,7 +243,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply events FK set null migration
@@ -245,7 +252,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply top_processes migration
@@ -254,7 +261,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply websites migration
@@ -263,7 +270,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply maintenance window migration
@@ -272,7 +279,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	// Apply tags migration
@@ -281,7 +288,7 @@ export function createMockD1(): D1Database {
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
-		db.run(`${stmt};`);
+		db.exec(`${stmt};`);
 	}
 
 	return {
@@ -290,7 +297,7 @@ export function createMockD1(): D1Database {
 		},
 
 		async exec(sql: string): Promise<D1ExecResult> {
-			db.run(sql);
+			db.exec(sql);
 			return {
 				count: 1,
 				duration: 0,

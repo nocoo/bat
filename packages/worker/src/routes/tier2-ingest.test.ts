@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import type { Tier2Payload } from "@bat/shared";
 import { Hono } from "hono";
 import { createMockD1 } from "../test-helpers/mock-d1";
@@ -84,7 +84,7 @@ describe("POST /api/tier2", () => {
 
 		// Verify JSON columns
 		const portsJson = JSON.parse(snapshot?.ports_json as string);
-		expect(portsJson.listening).toBeArray();
+		expect(portsJson.listening).toBeInstanceOf(Array);
 		expect(portsJson.listening.length).toBe(2);
 		expect(portsJson.listening[0].port).toBe(22);
 
@@ -176,7 +176,7 @@ describe("POST /api/tier2", () => {
 		expect(snapshot?.websites_json).not.toBeNull();
 
 		const parsed = JSON.parse(snapshot?.websites_json as string);
-		expect(parsed.sites).toBeArray();
+		expect(parsed.sites).toBeInstanceOf(Array);
 		expect(parsed.sites.length).toBe(2);
 		expect(parsed.sites[0].domain).toBe("example.com");
 		expect(parsed.sites[0].web_server).toBe("nginx");

@@ -2,7 +2,7 @@
 // classification helpers. The full middleware is covered by the integration
 // suite in api-key.test.ts; this file pins down the precise routing table.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { isMachineReadRoute, isWriteRequest } from "./api-key";
 
 describe("isWriteRequest — probe ingest", () => {

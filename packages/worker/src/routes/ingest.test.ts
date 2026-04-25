@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import type { MetricsPayload } from "@bat/shared";
 import { Hono } from "hono";
 import { createMockD1 } from "../test-helpers/mock-d1";
@@ -111,11 +111,11 @@ describe("POST /api/ingest", () => {
 
 		// Verify disk/net are JSON strings
 		const diskJson = JSON.parse(metrics?.disk_json as string);
-		expect(diskJson).toBeArray();
+		expect(diskJson).toBeInstanceOf(Array);
 		expect(diskJson[0].mount).toBe("/");
 
 		const netJson = JSON.parse(metrics?.net_json as string);
-		expect(netJson).toBeArray();
+		expect(netJson).toBeInstanceOf(Array);
 		expect(netJson[0].iface).toBe("eth0");
 	});
 
@@ -357,7 +357,7 @@ describe("POST /api/ingest", () => {
 
 		// Disk I/O
 		const diskIo = JSON.parse(row?.disk_io_json as string);
-		expect(diskIo).toBeArray();
+		expect(diskIo).toBeInstanceOf(Array);
 		expect(diskIo[0].device).toBe("sda");
 		expect(diskIo[0].io_util_pct).toBe(3.2);
 

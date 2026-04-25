@@ -1,5 +1,5 @@
 // Worker integration tests — full request lifecycle through Hono app with mock D1
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/shared";
 import { Hono } from "hono";
 import { apiKeyAuth } from "../../src/middleware/api-key";

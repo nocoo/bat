@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { type Tier2Row, rowToTier2Snapshot } from "./tier2-metrics";
 
 const emptyRow: Tier2Row = {
