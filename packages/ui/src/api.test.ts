@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { ApiError, buildUrl, deleteAPI, getAPI, postAPI, putAPI } from "./api";
 
 // Minimal fetch stub — records every call and returns a configurable Response.
