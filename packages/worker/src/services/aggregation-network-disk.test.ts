@@ -1,5 +1,5 @@
 // Unit tests for pure aggregation helpers: aggregateNetwork + aggregateDiskIo.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { aggregateDiskIo, aggregateNetwork } from "./aggregation.js";
 
 // These helpers only read a tiny slice of the full RawRow; cast partials.

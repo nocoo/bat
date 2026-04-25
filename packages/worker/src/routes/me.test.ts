@@ -1,5 +1,5 @@
 // Tests for /api/me — Access JWT payload decode + anonymous fallback.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { decodeJwtPayload, meRoute } from "./me";
 
 function b64url(obj: unknown): string {

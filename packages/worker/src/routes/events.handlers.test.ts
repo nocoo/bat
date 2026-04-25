@@ -1,5 +1,5 @@
 // Handler-level tests for /api/events (list + ingest).
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import { Hono } from "hono";
 import { createWebhookConfig } from "../services/events";
 import { createMockD1 } from "../test-helpers/mock-d1";

@@ -13,7 +13,7 @@
 //   4. Runs test cases against http://localhost:18787
 //   5. Tears down the server and cleans up on exit
 
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {

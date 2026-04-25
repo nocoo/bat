@@ -2,7 +2,7 @@
 // These helpers were untested before — split into their own sibling test file
 // so the existing monitoring.test.ts (HTTP-level integration) stays focused.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { HostStatus } from "@bat/shared";
 import {
 	type AlertRow,

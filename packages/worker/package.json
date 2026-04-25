@@ -7,8 +7,9 @@
 		"dev": "wrangler dev",
 		"build": "wrangler deploy --dry-run --outdir=dist",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test src/",
-		"test:unit:coverage": "bun test --coverage src/",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:unit:coverage": "vitest run --coverage",
 		"test:integration": "bun test test/integration/",
 		"test:e2e": "bun test test/e2e/",
 		"deploy": "wrangler deploy"

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import { hashHostId } from "@bat/shared";
 import type { Tier2Snapshot } from "@bat/shared";
 import { Hono } from "hono";
@@ -174,7 +174,7 @@ describe("GET /api/hosts/:id/tier2", () => {
 
 		const body = (await res.json()) as Tier2Snapshot;
 		expect(body.websites).not.toBeNull();
-		expect(body.websites?.sites).toBeArray();
+		expect(body.websites?.sites).toBeInstanceOf(Array);
 		expect(body.websites?.sites.length).toBe(2);
 		expect(body.websites?.sites[0].domain).toBe("example.com");
 		expect(body.websites?.sites[0].web_server).toBe("nginx");
