@@ -1,84 +1,37 @@
 #!/usr/bin/env bash
-# Check coverage for TypeScript packages (bun) and Rust probe (cargo-llvm-cov)
+# Check coverage for TypeScript packages (vitest) and Rust probe (cargo-llvm-cov)
 # Fails if any package drops below the threshold
 set -euo pipefail
 
-THRESHOLD="${1:-90}"
-RUST_THRESHOLD="${2:-$THRESHOLD}"
+THRESHOLD="${1:-95}"
+RUST_THRESHOLD="${2:-90}"
 
+# Parse the vitest v8 coverage "All files" row.
+# Format:
+#   File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
+#   All files  |  98.11  |  95.06   |  99.34  |  98.01  |
+#
+# We check line coverage (column 5).
 check_ts_coverage() {
   local pkg="$1"
   local output="$2"
-  local scope="${3:-all}"  # "all" uses All files line, "lib" calculates from src/lib/ lines
 
-  if [ "$scope" = "lib" ]; then
-    # Calculate weighted average of line coverage for src/lib/ files only
-    # (UI thin shells — page.tsx, layout.tsx, components — are exempt per quality system)
-    local total_lines=0
-    local covered_lines=0
-    while IFS='|' read -r file funcs lines uncovered; do
-      file=$(echo "$file" | tr -d ' ')
-      lines=$(echo "$lines" | tr -d ' ')
-      # Skip empty lines or header
-      if [[ -z "$lines" ]] || [[ "$lines" == *"Lines"* ]]; then
-        continue
-      fi
-      if [[ "$file" == src/lib/* ]] || [[ "$file" == src/hooks/* ]]; then
-        # Estimate: assume 100 lines per file as proxy weight, then apply percentage
-        # Since bun doesn't output absolute line counts, use the "All files" approach
-        # on a filtered test run instead
-        total_lines=1
-        covered_lines=1
-      fi
-    done <<< "$output"
-
-    # Simpler approach: re-parse the lib-specific lines from the full coverage output
-    # and compute average coverage
-    local sum=0
-    local count=0
-    while IFS='|' read -r file funcs lines uncovered; do
-      file=$(echo "$file" | tr -d ' ')
-      lines=$(echo "$lines" | tr -d ' ')
-      if [[ -z "$lines" ]] || [[ "$lines" == *"Lines"* ]] || [[ "$lines" == *"---"* ]]; then
-        continue
-      fi
-      if [[ "$file" == src/lib/* ]] || [[ "$file" == src/hooks/* ]]; then
-        sum=$(echo "$sum + $lines" | bc)
-        count=$((count + 1))
-      fi
-    done <<< "$output"
-
-    if [ "$count" -eq 0 ]; then
-      echo "✘ ${pkg}: no lib coverage data found (FAIL)"
-      return 1
-    fi
-
-    local coverage
-    coverage=$(echo "scale=2; $sum / $count" | bc)
-    local int_coverage
-    int_coverage=$(echo "$coverage" | cut -d. -f1)
-
-    if [ "$int_coverage" -lt "$THRESHOLD" ]; then
-      echo "✘ ${pkg}: lib coverage ${coverage}% < ${THRESHOLD}% threshold (${count} files)"
-      return 1
-    fi
-
-    echo "✔ ${pkg}: lib coverage ${coverage}% ≥ ${THRESHOLD}% (${count} files)"
-    return 0
-  fi
-
-  # Default: use "All files" summary line
-  # bun test --coverage outputs: All files | % Funcs | % Lines | Uncovered
-  # We check line coverage (column 3)
+  # Preferred: parse the "Lines : X% (Y/Z)" line from the coverage summary,
+  # which is printed whether or not any per-file rows are present.
   local coverage
-  coverage=$(echo "$output" | grep -E "^All files" | awk -F'|' '{print $3}' | tr -d ' ' | head -1)
+  coverage=$(echo "$output" | grep -E "^Lines\s*:" | awk -F'[:%]' '{print $2}' | tr -d ' ' | head -1)
+
+  # Fallback: parse the "All files" row (only present when at least one file
+  # has < 100% coverage).
+  if [ -z "$coverage" ]; then
+    coverage=$(echo "$output" | grep -E "^All files" | awk -F'|' '{print $5}' | tr -d ' ' | head -1)
+  fi
 
   if [ -z "$coverage" ]; then
     echo "✘ ${pkg}: no coverage data found (FAIL — cannot verify threshold)"
     return 1
   fi
 
-  # Compare as integers (floor)
   local int_coverage
   int_coverage=$(echo "$coverage" | cut -d. -f1)
 
@@ -121,13 +74,12 @@ echo "---"
 
 failed=0
 
-# TypeScript packages — run bun test directly in each package dir
-# (bun --filter ... test -- --coverage breaks: bun treats --coverage after -- as a file filter)
-for pkg in shared worker; do
+# TypeScript packages — run vitest in each package dir
+for pkg in shared worker ui; do
   pkg_dir="packages/${pkg}"
   filter="@bat/${pkg}"
 
-  output=$(cd "$pkg_dir" && bun test --coverage 2>&1) || true
+  output=$(cd "$pkg_dir" && npx vitest run --coverage 2>&1) || true
   if ! check_ts_coverage "$filter" "$output"; then
     failed=1
   fi
