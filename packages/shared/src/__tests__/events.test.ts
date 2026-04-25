@@ -2,8 +2,8 @@ import { describe, expect, test } from "vitest";
 import {
 	EVENT_BODY_MAX_BYTES,
 	EVENT_RETENTION_DAYS,
-	EVENT_TAG_MAX_LENGTH,
 	EVENT_TAGS_MAX_COUNT,
+	EVENT_TAG_MAX_LENGTH,
 	EVENT_TITLE_MAX_LENGTH,
 } from "../events";
 

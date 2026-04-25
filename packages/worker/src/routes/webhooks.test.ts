@@ -1,6 +1,6 @@
+import type { WebhookConfigRow } from "@bat/shared";
 // Unit tests for the pure DTO shaper in webhooks route.
 import { describe, expect, test } from "vitest";
-import type { WebhookConfigRow } from "@bat/shared";
 import { toWebhookConfig } from "./webhooks";
 
 const baseRow: WebhookConfigRow = {

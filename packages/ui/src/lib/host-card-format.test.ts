@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
+import { describe, expect, test } from "vitest";
 import {
 	buildSubtitle,
 	formatCpuTopology,

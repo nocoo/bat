@@ -13,7 +13,6 @@
 //   4. Runs test cases against http://localhost:18787
 //   5. Tears down the server and cleans up on exit
 
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
@@ -28,6 +27,7 @@ import type {
 	WebhookConfig,
 } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 const PORT = 18787;
 const BASE = `http://localhost:${PORT}`;

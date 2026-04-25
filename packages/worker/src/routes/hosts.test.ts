@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, test } from "vitest";
 import type { HostOverviewItem } from "@bat/shared";
 import { Hono } from "hono";
+import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import { hostsListRoute } from "./hosts";

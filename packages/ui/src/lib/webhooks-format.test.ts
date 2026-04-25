@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import type { HostOverviewItem, WebhookConfig } from "@bat/shared";
+import { describe, expect, test } from "vitest";
 import {
 	buildCurlCommand,
 	displayWebhookHostname,

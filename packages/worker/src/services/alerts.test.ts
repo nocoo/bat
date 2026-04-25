@@ -1,4 +1,3 @@
-import { beforeEach, describe, expect, test } from "vitest";
 import type {
 	ConntrackMetrics,
 	DiskIoMetric,
@@ -10,6 +9,7 @@ import type {
 	SoftnetMetrics,
 	TcpMetrics,
 } from "@bat/shared";
+import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateAlerts, evaluateRules } from "./alerts";
 

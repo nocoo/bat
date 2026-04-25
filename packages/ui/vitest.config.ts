@@ -1,26 +1,26 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
 	test: {
 		globals: true,
-		include: ['src/**/*.test.ts'],
+		include: ["src/**/*.test.ts"],
 		coverage: {
-			provider: 'v8',
-			reporter: ['text', 'json', 'html'],
-			include: ['src/**/*.ts'],
+			provider: "v8",
+			reporter: ["text", "json", "html"],
+			include: ["src/**/*.ts"],
 			exclude: [
-				'src/**/*.test.ts',
-				'src/**/*.d.ts',
-				'src/**/index.ts',
+				"src/**/*.test.ts",
+				"src/**/*.d.ts",
+				"src/**/index.ts",
 				// React components and entry points are exempt from coverage;
 				// only lib/ logic is tested.
-				'src/**/*.tsx',
-				'src/main.tsx',
-				'src/App.tsx',
-				'src/components/**',
-				'src/routes/**',
+				"src/**/*.tsx",
+				"src/main.tsx",
+				"src/App.tsx",
+				"src/components/**",
+				"src/routes/**",
 				// Hooks are thin SWR/React wrappers tested via e2e instead.
-				'src/hooks/**',
+				"src/hooks/**",
 			],
 			thresholds: {
 				lines: 95,
