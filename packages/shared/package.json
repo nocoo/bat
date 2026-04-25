@@ -14,9 +14,9 @@
 	"scripts": {
 		"build": "tsc",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test",
-		"test:coverage": "bun test --coverage",
-		"test:unit:coverage": "bun test --coverage"
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:unit:coverage": "vitest run --coverage"
 	},
 	"devDependencies": {
 		"typescript": "^5.8.2"

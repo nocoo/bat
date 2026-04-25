@@ -1,5 +1,5 @@
 // @bat/shared — Maintenance window utility tests
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { isInMaintenanceWindow, isValidTimeHHMM, toUtcHHMM } from "./maintenance.js";
 
 describe("isValidTimeHHMM", () => {
