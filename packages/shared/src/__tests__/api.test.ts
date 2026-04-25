@@ -1,5 +1,5 @@
 // @bat/shared — api.ts tests (hashHostId, route constants)
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
 	API_ROUTES,
 	MAX_ALLOWED_PORTS_PER_HOST,

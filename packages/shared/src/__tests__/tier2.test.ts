@@ -1,5 +1,5 @@
 // @bat/shared — Tier 2 type compile-time validation tests
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type {
 	DiskDeepScanData,
 	DockerContainer,
