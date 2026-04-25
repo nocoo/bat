@@ -1,8 +1,8 @@
-// Mock D1 database backed by better-sqlite3 for tests
-import BetterSqlite3 from "better-sqlite3";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// Mock D1 database backed by better-sqlite3 for tests
+import BetterSqlite3 from "better-sqlite3";
 
 type Database = BetterSqlite3.Database;
 const Database = BetterSqlite3;
@@ -12,15 +12,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATION_PATH = resolve(__dirname, "../../migrations/0001_initial.sql");
 const MIGRATION_TIER2_PATH = resolve(__dirname, "../../migrations/0003_tier2_tables.sql");
 const MIGRATION_TIER3_PATH = resolve(__dirname, "../../migrations/0004_tier3_columns.sql");
-const MIGRATION_INVENTORY_PATH = resolve(
-	__dirname,
-	"../../migrations/0005_host_inventory.sql",
-);
+const MIGRATION_INVENTORY_PATH = resolve(__dirname, "../../migrations/0005_host_inventory.sql");
 const MIGRATION_PUBLIC_IP_PATH = resolve(__dirname, "../../migrations/0006_public_ip.sql");
-const MIGRATION_PROBE_VERSION_PATH = resolve(
-	__dirname,
-	"../../migrations/0007_probe_version.sql",
-);
+const MIGRATION_PROBE_VERSION_PATH = resolve(__dirname, "../../migrations/0007_probe_version.sql");
 const MIGRATION_SIGNAL_EXPANSION_PATH = resolve(
 	__dirname,
 	"../../migrations/0008_signal_expansion.sql",
@@ -37,18 +31,12 @@ const MIGRATION_PORT_ALLOWLIST_PATH = resolve(
 	__dirname,
 	"../../migrations/0012_port_allowlist.sql",
 );
-const MIGRATION_HOST_EVENTS_PATH = resolve(
-	__dirname,
-	"../../migrations/0013_host_events.sql",
-);
+const MIGRATION_HOST_EVENTS_PATH = resolve(__dirname, "../../migrations/0013_host_events.sql");
 const MIGRATION_EVENTS_FK_SET_NULL_PATH = resolve(
 	__dirname,
 	"../../migrations/0014_events_fk_set_null.sql",
 );
-const MIGRATION_TOP_PROCESSES_PATH = resolve(
-	__dirname,
-	"../../migrations/0015_top_processes.sql",
-);
+const MIGRATION_TOP_PROCESSES_PATH = resolve(__dirname, "../../migrations/0015_top_processes.sql");
 const MIGRATION_WEBSITES_PATH = resolve(__dirname, "../../migrations/0016_websites.sql");
 const MIGRATION_MAINTENANCE_PATH = resolve(
 	__dirname,

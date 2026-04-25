@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import { hashHostId } from "@bat/shared";
+import { describe, expect, test } from "vitest";
 import { isOpaqueHid, resolveHostIdByHash, resolveHostRecord } from "./resolve-host";
 
 describe("isOpaqueHid", () => {

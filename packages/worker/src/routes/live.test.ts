@@ -1,6 +1,6 @@
-import { describe, expect, test } from "vitest";
 import { BAT_VERSION, type LiveResponse } from "@bat/shared";
 import { Hono } from "hono";
+import { describe, expect, test } from "vitest";
 import type { AppEnv } from "../types";
 import { liveRoute } from "./live";
 

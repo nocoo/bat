@@ -1,7 +1,7 @@
-// Worker integration tests — full request lifecycle through Hono app with mock D1
-import { beforeEach, describe, expect, test } from "vitest";
 import type { AlertItem, HostOverviewItem, MetricsQueryResponse } from "@bat/shared";
 import { Hono } from "hono";
+// Worker integration tests — full request lifecycle through Hono app with mock D1
+import { beforeEach, describe, expect, test } from "vitest";
 import { apiKeyAuth } from "../../src/middleware/api-key";
 import { alertsListRoute } from "../../src/routes/alerts";
 import { fleetStatusRoute } from "../../src/routes/fleet-status";

@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import type { HostStatus } from "@bat/shared";
+import { describe, expect, test } from "vitest";
 import { summarizeHostStatuses } from "./fleet-summary";
 
 describe("summarizeHostStatuses", () => {

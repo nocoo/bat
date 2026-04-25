@@ -1,7 +1,7 @@
 // Unit tests for access-auth middleware
 
-import { describe, expect, test } from "vitest";
 import { Hono } from "hono";
+import { describe, expect, test } from "vitest";
 import type { AppEnv } from "../types.js";
 import { accessAuth } from "./access-auth.js";
 

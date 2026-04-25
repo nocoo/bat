@@ -1,7 +1,7 @@
 // Unit tests for entry-control middleware
 
-import { describe, expect, test } from "vitest";
 import { Hono } from "hono";
+import { describe, expect, test } from "vitest";
 import type { AppEnv } from "../types.js";
 import { entryControl, isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
