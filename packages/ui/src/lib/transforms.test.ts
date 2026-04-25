@@ -1,5 +1,5 @@
-import { describe, expect, test } from "vitest";
 import type { MetricsDataPoint } from "@bat/shared";
+import { describe, expect, test } from "vitest";
 import {
 	formatBytes,
 	formatBytesRate,

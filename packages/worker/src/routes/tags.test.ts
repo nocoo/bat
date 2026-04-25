@@ -18,12 +18,15 @@ import {
 	validateTagUpdateBody,
 } from "./tags.js";
 
-function makeCtx(db: D1Database, opts: {
-	params?: Record<string, string>;
-	body?: unknown;
-	bodyRaw?: string;
-} = {}) {
-	const hasBody = opts.body !== undefined || opts.bodyRaw !== undefined;
+function makeCtx(
+	db: D1Database,
+	opts: {
+		params?: Record<string, string>;
+		body?: unknown;
+		bodyRaw?: string;
+	} = {},
+) {
+	const _hasBody = opts.body !== undefined || opts.bodyRaw !== undefined;
 	return {
 		env: { DB: db },
 		req: {
@@ -32,7 +35,9 @@ function makeCtx(db: D1Database, opts: {
 				if (opts.bodyRaw !== undefined) {
 					return JSON.parse(opts.bodyRaw);
 				}
-				if (opts.body === undefined) throw new Error("No body");
+				if (opts.body === undefined) {
+					throw new Error("No body");
+				}
 				return opts.body;
 			},
 			method: "POST",
@@ -43,7 +48,7 @@ function makeCtx(db: D1Database, opts: {
 				headers: { "Content-Type": "application/json" },
 			}),
 		body: (_data: unknown, status?: number) => new Response(null, { status: status ?? 200 }),
-	// biome-ignore lint/suspicious/noExplicitAny: test helper context
+		// biome-ignore lint/suspicious/noExplicitAny: test helper context
 	} as any;
 }
 
@@ -59,12 +64,16 @@ describe("tag validation helpers", () => {
 	test("validateTagCreateBody accepts valid name, clamps color to null when invalid", () => {
 		const r = validateTagCreateBody({ name: "prod", color: "bad" });
 		expect(r.ok).toBe(true);
-		if (r.ok) expect(r.color).toBe(null);
+		if (r.ok) {
+			expect(r.color).toBe(null);
+		}
 	});
 	test("validateTagCreateBody keeps valid color", () => {
 		const r = validateTagCreateBody({ name: "prod", color: 2 });
 		expect(r.ok).toBe(true);
-		if (r.ok) expect(r.color).toBe(2);
+		if (r.ok) {
+			expect(r.color).toBe(2);
+		}
 	});
 
 	test("validateTagUpdateBody rejects non-object", () => {
@@ -128,7 +137,12 @@ describe("tag CRUD routes", () => {
 	test("create tag with auto color", async () => {
 		const res = await tagsCreateRoute(makeCtx(db, { body: { name: "prod" } }));
 		expect(res.status).toBe(201);
-		const body = await res.json() as { id: number; name: string; color: number; host_count: number };
+		const body = (await res.json()) as {
+			id: number;
+			name: string;
+			color: number;
+			host_count: number;
+		};
 		expect(body.name).toBe("prod");
 		expect(body.host_count).toBe(0);
 	});
@@ -136,16 +150,21 @@ describe("tag CRUD routes", () => {
 	test("create tag with explicit color", async () => {
 		const res = await tagsCreateRoute(makeCtx(db, { body: { name: "prod", color: 3 } }));
 		expect(res.status).toBe(201);
-		const body = await res.json() as { color: number };
+		const body = (await res.json()) as { color: number };
 		expect(body.color).toBe(3);
 	});
 
 	test("create tag rejects invalid JSON body", async () => {
 		const ctx = {
 			env: { DB: db },
-			req: { json: async () => { throw new Error("bad"); }, param: () => "" },
+			req: {
+				json: async () => {
+					throw new Error("bad");
+				},
+				param: () => "",
+			},
 			json: (d: unknown, s?: number) => new Response(JSON.stringify(d), { status: s ?? 200 }),
-		// biome-ignore lint/suspicious/noExplicitAny: test
+			// biome-ignore lint/suspicious/noExplicitAny: test
 		} as any;
 		const res = await tagsCreateRoute(ctx);
 		expect(res.status).toBe(400);
@@ -164,22 +183,22 @@ describe("tag CRUD routes", () => {
 
 	test("update tag: rename", async () => {
 		const create = await tagsCreateRoute(makeCtx(db, { body: { name: "prod" } }));
-		const { id } = await create.json() as { id: number };
+		const { id } = (await create.json()) as { id: number };
 		const res = await tagsUpdateRoute(
 			makeCtx(db, { params: { id: String(id) }, body: { name: "production" } }),
 		);
 		expect(res.status).toBe(200);
-		expect((await res.json() as { name: string }).name).toBe("production");
+		expect(((await res.json()) as { name: string }).name).toBe("production");
 	});
 
 	test("update tag: change color", async () => {
 		const create = await tagsCreateRoute(makeCtx(db, { body: { name: "prod" } }));
-		const { id } = await create.json() as { id: number };
+		const { id } = (await create.json()) as { id: number };
 		const res = await tagsUpdateRoute(
 			makeCtx(db, { params: { id: String(id) }, body: { color: 5 } }),
 		);
 		expect(res.status).toBe(200);
-		expect((await res.json() as { color: number }).color).toBe(5);
+		expect(((await res.json()) as { color: number }).color).toBe(5);
 	});
 
 	test("update tag: invalid ID", async () => {
@@ -190,9 +209,14 @@ describe("tag CRUD routes", () => {
 	test("update tag: bad JSON", async () => {
 		const ctx = {
 			env: { DB: db },
-			req: { json: async () => { throw new Error("bad"); }, param: () => "1" },
+			req: {
+				json: async () => {
+					throw new Error("bad");
+				},
+				param: () => "1",
+			},
 			json: (d: unknown, s?: number) => new Response(JSON.stringify(d), { status: s ?? 200 }),
-		// biome-ignore lint/suspicious/noExplicitAny: test
+			// biome-ignore lint/suspicious/noExplicitAny: test
 		} as any;
 		const res = await tagsUpdateRoute(ctx);
 		expect(res.status).toBe(400);
@@ -204,16 +228,14 @@ describe("tag CRUD routes", () => {
 	});
 
 	test("update tag: 404 if not found", async () => {
-		const res = await tagsUpdateRoute(
-			makeCtx(db, { params: { id: "9999" }, body: { name: "x" } }),
-		);
+		const res = await tagsUpdateRoute(makeCtx(db, { params: { id: "9999" }, body: { name: "x" } }));
 		expect(res.status).toBe(404);
 	});
 
 	test("update tag: 409 on duplicate name", async () => {
 		const a = await tagsCreateRoute(makeCtx(db, { body: { name: "a" } }));
 		await tagsCreateRoute(makeCtx(db, { body: { name: "b" } }));
-		const aId = (await a.json() as { id: number }).id;
+		const aId = ((await a.json()) as { id: number }).id;
 		const res = await tagsUpdateRoute(
 			makeCtx(db, { params: { id: String(aId) }, body: { name: "b" } }),
 		);
@@ -222,7 +244,7 @@ describe("tag CRUD routes", () => {
 
 	test("delete tag", async () => {
 		const create = await tagsCreateRoute(makeCtx(db, { body: { name: "prod" } }));
-		const { id } = await create.json() as { id: number };
+		const { id } = (await create.json()) as { id: number };
 		const res = await tagsDeleteRoute(makeCtx(db, { params: { id: String(id) } }));
 		expect(res.status).toBe(204);
 	});
@@ -239,13 +261,11 @@ describe("tag CRUD routes", () => {
 
 	test("tagsByHosts returns grouped map", async () => {
 		const c = await tagsCreateRoute(makeCtx(db, { body: { name: "prod" } }));
-		const tagId = (await c.json() as { id: number }).id;
-		await hostTagsAddRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagId } }),
-		);
+		const tagId = ((await c.json()) as { id: number }).id;
+		await hostTagsAddRoute(makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagId } }));
 		const res = await tagsByHostsRoute(makeCtx(db));
 		expect(res.status).toBe(200);
-		const body = await res.json() as Record<string, unknown[]>;
+		const body = (await res.json()) as Record<string, unknown[]>;
 		expect(body[HOST_ID]).toHaveLength(1);
 	});
 });
@@ -264,8 +284,8 @@ describe("host-tag routes", () => {
 			.run();
 		const aRes = await tagsCreateRoute(makeCtx(db, { body: { name: "a" } }));
 		const bRes = await tagsCreateRoute(makeCtx(db, { body: { name: "b" } }));
-		tagA = (await aRes.json() as { id: number }).id;
-		tagB = (await bRes.json() as { id: number }).id;
+		tagA = ((await aRes.json()) as { id: number }).id;
+		tagB = ((await bRes.json()) as { id: number }).id;
 	});
 
 	test("hostTagsList empty by default", async () => {
@@ -280,25 +300,28 @@ describe("host-tag routes", () => {
 		);
 		expect(add.status).toBe(201);
 		const list = await hostTagsListRoute(makeCtx(db, { params: { id: HOST_ID } }));
-		const arr = await list.json() as unknown[];
+		const arr = (await list.json()) as unknown[];
 		expect(arr).toHaveLength(1);
 	});
 
 	test("hostTagsAdd: bad JSON", async () => {
 		const ctx = {
 			env: { DB: db },
-			req: { json: async () => { throw new Error("bad"); }, param: () => HOST_ID },
+			req: {
+				json: async () => {
+					throw new Error("bad");
+				},
+				param: () => HOST_ID,
+			},
 			json: (d: unknown, s?: number) => new Response(JSON.stringify(d), { status: s ?? 200 }),
-		// biome-ignore lint/suspicious/noExplicitAny: test
+			// biome-ignore lint/suspicious/noExplicitAny: test
 		} as any;
 		const res = await hostTagsAddRoute(ctx);
 		expect(res.status).toBe(400);
 	});
 
 	test("hostTagsAdd: bad body", async () => {
-		const res = await hostTagsAddRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: {} }),
-		);
+		const res = await hostTagsAddRoute(makeCtx(db, { params: { id: HOST_ID }, body: {} }));
 		expect(res.status).toBe(400);
 	});
 
@@ -317,9 +340,7 @@ describe("host-tag routes", () => {
 	});
 
 	test("hostTagsAdd: duplicate ignored", async () => {
-		await hostTagsAddRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }),
-		);
+		await hostTagsAddRoute(makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }));
 		const r = await hostTagsAddRoute(
 			makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }),
 		);
@@ -337,18 +358,21 @@ describe("host-tag routes", () => {
 	test("hostTagsReplace: bad JSON", async () => {
 		const ctx = {
 			env: { DB: db },
-			req: { json: async () => { throw new Error("bad"); }, param: () => HOST_ID },
+			req: {
+				json: async () => {
+					throw new Error("bad");
+				},
+				param: () => HOST_ID,
+			},
 			json: (d: unknown, s?: number) => new Response(JSON.stringify(d), { status: s ?? 200 }),
-		// biome-ignore lint/suspicious/noExplicitAny: test
+			// biome-ignore lint/suspicious/noExplicitAny: test
 		} as any;
 		const res = await hostTagsReplaceRoute(ctx);
 		expect(res.status).toBe(400);
 	});
 
 	test("hostTagsReplace: bad body 400", async () => {
-		const res = await hostTagsReplaceRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: {} }),
-		);
+		const res = await hostTagsReplaceRoute(makeCtx(db, { params: { id: HOST_ID }, body: {} }));
 		expect(res.status).toBe(400);
 	});
 
@@ -375,9 +399,7 @@ describe("host-tag routes", () => {
 	});
 
 	test("hostTagsReplace: empty array clears tags", async () => {
-		await hostTagsAddRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }),
-		);
+		await hostTagsAddRoute(makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }));
 		const res = await hostTagsReplaceRoute(
 			makeCtx(db, { params: { id: HOST_ID }, body: { tag_ids: [] } }),
 		);
@@ -386,9 +408,7 @@ describe("host-tag routes", () => {
 	});
 
 	test("hostTagsRemove: success", async () => {
-		await hostTagsAddRoute(
-			makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }),
-		);
+		await hostTagsAddRoute(makeCtx(db, { params: { id: HOST_ID }, body: { tag_id: tagA } }));
 		const res = await hostTagsRemoveRoute(
 			makeCtx(db, { params: { id: HOST_ID, tagId: String(tagA) } }),
 		);
@@ -396,9 +416,7 @@ describe("host-tag routes", () => {
 	});
 
 	test("hostTagsRemove: invalid tag ID", async () => {
-		const res = await hostTagsRemoveRoute(
-			makeCtx(db, { params: { id: HOST_ID, tagId: "abc" } }),
-		);
+		const res = await hostTagsRemoveRoute(makeCtx(db, { params: { id: HOST_ID, tagId: "abc" } }));
 		expect(res.status).toBe(400);
 	});
 

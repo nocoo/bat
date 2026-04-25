@@ -1,8 +1,8 @@
+import type { IdentityPayload, MetricsPayload, Tier2Payload } from "@bat/shared";
 // Tests for body-validators + inventory update builders.
 // These are exported from the route files so they can be tested as pure
 // functions (no HTTP fixture needed).
 import { describe, expect, test as it, test } from "vitest";
-import type { IdentityPayload, MetricsPayload, Tier2Payload } from "@bat/shared";
 import { validateAllowedPortBody } from "./allowed-ports";
 import { buildInventoryUpdate, validateIdentityPayload } from "./identity";
 import { validateMetricsPayload } from "./ingest";

@@ -1,7 +1,7 @@
+import { Hono } from "hono";
 // Handler-level tests for allowed-ports (list + add), complementing the
 // existing wire-semantics tests for DELETE.
 import { beforeEach, describe, expect, test } from "vitest";
-import { Hono } from "hono";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import {
