@@ -1,9 +1,24 @@
 // Unit tests for access-auth middleware
 
 import { Hono } from "hono";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 import type { AppEnv } from "../types.js";
 import { accessAuth } from "./access-auth.js";
+import { apiKeyAuth } from "./api-key.js";
+
+vi.mock("jose", async () => {
+	const actual = await vi.importActual<typeof import("jose")>("jose");
+	return {
+		...actual,
+		createRemoteJWKSet: () => "mock-jwks" as unknown,
+		jwtVerify: vi.fn(async (token: string) => {
+			if (token === "valid-jwt") {
+				return { payload: { sub: "user@example.com" }, protectedHeader: {} };
+			}
+			throw new Error("invalid token");
+		}),
+	};
+});
 
 // Helper to create a test app with access auth middleware
 function createTestApp(env: Partial<AppEnv["Bindings"]> = {}) {
@@ -148,6 +163,95 @@ describe("accessAuth middleware", () => {
 				headers: { host: "bat.hexly.ai" },
 			});
 			expect(res.status).toBe(500);
+		});
+
+		test("valid JWT sets accessAuthenticated and proceeds (happy path)", async () => {
+			const app = new Hono<AppEnv>();
+			app.use("*", async (c, next) => {
+				c.env = {
+					DB: {} as D1Database,
+					BAT_WRITE_KEY: "test-write-key",
+					BAT_READ_KEY: "test-read-key",
+					CF_ACCESS_TEAM_DOMAIN: "test.cloudflareaccess.com",
+					CF_ACCESS_AUD: "test-aud",
+				} as AppEnv["Bindings"];
+				return next();
+			});
+			app.use("*", accessAuth);
+			// Echo the context flag set by accessAuth so we can assert on it
+			app.get("/api/hosts", (c) =>
+				c.json({ accessAuthenticated: c.get("accessAuthenticated") === true }),
+			);
+
+			const res = await app.request("/api/hosts", {
+				method: "GET",
+				headers: {
+					host: "bat.hexly.ai",
+					"Cf-Access-Jwt-Assertion": "valid-jwt",
+				},
+			});
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({ accessAuthenticated: true });
+		});
+
+		test("valid JWT lets the downstream apiKeyAuth pass without API key", async () => {
+			// Integration: accessAuth → apiKeyAuth chain. The browser endpoint
+			// only carries an Access JWT (no Authorization header); apiKeyAuth
+			// must observe accessAuthenticated and let the request through for
+			// non-machine read routes.
+			const app = new Hono<AppEnv>();
+			app.use("*", async (c, next) => {
+				c.env = {
+					DB: {} as D1Database,
+					BAT_WRITE_KEY: "test-write-key",
+					BAT_READ_KEY: "test-read-key",
+					CF_ACCESS_TEAM_DOMAIN: "test.cloudflareaccess.com",
+					CF_ACCESS_AUD: "test-aud",
+				} as AppEnv["Bindings"];
+				return next();
+			});
+			app.use("*", accessAuth);
+			app.use("*", apiKeyAuth);
+			app.get("/api/hosts", (c) => c.json({ ok: true }));
+
+			const res = await app.request("/api/hosts", {
+				method: "GET",
+				headers: {
+					host: "bat.hexly.ai",
+					"Cf-Access-Jwt-Assertion": "valid-jwt",
+				},
+			});
+			expect(res.status).toBe(200);
+			expect(await res.json()).toEqual({ ok: true });
+		});
+
+		test("forged Cf-Access-Jwt-Assertion header alone does not bypass apiKeyAuth", async () => {
+			// Regression: apiKeyAuth must not trust the raw header — only the
+			// accessAuthenticated context flag set by accessAuth after verify.
+			// If accessAuth is somehow skipped (e.g. mounted only on bat.*),
+			// apiKeyAuth still requires Authorization on the machine endpoint.
+			const app = new Hono<AppEnv>();
+			app.use("*", async (c, next) => {
+				c.env = {
+					DB: {} as D1Database,
+					BAT_WRITE_KEY: "test-write-key",
+					BAT_READ_KEY: "test-read-key",
+				} as AppEnv["Bindings"];
+				return next();
+			});
+			// Note: no accessAuth here — simulating a request that bypasses it
+			app.use("*", apiKeyAuth);
+			app.get("/api/hosts", (c) => c.json({ ok: true }));
+
+			const res = await app.request("/api/hosts", {
+				method: "GET",
+				headers: {
+					host: "bat-ingest.worker.hexly.ai",
+					"Cf-Access-Jwt-Assertion": "anything",
+				},
+			});
+			// No Authorization → 401, header is ignored
+			expect(res.status).toBe(401);
 		});
 	});
 });
