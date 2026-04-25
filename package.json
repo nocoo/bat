@@ -12,8 +12,8 @@
 		"typecheck": "turbo typecheck",
 		"lint": "biome check --error-on-warnings .",
 		"lint:fix": "biome check --write .",
-		"test": "turbo test",
-		"test:unit:coverage": "turbo test:unit:coverage",
+		"test": "turbo test && cd probe && cargo test --quiet",
+		"test:unit:coverage": "bash scripts/check-coverage.sh",
 		"test:e2e:pw": "cd packages/ui && bunx playwright test",
 		"prepare": "husky"
 	},
