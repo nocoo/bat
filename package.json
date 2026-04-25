@@ -20,11 +20,13 @@
 	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd"],
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@vitest/coverage-v8": "^4.1.5",
 		"husky": "^9.1.0",
 		"lint-staged": "^16.4.0",
 		"picomatch": "^4.0.4",
 		"turbo": "^2.5.0",
-		"typescript": "^5.8.2"
+		"typescript": "^5.8.2",
+		"vitest": "^4.1.5"
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json,css}": ["biome check --error-on-warnings --no-errors-on-unmatched"]

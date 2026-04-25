@@ -1,5 +1,5 @@
 // @bat/shared — Tier 2 alert rules verification
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
 	ALL_ALERT_RULES,
 	SIGNAL_EXPANSION_ALERT_RULES,
