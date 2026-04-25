@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import type { HostOverviewItem } from "@bat/shared";
 import { Hono } from "hono";
 import { createMockD1 } from "../test-helpers/mock-d1";

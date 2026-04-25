@@ -2,7 +2,7 @@
 // hourly aggregation service. Previously covered only indirectly via the
 // 641-line integration test; direct tests make their semantics explicit.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { avg, avgNullable, max, maxNullable, min, sumNullable } from "./aggregation";
 
 describe("avg/max/min (non-nullable)", () => {

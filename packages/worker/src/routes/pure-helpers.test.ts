@@ -2,7 +2,7 @@
 // Keeping these in a single "pure-helpers" file (vs one test-per-route)
 // minimizes boilerplate.
 
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { extractBearerToken } from "./events-ingest";
 import { parsePagination, parseTags } from "./events-list";
 import { decodeJwtPayload } from "./me";

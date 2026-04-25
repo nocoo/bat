@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "vitest";
 import type { Tier2Payload } from "@bat/shared";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import { evaluateTier2Alerts, evaluateTier2Rules } from "./tier2-alerts";

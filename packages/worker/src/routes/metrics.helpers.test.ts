@@ -1,5 +1,5 @@
 // Unit tests for pure ext_json expansion helpers in metrics route.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import {
 	EXT_KEY_MAP,
 	type HourlyRow,

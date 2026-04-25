@@ -1,5 +1,5 @@
 // Tests for generateWebhookToken — pure fn over crypto.getRandomValues.
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { generateWebhookToken } from "./events";
 
 describe("generateWebhookToken", () => {
