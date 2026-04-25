@@ -35,5 +35,8 @@
 	},
 	"overrides": {
 		"undici": ">=7.24.0"
+	},
+	"dependencies": {
+		"postcss": "^8.5.10"
 	}
 }
