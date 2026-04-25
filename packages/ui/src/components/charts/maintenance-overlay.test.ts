@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { maintenanceAreas } from "./maintenance-overlay";
 
 const HOUR = 3600;

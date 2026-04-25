@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { HostOverviewItem, WebhookConfig } from "@bat/shared";
 import {
 	buildCurlCommand,
