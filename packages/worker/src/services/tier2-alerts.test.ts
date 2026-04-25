@@ -1,7 +1,12 @@
 import type { Tier2Payload } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1";
-import { evaluateTier2Alerts, evaluateTier2Rules } from "./tier2-alerts";
+import {
+	type AlertEvalResult,
+	evaluateTier2Alerts,
+	evaluateTier2Rules,
+	handleDurationRule,
+} from "./tier2-alerts";
 
 function makePayload(overrides?: Partial<Tier2Payload>): Tier2Payload {
 	const now = Math.floor(Date.now() / 1000);
@@ -409,5 +414,120 @@ describe("evaluateTier2Alerts (DB integration)", () => {
 			.bind("host-001", "public_port")
 			.first();
 		expect(alert).toBeNull();
+	});
+});
+
+// All shipped Tier-2 rules are instant (durationSeconds: 0), so the
+// duration branch in handleDurationRule is currently dead code in production.
+// These tests pin its state-machine behavior so adding a real duration rule
+// later doesn't break silently.
+describe("handleDurationRule (duration-based state machine)", () => {
+	let db: D1Database;
+	const RULE: Omit<AlertEvalResult, "fired" | "value"> = {
+		ruleId: "synthetic_duration_rule",
+		severity: "warning",
+		message: "synthetic",
+		durationSeconds: 600, // 10 minutes
+	};
+
+	beforeEach(async () => {
+		db = createMockD1();
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
+			.bind("host-001", "host-001", now)
+			.run();
+	});
+
+	test("first fire writes alert_pending, no alert_states yet", async () => {
+		const t0 = 1_000_000;
+		await handleDurationRule(db, "host-001", { ...RULE, fired: true, value: 1 }, t0);
+
+		const pending = await db
+			.prepare("SELECT first_seen, last_value FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first<{ first_seen: number; last_value: number }>();
+		expect(pending).toEqual({ first_seen: t0, last_value: 1 });
+
+		const state = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first();
+		expect(state).toBeNull();
+	});
+
+	test("subsequent fire before duration elapses keeps pending, updates last_value, no state yet", async () => {
+		const t0 = 1_000_000;
+		await handleDurationRule(db, "host-001", { ...RULE, fired: true, value: 1 }, t0);
+		await handleDurationRule(db, "host-001", { ...RULE, fired: true, value: 7 }, t0 + 60);
+
+		const pending = await db
+			.prepare("SELECT first_seen, last_value FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first<{ first_seen: number; last_value: number }>();
+		// first_seen unchanged, last_value updated
+		expect(pending).toEqual({ first_seen: t0, last_value: 7 });
+
+		const state = await db
+			.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first();
+		expect(state).toBeNull();
+	});
+
+	test("fire after duration elapses promotes to alert_states", async () => {
+		const t0 = 1_000_000;
+		await handleDurationRule(db, "host-001", { ...RULE, fired: true, value: 1 }, t0);
+		await handleDurationRule(
+			db,
+			"host-001",
+			{ ...RULE, fired: true, value: 9 },
+			t0 + RULE.durationSeconds,
+		);
+
+		const state = await db
+			.prepare(
+				"SELECT severity, value, message FROM alert_states WHERE host_id = ? AND rule_id = ?",
+			)
+			.bind("host-001", RULE.ruleId)
+			.first<{ severity: string; value: number; message: string }>();
+		expect(state).toEqual({ severity: "warning", value: 9, message: "synthetic" });
+	});
+
+	test("clear (fired=false) wipes both alert_pending and alert_states", async () => {
+		const t0 = 1_000_000;
+		await handleDurationRule(db, "host-001", { ...RULE, fired: true, value: 1 }, t0);
+		await handleDurationRule(
+			db,
+			"host-001",
+			{ ...RULE, fired: true, value: 9 },
+			t0 + RULE.durationSeconds,
+		);
+
+		// Now condition recovers
+		await handleDurationRule(
+			db,
+			"host-001",
+			{ ...RULE, fired: false, value: 0 },
+			t0 + RULE.durationSeconds + 1,
+		);
+
+		const pending = await db
+			.prepare("SELECT 1 FROM alert_pending WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first();
+		expect(pending).toBeNull();
+
+		const state = await db
+			.prepare("SELECT 1 FROM alert_states WHERE host_id = ? AND rule_id = ?")
+			.bind("host-001", RULE.ruleId)
+			.first();
+		expect(state).toBeNull();
+	});
+
+	test("clear without prior pending is a no-op (idempotent)", async () => {
+		await expect(
+			handleDurationRule(db, "host-001", { ...RULE, fired: false, value: 0 }, 1_000_000),
+		).resolves.toBeUndefined();
 	});
 });
