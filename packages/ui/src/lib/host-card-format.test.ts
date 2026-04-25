@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import {
 	buildSubtitle,

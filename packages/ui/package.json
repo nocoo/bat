@@ -8,8 +8,9 @@
 		"build": "tsc && vite build",
 		"preview": "vite preview",
 		"typecheck": "tsc --noEmit",
-		"test": "bun test src/",
-		"test:unit:coverage": "bun test --coverage src/",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage",
+		"test:unit:coverage": "vitest run --coverage",
 		"test:e2e": "playwright test",
 		"test:e2e:ui": "playwright test --ui",
 		"lint": "biome check src/"

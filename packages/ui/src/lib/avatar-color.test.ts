@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { AVATAR_COLORS, FALLBACK_COLOR, getAvatarColor, getDisplayName } from "./avatar-color";
 
 describe("getAvatarColor", () => {
