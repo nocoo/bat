@@ -13,8 +13,11 @@
 //   4. Runs test cases against http://localhost:18787
 //   5. Tears down the server and cleans up on exit
 
+import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
+import { fileURLToPath } from "node:url";
 import type {
 	AlertItem,
 	AllowedPort,
@@ -33,11 +36,12 @@ const PORT = 18787;
 const BASE = `http://localhost:${PORT}`;
 const WRITE_KEY = "e2e-write-key";
 const READ_KEY = "e2e-read-key";
-const WORKER_ROOT = join(import.meta.dir, "../..");
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WORKER_ROOT = join(__dirname, "../..");
 const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
 const DEV_VARS_PATH = join(WORKER_ROOT, ".dev.vars");
 
-let wranglerProc: ReturnType<typeof Bun.spawn> | null = null;
+let wranglerProc: ChildProcess | null = null;
 let devVarsExistedBefore = false;
 
 async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
@@ -51,20 +55,26 @@ async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 		} catch {
 			// Server not ready yet
 		}
-		await Bun.sleep(300);
+		await sleep(300);
 	}
 	throw new Error(`Wrangler did not start within ${timeoutMs}ms`);
 }
 
 async function runCommand(cmd: string[], cwd: string): Promise<void> {
-	const proc = Bun.spawn(cmd, {
+	const [bin, ...args] = cmd;
+	const proc = spawn(bin, args, {
 		cwd,
-		stdout: "ignore",
-		stderr: "pipe",
+		stdio: ["ignore", "ignore", "pipe"],
 	});
-	const exitCode = await proc.exited;
+	let stderr = "";
+	proc.stderr?.on("data", (chunk) => {
+		stderr += chunk.toString();
+	});
+	const exitCode: number = await new Promise((resolve, reject) => {
+		proc.on("error", reject);
+		proc.on("exit", (code) => resolve(code ?? 1));
+	});
 	if (exitCode !== 0) {
-		const stderr = await new Response(proc.stderr).text();
 		throw new Error(`Command failed (exit ${exitCode}): ${cmd.join(" ")}\n${stderr}`);
 	}
 }
@@ -119,12 +129,12 @@ beforeAll(async () => {
 	}
 
 	// 4. Start wrangler dev on the E2E port with local D1
-	wranglerProc = Bun.spawn(
-		["npx", "wrangler", "dev", "--port", String(PORT), "--local", "--persist-to", ".wrangler/e2e"],
+	wranglerProc = spawn(
+		"npx",
+		["wrangler", "dev", "--port", String(PORT), "--local", "--persist-to", ".wrangler/e2e"],
 		{
 			cwd: WORKER_ROOT,
-			stdout: "ignore",
-			stderr: "ignore",
+			stdio: "ignore",
 		},
 	);
 
