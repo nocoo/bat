@@ -1,15 +1,14 @@
 // Metrics insertion service — flattens MetricsPayload to D1 row
 import type { MetricsPayload } from "@bat/shared";
 
-/** Insert a raw metrics row into metrics_raw, flattening nested fields.
- *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries.
- *  Returns true if a row was actually inserted, false if it was a duplicate. */
-export async function insertMetricsRaw(
+/** Build the INSERT OR IGNORE statement for metrics_raw. Caller can either
+ *  `.run()` it directly or include it in a `db.batch([...])`. */
+export function buildInsertMetricsRawStatement(
 	db: D1Database,
 	hostId: string,
 	payload: MetricsPayload,
-): Promise<boolean> {
-	const result = await db
+): D1PreparedStatement {
+	return db
 		.prepare(
 			`INSERT OR IGNORE INTO metrics_raw
   (host_id, ts, cpu_load1, cpu_load5, cpu_load15, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_count,
@@ -160,8 +159,18 @@ VALUES (${new Array(98).fill("?").join(", ")})`,
 			payload.conntrack?.max ?? null,
 			// Top processes (JSON array)
 			payload.top_processes ? JSON.stringify(payload.top_processes) : null,
-		)
-		.run();
+		);
+}
+
+/** Insert a raw metrics row into metrics_raw, flattening nested fields.
+ *  Uses INSERT OR IGNORE to silently skip duplicates from Probe retries.
+ *  Returns true if a row was actually inserted, false if it was a duplicate. */
+export async function insertMetricsRaw(
+	db: D1Database,
+	hostId: string,
+	payload: MetricsPayload,
+): Promise<boolean> {
+	const result = await buildInsertMetricsRawStatement(db, hostId, payload).run();
 	return result.meta.changes > 0;
 }
 
