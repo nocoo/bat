@@ -456,8 +456,12 @@ async function main(): Promise<void> {
 		updateChangelog(changelogSection);
 	}
 
-	const versionPattern = `["']${currentVersion.replace(/\./g, "\\.")}["']|\\b${currentVersion.replace(/\./g, "\\.")}\\b`;
+	// Match the version when wrapped in quotes or prefixed with `v`, but never
+	// as a substring of an IPv4 literal (e.g. 1.1.1 inside 1.1.1.1).
+	const escaped = currentVersion.replace(/\./g, "\\.");
+	const versionPattern = `(?<![.\\d])(?:["']${escaped}["']|v${escaped})(?![.\\d])`;
 	const rgResult = await run("rg", [
+		"-P",
 		versionPattern,
 		"--glob",
 		"*.ts",
