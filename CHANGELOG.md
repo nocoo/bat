@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.1.2
+
+### Added
+- Migrate ui package from bun test to vitest
+- Migrate worker package from bun test to vitest
+- Migrate shared package from bun test to vitest
+
+### Changed
+- Cut D1 writes per ingest by ~80% via diff + batch
+- Bring hooks under unit coverage and clarify UT scope
+- Cover handleDurationRule state machine
+- Cover JWT happy path and apiKeyAuth chain
+- Include rust probe in repo-level test entrypoint
+- Fix better-sqlite3 rebuild and lockfile resolution
+- Rebuild better-sqlite3 for vitest node.js runtime
+- Fix biome format and lint errors
+- Update coverage scripts and thresholds for vitest
+
+### Fixed
+- Exclude IP literals from stale-version scan
+- Port worker E2E suite from Bun APIs to node stdlib
+- Switch worker integration/e2e scripts to vitest
+- Pin wrangler 4.73.0, override postcss 8.5.10 for CVE fix
+- Regenerate lockfile with postcss 8.5.10
+- Upgrade postcss to 8.5.10 (CVE GHSA-qx2v-qp2m-jg93)
+- Release workflow input tag should override GITHUB_REF_NAME
+
 ## v1.1.1
 
 ### Changed
