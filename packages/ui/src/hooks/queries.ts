@@ -16,6 +16,7 @@ import type {
 	HostTag,
 	MetricsQueryResponse,
 	TagItem,
+	Tier2Snapshot,
 	WebhookConfig,
 } from "@bat/shared";
 import useSWR, { type SWRConfiguration } from "swr";
@@ -96,6 +97,16 @@ export const useAllAllowedPorts = () =>
 		"all-allowed-ports",
 		() => getAPI<Record<string, number[]>>("/api/allowed-ports"),
 		KEEP_PREV,
+	);
+
+// ---- Tier 2 snapshot (slow-scan signals: ports, software, websites…) ----
+// Polled every 60s — the worker stores at most one snapshot per ~6h cycle,
+// so faster polling would just spam the cache.
+export const useHostTier2 = (hid: string | null) =>
+	useSWR<Tier2Snapshot>(
+		hid ? `tier2-${hid}` : null,
+		() => getAPI<Tier2Snapshot>(`/api/hosts/${hid}/tier2`),
+		POLL_60,
 	);
 
 // ---- Events -------------------------------------------------------------

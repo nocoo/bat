@@ -195,6 +195,7 @@ export function HostDetailPage() {
 							{host && (
 								<AllowedPortsPanel
 									hostId={host.host_id}
+									hashedHostId={hid}
 									hostAlerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []}
 								/>
 							)}
