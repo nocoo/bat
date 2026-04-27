@@ -8,6 +8,7 @@ import {
 	TcpChart,
 	TopProcessesTable,
 } from "@/components/charts";
+import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
@@ -147,6 +148,9 @@ export function HostDetailPage() {
 						{/* Right column — system info + disks */}
 						<div className="space-y-4">
 							<h2 className="text-base font-semibold">Overview</h2>
+							{host && (
+								<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
+							)}
 							<DiskBars data={metricsResponse.data} />
 							{host && (
 								<Card>
