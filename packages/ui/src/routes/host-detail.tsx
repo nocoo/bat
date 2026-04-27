@@ -9,6 +9,7 @@ import {
 	TopProcessesTable,
 } from "@/components/charts";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
+import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
@@ -194,6 +195,7 @@ export function HostDetailPage() {
 								</Card>
 							)}
 							{host && <HostTagsPanel hostId={host.host_id} />}
+							{host && <MaintenancePanel hostId={host.host_id} />}
 							{host && (
 								<AllowedPortsPanel
 									hostId={host.host_id}

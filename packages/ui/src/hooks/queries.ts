@@ -14,6 +14,7 @@ import type {
 	HostDetailItem,
 	HostOverviewItem,
 	HostTag,
+	MaintenanceWindow,
 	MetricsQueryResponse,
 	TagItem,
 	Tier2Snapshot,
@@ -48,6 +49,14 @@ export const useHostTagsFor = (hostId: string | null) =>
 	useSWR<HostTag[]>(
 		hostId ? `host-tags-${hostId}` : null,
 		() => getAPI<HostTag[]>(`/api/hosts/${hostId}/tags`),
+		KEEP_PREV,
+	);
+
+/** Per-host maintenance window. Suspends when hostId is null. */
+export const useHostMaintenance = (hostId: string | null) =>
+	useSWR<MaintenanceWindow | null>(
+		hostId ? `maintenance-${hostId}` : null,
+		() => getAPI<MaintenanceWindow | null>(`/api/hosts/${hostId}/maintenance`),
 		KEEP_PREV,
 	);
 
