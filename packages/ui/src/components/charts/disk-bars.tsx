@@ -25,9 +25,11 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 			<div className="space-y-3">
 				{disks.map((disk) => (
 					<div key={disk.mount} className="space-y-1">
-						<div className="flex items-center justify-between text-sm">
-							<span className="font-mono">{disk.mount}</span>
-							<span className="text-muted-foreground tabular-nums">
+						<div className="flex items-center justify-between gap-3 text-sm">
+							<span className="font-mono truncate min-w-0" title={disk.mount}>
+								{disk.mount}
+							</span>
+							<span className="text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
 								{disk.used_pct.toFixed(1)}% — {formatBytes(disk.avail_bytes)} free
 							</span>
 						</div>
