@@ -55,7 +55,9 @@ function ResourceBar({
 	);
 }
 
-/** Multi-line sparkline chart: CPU (red), Memory (green), Network (blue) */
+/** Multi-line sparkline chart: CPU (red), Memory (green), Network (blue).
+ *  Always renders a 32px-tall SVG so cards keep a consistent height even
+ *  before any history has accumulated for a freshly-onboarded host. */
 function SparklineChart({
 	cpu,
 	mem,
@@ -65,11 +67,6 @@ function SparklineChart({
 	mem: SparklinePoint[] | null;
 	net: SparklinePoint[] | null;
 }) {
-	const maxLen = Math.max(cpu?.length ?? 0, mem?.length ?? 0, net?.length ?? 0);
-	if (maxLen === 0) {
-		return null;
-	}
-
 	const height = 32;
 
 	return (
@@ -82,6 +79,17 @@ function SparklineChart({
 			role="img"
 			aria-label="CPU / Memory / Network sparkline"
 		>
+			{/* Baseline so empty/incomplete series still read as "0" instead of nothing */}
+			<line
+				x1="0"
+				y1={height - 1}
+				x2="100"
+				y2={height - 1}
+				stroke="hsl(var(--muted-foreground))"
+				strokeWidth="0.6"
+				vectorEffect="non-scaling-stroke"
+				opacity={0.25}
+			/>
 			{net && net.length > 0 && (
 				<polyline
 					points={toPolyline(net, net.length, height)}
@@ -172,16 +180,16 @@ export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTa
 					/>
 				</div>
 
-				{/* Sparkline — CPU (red), Memory (green), Network (blue) */}
-				{(host.cpu_sparkline || host.mem_sparkline || host.net_sparkline) && (
-					<div className="mt-2.5">
-						<SparklineChart
-							cpu={host.cpu_sparkline}
-							mem={host.mem_sparkline}
-							net={host.net_sparkline}
-						/>
-					</div>
-				)}
+				{/* Sparkline — CPU (red), Memory (green), Network (blue).
+				    Always rendered (even with empty series) so newly-onboarded
+				    hosts keep the same card height as long-running ones. */}
+				<div className="mt-2.5">
+					<SparklineChart
+						cpu={host.cpu_sparkline}
+						mem={host.mem_sparkline}
+						net={host.net_sparkline}
+					/>
+				</div>
 
 				{/* Footer */}
 				<div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground px-0.5">
