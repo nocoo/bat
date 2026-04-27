@@ -14,6 +14,7 @@ import {
 } from "@/lib/host-card-format";
 import type { HostOverviewItem, HostTag, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
+import { Unlock } from "lucide-react";
 import { Link } from "react-router";
 
 // ---------------------------------------------------------------------------
@@ -130,9 +131,18 @@ function SparklineChart({
 // Main component
 // ---------------------------------------------------------------------------
 
-export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTag[] | undefined }) {
+export function HostCard({
+	host,
+	tags,
+	openPublicPorts,
+}: {
+	host: HostOverviewItem;
+	tags?: HostTag[] | undefined;
+	openPublicPorts?: number;
+}) {
 	const subtitle = buildSubtitle(host);
 	const memUsage = formatMemoryUsage(host.mem_total_bytes, host.mem_used_pct);
+	const openPorts = openPublicPorts ?? 0;
 
 	return (
 		<Link to={`/hosts/${hashHostId(host.host_id)}`}>
@@ -146,7 +156,18 @@ export function HostCard({ host, tags }: { host: HostOverviewItem; tags?: HostTa
 						<span className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(host.status)}`} />
 						<span className="text-sm font-semibold truncate">{host.hostname}</span>
 					</div>
-					<StatusBadge status={host.status} />
+					<div className="flex items-center gap-1.5 shrink-0">
+						{openPorts > 0 && (
+							<span
+								className="flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+								title={`${openPorts} public port${openPorts === 1 ? "" : "s"} not on allowlist`}
+							>
+								<Unlock className="h-2.5 w-2.5" />
+								{openPorts}
+							</span>
+						)}
+						<StatusBadge status={host.status} />
+					</div>
 				</div>
 				{subtitle && (
 					<p className="text-[11px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
