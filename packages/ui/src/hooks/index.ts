@@ -4,6 +4,8 @@
 export {
 	EVENTS_PAGE_SIZE,
 	useAlerts,
+	useAllAllowedPorts,
+	useAllowedPorts,
 	useEvents,
 	useHostDetail,
 	useHostMetrics,

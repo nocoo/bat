@@ -9,6 +9,7 @@
 
 import type {
 	AlertItem,
+	AllowedPort,
 	EventsListResponse,
 	HostDetailItem,
 	HostOverviewItem,
@@ -80,6 +81,21 @@ export const useHostMetrics = (id: string | null, from: number, to: number) =>
 				to: String(to),
 			}),
 		POLL_60,
+	);
+
+// ---- Allowed ports ------------------------------------------------------
+export const useAllowedPorts = (hostId: string | null) =>
+	useSWR<AllowedPort[]>(
+		hostId ? `allowed-ports-${hostId}` : null,
+		() => getAPI<AllowedPort[]>(`/api/hosts/${hostId}/allowed-ports`),
+		KEEP_PREV,
+	);
+
+export const useAllAllowedPorts = () =>
+	useSWR<Record<string, number[]>>(
+		"all-allowed-ports",
+		() => getAPI<Record<string, number[]>>("/api/allowed-ports"),
+		KEEP_PREV,
 	);
 
 // ---- Events -------------------------------------------------------------
