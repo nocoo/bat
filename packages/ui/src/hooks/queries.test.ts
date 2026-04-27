@@ -34,6 +34,7 @@ import {
 	useHostDetail,
 	useHostMetrics,
 	useHostTags,
+	useHostTagsFor,
 	useHostTier2,
 	useHosts,
 	useMe,
@@ -213,6 +214,20 @@ describe("query hooks — keys, configs, and fetcher routes", () => {
 
 	test("useHostTier2(null) suspends fetch with null key", () => {
 		renderHook(() => useHostTier2(null));
+		expect(lastCall().key).toBeNull();
+	});
+
+	test("useHostTagsFor with hostId fetches /api/hosts/<id>/tags", async () => {
+		renderHook(() => useHostTagsFor("h-x"));
+		const c = lastCall();
+		expect(c.key).toBe("host-tags-h-x");
+		expect(c.config).toMatchObject({ keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/hosts/h-x/tags");
+	});
+
+	test("useHostTagsFor(null) suspends fetch", () => {
+		renderHook(() => useHostTagsFor(null));
 		expect(lastCall().key).toBeNull();
 	});
 });
