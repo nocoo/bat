@@ -1,5 +1,21 @@
 # Changelog
 
+## v2.0.0
+
+### Added
+- Show open public-port count badge on host card
+- Embed per-host alerts card on detail page
+- Add Websites and Software panels (tier2 slow-scan)
+- Restore maintenance window panel on host detail
+- Add per-host tag panel with typeahead + create-on-the-fly
+- Show currently listening ports above allowlist
+- Proxy local UI to prod worker via Access service token
+- Restore allowed-ports panel after Next.js→Vite migration
+
+### Fixed
+- Truncate long disk mount paths so size column stays single-line
+- Keep host-card height stable when sparkline series are empty
+
 ## v1.1.2
 
 ### Added
