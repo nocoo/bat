@@ -28,10 +28,13 @@ vi.mock("../api", () => ({
 import {
 	EVENTS_PAGE_SIZE,
 	useAlerts,
+	useAllAllowedPorts,
+	useAllowedPorts,
 	useEvents,
 	useHostDetail,
 	useHostMetrics,
 	useHostTags,
+	useHostTier2,
 	useHosts,
 	useMe,
 	useSetup,
@@ -175,5 +178,41 @@ describe("query hooks — keys, configs, and fetcher routes", () => {
 		renderHook(() => useEvents("h-1"));
 		const c = lastCall();
 		expect(c.key).toBe("events-h-1-page-1");
+	});
+
+	test("useAllowedPorts with hostId keys + fetches /api/hosts/<hid>/allowed-ports", async () => {
+		renderHook(() => useAllowedPorts("h-7"));
+		const c = lastCall();
+		expect(c.key).toBe("allowed-ports-h-7");
+		expect(c.config).toMatchObject({ keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/hosts/h-7/allowed-ports");
+	});
+
+	test("useAllowedPorts(null) suspends fetch with null key", () => {
+		renderHook(() => useAllowedPorts(null));
+		expect(lastCall().key).toBeNull();
+	});
+
+	test("useAllAllowedPorts → key 'all-allowed-ports'", async () => {
+		renderHook(() => useAllAllowedPorts());
+		const c = lastCall();
+		expect(c.key).toBe("all-allowed-ports");
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/allowed-ports");
+	});
+
+	test("useHostTier2 with hid keys uniquely + polls 60s + fetches tier2", async () => {
+		renderHook(() => useHostTier2("hashed-1"));
+		const c = lastCall();
+		expect(c.key).toBe("tier2-hashed-1");
+		expect(c.config).toMatchObject({ refreshInterval: 60_000 });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/hosts/hashed-1/tier2");
+	});
+
+	test("useHostTier2(null) suspends fetch with null key", () => {
+		renderHook(() => useHostTier2(null));
+		expect(lastCall().key).toBeNull();
 	});
 });
