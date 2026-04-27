@@ -32,6 +32,7 @@ import {
 	useAllowedPorts,
 	useEvents,
 	useHostDetail,
+	useHostMaintenance,
 	useHostMetrics,
 	useHostTags,
 	useHostTagsFor,
@@ -228,6 +229,20 @@ describe("query hooks — keys, configs, and fetcher routes", () => {
 
 	test("useHostTagsFor(null) suspends fetch", () => {
 		renderHook(() => useHostTagsFor(null));
+		expect(lastCall().key).toBeNull();
+	});
+
+	test("useHostMaintenance with hostId fetches /api/hosts/<id>/maintenance", async () => {
+		renderHook(() => useHostMaintenance("h-m"));
+		const c = lastCall();
+		expect(c.key).toBe("maintenance-h-m");
+		expect(c.config).toMatchObject({ keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/hosts/h-m/maintenance");
+	});
+
+	test("useHostMaintenance(null) suspends fetch", () => {
+		renderHook(() => useHostMaintenance(null));
 		expect(lastCall().key).toBeNull();
 	});
 });
