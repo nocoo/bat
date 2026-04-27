@@ -11,11 +11,12 @@ import {
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
+import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
 import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostDetail, useHostMetrics, useHosts } from "@/hooks";
+import { useAlerts, useHostDetail, useHostMetrics, useHostTier2, useHosts } from "@/hooks";
 import { formatMemory, formatUptime } from "@/lib/host-card-format";
 import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
 import { hashHostId } from "@bat/shared";
@@ -81,6 +82,7 @@ export function HostDetailPage() {
 	const { data: detail } = useHostDetail(hid);
 	const { data: alerts } = useAlerts();
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
+	const { data: tier2 } = useHostTier2(hid);
 
 	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
 
@@ -203,6 +205,8 @@ export function HostDetailPage() {
 									hostAlerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []}
 								/>
 							)}
+							<WebsitesPanel tier2={tier2} />
+							<SoftwarePanel tier2={tier2} />
 						</div>
 					</div>
 				) : (
