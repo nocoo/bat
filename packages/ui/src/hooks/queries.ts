@@ -43,6 +43,14 @@ export const useHostTags = () =>
 		getAPI<Record<string, HostTag[]>>("/api/tags/by-hosts"),
 	);
 
+/** Tags assigned to a specific host. Suspends when hostId is null. */
+export const useHostTagsFor = (hostId: string | null) =>
+	useSWR<HostTag[]>(
+		hostId ? `host-tags-${hostId}` : null,
+		() => getAPI<HostTag[]>(`/api/hosts/${hostId}/tags`),
+		KEEP_PREV,
+	);
+
 export const useWebhooks = () =>
 	useSWR<(WebhookConfig & { hostname: string })[]>(
 		"webhooks",

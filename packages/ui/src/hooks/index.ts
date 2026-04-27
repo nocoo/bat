@@ -11,6 +11,7 @@ export {
 	useHostMetrics,
 	useHosts,
 	useHostTags,
+	useHostTagsFor,
 	useHostTier2,
 	useMe,
 	useSetup,
