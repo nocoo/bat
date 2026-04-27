@@ -3,7 +3,8 @@ import { AppShell } from "@/components/layout";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useHostTags, useHosts, useTags } from "@/hooks";
+import { useAlerts, useHostTags, useHosts, useTags } from "@/hooks";
+import { countOpenPublicPorts } from "@/lib/host-card-ports";
 import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -55,6 +56,7 @@ export function HostsPage() {
 	const { data: hosts, error, isLoading } = useHosts();
 	const { data: hostTagsMap } = useHostTags();
 	const { data: allTags } = useTags();
+	const { data: alerts } = useAlerts();
 	const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 
 	const handleToggleTag = useCallback((tagId: number) => {
@@ -105,7 +107,11 @@ export function HostsPage() {
 								className="animate-fade-up"
 								style={{ animationDelay: `${index * 60}ms` }}
 							>
-								<HostCard host={host} tags={hostTagsMap?.[host.host_id]} />
+								<HostCard
+									host={host}
+									tags={hostTagsMap?.[host.host_id]}
+									openPublicPorts={countOpenPublicPorts(alerts, host.host_id)}
+								/>
 							</div>
 						))}
 					</div>
