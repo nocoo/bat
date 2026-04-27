@@ -63,14 +63,14 @@ Bat 使用 **单一 Worker 架构**，同时服务 API 和前端：
 
 ## Local Development
 
-**方式 1：本地全栈开发（推荐日常开发）**
+**日常开发：UI 本地 + 直连 prod worker（推荐）**
 ```bash
-bun dev   # turbo parallel: @bat/ui (vite, 7025) + @bat/worker (wrangler dev, 8787)
+bun dev   # 启动 vite (7025) + 本地 wrangler dev (8787, 仅供 E2E)
 ```
 - 访问 `http://localhost:7025` 或 `https://bat.dev.hexly.ai`（Caddy 反代 → 7025）
-- `/api/*` 由 vite proxy 到本地 wrangler dev（8787），使用本地 D1 数据库
-- `entry-control` 中间件对 localhost / `*.dev.hexly.ai` 自动 bypass（见 `packages/worker/src/middleware/entry-control.ts`），浏览器读路由（`/api/hosts` 等）全部可用，无需 Access JWT
-- 启动初期 UI 可能先于 worker 就绪，出现几次 `ECONNREFUSED` 是正常的，等 `⎔ Starting local server... Ready on http://localhost:8787` 出现后自动恢复
+- `/api/*` 由 vite proxy 到 **prod worker `https://bat.hexly.ai`**，看到的是真实生产数据
+- 浏览器先在另一个标签登录 `bat.hexly.ai` 拿到 Access cookie；vite proxy 透传 cookie，浏览器读路由（`/api/hosts`、`/api/alerts` 等）能直接走通
+- 本地 wrangler dev（8787）保留给 E2E 用，不参与日常 UI 开发
 
 **方式 2：接近生产的测试**
 ```bash
@@ -79,11 +79,6 @@ cd packages/worker && bun dev      # wrangler dev 服务静态资源
 ```
 - 访问 `localhost:8787`（wrangler 端口）
 - 测试 wrangler assets 配置、SPA fallback 等
-
-**⚠️ 不要用生产 `bat-ingest.worker.hexly.ai` 作为 vite proxy target**
-- `bat-ingest` 是机器入口，`entry-control` 白名单只放行 `POST /api/ingest|identity|tier2|events`、`GET /api/monitoring/*`、`GET /api/live|me`
-- `GET /api/hosts`、`/api/alerts` 等浏览器读路由会被 403 拒绝（`Route not allowed on machine endpoint`）
-- 浏览器读路由按架构设计只能走 `bat.hexly.ai` + Access JWT；本机没有 JWT，无法直接走生产
 
 ## Testing
 
