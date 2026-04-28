@@ -33,6 +33,8 @@ run_bg unit_cov   bash scripts/check-coverage.sh 90 95
 run_bg typecheck  bun turbo typecheck
 run_bg lint       bunx lint-staged
 run_bg gitleaks   gitleaks protect --staged --no-banner
+run_bg routes     bun run gate:routes
+run_bg pages      bun run gate:pages
 
 # Rust lint only if probe/ changed
 if git diff --cached --name-only | grep -q '^probe/'; then
@@ -44,6 +46,8 @@ wait_stage unit_cov
 wait_stage typecheck
 wait_stage lint
 wait_stage gitleaks
+wait_stage routes
+wait_stage pages
 
 # Wait for rust_lint if it was started
 if [ -n "${PID_rust_lint:-}" ]; then
