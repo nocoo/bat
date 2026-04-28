@@ -53,21 +53,3 @@ custom_domain = true
 [[env.production.routes]]
 pattern = "bat.hexly.ai"
 custom_domain = true
-
-# Test environment — E2E testing with isolated resources
-# Usage: wrangler dev --env test (local) or wrangler d1 execute --env test (remote)
-[env.test]
-name = "bat-test"
-
-[[env.test.d1_databases]]
-binding = "DB"
-database_name = "bat-db-test"
-database_id = "04bd8235-5aff-445f-9719-55b2836d83b7"
-
-[env.test.vars]
-ENVIRONMENT = "test"
-RESOURCE_ENV = "test"
-
-[[env.test.routes]]
-pattern = "bat-ingest-test.worker.hexly.ai"
-custom_domain = true

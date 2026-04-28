@@ -13,10 +13,11 @@
 //   1. `--local` — wrangler dev points at a local miniflare D1, never prod.
 //   2. `--persist-to .wrangler/e2e` — dedicated ephemeral state dir.
 //   3. We delete `.wrangler/e2e` before booting, so each run is clean.
-//   4. After migrations apply, we assert `_test_marker` row exists. Production
-//      D1 never gets `0018_test_marker.sql` applied (the migration is in
-//      migrations/ but only `--local` runs here apply ALL of them via this
-//      setup; prod migrations are applied selectively by the deploy script).
+//   4. After migrations apply, we assert `_test_marker` row exists. The
+//      marker is created by `0018_test_marker.sql` and only ever materializes
+//      in the local miniflare D1 used here — production deploys are physically
+//      isolated (no remote test DB exists in the CF account), so the marker
+//      doubles as a self-identification check that this loop is on a local DB.
 //   5. Pre-flight env scan — refuse to start if any env var that would point
 //      wrangler at a remote/prod resource is set (CLOUDFLARE_API_TOKEN,
 //      CLOUDFLARE_ACCOUNT_ID, WRANGLER_SEND_METRICS=true). Even though we
