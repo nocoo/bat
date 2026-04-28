@@ -101,7 +101,7 @@ E2E tests live in `packages/worker/test/e2e/*.test.ts`, one file per route group
   1. `--local` (wrangler points at miniflare D1, never prod)
   2. `--persist-to .wrangler/e2e` (dedicated state dir)
   3. dir wiped before each run (clean slate)
-  4. `_test_marker` row asserted post-migration (production D1 never has migration `0018_test_marker.sql` applied selectively)
+  4. `_test_marker` row asserted post-migration — created by `0018_test_marker.sql`, only ever materializes in the local miniflare D1 (no remote test DB exists in the CF account, so the marker doubles as a self-identification check)
   5. pre-flight env scan refuses to start if `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, or `CF_API_TOKEN` is set
 
 ## Probe Build & Release
