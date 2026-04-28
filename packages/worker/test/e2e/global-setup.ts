@@ -36,7 +36,7 @@ const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
 const DEV_VARS_PATH = join(WORKER_ROOT, ".dev.vars");
 const MIGRATIONS_DIR = join(WORKER_ROOT, "migrations");
 
-const PORT = 18787;
+const PORT = 17025;
 const BASE = `http://localhost:${PORT}`;
 const WRITE_KEY = "e2e-write-key";
 const READ_KEY = "e2e-read-key";

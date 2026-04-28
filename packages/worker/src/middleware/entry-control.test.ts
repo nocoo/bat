@@ -37,7 +37,7 @@ describe("isLocalhost", () => {
 	test("returns true for localhost", () => {
 		expect(isLocalhost("localhost")).toBe(true);
 		expect(isLocalhost("localhost:8787")).toBe(true);
-		expect(isLocalhost("localhost:18787")).toBe(true);
+		expect(isLocalhost("localhost:17025")).toBe(true);
 	});
 
 	test("returns true for 127.0.0.1", () => {
@@ -71,7 +71,7 @@ describe("entryControl middleware", () => {
 			// Machine routes
 			let res = await app.request("/api/ingest", {
 				method: "POST",
-				headers: { host: "localhost:18787" },
+				headers: { host: "localhost:17025" },
 			});
 			expect(res.status).toBe(200);
 

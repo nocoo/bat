@@ -5,9 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Port convention:
  *   - 7025: UI vite dev server
- *   - 8787: worker wrangler dev
- *   - 18787: L2 Worker E2E tests
- *   - 27787: L3 Playwright tests (this config)
+ *   - 8787: worker wrangler dev (default)
+ *   - 17025: L2 Worker E2E tests
+ *   - 27025: L3 Playwright tests (this config)
  *
  * Auth strategy: Cloudflare Access is external, so localhost bypasses auth.
  * Tests run against local Wrangler where /api/me returns authenticated: false.
@@ -26,7 +26,7 @@ export default defineConfig({
 	},
 
 	use: {
-		baseURL: "http://localhost:27787",
+		baseURL: "http://localhost:27025",
 		trace: "on-first-retry",
 		screenshot: "only-on-failure",
 	},
@@ -39,12 +39,12 @@ export default defineConfig({
 	],
 
 	webServer: {
-		// Start local Wrangler serving Worker + static assets on port 27787
+		// Start local Wrangler serving Worker + static assets on port 27025
 		// First apply migrations, then start wrangler
 		// Uses a separate persist dir to avoid conflicts with L2 tests
 		command:
-			"cd ../worker && bash ../../scripts/l3-setup.sh && bunx wrangler dev --port 27787 --local --persist-to .wrangler/e2e-pw",
-		url: "http://localhost:27787/api/live",
+			"cd ../worker && bash ../../scripts/l3-setup.sh && bunx wrangler dev --port 27025 --local --persist-to .wrangler/e2e-pw",
+		url: "http://localhost:27025/api/live",
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
 		stdout: "pipe",
