@@ -13,11 +13,11 @@
 //   1. `--local` — wrangler dev points at a local miniflare D1, never prod.
 //   2. `--persist-to .wrangler/e2e` — dedicated ephemeral state dir.
 //   3. We delete `.wrangler/e2e` before booting, so each run is clean.
-//   4. After migrations apply, we assert `_test_marker` row exists. The
-//      marker is created by `0018_test_marker.sql` and only ever materializes
-//      in the local miniflare D1 used here — production deploys are physically
-//      isolated (no remote test DB exists in the CF account), so the marker
-//      doubles as a self-identification check that this loop is on a local DB.
+//   4. After production migrations, we apply `fixtures/test_marker.sql` to
+//      stamp the local DB, then assert the marker row exists. This file lives
+//      outside `migrations/` so it's never applied to production D1 — the
+//      marker doubles as a self-identification check that this loop is on a
+//      test DB.
 //   5. Pre-flight env scan — refuse to start if any env var that would point
 //      wrangler at a remote/prod resource is set (CLOUDFLARE_API_TOKEN,
 //      CLOUDFLARE_ACCOUNT_ID, WRANGLER_SEND_METRICS=true). Even though we
@@ -35,6 +35,7 @@ const WORKER_ROOT = join(__dirname, "../..");
 const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
 const DEV_VARS_PATH = join(WORKER_ROOT, ".dev.vars");
 const MIGRATIONS_DIR = join(WORKER_ROOT, "migrations");
+const TEST_MARKER_SQL = join(__dirname, "fixtures/test_marker.sql");
 
 const PORT = 17025;
 const BASE = `http://localhost:${PORT}`;
@@ -133,6 +134,24 @@ export async function setup(): Promise<void> {
 			WORKER_ROOT,
 		);
 	}
+
+	// Apply test marker AFTER production migrations — this file lives outside
+	// migrations/ so it never gets applied to production D1.
+	await runCommand(
+		[
+			"npx",
+			"wrangler",
+			"d1",
+			"execute",
+			"bat-db",
+			"--local",
+			"--persist-to",
+			".wrangler/e2e",
+			"--file",
+			TEST_MARKER_SQL,
+		],
+		WORKER_ROOT,
+	);
 
 	// Isolation guard layer 4 — assert _test_marker present. If a future
 	// refactor accidentally points this loop at a non-test D1, the marker
