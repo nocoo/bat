@@ -18,11 +18,11 @@
 | Dimension | What | Tools | Trigger | Pass criteria |
 |-----------|------|-------|---------|---------------|
 | **L1** Unit | Pure logic tests | Bun test (TS), `cargo llvm-cov` (Rust) | pre-commit | ≥ 90% TS, ≥ 95% Rust |
-| **L2** Integration | Real HTTP E2E against Wrangler | Bun test + local Wrangler/D1 | pre-push | 100% route coverage, 57 tests |
-| **L3** Browser E2E | User flows in real browser | Playwright (Chromium) | CI only | All specs pass, 69 tests |
+| **L2** Integration | Real HTTP E2E against Wrangler | Bun test + local Wrangler/D1 | pre-push | 100% route coverage |
+| **L3** Browser E2E | User flows in real browser | Playwright (Chromium) | CI only | All specs pass |
 | **G1** Static | Type errors, lint, format | Biome, tsc, clippy, cargo fmt | pre-commit | 0 diagnostics |
 | **G2** Security | CVEs + secrets | osv-scanner, gitleaks | pre-push | 0 vulnerabilities, 0 leaks |
-| **D1** Isolation | Test/prod resource separation | `[env.test]` bindings, verify script | build-time | All test bindings use `-test` suffix |
+| **D1** Isolation | Test/prod resource separation | Local Miniflare only (`--local`) | runtime | L2/L3 never touch prod D1 |
 
 ### Tier System
 
@@ -271,33 +271,33 @@ Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
 
 ## D1 — Test Isolation
 
-**What**: Test resources are physically separated from dev/prod to prevent accidental data corruption.
+**What**: L2/L3 tests run against local Miniflare D1 only, never touching production.
 
-**When**: Verified at build time and in pre-push hook.
+**When**: Enforced at runtime by five-layer isolation guard in `global-setup.ts`.
 
-### Resource separation
+### Isolation layers
 
-| Resource | Dev/Prod | Test |
-|----------|----------|------|
-| D1 Database | `bat-db` (89d4d080) | `bat-db-test` (04bd8235) |
-| Worker name | `bat` | `bat-test` |
-| Environment var | `development` / `production` | `test` |
-
-### Verification
-
-- `scripts/verify-test-bindings.ts` — checks all `[env.test]` bindings use `-test` suffixed names
-- `_test_marker` table (migration `0018`) — only exists in test DB for positive identification
-- Pre-push hook runs D1 isolation check before L2 tests
+| Layer | Mechanism | What it prevents |
+|-------|-----------|------------------|
+| 1 | `--local` flag | Wrangler uses in-process Miniflare, not remote CF |
+| 2 | `--persist-to .wrangler/e2e` | Dedicated state dir, separate from other runs |
+| 3 | Dir wiped before each run | Clean slate, no stale data |
+| 4 | `_test_marker` row asserted | Test-only marker table (applied from `fixtures/test_marker.sql`, not in production migrations) |
+| 5 | Env var guard | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set |
 
 ### Failure behavior
 
-Pre-push hook blocks the push if test bindings reference production resources.
+L2 global-setup aborts if any isolation check fails (missing marker, blocked env vars).
+
+### Note
+
+There is no remote `bat-db-test` database or `[env.test]` wrangler environment. Isolation is achieved entirely through local Miniflare.
 
 ---
 
 ## Hook Execution Model
 
-### pre-commit: L1 + G1 (5 parallel stages)
+### pre-commit: L1 + G1 + G2 + gates (7 parallel stages)
 
 Runs on every `git commit`. All stages execute in parallel; any failure blocks the commit.
 
@@ -308,18 +308,20 @@ Runs on every `git commit`. All stages execute in parallel; any failure blocks t
 | `lint` | `bunx lint-staged` | G1: Biome lint on staged files |
 | `rust_lint` | `cargo fmt --check && cargo clippy -- -D warnings` | G1: Rust format + lint (only if `probe/` changed) |
 | `gitleaks` | `gitleaks protect --staged --no-banner` | G2: Secrets detection on staged changes |
+| `routes` | `bun run gate:routes` | L2: Structural route coverage gate |
+| `pages` | `bun run gate:pages` | L3: Structural page coverage gate |
 
 **Total time**: ~15-20s (parallel, dominated by unit tests + Rust compilation).
 
-### pre-push: L2 + G2 + D1 (3 parallel stages)
+### pre-push: L2 + G2 (3 parallel stages)
 
 Runs before `git push`. All stages execute in parallel; any failure blocks the push.
 
 | Stage | Command | What |
 |-------|---------|------|
-| `d1_isolation` | `scripts/verify-test-bindings.ts` | D1: Verify test bindings |
-| `l2_e2e` | `bun turbo test:e2e --filter=@bat/worker` | L2: Full API E2E (57 tests) |
-| `osv_js` + `osv_rust` | `osv-scanner scan --lockfile=...` | G2: CVE scanning for JS + Rust deps |
+| `l2_e2e` | `bun turbo test:e2e --filter=@bat/worker` | L2: Full API E2E |
+| `osv_js` | `osv-scanner scan --lockfile=bun.lock` | G2: CVE scanning for JS deps |
+| `osv_rust` | `osv-scanner scan --lockfile=probe/Cargo.lock` | G2: CVE scanning for Rust deps |
 
 **Total time**: ~25-30s (parallel, dominated by Wrangler startup + test execution).
 
@@ -339,6 +341,7 @@ GitHub Actions runs all dimensions in parallel for maximum speed.
 # .github/workflows/ci.yml
 jobs:
   quality:         # L1 + G1 + G2 via nocoo/base-ci
+  coverage-gates:  # Route + page structural coverage
   l2-e2e:          # L2: Worker E2E (local Wrangler/D1)
   l3-playwright:   # L3: Browser E2E (Chromium)
   probe:           # Rust: cargo test + clippy + fmt
@@ -349,11 +352,12 @@ jobs:
 | Job | Runs | Duration | Dependencies |
 |-----|------|----------|-------------|
 | `quality` | L1 unit tests, G1 typecheck + lint, G2 osv-scanner + gitleaks | ~45s | None |
-| `l2-e2e` | 57 Worker API E2E tests against local Wrangler | ~30s | None |
-| `l3-playwright` | 69 Playwright browser tests with Chromium | ~60s | None (builds UI internally) |
+| `coverage-gates` | gate:routes + gate:pages structural coverage | ~10s | None |
+| `l2-e2e` | Worker API E2E tests against local Wrangler | ~30s | None |
+| `l3-playwright` | Playwright browser tests with Chromium | ~60s | None (builds UI internally) |
 | `probe` | `cargo test` + `cargo clippy` + `cargo fmt --check` | ~60s (cold) / ~20s (cached) | None |
 
-All four jobs run in parallel (no `needs` dependency). Total CI time: ~60s (wall clock).
+All five jobs run in parallel (no `needs` dependency). Total CI time: ~60s (wall clock).
 
 ### CI-specific details
 
