@@ -90,6 +90,20 @@ cd packages/worker && bun dev      # wrangler dev 服务静态资源
 - **CI**: GitHub Actions via `nocoo/base-ci` reusable workflow
 - **Package manager**: bun (declared in `packageManager` field, single `bun.lock` lockfile)
 
+### L2 (E2E) layout & isolation
+
+E2E tests live in `packages/worker/test/e2e/*.test.ts`, one file per route group, sharing one wrangler dev instance via `global-setup.ts`.
+
+- **Boot**: `global-setup.ts` spawns `wrangler dev --local --persist-to .wrangler/e2e --port 18787` once for the whole suite (~10s saved per file). Migrations are auto-discovered from `migrations/` in lexical order — no hardcoded list to maintain.
+- **Helpers**: `helpers.ts` exports `BASE / writeHeaders() / readHeaders() / makeIdentityPayload() / assertStatus()`. Use `assertStatus` (not `expect`) inside `beforeAll` — biome's `noMisplacedAssertion` forbids `expect` outside `it/test`.
+- **Per-file HID**: each test file owns a unique `host_id` prefix (e.g. `e2e-tags-host`, `e2e-maint-host`) to avoid cross-file D1 contamination since `fileParallelism: false` runs files serially against shared state.
+- **Five-layer isolation guard** (mirrors zhe `docs/05-testing.md` §L2):
+  1. `--local` (wrangler points at miniflare D1, never prod)
+  2. `--persist-to .wrangler/e2e` (dedicated state dir)
+  3. dir wiped before each run (clean slate)
+  4. `_test_marker` row asserted post-migration (production D1 never has migration `0018_test_marker.sql` applied selectively)
+  5. pre-flight env scan refuses to start if `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, or `CF_API_TOKEN` is set
+
 ## Probe Build & Release
 
 ### Cross-compile (macOS → Linux)
