@@ -364,9 +364,9 @@ database_name = "bat-db"
 crons = ["0 * * * *"]
 ```
 
-### Test environment (`[env.test]`)
+### Test environment
 
-Isolated D1 database (`bat-db-test`) and separate domain (`bat-ingest-test.worker.hexly.ai`). See [07-testing.md § D1 Isolation](./07-testing.md#d1--test-isolation).
+L2/L3 tests use local Miniflare D1 only (`--local` flag) — no remote test database or `[env.test]` environment. See [07-testing.md § D1 Isolation](./07-testing.md#d1--test-isolation).
 
 ---
 
