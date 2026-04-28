@@ -169,20 +169,21 @@ jobs:
           workingDirectory: packages/worker
           command: deploy --env production
 
-      - name: Verify /api/live responds 200
+      - name: Verify /api/live reports new version
         run: |
           set -e
+          EXPECTED="${{ steps.ver.outputs.version }}"
           for i in 1 2 3 4 5 6; do
             HTTP=$(curl -fsS -o /tmp/live.json -w "%{http_code}" https://bat-ingest.worker.hexly.ai/api/live || echo "000")
             ACTUAL=$(jq -r .version /tmp/live.json 2>/dev/null || echo "?")
-            echo "attempt $i: http=$HTTP version=$ACTUAL"
-            if [ "$HTTP" = "200" ]; then
-              echo "✅ Live endpoint healthy"
+            echo "attempt $i: http=$HTTP version=$ACTUAL expected=$EXPECTED"
+            if [ "$ACTUAL" = "$EXPECTED" ]; then
+              echo "✅ Live version matches"
               exit 0
             fi
             sleep 5
           done
-          echo "❌ /api/live not healthy after 30s"
+          echo "❌ /api/live did not report $EXPECTED after 30s"
           exit 1
 
       - name: Summary
