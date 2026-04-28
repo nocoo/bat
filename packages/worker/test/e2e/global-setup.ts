@@ -9,7 +9,7 @@
 //   - bat workers run via `wrangler dev --local` against in-process miniflare,
 //     so spawning + waiting in this script is enough; no separate Next.js.
 //
-// Isolation guard (four layers, mirroring zhe docs/05-testing.md §L2):
+// Isolation guard (five layers, mirroring zhe docs/05-testing.md §L2):
 //   1. `--local` — wrangler dev points at a local miniflare D1, never prod.
 //   2. `--persist-to .wrangler/e2e` — dedicated ephemeral state dir.
 //   3. We delete `.wrangler/e2e` before booting, so each run is clean.
@@ -17,6 +17,11 @@
 //      D1 never gets `0018_test_marker.sql` applied (the migration is in
 //      migrations/ but only `--local` runs here apply ALL of them via this
 //      setup; prod migrations are applied selectively by the deploy script).
+//   5. Pre-flight env scan — refuse to start if any env var that would point
+//      wrangler at a remote/prod resource is set (CLOUDFLARE_API_TOKEN,
+//      CLOUDFLARE_ACCOUNT_ID, WRANGLER_SEND_METRICS=true). Even though we
+//      pass `--local`, defense-in-depth prevents an accidental future flag
+//      from leaking auth credentials into the loop.
 
 import { type ChildProcess, spawn } from "node:child_process";
 import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
@@ -85,7 +90,23 @@ function discoverMigrations(): string[] {
 		.map((f) => join("migrations", f));
 }
 
+/** Isolation guard layer 5 — refuse to run if env vars are set that could
+ *  point wrangler at a remote (production) Cloudflare resource. Defense in
+ *  depth: even though we pass `--local`, a future flag drift or
+ *  child-process inheritance must not be able to reach prod. */
+function assertNoRemoteCloudflareEnv(): void {
+	const offenders = ["CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID", "CF_API_TOKEN"].filter(
+		(k) => process.env[k],
+	);
+	if (offenders.length > 0) {
+		throw new Error(
+			`E2E isolation guard failed: refusing to start with ${offenders.join(", ")} set. These could let wrangler reach a remote Cloudflare resource. Unset them and re-run.`,
+		);
+	}
+}
+
 export async function setup(): Promise<void> {
+	assertNoRemoteCloudflareEnv();
 	devVarsExistedBefore = existsSync(DEV_VARS_PATH);
 	writeFileSync(DEV_VARS_PATH, `BAT_WRITE_KEY=${WRITE_KEY}\nBAT_READ_KEY=${READ_KEY}\n`);
 
