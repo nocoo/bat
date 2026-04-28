@@ -94,7 +94,7 @@ cd packages/worker && bun dev      # wrangler dev 服务静态资源
 
 E2E tests live in `packages/worker/test/e2e/*.test.ts`, one file per route group, sharing one wrangler dev instance via `global-setup.ts`.
 
-- **Boot**: `global-setup.ts` spawns `wrangler dev --local --persist-to .wrangler/e2e --port 18787` once for the whole suite (~10s saved per file). Migrations are auto-discovered from `migrations/` in lexical order — no hardcoded list to maintain.
+- **Boot**: `global-setup.ts` spawns `wrangler dev --local --persist-to .wrangler/e2e --port 17025` once for the whole suite (~10s saved per file). Migrations are auto-discovered from `migrations/` in lexical order — no hardcoded list to maintain.
 - **Helpers**: `helpers.ts` exports `BASE / writeHeaders() / readHeaders() / makeIdentityPayload() / assertStatus()`. Use `assertStatus` (not `expect`) inside `beforeAll` — biome's `noMisplacedAssertion` forbids `expect` outside `it/test`.
 - **Per-file HID**: each test file owns a unique `host_id` prefix (e.g. `e2e-tags-host`, `e2e-maint-host`) to avoid cross-file D1 contamination since `fileParallelism: false` runs files serially against shared state.
 - **Five-layer isolation guard** (mirrors zhe `docs/05-testing.md` §L2):
@@ -140,7 +140,11 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
 
 ### Release checklist
 
-**Worker + UI 部署已自动化**（P0，2026-04）：tag `v*.*.*` push 触发 `.github/workflows/release.yml`，自动跑 build → D1 migrate → wrangler deploy → verify `/api/live`。Probe 二进制 / R2 / VPS 仍手动（待 P1/P2）。
+**Worker + UI 部署已自动化**（P0，2026-04）：
+- **Tag 触发**：`v*.*.*` tag push 触发部署（严格版本校验）
+- **CI 绿灯触发**：main 分支 CI 通过后自动部署（连续部署）
+- 流程：build → D1 migrate → wrangler deploy → verify `/api/live`
+- Probe 二进制 / R2 / VPS 仍手动（待 P1/P2）
 
 GitHub Secrets 依赖：`CLOUDFLARE_API_TOKEN`（Workers Edit + D1 Edit）、`CLOUDFLARE_ACCOUNT_ID`。
 
