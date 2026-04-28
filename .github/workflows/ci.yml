@@ -23,6 +23,29 @@ jobs:
     secrets: inherit
 
   # ─────────────────────────────────────────────────────
+  # Coverage gates: structural route + page coverage
+  # Runs in PARALLEL — static analysis, no runtime needed.
+  # ─────────────────────────────────────────────────────
+  coverage-gates:
+    name: "Coverage Gates"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
+      - name: "G: Route coverage (L2)"
+        run: bun run gate:routes
+
+      - name: "G: Page coverage (L3)"
+        run: bun run gate:pages
+
+  # ─────────────────────────────────────────────────────
   # L2: Worker E2E — local wrangler miniflare
   # Runs in PARALLEL with quality for faster CI.
   # No external secrets needed — uses local D1/miniflare.
