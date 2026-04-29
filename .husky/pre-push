@@ -4,6 +4,7 @@ set -o pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$HOOK_DIR/../scripts/ensure-tools.sh"
 require_tool osv-scanner "dependency audit"
+require_tool gitleaks "secrets scanning"
 [ -f bun.lock ] || { echo "❌ bun.lock not found" >&2; exit 1; }
 
 TMPDIR_HOOK=$(mktemp -d -t bat-prepush-XXXXXX)
@@ -31,13 +32,11 @@ wait_stage() {
 # L2: Worker API E2E tests
 run_bg l2_e2e bun turbo test:e2e --filter=@bat/worker
 
-# G2: Security scanning
-run_bg osv_js   osv-scanner scan --lockfile=bun.lock --config=osv-scanner.toml
-run_bg osv_rust osv-scanner scan --lockfile=probe/Cargo.lock --config=osv-scanner.toml
+# G2: Security scanning (osv-scanner + gitleaks unified)
+run_bg g2_security bun run gate:security
 
 # Wait in declaration order
 wait_stage l2_e2e
-wait_stage osv_js
-wait_stage osv_rust
+wait_stage g2_security
 
 echo "✔ pre-push passed (L2 + G2)"
