@@ -10,7 +10,7 @@ describe("L2: SPA root + live", () => {
 		expect(res.status).toBe(200);
 		const text = await res.text();
 		expect(text).toContain("<!DOCTYPE html>");
-		expect(text).toContain("Bat Dashboard");
+		expect(text).toContain("bat - VPS Monitoring Dashboard");
 	});
 
 	test("GET /api/live → 200", async () => {
