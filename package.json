@@ -17,6 +17,7 @@
 		"test:e2e:pw": "cd packages/ui && bunx playwright test",
 		"gate:routes": "bun run scripts/check-route-coverage.ts",
 		"gate:pages": "bun run scripts/check-page-coverage.ts",
+		"gate:security": "bun run scripts/run-security.ts",
 		"prepare": "husky"
 	},
 	"trustedDependencies": ["@biomejs/biome", "esbuild", "workerd"],
