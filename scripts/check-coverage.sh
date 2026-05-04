@@ -46,8 +46,8 @@ check_ts_coverage() {
 
 check_rust_coverage() {
   if ! command -v cargo-llvm-cov &>/dev/null; then
-    echo "⚠ probe: cargo-llvm-cov not installed (skipping)"
-    return 0
+    echo "✘ probe: cargo-llvm-cov not installed — install with 'cargo install cargo-llvm-cov' and 'rustup component add llvm-tools-preview'"
+    return 1
   fi
 
   # Prefer nightly for coverage(off) attribute support
