@@ -146,7 +146,7 @@ export function HostDetailPage() {
 						</div>
 
 						{/* Right column — system info + disks */}
-						<div className="space-y-4">
+						<div className="space-y-4 min-w-0">
 							<h2 className="text-base font-semibold">Overview</h2>
 							{host && (
 								<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
