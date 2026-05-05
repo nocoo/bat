@@ -15,6 +15,7 @@ export {
 	useHostTagsFor,
 	useHostTier2,
 	useMe,
+	useSettings,
 	useSetup,
 	useTags,
 	useWebhooks,

@@ -16,6 +16,7 @@ import type {
 	HostTag,
 	MaintenanceWindow,
 	MetricsQueryResponse,
+	SettingsResponse,
 	TagItem,
 	Tier2Snapshot,
 	WebhookConfig,
@@ -145,3 +146,7 @@ export function useEvents(hostId?: string, page = 1) {
 		POLL_30,
 	);
 }
+
+// ---- Settings ---------------------------------------------------------------
+export const useSettings = () =>
+	useSWR<SettingsResponse>("settings", () => getAPI<SettingsResponse>("/api/settings"), KEEP_PREV);
