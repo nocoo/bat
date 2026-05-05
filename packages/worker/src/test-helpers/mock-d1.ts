@@ -43,6 +43,7 @@ const MIGRATION_MAINTENANCE_PATH = resolve(
 	"../../migrations/0017_maintenance_window.sql",
 );
 const MIGRATION_TAGS_PATH = resolve(__dirname, "../../migrations/0010_tags.sql");
+const MIGRATION_SETTINGS_PATH = resolve(__dirname, "../../migrations/0018_settings.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -273,6 +274,15 @@ export function createMockD1(): D1Database {
 	// Apply tags migration
 	const tagsSchema = readFileSync(MIGRATION_TAGS_PATH, "utf-8");
 	for (const stmt of tagsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply settings migration
+	const settingsSchema = readFileSync(MIGRATION_SETTINGS_PATH, "utf-8");
+	for (const stmt of settingsSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
