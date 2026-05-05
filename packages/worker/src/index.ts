@@ -30,6 +30,7 @@ import {
 	monitoringHostDetailRoute,
 	monitoringHostsRoute,
 } from "./routes/monitoring.js";
+import { settingsGetRoute, settingsPutRoute } from "./routes/settings.js";
 import { setupRoute } from "./routes/setup.js";
 import {
 	hostTagsAddRoute,
@@ -113,6 +114,8 @@ app.get("/api/webhooks", webhooksListRoute);
 app.post("/api/webhooks", webhooksCreateRoute);
 app.delete("/api/webhooks/:id", webhooksDeleteRoute);
 app.post("/api/webhooks/:id/regenerate", webhooksRegenerateRoute);
+app.get("/api/settings", settingsGetRoute);
+app.put("/api/settings", settingsPutRoute);
 
 export default {
 	fetch: app.fetch,

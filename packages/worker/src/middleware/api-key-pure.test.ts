@@ -71,6 +71,15 @@ describe("isWriteRequest — allowed-ports", () => {
 	});
 });
 
+describe("isWriteRequest — settings", () => {
+	test("PUT /api/settings is a write", () => {
+		expect(isWriteRequest("PUT", "/api/settings")).toBe(true);
+	});
+	test("GET /api/settings is a read", () => {
+		expect(isWriteRequest("GET", "/api/settings")).toBe(false);
+	});
+});
+
 describe("isWriteRequest — other GET routes are reads", () => {
 	test.each([
 		["GET", "/api/hosts"],

@@ -90,6 +90,12 @@ export function isWriteRequest(method: string, path: string): boolean {
 		return true;
 	}
 
+	// Settings mutations require write key
+	// PUT /api/settings — update settings
+	if (path === "/api/settings" && method === "PUT") {
+		return true;
+	}
+
 	return false;
 }
 
