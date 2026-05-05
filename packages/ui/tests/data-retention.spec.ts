@@ -1,11 +1,39 @@
 import { expect, test } from "@playwright/test";
 
-test.describe("Data Retention page", () => {
-	// Restore default 7-day retention after each test
-	test.afterEach(async ({ request }) => {
-		await request.put("/api/settings", { data: { retention_days: 7 } });
+// Helper: mock GET /api/settings to return a fixed value, and optionally
+// mock PUT to succeed (updating the mocked value) or fail. Each test gets
+// its own in-memory state so parallel workers never interfere.
+function mockSettingsAPI(
+	page: import("@playwright/test").Page,
+	opts: { initial: number; putResult?: "success" | "fail" },
+) {
+	let current = opts.initial;
+	return page.route("**/api/settings", async (route) => {
+		if (route.request().method() === "GET") {
+			await route.fulfill({
+				status: 200,
+				contentType: "application/json",
+				body: JSON.stringify({ retention_days: current }),
+			});
+		} else if (route.request().method() === "PUT") {
+			if (opts.putResult === "fail") {
+				await route.fulfill({ status: 500, body: "Internal Server Error" });
+			} else {
+				const body = route.request().postDataJSON();
+				current = body.retention_days;
+				await route.fulfill({
+					status: 200,
+					contentType: "application/json",
+					body: JSON.stringify({ retention_days: current }),
+				});
+			}
+		} else {
+			await route.continue();
+		}
 	});
+}
 
+test.describe("Data Retention page", () => {
 	test("page loads with correct breadcrumbs", async ({ page }) => {
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
@@ -26,6 +54,7 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("shows retention radios with proper labels", async ({ page }) => {
+		await mockSettingsAPI(page, { initial: 7 });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -35,13 +64,13 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("7 days is selected by default", async ({ page }) => {
+		await mockSettingsAPI(page, { initial: 7 });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
 		const radio7 = page.getByRole("radio", { name: "7 days" });
 		await expect(radio7).toBeChecked({ timeout: 15_000 });
 
-		// Other options are not selected
 		await expect(page.getByRole("radio", { name: "1 day" })).not.toBeChecked();
 		await expect(page.getByRole("radio", { name: "30 days" })).not.toBeChecked();
 	});
@@ -55,26 +84,22 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("clicking 30 days saves and shows Saved feedback", async ({ page }) => {
+		await mockSettingsAPI(page, { initial: 7, putResult: "success" });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Wait for initial load
 		const radio30 = page.getByRole("radio", { name: "30 days" });
 		await expect(radio30).toBeAttached({ timeout: 15_000 });
 
-		// Click 30 days via its label (radio is sr-only)
 		await page.getByText("30 days").click();
 
-		// Should show "Saved" feedback
 		await expect(page.getByText("Saved")).toBeVisible({ timeout: 10_000 });
-
-		// 30 days should now be checked
 		await expect(radio30).toBeChecked();
-		// 7 days should no longer be checked
 		await expect(page.getByRole("radio", { name: "7 days" })).not.toBeChecked();
 	});
 
 	test("clicking 1 day saves and updates selection", async ({ page }) => {
+		await mockSettingsAPI(page, { initial: 7, putResult: "success" });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -87,32 +112,17 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("PUT failure shows error and preserves original selection", async ({ page }) => {
+		await mockSettingsAPI(page, { initial: 7, putResult: "fail" });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Wait for initial render
 		const radio7 = page.getByRole("radio", { name: "7 days" });
 		await expect(radio7).toBeChecked({ timeout: 15_000 });
 
-		// Mock PUT /api/settings to fail
-		await page.route("**/api/settings", async (route) => {
-			if (route.request().method() === "PUT") {
-				await route.fulfill({ status: 500, body: "Internal Server Error" });
-			} else {
-				await route.continue();
-			}
-		});
-
-		// Click 30 days — should fail
 		await page.getByText("30 days").click();
 
-		// Should show error message
 		await expect(page.getByText("API error: 500")).toBeVisible({ timeout: 10_000 });
-
-		// "Saved" should NOT be visible
 		await expect(page.getByText("Saved")).not.toBeVisible();
-
-		// Original selection (7 days) should be preserved via SWR revalidation
 		await expect(radio7).toBeChecked();
 	});
 });
