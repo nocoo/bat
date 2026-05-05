@@ -51,7 +51,7 @@ import {
 	webhooksListRoute,
 	webhooksRegenerateRoute,
 } from "./routes/webhooks.js";
-import { aggregateHour, purgeOldData } from "./services/aggregation.js";
+import { aggregateHour, runScheduledMaintenance } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
@@ -122,7 +122,7 @@ export default {
 	async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
 		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
 		await aggregateHour(env.DB, hourTs);
-		await purgeOldData(env.DB, Math.floor(Date.now() / 1000));
+		await runScheduledMaintenance(env.DB, Math.floor(Date.now() / 1000));
 	},
 };
 
