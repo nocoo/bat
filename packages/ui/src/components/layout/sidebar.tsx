@@ -8,6 +8,7 @@ import { APP_VERSION } from "@/lib/version";
 import {
 	Bell,
 	ChevronUp,
+	Database,
 	Download,
 	PanelLeft,
 	ScrollText,
@@ -52,6 +53,7 @@ const NAV_GROUPS: NavGroup[] = [
 		items: [
 			{ href: "/setup", label: "Setup", icon: Download },
 			{ href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
+			{ href: "/settings/data", label: "Data Retention", icon: Database },
 		],
 	},
 ];

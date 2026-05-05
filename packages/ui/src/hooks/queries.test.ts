@@ -39,6 +39,7 @@ import {
 	useHostTier2,
 	useHosts,
 	useMe,
+	useSettings,
 	useSetup,
 	useTags,
 	useWebhooks,
@@ -244,5 +245,14 @@ describe("query hooks — keys, configs, and fetcher routes", () => {
 	test("useHostMaintenance(null) suspends fetch", () => {
 		renderHook(() => useHostMaintenance(null));
 		expect(lastCall().key).toBeNull();
+	});
+
+	test("useSettings → key 'settings', keepPreviousData, fetches /api/settings", async () => {
+		renderHook(() => useSettings());
+		const c = lastCall();
+		expect(c.key).toBe("settings");
+		expect(c.config).toMatchObject({ keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/settings");
 	});
 });
