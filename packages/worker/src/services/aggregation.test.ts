@@ -1,7 +1,6 @@
-import { RETENTION } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1";
-import { aggregateHour, purgeOldData } from "./aggregation";
+import { aggregateHour, purgeOldData, runScheduledMaintenance } from "./aggregation";
 
 async function insertHost(db: D1Database, hostId: string, lastSeen: number) {
 	await db
@@ -556,42 +555,31 @@ describe("aggregateHour", () => {
 	});
 });
 
-describe("purgeOldData", () => {
+describe("purgeOldData — unified retention", () => {
 	let db: D1Database;
 
 	beforeEach(() => {
 		db = createMockD1();
 	});
 
-	test("removes raw data older than 7 days", async () => {
-		const now = 1700000000;
-		await insertHost(db, "host-001", now);
+	async function insertEvent(d: D1Database, hostId: string, createdAt: number) {
+		await d
+			.prepare(
+				"INSERT INTO events (host_id, title, body, tags, source_ip, created_at) VALUES (?, 'e', '', '[]', '127.0.0.1', ?)",
+			)
+			.bind(hostId, createdAt)
+			.run();
+	}
 
-		// Old data (8 days ago)
-		const oldTs = now - 8 * 86400;
-		await insertRawMetrics(db, "host-001", oldTs);
-		// Recent data (1 day ago)
-		const recentTs = now - 1 * 86400;
-		await insertRawMetrics(db, "host-001", recentTs);
+	async function insertTier2(d: D1Database, hostId: string, ts: number) {
+		await d
+			.prepare("INSERT INTO tier2_snapshots (host_id, ts, ports_json) VALUES (?, ?, '[]')")
+			.bind(hostId, ts)
+			.run();
+	}
 
-		await purgeOldData(db, now);
-
-		const remaining = await db
-			.prepare("SELECT ts FROM metrics_raw WHERE host_id = ?")
-			.bind("host-001")
-			.all<{ ts: number }>();
-
-		expect(remaining.results).toHaveLength(1);
-		expect(remaining.results[0].ts).toBe(recentTs);
-	});
-
-	test("removes hourly data older than 90 days", async () => {
-		const now = 1700000000;
-		await insertHost(db, "host-001", now);
-
-		// Old hourly (91 days ago)
-		const oldHourTs = now - 91 * 86400;
-		await db
+	async function insertHourly(d: D1Database, hostId: string, hourTs: number) {
+		await d
 			.prepare(
 				`INSERT INTO metrics_hourly (host_id, hour_ts, sample_count, cpu_usage_avg, cpu_usage_max,
          cpu_iowait_avg, cpu_steal_avg, cpu_load1_avg, cpu_load5_avg, cpu_load15_avg,
@@ -603,39 +591,181 @@ describe("purgeOldData", () => {
          8000000000, 4000000000, 50, 60, 2000000000, 100000000, 5, 8,
          86000, '[]', 1000, 5000, 500, 2000, 0, 0)`,
 			)
-			.bind("host-001", oldHourTs)
+			.bind(hostId, hourTs)
 			.run();
+	}
 
-		// Recent hourly (30 days ago)
-		const recentHourTs = now - 30 * 86400;
-		await db
-			.prepare(
-				`INSERT INTO metrics_hourly (host_id, hour_ts, sample_count, cpu_usage_avg, cpu_usage_max,
-         cpu_iowait_avg, cpu_steal_avg, cpu_load1_avg, cpu_load5_avg, cpu_load15_avg,
-         mem_total, mem_available_min, mem_used_pct_avg, mem_used_pct_max,
-         swap_total, swap_used_max, swap_used_pct_avg, swap_used_pct_max,
-         uptime_min, disk_json, net_rx_bytes_avg, net_rx_bytes_max,
-         net_tx_bytes_avg, net_tx_bytes_max, net_rx_errors, net_tx_errors)
-       VALUES (?, ?, 10, 20, 30, 1, 0, 0.5, 0.3, 0.2,
-         8000000000, 4000000000, 50, 60, 2000000000, 100000000, 5, 8,
-         86000, '[]', 1000, 5000, 500, 2000, 0, 0)`,
-			)
-			.bind("host-001", recentHourTs)
-			.run();
+	test("retention_days=7: removes data older than 7 days across all tables", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
 
-		await purgeOldData(db, now);
+		const oldTs = now - 8 * 86400; // 8 days ago
+		const recentTs = now - 1 * 86400; // 1 day ago
 
-		const remaining = await db
-			.prepare("SELECT hour_ts FROM metrics_hourly WHERE host_id = ?")
-			.bind("host-001")
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+		await insertHourly(db, "h1", oldTs);
+		await insertHourly(db, "h1", recentTs);
+		await insertTier2(db, "h1", oldTs);
+		await insertTier2(db, "h1", recentTs);
+		await insertEvent(db, "h1", oldTs);
+		await insertEvent(db, "h1", recentTs);
+
+		await purgeOldData(db, now, 7);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
+
+		const hourly = await db
+			.prepare("SELECT hour_ts FROM metrics_hourly")
 			.all<{ hour_ts: number }>();
+		expect(hourly.results).toHaveLength(1);
+		expect(hourly.results[0].hour_ts).toBe(recentTs);
 
-		expect(remaining.results).toHaveLength(1);
-		expect(remaining.results[0].hour_ts).toBe(recentHourTs);
+		const tier2 = await db.prepare("SELECT ts FROM tier2_snapshots").all<{ ts: number }>();
+		expect(tier2.results).toHaveLength(1);
+		expect(tier2.results[0].ts).toBe(recentTs);
+
+		const events = await db.prepare("SELECT created_at FROM events").all<{ created_at: number }>();
+		expect(events.results).toHaveLength(1);
+		expect(events.results[0].created_at).toBe(recentTs);
 	});
 
-	test("uses correct retention constants", () => {
-		expect(RETENTION.RAW_DAYS).toBe(7);
-		expect(RETENTION.HOURLY_DAYS).toBe(90);
+	test("retention_days=1: removes data older than 1 day", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		const oldTs = now - 2 * 86400; // 2 days ago
+		const recentTs = now - 3600; // 1 hour ago
+
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+		await insertEvent(db, "h1", oldTs);
+		await insertEvent(db, "h1", recentTs);
+
+		await purgeOldData(db, now, 1);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
+
+		const events = await db.prepare("SELECT created_at FROM events").all<{ created_at: number }>();
+		expect(events.results).toHaveLength(1);
+		expect(events.results[0].created_at).toBe(recentTs);
+	});
+
+	test("retention_days=30: removes data older than 30 days", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		const oldTs = now - 31 * 86400; // 31 days ago
+		const recentTs = now - 10 * 86400; // 10 days ago
+
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+		await insertHourly(db, "h1", oldTs);
+		await insertHourly(db, "h1", recentTs);
+
+		await purgeOldData(db, now, 30);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
+
+		const hourly = await db
+			.prepare("SELECT hour_ts FROM metrics_hourly")
+			.all<{ hour_ts: number }>();
+		expect(hourly.results).toHaveLength(1);
+		expect(hourly.results[0].hour_ts).toBe(recentTs);
+	});
+
+	test("boundary: ts exactly at cutoff is retained", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		const exactCutoff = now - 7 * 86400; // exactly 7 days ago
+		await insertRawMetrics(db, "h1", exactCutoff);
+
+		await purgeOldData(db, now, 7);
+
+		// ts == cutoff should NOT be deleted (DELETE WHERE ts < cutoff)
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(exactCutoff);
+	});
+
+	test("boundary: ts one second before cutoff is deleted", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		const justBefore = now - 7 * 86400 - 1; // 1 second before cutoff
+		await insertRawMetrics(db, "h1", justBefore);
+
+		await purgeOldData(db, now, 7);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(0);
+	});
+});
+
+describe("runScheduledMaintenance", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("uses default retention_days=7 from settings table", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		const oldTs = now - 8 * 86400;
+		const recentTs = now - 1 * 86400;
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+
+		await runScheduledMaintenance(db, now);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
+	});
+
+	test("reads updated retention_days from settings", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		// Change setting to 1 day
+		await db.prepare("UPDATE settings SET value = '1' WHERE key = 'retention_days'").run();
+
+		const oldTs = now - 2 * 86400; // 2 days ago
+		const recentTs = now - 3600; // 1 hour ago
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+
+		await runScheduledMaintenance(db, now);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
+	});
+
+	test("falls back to 7 on bad settings value", async () => {
+		const now = 1700000000;
+		await insertHost(db, "h1", now);
+
+		await db.prepare("UPDATE settings SET value = 'garbage' WHERE key = 'retention_days'").run();
+
+		const oldTs = now - 8 * 86400;
+		const recentTs = now - 1 * 86400;
+		await insertRawMetrics(db, "h1", oldTs);
+		await insertRawMetrics(db, "h1", recentTs);
+
+		await runScheduledMaintenance(db, now);
+
+		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
+		expect(raw.results).toHaveLength(1);
+		expect(raw.results[0].ts).toBe(recentTs);
 	});
 });

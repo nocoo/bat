@@ -1,6 +1,6 @@
 // Hourly aggregation and data purge service
-import { RETENTION } from "@bat/shared";
-import { EVENT_RETENTION_DAYS } from "@bat/shared";
+import type { RetentionDays } from "@bat/shared";
+import { getRetentionDays } from "../routes/settings.js";
 
 /**
  * Aggregate raw metrics for all active hosts in a given hour.
@@ -546,24 +546,32 @@ export function aggregateDiskIo(rows: RawRow[]): string | null {
 }
 
 /**
- * Purge old data beyond retention windows.
- * - metrics_raw: older than 7 days
- * - metrics_hourly: older than 90 days
- * - tier2_snapshots: older than 90 days
+ * Purge old data beyond retention window.
+ * Unified semantics: all tables use the same retentionDays cutoff.
  */
-export async function purgeOldData(db: D1Database, nowSeconds: number): Promise<void> {
-	const rawCutoff = nowSeconds - RETENTION.RAW_DAYS * 86400;
-	const hourlyCutoff = nowSeconds - RETENTION.HOURLY_DAYS * 86400;
+export async function purgeOldData(
+	db: D1Database,
+	nowSeconds: number,
+	retentionDays: RetentionDays,
+): Promise<void> {
+	const cutoff = nowSeconds - retentionDays * 86400;
 
-	await db.prepare("DELETE FROM metrics_raw WHERE ts < ?").bind(rawCutoff).run();
+	await db.prepare("DELETE FROM metrics_raw WHERE ts < ?").bind(cutoff).run();
 
-	await db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(hourlyCutoff).run();
+	await db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(cutoff).run();
 
-	await db.prepare("DELETE FROM tier2_snapshots WHERE ts < ?").bind(hourlyCutoff).run();
+	await db.prepare("DELETE FROM tier2_snapshots WHERE ts < ?").bind(cutoff).run();
 
-	// Purge old events (30-day retention)
-	const eventCutoff = nowSeconds - EVENT_RETENTION_DAYS * 86400;
-	await db.prepare("DELETE FROM events WHERE created_at < ?").bind(eventCutoff).run();
+	await db.prepare("DELETE FROM events WHERE created_at < ?").bind(cutoff).run();
+}
+
+/**
+ * Scheduled maintenance entry point.
+ * Reads retention_days from settings, then purges old data.
+ */
+export async function runScheduledMaintenance(db: D1Database, nowSeconds: number): Promise<void> {
+	const retentionDays = await getRetentionDays(db);
+	await purgeOldData(db, nowSeconds, retentionDays);
 }
 
 // --- Helpers ---
