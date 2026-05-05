@@ -132,3 +132,11 @@ export {
 	isValidTimeHHMM,
 	toUtcHHMM,
 } from "./maintenance.js";
+
+// Settings types and utilities
+export type { RetentionDays, SettingsResponse, SettingsUpdateBody } from "./settings.js";
+export {
+	DEFAULT_RETENTION_DAYS,
+	parseRetentionDays,
+	RETENTION_OPTIONS,
+} from "./settings.js";

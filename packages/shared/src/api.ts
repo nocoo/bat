@@ -37,6 +37,7 @@ export const API_ROUTES = {
 	WEBHOOKS: "/api/webhooks",
 	WEBHOOK_DETAIL: "/api/webhooks/:id",
 	WEBHOOK_REGENERATE: "/api/webhooks/:id/regenerate",
+	SETTINGS: "/api/settings",
 } as const;
 
 // --- Response DTOs ---
