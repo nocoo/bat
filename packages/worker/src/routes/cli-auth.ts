@@ -25,14 +25,18 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 	const raw = await c.req.text();
 
 	if (raw.trim().length > 0) {
-		let body: Record<string, unknown>;
+		let body: unknown;
 		try {
 			body = JSON.parse(raw);
 		} catch {
 			return c.json({ error: "Invalid JSON body" }, 400);
 		}
-		if (typeof body.label === "string" && body.label.trim().length > 0) {
-			const trimmed = body.label.trim();
+		if (typeof body !== "object" || body === null || Array.isArray(body)) {
+			return c.json({ error: "Request body must be a JSON object" }, 400);
+		}
+		const obj = body as Record<string, unknown>;
+		if (typeof obj.label === "string" && obj.label.trim().length > 0) {
+			const trimmed = obj.label.trim();
 			if (trimmed.length > CLI_TOKEN_LABEL_MAX_LENGTH) {
 				return c.json(
 					{ error: `label must be at most ${CLI_TOKEN_LABEL_MAX_LENGTH} characters` },
