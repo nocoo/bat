@@ -17,6 +17,14 @@ import {
 	hostAllowedPortsListRoute,
 	hostAllowedPortsRemoveRoute,
 } from "./routes/allowed-ports.js";
+import {
+	assetsCreateRoute,
+	assetsDeleteRoute,
+	assetsGetRoute,
+	assetsListRoute,
+	assetsTagsReplaceRoute,
+	assetsUpdateRoute,
+} from "./routes/assets.js";
 import { cliAuthRoute } from "./routes/cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
@@ -139,6 +147,14 @@ app.get("/api/agents/:id", agentsGetRoute);
 app.patch("/api/agents/:id", agentsUpdateRoute);
 app.delete("/api/agents/:id", agentsDeleteRoute);
 app.put("/api/agents/:id/tags", agentsTagsReplaceRoute);
+
+// Asset CRUD (CLI token scope: assets)
+app.get("/api/assets", assetsListRoute);
+app.post("/api/assets", assetsCreateRoute);
+app.get("/api/assets/:id", assetsGetRoute);
+app.patch("/api/assets/:id", assetsUpdateRoute);
+app.delete("/api/assets/:id", assetsDeleteRoute);
+app.put("/api/assets/:id/tags", assetsTagsReplaceRoute);
 
 export default {
 	fetch: app.fetch,
