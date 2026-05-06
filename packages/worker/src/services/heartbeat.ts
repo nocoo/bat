@@ -77,20 +77,27 @@ export async function processHeartbeat(
 			);
 			updated++;
 		} else {
-			// Create new agent — use ON CONFLICT for idempotency under concurrent/retry
+			// Create new agent — use ON CONFLICT for idempotency under concurrent/retry.
+			// Dynamic DO UPDATE SET: status + last_seen_at always; runtime fields only if present.
 			const id = generateId("agt_");
 			const runtimeApp = "runtime_app" in entry ? (entry.runtime_app ?? null) : null;
 			const runtimeVersion = "runtime_version" in entry ? (entry.runtime_version ?? null) : null;
+
+			const conflictSets = ["status = excluded.status", "last_seen_at = excluded.last_seen_at"];
+			if ("runtime_app" in entry) {
+				conflictSets.push("runtime_app = excluded.runtime_app");
+			}
+			if ("runtime_version" in entry) {
+				conflictSets.push("runtime_version = excluded.runtime_version");
+			}
+
 			statements.push(
 				db
 					.prepare(
 						`INSERT INTO agents (id, source_key, match_key, runtime_app, runtime_version, status, last_seen_at)
 						 VALUES (?, ?, ?, ?, ?, ?, ?)
 						 ON CONFLICT(source_key, match_key) DO UPDATE SET
-						   runtime_app = COALESCE(excluded.runtime_app, agents.runtime_app),
-						   runtime_version = COALESCE(excluded.runtime_version, agents.runtime_version),
-						   status = excluded.status,
-						   last_seen_at = excluded.last_seen_at`,
+						   ${conflictSets.join(", ")}`,
 					)
 					.bind(id, sourceKey, entry.match_key, runtimeApp, runtimeVersion, entry.status, now),
 			);
