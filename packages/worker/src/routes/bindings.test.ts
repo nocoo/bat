@@ -1,4 +1,5 @@
 // Tests for Binding CRUD + Map/Overview routes
+import { hashHostId } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import {
@@ -279,6 +280,7 @@ describe("GET /api/assets/map", () => {
 		const data = await parseJson(res);
 		expect(data.hosts).toHaveLength(1);
 		expect(data.hosts[0].hostname).toBe("web-1");
+		expect(data.hosts[0].hid).toBe(hashHostId("h1"));
 		expect(data.agents).toHaveLength(1);
 		expect(data.agents[0].nickname).toBe("my-agent");
 		expect(data.assets).toHaveLength(1);

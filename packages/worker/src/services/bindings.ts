@@ -1,5 +1,6 @@
 // Binding CRUD + map/overview read models — D1 operations.
 
+import { hashHostId } from "@bat/shared";
 import type {
 	AssetMapAgent,
 	AssetMapAsset,
@@ -127,7 +128,7 @@ export async function getAssetMap(db: D1Database): Promise<AssetMapResponse> {
 	return {
 		hosts: hostRows.results.map((h) => ({
 			host_id: h.host_id,
-			hid: h.host_id.slice(0, 8),
+			hid: hashHostId(h.host_id),
 			hostname: h.hostname,
 			status: h.status,
 		})),
