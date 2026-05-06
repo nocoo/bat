@@ -1,7 +1,7 @@
 // L2 — Agent Heartbeat E2E
 // Validates heartbeat flow: create, update, mark-missing, source_key isolation.
 
-import type { AgentHeartbeatResponse } from "@bat/shared";
+import type { AgentHeartbeatResponse, AgentItem } from "@bat/shared";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { BASE, assertStatus, writeHeaders } from "./helpers";
 
@@ -30,22 +30,23 @@ describe("L2: POST /api/agents/heartbeat", () => {
 	});
 
 	afterAll(async () => {
-		// Clean up: delete all agents with our source_key
-		// First list them, then delete each
+		// Clean up only agents created by this test run.
+		// List all agents, filter by our unique SUFFIX in match_key field.
 		const listRes = await fetch(`${BASE}/api/agents`, {
 			headers: writeHeaders(),
 		});
 		if (listRes.ok) {
-			const agents = (await listRes.json()) as { id: string; source_key_short: string }[];
+			const agents = (await listRes.json()) as AgentItem[];
 			for (const agent of agents) {
-				// Delete by ID — we can't filter by source_key in list, so delete known ones
-				await fetch(`${BASE}/api/agents/${agent.id}`, {
-					method: "DELETE",
-					headers: writeHeaders(),
-				});
+				if (agent.match_key?.includes(SUFFIX)) {
+					await fetch(`${BASE}/api/agents/${agent.id}`, {
+						method: "DELETE",
+						headers: writeHeaders(),
+					});
+				}
 			}
 		}
-		// At minimum clean up the pre-registered one
+		// Fallback: ensure pre-registered agent is cleaned up
 		await fetch(`${BASE}/api/agents/${preRegisteredAgentId}`, {
 			method: "DELETE",
 			headers: writeHeaders(),
@@ -101,6 +102,18 @@ describe("L2: POST /api/agents/heartbeat", () => {
 					{ match_key: "dup", status: "running" },
 					{ match_key: "dup", status: "stopped" },
 				],
+			}),
+		});
+		expect(res.status).toBe(400);
+	});
+
+	test("POST /api/agents/heartbeat → 400 (status 'missing' is server-only)", async () => {
+		const res = await fetch(`${BASE}/api/agents/heartbeat`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({
+				source_key: SOURCE_KEY,
+				agents: [{ match_key: "mk_test", status: "missing" }],
 			}),
 		});
 		expect(res.status).toBe(400);
