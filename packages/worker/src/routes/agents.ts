@@ -1,11 +1,19 @@
 // Agent CRUD routes
-// POST   /api/agents     — create or upsert agent
-// GET    /api/agents     — list all agents
-// GET    /api/agents/:id — get single agent
-// PATCH  /api/agents/:id — update agent fields
-// DELETE /api/agents/:id — hard delete
+// POST   /api/agents          — create or upsert agent
+// GET    /api/agents          — list all agents
+// GET    /api/agents/:id      — get single agent
+// PATCH  /api/agents/:id      — update agent fields
+// DELETE /api/agents/:id      — hard delete
+// PUT    /api/agents/:id/tags — replace tag list
 
 import {
+	AGENT_MATCH_KEY_MAX_LENGTH,
+	AGENT_NICKNAME_MAX_LENGTH,
+	AGENT_ROLE_MAX_LENGTH,
+	AGENT_RUNTIME_APP_MAX_LENGTH,
+	AGENT_RUNTIME_VERSION_MAX_LENGTH,
+	AGENT_SOURCE_KEY_MAX_LENGTH,
+	MAX_TAGS_PER_AGENT,
 	VALID_AGENT_STATUSES,
 	generateId,
 	validateMetadata,
@@ -21,6 +29,7 @@ import {
 	getAgent,
 	hostExists,
 	listAgents,
+	replaceAgentTags,
 	updateAgent,
 } from "../services/agents.js";
 import type { AppEnv } from "../types.js";
@@ -57,29 +66,41 @@ export async function agentsCreateRoute(c: Context<AppEnv>) {
 	const obj = body as Record<string, unknown>;
 
 	// Validate required fields
-	const sourceKeyResult = validateString("source_key", obj.source_key, 64);
+	const sourceKeyResult = validateString("source_key", obj.source_key, AGENT_SOURCE_KEY_MAX_LENGTH);
 	if (!sourceKeyResult.ok) {
 		return c.json({ error: sourceKeyResult.error }, 400);
 	}
-	const matchKeyResult = validateString("match_key", obj.match_key, 128);
+	const matchKeyResult = validateString("match_key", obj.match_key, AGENT_MATCH_KEY_MAX_LENGTH);
 	if (!matchKeyResult.ok) {
 		return c.json({ error: matchKeyResult.error }, 400);
 	}
 
 	// Validate optional fields
-	const nicknameResult = validateOptionalString("nickname", obj.nickname, 64);
+	const nicknameResult = validateOptionalString(
+		"nickname",
+		obj.nickname,
+		AGENT_NICKNAME_MAX_LENGTH,
+	);
 	if (!nicknameResult.ok) {
 		return c.json({ error: nicknameResult.error }, 400);
 	}
-	const roleResult = validateOptionalString("role", obj.role, 64);
+	const roleResult = validateOptionalString("role", obj.role, AGENT_ROLE_MAX_LENGTH);
 	if (!roleResult.ok) {
 		return c.json({ error: roleResult.error }, 400);
 	}
-	const runtimeAppResult = validateOptionalString("runtime_app", obj.runtime_app, 64);
+	const runtimeAppResult = validateOptionalString(
+		"runtime_app",
+		obj.runtime_app,
+		AGENT_RUNTIME_APP_MAX_LENGTH,
+	);
 	if (!runtimeAppResult.ok) {
 		return c.json({ error: runtimeAppResult.error }, 400);
 	}
-	const runtimeVersionResult = validateOptionalString("runtime_version", obj.runtime_version, 32);
+	const runtimeVersionResult = validateOptionalString(
+		"runtime_version",
+		obj.runtime_version,
+		AGENT_RUNTIME_VERSION_MAX_LENGTH,
+	);
 	if (!runtimeVersionResult.ok) {
 		return c.json({ error: runtimeVersionResult.error }, 400);
 	}
@@ -124,11 +145,11 @@ export async function agentsCreateRoute(c: Context<AppEnv>) {
 		// Upsert: update existing agent
 		await updateAgent(c.env.DB, existing.id, {
 			host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
-			nickname: nicknameResult.value ?? undefined,
-			role: roleResult.value ?? undefined,
-			runtime_app: runtimeAppResult.value ?? undefined,
-			runtime_version: runtimeVersionResult.value ?? undefined,
-			status: statusResult.value ?? undefined,
+			nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
+			role: obj.role !== undefined ? roleResult.value : undefined,
+			runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
+			runtime_version: obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
+			status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
 			metadata: obj.metadata !== undefined ? metadataJson : undefined,
 		});
 		const item = await getAgent(c.env.DB, existing.id);
@@ -180,19 +201,31 @@ export async function agentsUpdateRoute(c: Context<AppEnv>) {
 	const obj = body as Record<string, unknown>;
 
 	// Validate optional fields
-	const nicknameResult = validateOptionalString("nickname", obj.nickname, 64);
+	const nicknameResult = validateOptionalString(
+		"nickname",
+		obj.nickname,
+		AGENT_NICKNAME_MAX_LENGTH,
+	);
 	if (!nicknameResult.ok) {
 		return c.json({ error: nicknameResult.error }, 400);
 	}
-	const roleResult = validateOptionalString("role", obj.role, 64);
+	const roleResult = validateOptionalString("role", obj.role, AGENT_ROLE_MAX_LENGTH);
 	if (!roleResult.ok) {
 		return c.json({ error: roleResult.error }, 400);
 	}
-	const runtimeAppResult = validateOptionalString("runtime_app", obj.runtime_app, 64);
+	const runtimeAppResult = validateOptionalString(
+		"runtime_app",
+		obj.runtime_app,
+		AGENT_RUNTIME_APP_MAX_LENGTH,
+	);
 	if (!runtimeAppResult.ok) {
 		return c.json({ error: runtimeAppResult.error }, 400);
 	}
-	const runtimeVersionResult = validateOptionalString("runtime_version", obj.runtime_version, 32);
+	const runtimeVersionResult = validateOptionalString(
+		"runtime_version",
+		obj.runtime_version,
+		AGENT_RUNTIME_VERSION_MAX_LENGTH,
+	);
 	if (!runtimeVersionResult.ok) {
 		return c.json({ error: runtimeVersionResult.error }, 400);
 	}
@@ -228,11 +261,11 @@ export async function agentsUpdateRoute(c: Context<AppEnv>) {
 
 	await updateAgent(c.env.DB, id, {
 		host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
-		nickname: nicknameResult.value ?? undefined,
-		role: roleResult.value ?? undefined,
-		runtime_app: runtimeAppResult.value ?? undefined,
-		runtime_version: runtimeVersionResult.value ?? undefined,
-		status: statusResult.value ?? undefined,
+		nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
+		role: obj.role !== undefined ? roleResult.value : undefined,
+		runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
+		runtime_version: obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
+		status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
 		metadata: metadataJson,
 	});
 
@@ -247,4 +280,54 @@ export async function agentsDeleteRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Agent not found" }, 404);
 	}
 	return c.body(null, 204);
+}
+
+export async function agentsTagsReplaceRoute(c: Context<AppEnv>) {
+	const id = c.req.param("id") ?? "";
+
+	// Verify agent exists
+	const existing = await getAgent(c.env.DB, id);
+	if (!existing) {
+		return c.json({ error: "Agent not found" }, 404);
+	}
+
+	const raw = await c.req.text();
+	if (raw.trim().length === 0) {
+		return c.json({ error: "Request body required" }, 400);
+	}
+
+	let body: unknown;
+	try {
+		body = JSON.parse(raw);
+	} catch {
+		return c.json({ error: "Invalid JSON body" }, 400);
+	}
+	if (typeof body !== "object" || body === null || Array.isArray(body)) {
+		return c.json({ error: "Request body must be a JSON object" }, 400);
+	}
+	const obj = body as Record<string, unknown>;
+
+	// Validate tag_ids: must be an array of numbers
+	if (!Array.isArray(obj.tag_ids)) {
+		return c.json({ error: "tag_ids must be an array" }, 400);
+	}
+	const tagIds = obj.tag_ids as unknown[];
+	if (tagIds.length > MAX_TAGS_PER_AGENT) {
+		return c.json({ error: `tag_ids exceeds maximum of ${MAX_TAGS_PER_AGENT}` }, 400);
+	}
+	for (const tid of tagIds) {
+		if (typeof tid !== "number" || !Number.isInteger(tid) || tid <= 0) {
+			return c.json({ error: "tag_ids must contain positive integers" }, 400);
+		}
+	}
+	const uniqueIds = [...new Set(tagIds as number[])];
+
+	// Replace tags (validates all tag IDs exist)
+	const result = await replaceAgentTags(c.env.DB, id, uniqueIds);
+	if (!result.ok) {
+		return c.json({ error: result.error }, 400);
+	}
+
+	const item = await getAgent(c.env.DB, id);
+	return c.json(item);
 }

@@ -7,6 +7,7 @@ import {
 	agentsDeleteRoute,
 	agentsGetRoute,
 	agentsListRoute,
+	agentsTagsReplaceRoute,
 	agentsUpdateRoute,
 } from "./routes/agents.js";
 import { alertsListRoute } from "./routes/alerts.js";
@@ -137,6 +138,7 @@ app.post("/api/agents", agentsCreateRoute);
 app.get("/api/agents/:id", agentsGetRoute);
 app.patch("/api/agents/:id", agentsUpdateRoute);
 app.delete("/api/agents/:id", agentsDeleteRoute);
+app.put("/api/agents/:id/tags", agentsTagsReplaceRoute);
 
 export default {
 	fetch: app.fetch,

@@ -6,6 +6,7 @@ import {
 	agentsDeleteRoute,
 	agentsGetRoute,
 	agentsListRoute,
+	agentsTagsReplaceRoute,
 	agentsUpdateRoute,
 } from "./agents.js";
 
@@ -223,7 +224,7 @@ describe("POST /api/agents (create)", () => {
 
 	test("rejects source_key exceeding max length", async () => {
 		const ctx = makeCtx(db, {
-			body: { source_key: "x".repeat(65), match_key: "mk" },
+			body: { source_key: "x".repeat(129), match_key: "mk" },
 		});
 		const res = await agentsCreateRoute(ctx);
 		expect(res.status).toBe(400);
@@ -564,5 +565,222 @@ describe("DELETE /api/agents/:id", () => {
 			.bind(created.id)
 			.first<{ cnt: number }>();
 		expect(tagRowAfter?.cnt).toBe(0);
+	});
+});
+
+describe("PATCH /api/agents/:id — nullable field clearing", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	async function createAgentWithFields() {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk_clear",
+				match_key: "mk_clear",
+				nickname: "has-nick",
+				role: "has-role",
+				runtime_app: "has-app",
+				runtime_version: "1.0",
+			},
+		});
+		const res = await agentsCreateRoute(ctx);
+		return parseJson(res);
+	}
+
+	test("PATCH { nickname: null } clears nickname to null", async () => {
+		const created = await createAgentWithFields();
+		expect(created.nickname).toBe("has-nick");
+
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { nickname: null },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.nickname).toBeNull();
+	});
+
+	test("PATCH { role: '' } clears role to null", async () => {
+		const created = await createAgentWithFields();
+		expect(created.role).toBe("has-role");
+
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { role: "" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.role).toBeNull();
+	});
+
+	test("PATCH { runtime_app: null } clears runtime_app", async () => {
+		const created = await createAgentWithFields();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { runtime_app: null },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.runtime_app).toBeNull();
+	});
+
+	test("upsert with { nickname: null } clears nickname on existing", async () => {
+		const created = await createAgentWithFields();
+		expect(created.nickname).toBe("has-nick");
+
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk_clear", match_key: "mk_clear", nickname: null },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.id).toBe(created.id);
+		expect(data.nickname).toBeNull();
+	});
+});
+
+describe("PUT /api/agents/:id/tags", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	async function createTestAgent() {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk_tags", match_key: "mk_tags" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		return parseJson(res);
+	}
+
+	test("replaces tags with valid tag_ids", async () => {
+		await insertTag(db, 1, "work");
+		await insertTag(db, 2, "learning");
+		const agent = await createTestAgent();
+
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [1, 2] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.tags).toHaveLength(2);
+		const tagNames = data.tags.map((t: { name: string }) => t.name).sort();
+		expect(tagNames).toEqual(["learning", "work"]);
+	});
+
+	test("clears all tags with empty array", async () => {
+		await insertTag(db, 1, "temp");
+		const agent = await createTestAgent();
+		await linkAgentTag(db, agent.id, 1);
+
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.tags).toEqual([]);
+	});
+
+	test("replaces existing tags", async () => {
+		await insertTag(db, 1, "old-tag");
+		await insertTag(db, 2, "new-tag");
+		const agent = await createTestAgent();
+		await linkAgentTag(db, agent.id, 1);
+
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [2] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.tags).toHaveLength(1);
+		expect(data.tags[0].name).toBe("new-tag");
+	});
+
+	test("returns 400 for non-existent tag_ids", async () => {
+		const agent = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [999] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("not found");
+	});
+
+	test("returns 400 when exceeding MAX_TAGS_PER_AGENT", async () => {
+		const agent = await createTestAgent();
+		// Create 11 tags (max is 10)
+		for (let i = 1; i <= 11; i++) {
+			await insertTag(db, i, `tag-${i}`);
+		}
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("maximum");
+	});
+
+	test("returns 400 for missing tag_ids field", async () => {
+		const agent = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tags: [1] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("tag_ids");
+	});
+
+	test("returns 400 for non-integer tag_ids", async () => {
+		const agent = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: ["abc"] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("positive integers");
+	});
+
+	test("returns 404 for non-existent agent", async () => {
+		const ctx = makeCtx(db, {
+			params: { id: "agt_ghost" },
+			body: { tag_ids: [] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(404);
+	});
+
+	test("deduplicates tag_ids", async () => {
+		await insertTag(db, 1, "dup-tag");
+		const agent = await createTestAgent();
+
+		const ctx = makeCtx(db, {
+			params: { id: agent.id },
+			body: { tag_ids: [1, 1, 1] },
+		});
+		const res = await agentsTagsReplaceRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.tags).toHaveLength(1);
 	});
 });

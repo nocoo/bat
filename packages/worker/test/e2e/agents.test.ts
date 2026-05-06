@@ -146,6 +146,115 @@ describe("L2: agents CRUD", () => {
 		expect((data as { error: string }).error).toContain("host_id");
 	});
 
+	test("PATCH /api/agents/:id — clear nullable field with null", async () => {
+		// Create a fresh agent with nickname
+		const createRes = await fetch(`${BASE}/api/agents`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({
+				source_key: "e2e_nullable_src",
+				match_key: "e2e_nullable_mk",
+				nickname: "will-clear",
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const created = (await createRes.json()) as AgentItem;
+		expect(created.nickname).toBe("will-clear");
+
+		// PATCH to null
+		const patchRes = await fetch(`${BASE}/api/agents/${created.id}`, {
+			method: "PATCH",
+			headers: writeHeaders(),
+			body: JSON.stringify({ nickname: null }),
+		});
+		expect(patchRes.status).toBe(200);
+		const patched = (await patchRes.json()) as AgentItem;
+		expect(patched.nickname).toBeNull();
+
+		// Cleanup
+		await fetch(`${BASE}/api/agents/${created.id}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+	});
+
+	test("PUT /api/agents/:id/tags → 200 (assign tags)", async () => {
+		// Create a tag first
+		const tagRes = await fetch(`${BASE}/api/tags`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ name: "e2e-agent-tag" }),
+		});
+		expect(tagRes.status).toBe(201);
+		const tag = (await tagRes.json()) as { id: number; name: string };
+
+		// Create agent
+		const createRes = await fetch(`${BASE}/api/agents`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({
+				source_key: "e2e_tag_src",
+				match_key: "e2e_tag_mk",
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const created = (await createRes.json()) as AgentItem;
+
+		// Assign tag
+		const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ tag_ids: [tag.id] }),
+		});
+		expect(putRes.status).toBe(200);
+		const tagged = (await putRes.json()) as AgentItem;
+		expect(tagged.tags).toHaveLength(1);
+		expect(tagged.tags[0].name).toBe("e2e-agent-tag");
+
+		// Clear tags
+		const clearRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ tag_ids: [] }),
+		});
+		expect(clearRes.status).toBe(200);
+		const cleared = (await clearRes.json()) as AgentItem;
+		expect(cleared.tags).toEqual([]);
+
+		// Cleanup
+		await fetch(`${BASE}/api/agents/${created.id}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+	});
+
+	test("PUT /api/agents/:id/tags → 400 (non-existent tags)", async () => {
+		// Create agent
+		const createRes = await fetch(`${BASE}/api/agents`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({
+				source_key: "e2e_badtag_src",
+				match_key: "e2e_badtag_mk",
+			}),
+		});
+		expect(createRes.status).toBe(201);
+		const created = (await createRes.json()) as AgentItem;
+
+		const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+			method: "PUT",
+			headers: writeHeaders(),
+			body: JSON.stringify({ tag_ids: [99999] }),
+		});
+		expect(putRes.status).toBe(400);
+
+		// Cleanup
+		await fetch(`${BASE}/api/agents/${created.id}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+	});
+
 	test("DELETE /api/agents/:id → 204 (hard delete)", async () => {
 		const res = await fetch(`${BASE}/api/agents/${agentId}`, {
 			method: "DELETE",
