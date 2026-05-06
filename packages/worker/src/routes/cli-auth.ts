@@ -48,7 +48,7 @@ function parseLoopbackUrl(raw: string): URL | null {
  *   - state (required): CSRF nonce, passed through unchanged
  *   - label (optional): label for the minted token (default: "cli")
  *
- * On success: 302 redirect to callback?api_key=<token>&state=<state>&worker_url=<origin>
+ * On success: 302 redirect to callback?api_key=<token>&state=<state>&worker_url=<machine_endpoint>
  * On failure: 4xx JSON error
  */
 export async function cliAuthBridgeRoute(c: Context<AppEnv>) {
