@@ -179,11 +179,12 @@ describe("L2: agents CRUD", () => {
 	});
 
 	test("PUT /api/agents/:id/tags → 200 (assign tags)", async () => {
-		// Create a tag first
+		// Create a tag first (unique name to avoid 409 on re-runs)
+		const tagName = `e2e-agent-tag-${Date.now()}`;
 		const tagRes = await fetch(`${BASE}/api/tags`, {
 			method: "POST",
 			headers: writeHeaders(),
-			body: JSON.stringify({ name: "e2e-agent-tag" }),
+			body: JSON.stringify({ name: tagName }),
 		});
 		expect(tagRes.status).toBe(201);
 		const tag = (await tagRes.json()) as { id: number; name: string };
@@ -209,7 +210,7 @@ describe("L2: agents CRUD", () => {
 		expect(putRes.status).toBe(200);
 		const tagged = (await putRes.json()) as AgentItem;
 		expect(tagged.tags).toHaveLength(1);
-		expect(tagged.tags[0].name).toBe("e2e-agent-tag");
+		expect(tagged.tags[0].name).toBe(tagName);
 
 		// Clear tags
 		const clearRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
@@ -221,8 +222,12 @@ describe("L2: agents CRUD", () => {
 		const cleared = (await clearRes.json()) as AgentItem;
 		expect(cleared.tags).toEqual([]);
 
-		// Cleanup
+		// Cleanup agent and tag
 		await fetch(`${BASE}/api/agents/${created.id}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		await fetch(`${BASE}/api/tags/${tag.id}`, {
 			method: "DELETE",
 			headers: writeHeaders(),
 		});

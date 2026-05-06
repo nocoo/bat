@@ -15,7 +15,6 @@ import {
 	AGENT_SOURCE_KEY_MAX_LENGTH,
 	MAX_TAGS_PER_AGENT,
 	VALID_AGENT_STATUSES,
-	generateId,
 	validateMetadata,
 	validateOptionalEnum,
 	validateOptionalString,
@@ -23,14 +22,13 @@ import {
 } from "@bat/shared";
 import type { Context } from "hono";
 import {
-	createAgent,
 	deleteAgent,
-	findAgentBySourceMatch,
 	getAgent,
 	hostExists,
 	listAgents,
 	replaceAgentTags,
 	updateAgent,
+	upsertAgent,
 } from "../services/agents.js";
 import type { AppEnv } from "../types.js";
 
@@ -134,33 +132,20 @@ export async function agentsCreateRoute(c: Context<AppEnv>) {
 		}
 	}
 
-	// Check for existing agent with same source_key + match_key (upsert)
-	const existing = await findAgentBySourceMatch(
+	// Upsert: create or update on source_key + match_key conflict
+	const updateFields = {
+		host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
+		nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
+		role: obj.role !== undefined ? roleResult.value : undefined,
+		runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
+		runtime_version: obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
+		status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
+		metadata: obj.metadata !== undefined ? metadataJson : undefined,
+	};
+
+	const result = await upsertAgent(
 		c.env.DB,
-		sourceKeyResult.value,
-		matchKeyResult.value,
-	);
-
-	if (existing) {
-		// Upsert: update existing agent
-		await updateAgent(c.env.DB, existing.id, {
-			host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
-			nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
-			role: obj.role !== undefined ? roleResult.value : undefined,
-			runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
-			runtime_version: obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
-			status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
-			metadata: obj.metadata !== undefined ? metadataJson : undefined,
-		});
-		const item = await getAgent(c.env.DB, existing.id);
-		return c.json(item, 200);
-	}
-
-	// Create new agent — catch unique constraint race
-	const id = generateId("agt_");
-	try {
-		await createAgent(c.env.DB, {
-			id,
+		{
 			source_key: sourceKeyResult.value,
 			match_key: matchKeyResult.value,
 			host_id: (obj.host_id as string | null) ?? null,
@@ -170,35 +155,12 @@ export async function agentsCreateRoute(c: Context<AppEnv>) {
 			runtime_version: runtimeVersionResult.value ?? null,
 			status: statusResult.value ?? "unknown",
 			metadata: metadataJson,
-		});
-	} catch (err: unknown) {
-		// Race condition: another request inserted with same source_key + match_key
-		if (err instanceof Error && err.message.includes("UNIQUE")) {
-			const raced = await findAgentBySourceMatch(
-				c.env.DB,
-				sourceKeyResult.value,
-				matchKeyResult.value,
-			);
-			if (raced) {
-				await updateAgent(c.env.DB, raced.id, {
-					host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
-					nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
-					role: obj.role !== undefined ? roleResult.value : undefined,
-					runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
-					runtime_version:
-						obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
-					status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
-					metadata: obj.metadata !== undefined ? metadataJson : undefined,
-				});
-				const item = await getAgent(c.env.DB, raced.id);
-				return c.json(item, 200);
-			}
-		}
-		throw err;
-	}
+		},
+		updateFields,
+	);
 
-	const item = await getAgent(c.env.DB, id);
-	return c.json(item, 201);
+	const item = await getAgent(c.env.DB, result.id);
+	return c.json(item, result.created ? 201 : 200);
 }
 
 export async function agentsUpdateRoute(c: Context<AppEnv>) {
