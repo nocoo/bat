@@ -169,6 +169,42 @@ export async function findAgentBySourceMatch(
 		.first<AgentRow>();
 }
 
+/** Replace all tags for an agent. Validates that all tag IDs exist. */
+export async function replaceAgentTags(
+	db: D1Database,
+	agentId: string,
+	tagIds: number[],
+): Promise<{ ok: true } | { ok: false; error: string }> {
+	if (tagIds.length === 0) {
+		// Clear all tags
+		await db.prepare("DELETE FROM agent_tags WHERE agent_id = ?").bind(agentId).run();
+		return { ok: true };
+	}
+
+	// Verify all tag IDs exist
+	const placeholders = tagIds.map(() => "?").join(",");
+	const existing = await db
+		.prepare(`SELECT id FROM tags WHERE id IN (${placeholders})`)
+		.bind(...tagIds)
+		.all<{ id: number }>();
+
+	const existingIds = new Set(existing.results.map((r) => r.id));
+	const missing = tagIds.filter((id) => !existingIds.has(id));
+	if (missing.length > 0) {
+		return { ok: false, error: `tag_ids not found: ${missing.join(", ")}` };
+	}
+
+	// Replace: delete existing + insert new (within batch)
+	const stmts: D1PreparedStatement[] = [
+		db.prepare("DELETE FROM agent_tags WHERE agent_id = ?").bind(agentId),
+		...tagIds.map((tagId) =>
+			db.prepare("INSERT INTO agent_tags (agent_id, tag_id) VALUES (?, ?)").bind(agentId, tagId),
+		),
+	];
+	await db.batch(stmts);
+	return { ok: true };
+}
+
 // --- Internal helpers ---
 
 interface TagRef {

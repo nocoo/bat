@@ -32,6 +32,8 @@ export function generateId(prefix: string): string {
 export const AGENT_MATCH_KEY_MAX_LENGTH = 256;
 export const AGENT_NICKNAME_MAX_LENGTH = 64;
 export const AGENT_ROLE_MAX_LENGTH = 128;
+export const AGENT_RUNTIME_APP_MAX_LENGTH = 64;
+export const AGENT_RUNTIME_VERSION_MAX_LENGTH = 32;
 export const AGENT_SOURCE_KEY_MAX_LENGTH = 128;
 export const ASSET_NAME_MAX_LENGTH = 128;
 export const ASSET_SUBTYPE_MAX_LENGTH = 64;
