@@ -156,20 +156,46 @@ export async function agentsCreateRoute(c: Context<AppEnv>) {
 		return c.json(item, 200);
 	}
 
-	// Create new agent
+	// Create new agent — catch unique constraint race
 	const id = generateId("agt_");
-	await createAgent(c.env.DB, {
-		id,
-		source_key: sourceKeyResult.value,
-		match_key: matchKeyResult.value,
-		host_id: (obj.host_id as string | null) ?? null,
-		nickname: nicknameResult.value ?? null,
-		role: roleResult.value ?? null,
-		runtime_app: runtimeAppResult.value ?? null,
-		runtime_version: runtimeVersionResult.value ?? null,
-		status: statusResult.value ?? "unknown",
-		metadata: metadataJson,
-	});
+	try {
+		await createAgent(c.env.DB, {
+			id,
+			source_key: sourceKeyResult.value,
+			match_key: matchKeyResult.value,
+			host_id: (obj.host_id as string | null) ?? null,
+			nickname: nicknameResult.value ?? null,
+			role: roleResult.value ?? null,
+			runtime_app: runtimeAppResult.value ?? null,
+			runtime_version: runtimeVersionResult.value ?? null,
+			status: statusResult.value ?? "unknown",
+			metadata: metadataJson,
+		});
+	} catch (err: unknown) {
+		// Race condition: another request inserted with same source_key + match_key
+		if (err instanceof Error && err.message.includes("UNIQUE")) {
+			const raced = await findAgentBySourceMatch(
+				c.env.DB,
+				sourceKeyResult.value,
+				matchKeyResult.value,
+			);
+			if (raced) {
+				await updateAgent(c.env.DB, raced.id, {
+					host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
+					nickname: obj.nickname !== undefined ? nicknameResult.value : undefined,
+					role: obj.role !== undefined ? roleResult.value : undefined,
+					runtime_app: obj.runtime_app !== undefined ? runtimeAppResult.value : undefined,
+					runtime_version:
+						obj.runtime_version !== undefined ? runtimeVersionResult.value : undefined,
+					status: obj.status !== undefined ? (statusResult.value ?? undefined) : undefined,
+					metadata: obj.metadata !== undefined ? metadataJson : undefined,
+				});
+				const item = await getAgent(c.env.DB, raced.id);
+				return c.json(item, 200);
+			}
+		}
+		throw err;
+	}
 
 	const item = await getAgent(c.env.DB, id);
 	return c.json(item, 201);
@@ -312,16 +338,15 @@ export async function agentsTagsReplaceRoute(c: Context<AppEnv>) {
 		return c.json({ error: "tag_ids must be an array" }, 400);
 	}
 	const tagIds = obj.tag_ids as unknown[];
-	if (tagIds.length > MAX_TAGS_PER_AGENT) {
-		return c.json({ error: `tag_ids exceeds maximum of ${MAX_TAGS_PER_AGENT}` }, 400);
-	}
 	for (const tid of tagIds) {
 		if (typeof tid !== "number" || !Number.isInteger(tid) || tid <= 0) {
 			return c.json({ error: "tag_ids must contain positive integers" }, 400);
 		}
 	}
 	const uniqueIds = [...new Set(tagIds as number[])];
-
+	if (uniqueIds.length > MAX_TAGS_PER_AGENT) {
+		return c.json({ error: `tag_ids exceeds maximum of ${MAX_TAGS_PER_AGENT}` }, 400);
+	}
 	// Replace tags (validates all tag IDs exist)
 	const result = await replaceAgentTags(c.env.DB, id, uniqueIds);
 	if (!result.ok) {
