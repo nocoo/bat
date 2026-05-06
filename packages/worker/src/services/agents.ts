@@ -158,18 +158,6 @@ export async function hostExists(db: D1Database, hostId: string): Promise<boolea
 	return row !== null;
 }
 
-/** Find an agent by source_key + match_key (for upsert semantics). */
-export async function findAgentBySourceMatch(
-	db: D1Database,
-	sourceKey: string,
-	matchKey: string,
-): Promise<AgentRow | null> {
-	return db
-		.prepare("SELECT * FROM agents WHERE source_key = ? AND match_key = ?")
-		.bind(sourceKey, matchKey)
-		.first<AgentRow>();
-}
-
 export interface UpsertAgentParams {
 	source_key: string;
 	match_key: string;
@@ -198,56 +186,90 @@ export interface UpsertResult {
 }
 
 /**
- * Atomic upsert: try INSERT, on UNIQUE(source_key, match_key) conflict
- * fall back to find + update. Returns the agent ID and whether it was created.
+ * Atomic upsert via INSERT ... ON CONFLICT(source_key, match_key) DO UPDATE.
+ * Race-free: a single SQL statement handles both create and update.
+ * Returns the agent ID and whether it was newly created.
+ *
+ * Detection: we generate a candidate `id`; if the returned row's `id` matches,
+ * it was an INSERT (created). Otherwise ON CONFLICT fired and the existing
+ * row's `id` is preserved (updated).
  */
 export async function upsertAgent(
 	db: D1Database,
 	createParams: UpsertAgentParams,
 	updateFields: UpsertAgentUpdateFields,
 ): Promise<UpsertResult> {
-	// Optimistic path: check if agent already exists
-	const existing = await findAgentBySourceMatch(
-		db,
-		createParams.source_key,
-		createParams.match_key,
-	);
-	if (existing) {
-		await updateAgent(db, existing.id, updateFields);
-		return { id: existing.id, created: false };
+	const candidateId = generateId("agt_");
+
+	// Build DO UPDATE SET clause from updateFields (only provided fields)
+	const setClauses: string[] = [];
+	const updateBindings: unknown[] = [];
+
+	if (updateFields.host_id !== undefined) {
+		setClauses.push("host_id = ?");
+		updateBindings.push(updateFields.host_id);
+	}
+	if (updateFields.nickname !== undefined) {
+		setClauses.push("nickname = ?");
+		updateBindings.push(updateFields.nickname);
+	}
+	if (updateFields.role !== undefined) {
+		setClauses.push("role = ?");
+		updateBindings.push(updateFields.role);
+	}
+	if (updateFields.runtime_app !== undefined) {
+		setClauses.push("runtime_app = ?");
+		updateBindings.push(updateFields.runtime_app);
+	}
+	if (updateFields.runtime_version !== undefined) {
+		setClauses.push("runtime_version = ?");
+		updateBindings.push(updateFields.runtime_version);
+	}
+	if (updateFields.status !== undefined) {
+		setClauses.push("status = ?");
+		updateBindings.push(updateFields.status);
+	}
+	if (updateFields.metadata !== undefined) {
+		setClauses.push("metadata = ?");
+		updateBindings.push(updateFields.metadata);
 	}
 
-	// Try to create — handle UNIQUE race
-	const id = generateId("agt_");
-	try {
-		await createAgent(db, {
-			id,
-			source_key: createParams.source_key,
-			match_key: createParams.match_key,
-			host_id: createParams.host_id ?? null,
-			nickname: createParams.nickname ?? null,
-			role: createParams.role ?? null,
-			runtime_app: createParams.runtime_app ?? null,
-			runtime_version: createParams.runtime_version ?? null,
-			status: createParams.status ?? "unknown",
-			metadata: createParams.metadata ?? "{}",
-		});
-		return { id, created: true };
-	} catch (err: unknown) {
-		if (err instanceof Error && err.message.includes("UNIQUE")) {
-			// Race: another request inserted between our find and insert
-			const raced = await findAgentBySourceMatch(
-				db,
-				createParams.source_key,
-				createParams.match_key,
-			);
-			if (raced) {
-				await updateAgent(db, raced.id, updateFields);
-				return { id: raced.id, created: false };
-			}
-		}
-		throw err;
+	// If no update fields provided, ON CONFLICT should still be a no-op update
+	// to trigger RETURNING. Use a self-assignment on source_key.
+	const doUpdateSql =
+		setClauses.length > 0
+			? `DO UPDATE SET ${setClauses.join(", ")}`
+			: "DO UPDATE SET source_key = excluded.source_key";
+
+	const sql = `INSERT INTO agents (id, source_key, match_key, host_id, nickname, role, runtime_app, runtime_version, status, metadata)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(source_key, match_key) ${doUpdateSql}
+		 RETURNING id`;
+
+	const insertBindings = [
+		candidateId,
+		createParams.source_key,
+		createParams.match_key,
+		createParams.host_id ?? null,
+		createParams.nickname ?? null,
+		createParams.role ?? null,
+		createParams.runtime_app ?? null,
+		createParams.runtime_version ?? null,
+		createParams.status ?? "unknown",
+		createParams.metadata ?? "{}",
+	];
+
+	const allBindings = [...insertBindings, ...updateBindings];
+	const row = await db
+		.prepare(sql)
+		.bind(...allBindings)
+		.first<{ id: string }>();
+
+	if (!row) {
+		throw new Error("upsertAgent: INSERT ... ON CONFLICT returned no row");
 	}
+
+	return { id: row.id, created: row.id === candidateId };
 }
 
 /** Replace all tags for an agent. Validates that all tag IDs exist. */
