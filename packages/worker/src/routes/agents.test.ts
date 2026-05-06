@@ -1,0 +1,568 @@
+// Tests for Agent CRUD routes
+import { beforeEach, describe, expect, test } from "vitest";
+import { createMockD1 } from "../test-helpers/mock-d1.js";
+import {
+	agentsCreateRoute,
+	agentsDeleteRoute,
+	agentsGetRoute,
+	agentsListRoute,
+	agentsUpdateRoute,
+} from "./agents.js";
+
+// --- Helpers ---
+
+function makeCtx(
+	db: D1Database,
+	opts: {
+		params?: Record<string, string>;
+		body?: unknown;
+		rawBody?: string;
+	} = {},
+) {
+	const rawText =
+		opts.rawBody !== undefined
+			? opts.rawBody
+			: opts.body !== undefined
+				? JSON.stringify(opts.body)
+				: "";
+	return {
+		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+		req: {
+			param: (key: string) => opts.params?.[key],
+			text: async () => rawText,
+			json: async () => {
+				if (opts.body === undefined) {
+					throw new Error("No body");
+				}
+				return opts.body;
+			},
+		},
+		json: (data: unknown, status?: number) =>
+			new Response(JSON.stringify(data), {
+				status: status ?? 200,
+				headers: { "Content-Type": "application/json" },
+			}),
+		body: (_data: unknown, status?: number) => new Response(null, { status: status ?? 200 }),
+		// biome-ignore lint/suspicious/noExplicitAny: test helper
+	} as any;
+}
+
+/** Insert a host row directly for FK tests. */
+async function insertHost(db: D1Database, hostId: string, hostname = "test-host") {
+	await db
+		.prepare(
+			"INSERT INTO hosts (host_id, hostname, last_seen, is_active, created_at) VALUES (?, ?, unixepoch(), 1, unixepoch())",
+		)
+		.bind(hostId, hostname)
+		.run();
+}
+
+/** Insert a tag row directly. */
+async function insertTag(db: D1Database, id: number, name: string, color = 0) {
+	await db
+		.prepare("INSERT INTO tags (id, name, color) VALUES (?, ?, ?)")
+		.bind(id, name, color)
+		.run();
+}
+
+/** Link agent to tag. */
+async function linkAgentTag(db: D1Database, agentId: string, tagId: number) {
+	await db
+		.prepare("INSERT INTO agent_tags (agent_id, tag_id) VALUES (?, ?)")
+		.bind(agentId, tagId)
+		.run();
+}
+
+/** Count rows in agents table. */
+async function countAgents(db: D1Database): Promise<number> {
+	const row = await db
+		.prepare("SELECT COUNT(*) as cnt FROM agents")
+		.bind()
+		.first<{ cnt: number }>();
+	return row?.cnt ?? 0;
+}
+
+async function parseJson(res: Response) {
+	return JSON.parse(await res.text());
+}
+
+// --- Tests ---
+
+describe("POST /api/agents (create)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("creates agent with required fields only", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "src_abc123", match_key: "match_xyz" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(201);
+		const data = await parseJson(res);
+		expect(data.id).toMatch(/^agt_/);
+		expect(data.source_key_short).toBe("src_abc1");
+		expect(data.match_key).toBe("match_xyz");
+		expect(data.status).toBe("unknown");
+		expect(data.nickname).toBeNull();
+		expect(data.role).toBeNull();
+		expect(data.metadata).toEqual({});
+		expect(data.tags).toEqual([]);
+		expect(await countAgents(db)).toBe(1);
+	});
+
+	test("creates agent with all optional fields", async () => {
+		await insertHost(db, "host_001", "web-server");
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "src_k",
+				match_key: "match_k",
+				host_id: "host_001",
+				nickname: "my-agent",
+				role: "worker",
+				runtime_app: "claude-code",
+				runtime_version: "1.2.3",
+				status: "running",
+				metadata: { env: "prod" },
+			},
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(201);
+		const data = await parseJson(res);
+		expect(data.host_id).toBe("host_001");
+		expect(data.hostname).toBe("web-server");
+		expect(data.nickname).toBe("my-agent");
+		expect(data.role).toBe("worker");
+		expect(data.runtime_app).toBe("claude-code");
+		expect(data.runtime_version).toBe("1.2.3");
+		expect(data.status).toBe("running");
+		expect(data.metadata).toEqual({ env: "prod" });
+	});
+
+	test("upserts on duplicate source_key + match_key", async () => {
+		const ctx1 = makeCtx(db, {
+			body: { source_key: "src_dup", match_key: "match_dup", nickname: "first" },
+		});
+		const res1 = await agentsCreateRoute(ctx1);
+		expect(res1.status).toBe(201);
+		const data1 = await parseJson(res1);
+
+		const ctx2 = makeCtx(db, {
+			body: {
+				source_key: "src_dup",
+				match_key: "match_dup",
+				nickname: "second",
+				status: "running",
+			},
+		});
+		const res2 = await agentsCreateRoute(ctx2);
+		expect(res2.status).toBe(200);
+		const data2 = await parseJson(res2);
+		expect(data2.id).toBe(data1.id);
+		expect(data2.nickname).toBe("second");
+		expect(data2.status).toBe("running");
+		expect(await countAgents(db)).toBe(1);
+	});
+
+	test("rejects empty body", async () => {
+		const ctx = makeCtx(db, { rawBody: "" });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("body required");
+	});
+
+	test("rejects invalid JSON", async () => {
+		const ctx = makeCtx(db, { rawBody: "{bad" });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("Invalid JSON");
+	});
+
+	test("rejects non-object body (array)", async () => {
+		const ctx = makeCtx(db, { rawBody: "[1,2,3]" });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("JSON object");
+		expect(await countAgents(db)).toBe(0);
+	});
+
+	test("rejects non-object body (null)", async () => {
+		const ctx = makeCtx(db, { rawBody: "null" });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		expect(await countAgents(db)).toBe(0);
+	});
+
+	test("rejects non-object body (string)", async () => {
+		const ctx = makeCtx(db, { rawBody: '"hello"' });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		expect(await countAgents(db)).toBe(0);
+	});
+
+	test("rejects missing source_key", async () => {
+		const ctx = makeCtx(db, { body: { match_key: "mk" } });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("source_key");
+	});
+
+	test("rejects missing match_key", async () => {
+		const ctx = makeCtx(db, { body: { source_key: "sk" } });
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("match_key");
+	});
+
+	test("rejects source_key exceeding max length", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "x".repeat(65), match_key: "mk" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("source_key");
+	});
+
+	test("rejects invalid status enum", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", status: "invalid_status" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("status");
+	});
+
+	test("rejects host_id FK that does not exist", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", host_id: "nonexistent" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("host_id");
+		expect(data.error).toContain("does not exist");
+		expect(await countAgents(db)).toBe(0);
+	});
+
+	test("rejects empty-string host_id", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", host_id: "" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("host_id");
+	});
+
+	test("accepts null host_id", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", host_id: null },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(201);
+		const data = await parseJson(res);
+		expect(data.host_id).toBeNull();
+	});
+
+	test("rejects metadata exceeding size limit", async () => {
+		const bigMeta: Record<string, string> = {};
+		for (let i = 0; i < 200; i++) {
+			bigMeta[`key_${i}`] = "x".repeat(100);
+		}
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", metadata: bigMeta },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("metadata");
+	});
+
+	test("rejects non-object metadata", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", metadata: "not-an-object" },
+		});
+		const res = await agentsCreateRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+});
+
+describe("GET /api/agents (list)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("returns empty array when no agents", async () => {
+		const ctx = makeCtx(db);
+		const res = await agentsListRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data).toEqual([]);
+	});
+
+	test("returns all agents with hostname and tags", async () => {
+		await insertHost(db, "host_a", "alpha-host");
+		await insertTag(db, 1, "prod", 0xff0000);
+
+		// Create agent
+		const ctx1 = makeCtx(db, {
+			body: { source_key: "sk1", match_key: "mk1", host_id: "host_a", nickname: "agent-1" },
+		});
+		const createRes = await agentsCreateRoute(ctx1);
+		const created = await parseJson(createRes);
+
+		// Link tag
+		await linkAgentTag(db, created.id, 1);
+
+		// List
+		const ctx2 = makeCtx(db);
+		const res = await agentsListRoute(ctx2);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data).toHaveLength(1);
+		expect(data[0].hostname).toBe("alpha-host");
+		expect(data[0].tags).toHaveLength(1);
+		expect(data[0].tags[0].name).toBe("prod");
+		expect(data[0].tags[0].color).toBe(0xff0000);
+	});
+});
+
+describe("GET /api/agents/:id", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("returns agent by id", async () => {
+		const ctx1 = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", nickname: "found-me" },
+		});
+		const createRes = await agentsCreateRoute(ctx1);
+		const created = await parseJson(createRes);
+
+		const ctx2 = makeCtx(db, { params: { id: created.id } });
+		const res = await agentsGetRoute(ctx2);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.id).toBe(created.id);
+		expect(data.nickname).toBe("found-me");
+	});
+
+	test("returns 404 for non-existent id", async () => {
+		const ctx = makeCtx(db, { params: { id: "agt_nonexistent" } });
+		const res = await agentsGetRoute(ctx);
+		expect(res.status).toBe(404);
+	});
+});
+
+describe("PATCH /api/agents/:id (update)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	async function createTestAgent(overrides: Record<string, unknown> = {}) {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk", match_key: "mk", ...overrides },
+		});
+		const res = await agentsCreateRoute(ctx);
+		return parseJson(res);
+	}
+
+	test("updates nickname", async () => {
+		const created = await createTestAgent({ nickname: "old" });
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { nickname: "new" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.nickname).toBe("new");
+	});
+
+	test("updates status", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { status: "running" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.status).toBe("running");
+	});
+
+	test("updates host_id with valid FK", async () => {
+		await insertHost(db, "host_new", "new-host");
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { host_id: "host_new" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.host_id).toBe("host_new");
+		expect(data.hostname).toBe("new-host");
+	});
+
+	test("clears host_id with null", async () => {
+		await insertHost(db, "host_x", "x-host");
+		const created = await createTestAgent({ host_id: "host_x" });
+		expect(created.host_id).toBe("host_x");
+
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { host_id: null },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.host_id).toBeNull();
+	});
+
+	test("updates metadata", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { metadata: { version: "2.0" } },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.metadata).toEqual({ version: "2.0" });
+	});
+
+	test("returns 404 for non-existent agent", async () => {
+		const ctx = makeCtx(db, {
+			params: { id: "agt_ghost" },
+			body: { nickname: "nope" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(404);
+	});
+
+	test("rejects invalid status", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { status: "bogus" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("status");
+	});
+
+	test("rejects host_id FK that does not exist", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			body: { host_id: "nonexistent" },
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("host_id");
+	});
+
+	test("rejects empty body", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			rawBody: "",
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("rejects invalid JSON body", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			rawBody: "not-json",
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("rejects non-object body", async () => {
+		const created = await createTestAgent();
+		const ctx = makeCtx(db, {
+			params: { id: created.id },
+			rawBody: "[1,2]",
+		});
+		const res = await agentsUpdateRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+});
+
+describe("DELETE /api/agents/:id", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("deletes existing agent (hard delete)", async () => {
+		const ctx1 = makeCtx(db, {
+			body: { source_key: "sk_del", match_key: "mk_del" },
+		});
+		const createRes = await agentsCreateRoute(ctx1);
+		const created = await parseJson(createRes);
+		expect(await countAgents(db)).toBe(1);
+
+		const ctx2 = makeCtx(db, { params: { id: created.id } });
+		const res = await agentsDeleteRoute(ctx2);
+		expect(res.status).toBe(204);
+		expect(await countAgents(db)).toBe(0);
+	});
+
+	test("returns 404 for non-existent agent", async () => {
+		const ctx = makeCtx(db, { params: { id: "agt_nope" } });
+		const res = await agentsDeleteRoute(ctx);
+		expect(res.status).toBe(404);
+	});
+
+	test("cascades tag associations on delete", async () => {
+		await insertTag(db, 10, "temp-tag");
+		const ctx1 = makeCtx(db, {
+			body: { source_key: "sk_cas", match_key: "mk_cas" },
+		});
+		const createRes = await agentsCreateRoute(ctx1);
+		const created = await parseJson(createRes);
+		await linkAgentTag(db, created.id, 10);
+
+		// Verify tag link exists
+		const tagRow = await db
+			.prepare("SELECT COUNT(*) as cnt FROM agent_tags WHERE agent_id = ?")
+			.bind(created.id)
+			.first<{ cnt: number }>();
+		expect(tagRow?.cnt).toBe(1);
+
+		// Delete agent
+		const ctx2 = makeCtx(db, { params: { id: created.id } });
+		await agentsDeleteRoute(ctx2);
+
+		// Tag association should be cascade-deleted
+		const tagRowAfter = await db
+			.prepare("SELECT COUNT(*) as cnt FROM agent_tags WHERE agent_id = ?")
+			.bind(created.id)
+			.first<{ cnt: number }>();
+		expect(tagRowAfter?.cnt).toBe(0);
+	});
+});
