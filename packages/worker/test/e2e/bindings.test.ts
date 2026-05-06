@@ -2,10 +2,12 @@
 // Validates full round-trip including FK checks, idempotent create, and read models.
 
 import type { AssetItem, AssetMapResponse, AssetsOverview, BindingItem } from "@bat/shared";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { BASE, assertStatus, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
-const HOST_ID = "e2e-bindings-host";
+// Use unique suffix per test run to avoid collisions on shared dev D1
+const SUFFIX = Date.now().toString(36);
+const HOST_ID = `e2e-bind-host-${SUFFIX}`;
 let agentId = "";
 let assetId = "";
 
@@ -19,13 +21,13 @@ describe("L2: bindings + map + overview", () => {
 		});
 		assertStatus(hostRes.status, 204, "bindings beforeAll identity");
 
-		// Create an agent
+		// Create an agent (unique keys)
 		const agentRes = await fetch(`${BASE}/api/agents`, {
 			method: "POST",
 			headers: writeHeaders(),
 			body: JSON.stringify({
-				source_key: "e2e_bind_src",
-				match_key: "e2e_bind_mk",
+				source_key: `e2e_bind_src_${SUFFIX}`,
+				match_key: `e2e_bind_mk_${SUFFIX}`,
 				host_id: HOST_ID,
 				nickname: "bind-agent",
 			}),
@@ -40,7 +42,7 @@ describe("L2: bindings + map + overview", () => {
 			headers: writeHeaders(),
 			body: JSON.stringify({
 				type: "cloud_service",
-				name: "bind-asset",
+				name: `bind-asset-${SUFFIX}`,
 				host_id: HOST_ID,
 				subtype: "workers",
 			}),
@@ -50,7 +52,23 @@ describe("L2: bindings + map + overview", () => {
 		assetId = assetData.id;
 	});
 
-	test("GET /api/bindings → 200 (empty list)", async () => {
+	afterAll(async () => {
+		// Clean up: binding (may already be deleted by tests), asset, agent
+		await fetch(`${BASE}/api/bindings/${agentId}/${assetId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		await fetch(`${BASE}/api/assets/${assetId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+		await fetch(`${BASE}/api/agents/${agentId}`, {
+			method: "DELETE",
+			headers: writeHeaders(),
+		});
+	});
+
+	test("GET /api/bindings → 200 (list)", async () => {
 		const res = await fetch(`${BASE}/api/bindings`, { headers: readHeaders() });
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as BindingItem[];
@@ -85,7 +103,7 @@ describe("L2: bindings + map + overview", () => {
 		const found = data.find((b) => b.agent_id === agentId && b.asset_id === assetId);
 		expect(found).toBeDefined();
 		expect(found?.agent_nickname).toBe("bind-agent");
-		expect(found?.asset_name).toBe("bind-asset");
+		expect(found?.asset_name).toBe(`bind-asset-${SUFFIX}`);
 		expect(found?.asset_type).toBe("cloud_service");
 	});
 
@@ -116,7 +134,25 @@ describe("L2: bindings + map + overview", () => {
 		expect(res.status).toBe(400);
 	});
 
-	test("GET /api/assets/map → 200 (full graph)", async () => {
+	test("POST /api/bindings → 400 (null body values)", async () => {
+		const res = await fetch(`${BASE}/api/bindings`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ agent_id: null, asset_id: null }),
+		});
+		expect(res.status).toBe(400);
+	});
+
+	test("POST /api/bindings → 400 (array body)", async () => {
+		const res = await fetch(`${BASE}/api/bindings`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify([agentId, assetId]),
+		});
+		expect(res.status).toBe(400);
+	});
+
+	test("GET /api/assets/map → 200 (full graph with correct fields)", async () => {
 		const res = await fetch(`${BASE}/api/assets/map`, { headers: readHeaders() });
 		expect(res.status).toBe(200);
 		const data = (await res.json()) as AssetMapResponse;
@@ -129,6 +165,10 @@ describe("L2: bindings + map + overview", () => {
 		expect(data.agents.some((a) => a.id === agentId)).toBe(true);
 		expect(data.assets.some((a) => a.id === assetId)).toBe(true);
 		expect(data.bindings.some((b) => b.agent_id === agentId && b.asset_id === assetId)).toBe(true);
+		// Verify hid is present on hosts (not just host_id prefix)
+		const host = data.hosts.find((h) => h.host_id === HOST_ID);
+		expect(host).toBeDefined();
+		expect(host?.hid).toMatch(/^[0-9a-f]{8}$/);
 	});
 
 	test("GET /api/assets/overview → 200 (counters)", async () => {
@@ -140,6 +180,17 @@ describe("L2: bindings + map + overview", () => {
 		expect(data.agents.total).toBeGreaterThanOrEqual(1);
 		expect(data.assets.total).toBeGreaterThanOrEqual(1);
 		expect(data.bindings).toBeGreaterThanOrEqual(1);
+	});
+
+	test("GET /api/assets/map → 200 (route not captured by /:id)", async () => {
+		// Verify static route /api/assets/map is not treated as asset ID "map"
+		const res = await fetch(`${BASE}/api/assets/map`, { headers: readHeaders() });
+		expect(res.status).toBe(200);
+		const data = (await res.json()) as AssetMapResponse;
+		// Must have hosts/agents/assets/bindings/tags keys (not a 404 or asset detail)
+		expect("hosts" in data).toBe(true);
+		expect("agents" in data).toBe(true);
+		expect("assets" in data).toBe(true);
 	});
 
 	test("DELETE /api/bindings/:agentId/:assetId → 204", async () => {
