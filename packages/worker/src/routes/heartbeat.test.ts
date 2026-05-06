@@ -171,6 +171,32 @@ describe("POST /api/agents/heartbeat (validation)", () => {
 		expect(data.error).toContain("status");
 	});
 
+	test("returns 400 for status 'missing' (server-only)", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "missing" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("status");
+	});
+
+	test("returns 400 for status 'unknown' (not heartbeat-reportable)", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "unknown" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("status");
+	});
+
 	test("returns 400 for duplicate match_key in same request", async () => {
 		const ctx = makeCtx(db, {
 			body: {

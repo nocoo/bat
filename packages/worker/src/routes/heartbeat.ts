@@ -8,9 +8,14 @@ import {
 	AGENT_RUNTIME_VERSION_MAX_LENGTH,
 	AGENT_SOURCE_KEY_MAX_LENGTH,
 	MAX_HEARTBEAT_AGENTS,
-	VALID_AGENT_STATUSES,
 } from "@bat/shared";
 import type { AgentHeartbeatBody, AgentHeartbeatEntry, AgentStatus } from "@bat/shared";
+
+/**
+ * Heartbeat-specific allowed statuses. Clients may only report "running" or "stopped".
+ * "missing" is exclusively set by server-side diff logic; "unknown" is initial state only.
+ */
+const HEARTBEAT_ALLOWED_STATUSES: readonly AgentStatus[] = ["running", "stopped"] as const;
 import type { Context } from "hono";
 import { processHeartbeat } from "../services/heartbeat.js";
 import type { AppEnv } from "../types.js";
@@ -74,14 +79,14 @@ export async function agentsHeartbeatRoute(c: Context<AppEnv>) {
 		}
 		seenMatchKeys.add(e.match_key);
 
-		// status: required, must be a valid AgentStatus (running/stopped only for heartbeat)
+		// status: required, must be running or stopped (missing is server-only)
 		if (typeof e.status !== "string") {
 			return c.json({ error: `agents[${i}].status: required string` }, 400);
 		}
-		if (!VALID_AGENT_STATUSES.includes(e.status as AgentStatus)) {
+		if (!HEARTBEAT_ALLOWED_STATUSES.includes(e.status as AgentStatus)) {
 			return c.json(
 				{
-					error: `agents[${i}].status: must be one of ${VALID_AGENT_STATUSES.join(", ")}`,
+					error: `agents[${i}].status: must be one of ${HEARTBEAT_ALLOWED_STATUSES.join(", ")}`,
 				},
 				400,
 			);
