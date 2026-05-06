@@ -171,6 +171,38 @@ describe("/api/auth/cli", () => {
 		expect(data.label).toBe("chunked-cli");
 	});
 
+	test("rejects null body", async () => {
+		const ctx = makeCtx(db, { accessAuthenticated: true, rawBody: "null" });
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("JSON object");
+	});
+
+	test("rejects array body", async () => {
+		const ctx = makeCtx(db, { accessAuthenticated: true, rawBody: '["a","b"]' });
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("JSON object");
+	});
+
+	test("rejects string body", async () => {
+		const ctx = makeCtx(db, { accessAuthenticated: true, rawBody: '"hello"' });
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("JSON object");
+	});
+
+	test("rejects number body", async () => {
+		const ctx = makeCtx(db, { accessAuthenticated: true, rawBody: "42" });
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("JSON object");
+	});
+
 	test("stores hashed token (not plaintext)", async () => {
 		const ctx = makeCtx(db, { accessAuthenticated: true, body: {} });
 		const res = await cliAuthRoute(ctx);
