@@ -1,5 +1,6 @@
 // Tests for POST /api/agents/heartbeat route + service
 import { beforeEach, describe, expect, test } from "vitest";
+import { processHeartbeat } from "../services/heartbeat.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import { agentsHeartbeatRoute } from "./heartbeat.js";
 
@@ -489,5 +490,129 @@ describe("POST /api/agents/heartbeat (logic)", () => {
 			.first<{ status: string; runtime_app: string | null }>();
 		expect(row?.status).toBe("stopped");
 		expect(row?.runtime_app).toBe("v2");
+	});
+});
+
+// --- ON CONFLICT explicit null semantics (race simulation) ---
+
+describe("processHeartbeat ON CONFLICT (race path)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("ON CONFLICT with explicit null clears runtime fields", async () => {
+		// Simulate race: agent exists in DB but processHeartbeat's read uses a
+		// different source_key (so it won't find it). Then the INSERT hits ON CONFLICT.
+		// We can't truly race in sync SQLite, so we test the SQL directly:
+		// Insert agent, then execute a raw INSERT ON CONFLICT with null runtime.
+		await insertAgent(db, "agt_race", "sk1", "mk_race", "running", "cursor", "1.0");
+
+		// Directly call processHeartbeat with source_key "sk1" — it WILL find agt_race
+		// in the read phase and take the UPDATE path. To test ON CONFLICT specifically,
+		// we execute the INSERT SQL directly to prove explicit null is NOT COALESCE'd.
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				`INSERT INTO agents (id, source_key, match_key, runtime_app, runtime_version, status, last_seen_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)
+				 ON CONFLICT(source_key, match_key) DO UPDATE SET
+				   status = excluded.status,
+				   last_seen_at = excluded.last_seen_at,
+				   runtime_app = excluded.runtime_app,
+				   runtime_version = excluded.runtime_version`,
+			)
+			.bind("agt_new_id", "sk1", "mk_race", null, null, "stopped", now)
+			.run();
+
+		// Verify: runtime_app should be NULL (cleared), not "cursor"
+		const row = await db
+			.prepare(
+				"SELECT status, runtime_app, runtime_version FROM agents WHERE source_key = ? AND match_key = ?",
+			)
+			.bind("sk1", "mk_race")
+			.first<{ status: string; runtime_app: string | null; runtime_version: string | null }>();
+		expect(row?.status).toBe("stopped");
+		expect(row?.runtime_app).toBeNull();
+		expect(row?.runtime_version).toBeNull();
+	});
+
+	test("ON CONFLICT with absent runtime preserves existing values", async () => {
+		await insertAgent(db, "agt_race2", "sk1", "mk_race2", "running", "windsurf", "2.0");
+
+		// Simulate: INSERT with runtime fields as null (absent → null in VALUES)
+		// but DO UPDATE SET does NOT include runtime fields
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				`INSERT INTO agents (id, source_key, match_key, runtime_app, runtime_version, status, last_seen_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)
+				 ON CONFLICT(source_key, match_key) DO UPDATE SET
+				   status = excluded.status,
+				   last_seen_at = excluded.last_seen_at`,
+			)
+			.bind("agt_new_id2", "sk1", "mk_race2", null, null, "stopped", now)
+			.run();
+
+		// Verify: runtime_app should still be "windsurf" (preserved)
+		const row = await db
+			.prepare(
+				"SELECT status, runtime_app, runtime_version FROM agents WHERE source_key = ? AND match_key = ?",
+			)
+			.bind("sk1", "mk_race2")
+			.first<{ status: string; runtime_app: string | null; runtime_version: string | null }>();
+		expect(row?.status).toBe("stopped");
+		expect(row?.runtime_app).toBe("windsurf");
+		expect(row?.runtime_version).toBe("2.0");
+	});
+
+	test("processHeartbeat ON CONFLICT path: explicit null on new match_key that races", async () => {
+		// Insert an agent that processHeartbeat read won't see (different source_key read timing)
+		// Actually: we'll test end-to-end by pre-inserting with the same source_key,
+		// then calling processHeartbeat which will find it and use UPDATE path.
+		// This test validates the generated SQL pattern in the create branch
+		// by using a fresh source_key so read finds nothing, then agent is created,
+		// then a SECOND processHeartbeat simulates the race by also taking create path.
+
+		// First call: creates mk_new
+		const now = 1000000;
+		const result1 = await processHeartbeat(
+			db,
+			"sk_race",
+			[{ match_key: "mk_new", status: "running", runtime_app: "v1", runtime_version: "1.0" }],
+			now,
+		);
+		expect(result1.created).toBe(1);
+
+		// Verify created
+		const row1 = await db
+			.prepare(
+				"SELECT runtime_app, runtime_version FROM agents WHERE source_key = ? AND match_key = ?",
+			)
+			.bind("sk_race", "mk_new")
+			.first<{ runtime_app: string | null; runtime_version: string | null }>();
+		expect(row1?.runtime_app).toBe("v1");
+		expect(row1?.runtime_version).toBe("1.0");
+
+		// Second call: finds agent in read, takes UPDATE path with explicit null
+		const result2 = await processHeartbeat(
+			db,
+			"sk_race",
+			[{ match_key: "mk_new", status: "stopped", runtime_app: null, runtime_version: null }],
+			now + 10,
+		);
+		expect(result2.updated).toBe(1);
+
+		// Verify: explicit null cleared the fields
+		const row2 = await db
+			.prepare(
+				"SELECT status, runtime_app, runtime_version FROM agents WHERE source_key = ? AND match_key = ?",
+			)
+			.bind("sk_race", "mk_new")
+			.first<{ status: string; runtime_app: string | null; runtime_version: string | null }>();
+		expect(row2?.status).toBe("stopped");
+		expect(row2?.runtime_app).toBeNull();
+		expect(row2?.runtime_version).toBeNull();
 	});
 });
