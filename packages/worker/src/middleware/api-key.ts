@@ -1,8 +1,7 @@
 // API Key auth middleware with read/write scope separation + CLI token support
 // Write routes: POST /api/ingest, POST /api/identity, webhook CRUD → BAT_WRITE_KEY
 // Read routes: GET /api/hosts, GET /api/hosts/:id/metrics, GET /api/alerts → BAT_READ_KEY
-// CLI token (assets scope): /api/agents/*, /api/assets/*, /api/bindings/*, /api/assets/overview, /api/assets/map
-// CLI token (full scope): equivalent to BAT_WRITE_KEY
+// CLI token (assets scope): /api/agents/*, /api/assets/*, /api/bindings/*
 // Public routes: GET /api/live → no auth required
 // Access-authenticated routes: browser endpoint with valid Access JWT → no API key required
 
@@ -104,6 +103,12 @@ export function isWriteRequest(method: string, path: string): boolean {
 		return true;
 	}
 
+	// Asset/agent/binding mutations require write-level auth
+	// POST/PUT/PATCH/DELETE on /api/agents/*, /api/assets/*, /api/bindings/*
+	if (isCliAssetsScopePath(path) && method !== "GET") {
+		return true;
+	}
+
 	return false;
 }
 
@@ -199,14 +204,10 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return c.json({ error: "Invalid API key" }, 403);
 	}
 
-	// Scope enforcement
-	if (cliToken.scope === "assets") {
-		// assets scope: only /api/agents, /api/assets, /api/bindings paths
-		if (!isCliAssetsScopePath(path)) {
-			return c.json({ error: "Token scope insufficient for this route" }, 403);
-		}
+	// Scope enforcement: assets scope only allows /api/agents, /api/assets, /api/bindings
+	if (!isCliAssetsScopePath(path)) {
+		return c.json({ error: "Token scope insufficient for this route" }, 403);
 	}
-	// scope === "full": all routes accessible (equivalent to write key for asset routes)
 
 	return next();
 }

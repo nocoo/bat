@@ -47,7 +47,7 @@ export const CLI_TOKEN_LABEL_MAX_LENGTH = 64;
 export type AgentStatus = "running" | "stopped" | "missing" | "unknown";
 export type AssetType = "cloud_service" | "domain" | "container" | "cli_tool" | "mcp_service";
 export type AssetStatus = "active" | "inactive" | "missing" | "unknown";
-export type CliTokenScope = "assets" | "full";
+export type CliTokenScope = "assets";
 
 export const VALID_AGENT_STATUSES: readonly AgentStatus[] = [
 	"running",
@@ -71,7 +71,7 @@ export const VALID_ASSET_STATUSES: readonly AssetStatus[] = [
 	"unknown",
 ] as const;
 
-export const VALID_CLI_TOKEN_SCOPES: readonly CliTokenScope[] = ["assets", "full"] as const;
+export const VALID_CLI_TOKEN_SCOPES: readonly CliTokenScope[] = ["assets"] as const;
 
 // --- Validators ---
 
