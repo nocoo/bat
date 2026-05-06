@@ -1,0 +1,27 @@
+{
+	"name": "@bat/cli",
+	"version": "2.0.1",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"bat-cli": "./dist/bin/bat-cli.js"
+	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"scripts": {
+		"build": "tsc",
+		"dev": "bun run src/bin/bat-cli.ts",
+		"typecheck": "tsc --noEmit",
+		"test": "vitest run",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@bat/shared": "workspace:*",
+		"@nocoo/cli-base": "^0.2.4"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"typescript": "^5.8.2",
+		"vitest": "^4.1.5"
+	}
+}

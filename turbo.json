@@ -5,6 +5,10 @@
 			"dependsOn": ["^build"],
 			"outputs": ["dist/**"]
 		},
+		"@bat/cli#build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**"]
+		},
 		"@bat/ui#build": {
 			"dependsOn": ["^build"],
 			"outputs": ["../worker/static/**"]
