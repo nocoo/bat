@@ -48,6 +48,7 @@ const VERSION_TARGETS: VersionTarget[] = [
 	{ path: "packages/worker/package.json", pattern: "json-version" },
 	{ path: "packages/shared/package.json", pattern: "json-version" },
 	{ path: "packages/ui/package.json", pattern: "json-version" },
+	{ path: "packages/cli/package.json", pattern: "json-version" },
 	// Source code version constants
 	{ path: "packages/shared/src/version.ts", pattern: "const-version" },
 	// Rust probe

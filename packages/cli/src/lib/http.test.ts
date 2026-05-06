@@ -122,15 +122,47 @@ describe("HttpClient", () => {
 			mockFetch.mockResolvedValueOnce(mockResponse(401, { error: "Invalid API key" }));
 
 			const client = new HttpClient("https://bat.hexly.ai", "bad-token");
-			await expect(client.get("/api/agents")).rejects.toThrow(AuthError);
-			await expect(
-				client.get("/api/agents").catch((e) => {
-					throw e;
-				}),
-			).rejects.toThrow(); // already thrown above, just ensuring type
+			try {
+				await client.get("/api/agents");
+				expect.unreachable("Should have thrown");
+			} catch (e) {
+				expect(e).toBeInstanceOf(AuthError);
+				expect((e as AuthError).status).toBe(401);
+			}
 		});
 
-		test("AuthError has correct status and message", async () => {
+		test("throws AuthError on 403 (scope insufficient)", async () => {
+			mockFetch.mockResolvedValueOnce(
+				mockResponse(403, { error: "Token scope insufficient for this route" }),
+			);
+
+			const client = new HttpClient("https://bat.hexly.ai", "token");
+			try {
+				await client.get("/api/hosts");
+				expect.unreachable("Should have thrown");
+			} catch (e) {
+				expect(e).toBeInstanceOf(AuthError);
+				expect(e).toBeInstanceOf(ApiError);
+				expect((e as AuthError).status).toBe(403);
+				expect((e as AuthError).message).toBe("Token scope insufficient for this route");
+			}
+		});
+
+		test("throws AuthError on 403 (invalid key)", async () => {
+			mockFetch.mockResolvedValueOnce(mockResponse(403, { error: "Invalid API key" }));
+
+			const client = new HttpClient("https://bat.hexly.ai", "bad-token");
+			try {
+				await client.get("/api/agents");
+				expect.unreachable("Should have thrown");
+			} catch (e) {
+				expect(e).toBeInstanceOf(AuthError);
+				expect((e as AuthError).status).toBe(403);
+				expect((e as AuthError).message).toBe("Invalid API key");
+			}
+		});
+
+		test("AuthError has correct status and message for 401", async () => {
 			mockFetch.mockResolvedValueOnce(
 				mockResponse(401, { error: "Missing or invalid Authorization header" }),
 			);
@@ -146,7 +178,7 @@ describe("HttpClient", () => {
 			}
 		});
 
-		test("throws ApiError on 4xx/5xx", async () => {
+		test("throws ApiError on 4xx/5xx (not 401/403)", async () => {
 			mockFetch.mockResolvedValueOnce(
 				mockResponse(400, { error: "source_key must be a non-empty string" }),
 			);
