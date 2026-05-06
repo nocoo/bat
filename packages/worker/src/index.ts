@@ -25,6 +25,13 @@ import {
 	assetsTagsReplaceRoute,
 	assetsUpdateRoute,
 } from "./routes/assets.js";
+import {
+	assetsMapRoute,
+	assetsOverviewRoute,
+	bindingsCreateRoute,
+	bindingsDeleteRoute,
+	bindingsListRoute,
+} from "./routes/bindings.js";
 import { cliAuthRoute } from "./routes/cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
@@ -149,12 +156,20 @@ app.delete("/api/agents/:id", agentsDeleteRoute);
 app.put("/api/agents/:id/tags", agentsTagsReplaceRoute);
 
 // Asset CRUD (CLI token scope: assets)
+// Static routes MUST be before /:id to avoid param capture
+app.get("/api/assets/map", assetsMapRoute);
+app.get("/api/assets/overview", assetsOverviewRoute);
 app.get("/api/assets", assetsListRoute);
 app.post("/api/assets", assetsCreateRoute);
 app.get("/api/assets/:id", assetsGetRoute);
 app.patch("/api/assets/:id", assetsUpdateRoute);
 app.delete("/api/assets/:id", assetsDeleteRoute);
 app.put("/api/assets/:id/tags", assetsTagsReplaceRoute);
+
+// Binding CRUD (CLI token scope: assets)
+app.get("/api/bindings", bindingsListRoute);
+app.post("/api/bindings", bindingsCreateRoute);
+app.delete("/api/bindings/:agentId/:assetId", bindingsDeleteRoute);
 
 export default {
 	fetch: app.fetch,
