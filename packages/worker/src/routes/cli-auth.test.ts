@@ -177,6 +177,9 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(400);
 		const data = await res.json();
 		expect(data.error).toContain("JSON object");
+		// No token created
+		const count = await db.prepare("SELECT COUNT(*) as n FROM cli_tokens").first<{ n: number }>();
+		expect(count?.n).toBe(0);
 	});
 
 	test("rejects array body", async () => {
@@ -185,6 +188,8 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(400);
 		const data = await res.json();
 		expect(data.error).toContain("JSON object");
+		const count = await db.prepare("SELECT COUNT(*) as n FROM cli_tokens").first<{ n: number }>();
+		expect(count?.n).toBe(0);
 	});
 
 	test("rejects string body", async () => {
@@ -193,6 +198,8 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(400);
 		const data = await res.json();
 		expect(data.error).toContain("JSON object");
+		const count = await db.prepare("SELECT COUNT(*) as n FROM cli_tokens").first<{ n: number }>();
+		expect(count?.n).toBe(0);
 	});
 
 	test("rejects number body", async () => {
@@ -201,6 +208,8 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(400);
 		const data = await res.json();
 		expect(data.error).toContain("JSON object");
+		const count = await db.prepare("SELECT COUNT(*) as n FROM cli_tokens").first<{ n: number }>();
+		expect(count?.n).toBe(0);
 	});
 
 	test("stores hashed token (not plaintext)", async () => {
