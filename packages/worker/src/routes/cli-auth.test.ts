@@ -15,19 +15,27 @@ function makeCtx(
 	opts: {
 		params?: Record<string, string>;
 		body?: unknown;
+		rawBody?: string;
 		accessAuthenticated?: boolean;
 		authorization?: string;
-		contentLength?: string;
 	} = {},
 ) {
 	const variables: Record<string, unknown> = {};
 	if (opts.accessAuthenticated) {
 		variables.accessAuthenticated = true;
 	}
+	// Determine raw text: explicit rawBody takes priority, then JSON-stringify body, then empty
+	const rawText =
+		opts.rawBody !== undefined
+			? opts.rawBody
+			: opts.body !== undefined
+				? JSON.stringify(opts.body)
+				: "";
 	return {
 		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
 		req: {
 			param: (key: string) => opts.params?.[key] ?? "",
+			text: async () => rawText,
 			json: async () => {
 				if (opts.body === undefined) {
 					throw new Error("No body");
@@ -37,9 +45,6 @@ function makeCtx(
 			header: (name: string) => {
 				if (name === "Authorization") {
 					return opts.authorization;
-				}
-				if (name === "Content-Length") {
-					return opts.contentLength;
 				}
 				return undefined;
 			},
@@ -72,7 +77,6 @@ describe("/api/auth/cli", () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
 			body: { label: "my-cli" },
-			contentLength: "25",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(201);
@@ -127,7 +131,6 @@ describe("/api/auth/cli", () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
 			body: { label: "x".repeat(100) },
-			contentLength: "110",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(400);
@@ -136,41 +139,40 @@ describe("/api/auth/cli", () => {
 	});
 
 	test("rejects malformed JSON body", async () => {
-		// Simulate: Content-Length present but json() throws (invalid JSON)
-		const variables: Record<string, unknown> = { accessAuthenticated: true };
-		const ctx = {
-			env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
-			req: {
-				json: async () => {
-					throw new SyntaxError("Unexpected token");
-				},
-				header: (name: string) => {
-					if (name === "Content-Length") {
-						return "15";
-					}
-					return undefined;
-				},
-				method: "POST",
-			},
-			get: (key: string) => variables[key],
-			set: (key: string, val: unknown) => {
-				variables[key] = val;
-			},
-			json: (data: unknown, status?: number) =>
-				new Response(JSON.stringify(data), {
-					status: status ?? 200,
-					headers: { "Content-Type": "application/json" },
-				}),
-			// biome-ignore lint/suspicious/noExplicitAny: test helper
-		} as any;
+		const ctx = makeCtx(db, {
+			accessAuthenticated: true,
+			rawBody: "{invalid json!!!",
+		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(400);
 		const data = await res.json();
 		expect(data.error).toContain("Invalid JSON");
 	});
 
+	test("rejects malformed JSON without Content-Length header", async () => {
+		// Simulates chunked request with no Content-Length but non-empty malformed body
+		const ctx = makeCtx(db, {
+			accessAuthenticated: true,
+			rawBody: "not-json-at-all",
+		});
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("accepts valid JSON without Content-Length header", async () => {
+		// Simulates chunked request with valid JSON body
+		const ctx = makeCtx(db, {
+			accessAuthenticated: true,
+			body: { label: "chunked-cli" },
+		});
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(201);
+		const data = await res.json();
+		expect(data.label).toBe("chunked-cli");
+	});
+
 	test("stores hashed token (not plaintext)", async () => {
-		const ctx = makeCtx(db, { accessAuthenticated: true, body: {}, contentLength: "2" });
+		const ctx = makeCtx(db, { accessAuthenticated: true, body: {} });
 		const res = await cliAuthRoute(ctx);
 		const data = await res.json();
 		const plaintext = data.token;
@@ -188,7 +190,6 @@ describe("/api/auth/cli", () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
 			body: { label: "test" },
-			contentLength: "18",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(201);
