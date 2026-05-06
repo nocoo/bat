@@ -1,0 +1,378 @@
+// Tests for POST /api/agents/heartbeat route + service
+import { beforeEach, describe, expect, test } from "vitest";
+import { createMockD1 } from "../test-helpers/mock-d1.js";
+import { agentsHeartbeatRoute } from "./heartbeat.js";
+
+// --- Helpers ---
+
+function makeCtx(
+	db: D1Database,
+	opts: {
+		body?: unknown;
+		rawBody?: string;
+	} = {},
+) {
+	const rawText =
+		opts.rawBody !== undefined
+			? opts.rawBody
+			: opts.body !== undefined
+				? JSON.stringify(opts.body)
+				: "";
+	return {
+		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+		req: {
+			text: async () => rawText,
+		},
+		json: (data: unknown, status?: number) =>
+			new Response(JSON.stringify(data), {
+				status: status ?? 200,
+				headers: { "Content-Type": "application/json" },
+			}),
+		body: (_data: unknown, status?: number) => new Response(null, { status: status ?? 200 }),
+		// biome-ignore lint/suspicious/noExplicitAny: test helper
+	} as any;
+}
+
+async function insertAgent(
+	db: D1Database,
+	id: string,
+	sourceKey: string,
+	matchKey: string,
+	status = "running",
+) {
+	await db
+		.prepare(
+			"INSERT INTO agents (id, source_key, match_key, status, metadata) VALUES (?, ?, ?, ?, '{}')",
+		)
+		.bind(id, sourceKey, matchKey, status)
+		.run();
+}
+
+async function getAgent(db: D1Database, id: string) {
+	return db.prepare("SELECT * FROM agents WHERE id = ?").bind(id).first<{
+		id: string;
+		status: string;
+		runtime_app: string | null;
+		last_seen_at: number | null;
+	}>();
+}
+
+async function parseJson(res: Response) {
+	return JSON.parse(await res.text());
+}
+
+// --- Validation tests ---
+
+describe("POST /api/agents/heartbeat (validation)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("returns 400 for empty body", async () => {
+		const ctx = makeCtx(db, { rawBody: "" });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("returns 400 for non-JSON body", async () => {
+		const ctx = makeCtx(db, { rawBody: "not json" });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("Invalid JSON");
+	});
+
+	test("returns 400 for array body", async () => {
+		const ctx = makeCtx(db, { body: [] });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("JSON object");
+	});
+
+	test("returns 400 for missing source_key", async () => {
+		const ctx = makeCtx(db, { body: { agents: [] } });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("source_key");
+	});
+
+	test("returns 400 for empty source_key", async () => {
+		const ctx = makeCtx(db, { body: { source_key: "", agents: [] } });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("source_key");
+	});
+
+	test("returns 400 for source_key exceeding max length", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "x".repeat(200), agents: [] },
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("max length");
+	});
+
+	test("returns 400 for non-array agents", async () => {
+		const ctx = makeCtx(db, { body: { source_key: "sk1", agents: "nope" } });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("agents must be an array");
+	});
+
+	test("returns 400 when agents array exceeds max size", async () => {
+		const agents = Array.from({ length: 101 }, (_, i) => ({
+			match_key: `mk_${i}`,
+			status: "running",
+		}));
+		const ctx = makeCtx(db, { body: { source_key: "sk1", agents } });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("max size");
+	});
+
+	test("returns 400 for invalid agent entry (not object)", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk1", agents: ["string"] },
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("agents[0]");
+	});
+
+	test("returns 400 for missing match_key", async () => {
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk1", agents: [{ status: "running" }] },
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("match_key");
+	});
+
+	test("returns 400 for invalid status", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "invalid" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("status");
+	});
+
+	test("returns 400 for duplicate match_key in same request", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [
+					{ match_key: "mk1", status: "running" },
+					{ match_key: "mk1", status: "stopped" },
+				],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("duplicate");
+	});
+
+	test("returns 400 for invalid runtime_app type", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "running", runtime_app: 123 }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await parseJson(res);
+		expect(data.error).toContain("runtime_app");
+	});
+});
+
+// --- Service logic tests ---
+
+describe("POST /api/agents/heartbeat (logic)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("empty agents array → no changes, zeroes", async () => {
+		const ctx = makeCtx(db, { body: { source_key: "sk1", agents: [] } });
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(0);
+		expect(data.created).toBe(0);
+		expect(data.missing).toBe(0);
+	});
+
+	test("creates new agents when match_key not in DB", async () => {
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk_new", status: "running", runtime_app: "claude" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.created).toBe(1);
+		expect(data.updated).toBe(0);
+		expect(data.missing).toBe(0);
+
+		// Verify agent was created in DB
+		const row = await db
+			.prepare("SELECT * FROM agents WHERE source_key = ? AND match_key = ?")
+			.bind("sk1", "mk_new")
+			.first<{ status: string; runtime_app: string }>();
+		expect(row).not.toBeNull();
+		expect(row?.status).toBe("running");
+		expect(row?.runtime_app).toBe("claude");
+	});
+
+	test("updates existing agent on heartbeat", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "unknown");
+
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [
+					{
+						match_key: "mk1",
+						status: "running",
+						runtime_app: "cursor",
+						runtime_version: "0.50",
+					},
+				],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(1);
+		expect(data.created).toBe(0);
+		expect(data.missing).toBe(0);
+
+		// Verify fields were updated
+		const row = await getAgent(db, "agt_1");
+		expect(row?.status).toBe("running");
+		expect(row?.runtime_app).toBe("cursor");
+		expect(row?.last_seen_at).toBeGreaterThan(0);
+	});
+
+	test("marks unreported agent as missing", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "running");
+		await insertAgent(db, "agt_2", "sk1", "mk2", "running");
+
+		// Only report mk1 — mk2 should become missing
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "running" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(1);
+		expect(data.missing).toBe(1);
+
+		const row = await getAgent(db, "agt_2");
+		expect(row?.status).toBe("missing");
+	});
+
+	test("does not mark already-missing agent again", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "missing");
+
+		// Report empty — mk1 is already missing, should not count
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk1", agents: [] },
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.missing).toBe(0);
+	});
+
+	test("source_key isolation: only affects agents with same source_key", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "running");
+		await insertAgent(db, "agt_2", "sk2", "mk2", "running");
+
+		// Heartbeat for sk1 with empty → mk1 goes missing, mk2 untouched
+		const ctx = makeCtx(db, {
+			body: { source_key: "sk1", agents: [] },
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		const data = await parseJson(res);
+		expect(data.missing).toBe(1);
+
+		// sk2 agent should NOT be affected
+		const row2 = await getAgent(db, "agt_2");
+		expect(row2?.status).toBe("running");
+	});
+
+	test("mixed scenario: update + create + missing", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk_existing", "running");
+		await insertAgent(db, "agt_2", "sk1", "mk_stale", "running");
+
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [
+					{ match_key: "mk_existing", status: "running", runtime_app: "v2" },
+					{ match_key: "mk_brand_new", status: "stopped" },
+				],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(1);
+		expect(data.created).toBe(1);
+		expect(data.missing).toBe(1);
+
+		// mk_stale should be missing
+		const stale = await getAgent(db, "agt_2");
+		expect(stale?.status).toBe("missing");
+	});
+
+	test("heartbeat with null runtime_app and runtime_version", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "running");
+
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [
+					{
+						match_key: "mk1",
+						status: "stopped",
+						runtime_app: null,
+						runtime_version: null,
+					},
+				],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(1);
+
+		const row = await getAgent(db, "agt_1");
+		expect(row?.status).toBe("stopped");
+		expect(row?.runtime_app).toBeNull();
+	});
+});

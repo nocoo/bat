@@ -37,6 +37,7 @@ import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js
 import { eventsIngestRoute } from "./routes/events-ingest.js";
 import { eventsListRoute } from "./routes/events-list.js";
 import { fleetStatusRoute } from "./routes/fleet-status.js";
+import { agentsHeartbeatRoute } from "./routes/heartbeat.js";
 import { hostDetailRoute } from "./routes/host-detail.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
@@ -148,6 +149,7 @@ app.get("/api/cli-tokens", cliTokensListRoute);
 app.delete("/api/cli-tokens/:id", cliTokensDeleteRoute);
 
 // Agent CRUD (CLI token scope: assets)
+app.post("/api/agents/heartbeat", agentsHeartbeatRoute);
 app.get("/api/agents", agentsListRoute);
 app.post("/api/agents", agentsCreateRoute);
 app.get("/api/agents/:id", agentsGetRoute);
