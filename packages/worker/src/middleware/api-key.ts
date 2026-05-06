@@ -172,8 +172,8 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		if (token === c.env.BAT_READ_KEY) {
 			return c.json({ error: "Read key cannot be used on write routes" }, 403);
 		}
-		// CLI tokens with full scope can do write operations on asset routes
-		// But NOT on probe ingest/settings/webhook routes — those are static key only
+		// CLI tokens can write on asset routes (agents/assets/bindings)
+		// Probe ingest/settings/webhook routes are static key only
 		if (isCliAssetsScopePath(path)) {
 			// Defer to CLI token check below
 		} else {

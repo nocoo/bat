@@ -20,15 +20,14 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 		return c.json({ error: "CLI token minting requires browser authentication" }, 403);
 	}
 
-	// Parse optional body — distinguish empty body from malformed JSON
+	// Parse optional body — read raw text to handle chunked/no-Content-Length cases
 	let label = "cli";
-	const contentLength = c.req.header("Content-Length");
-	const hasBody = contentLength !== undefined && contentLength !== "0";
+	const raw = await c.req.text();
 
-	if (hasBody) {
+	if (raw.trim().length > 0) {
 		let body: Record<string, unknown>;
 		try {
-			body = await c.req.json<Record<string, unknown>>();
+			body = JSON.parse(raw);
 		} catch {
 			return c.json({ error: "Invalid JSON body" }, 400);
 		}
