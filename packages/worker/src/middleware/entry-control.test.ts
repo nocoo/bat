@@ -30,6 +30,23 @@ function createTestApp() {
 	app.post("/api/webhooks", (c) => c.json({ status: "ok" }));
 	app.delete("/api/webhooks/:id", (c) => c.json({ status: "ok" }));
 
+	// CLI asset routes
+	app.get("/api/agents", (c) => c.json({ status: "ok" }));
+	app.post("/api/agents", (c) => c.json({ status: "ok" }));
+	app.get("/api/agents/:id", (c) => c.json({ status: "ok" }));
+	app.patch("/api/agents/:id", (c) => c.json({ status: "ok" }));
+	app.delete("/api/agents/:id", (c) => c.json({ status: "ok" }));
+	app.post("/api/agents/heartbeat", (c) => c.json({ status: "ok" }));
+	app.put("/api/agents/:id/tags", (c) => c.json({ status: "ok" }));
+	app.get("/api/assets", (c) => c.json({ status: "ok" }));
+	app.post("/api/assets", (c) => c.json({ status: "ok" }));
+	app.get("/api/assets/:id", (c) => c.json({ status: "ok" }));
+	app.patch("/api/assets/:id", (c) => c.json({ status: "ok" }));
+	app.delete("/api/assets/:id", (c) => c.json({ status: "ok" }));
+	app.get("/api/bindings", (c) => c.json({ status: "ok" }));
+	app.post("/api/bindings", (c) => c.json({ status: "ok" }));
+	app.delete("/api/bindings/:agentId/:assetId", (c) => c.json({ status: "ok" }));
+
 	return app;
 }
 
@@ -236,6 +253,112 @@ describe("entryControl middleware", () => {
 				headers: { host: machineHost },
 			});
 			expect(res.status).toBe(403);
+		});
+
+		test("allows GET /api/agents (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/agents", {
+				method: "GET",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows POST /api/agents (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/agents", {
+				method: "POST",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows PATCH /api/agents/:id (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/agents/agt_123", {
+				method: "PATCH",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows DELETE /api/agents/:id (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/agents/agt_123", {
+				method: "DELETE",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows POST /api/agents/heartbeat (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/agents/heartbeat", {
+				method: "POST",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows GET /api/assets/* (CLI asset route)", async () => {
+			const app = createTestApp();
+
+			let res = await app.request("/api/assets", {
+				method: "GET",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+
+			res = await app.request("/api/assets/ast_123", {
+				method: "GET",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows POST /api/assets (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/assets", {
+				method: "POST",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows DELETE /api/assets/:id (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/assets/ast_123", {
+				method: "DELETE",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows GET /api/bindings (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/bindings", {
+				method: "GET",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows POST /api/bindings (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/bindings", {
+				method: "POST",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
+		});
+
+		test("allows DELETE /api/bindings/:a/:b (CLI asset route)", async () => {
+			const app = createTestApp();
+			const res = await app.request("/api/bindings/agt_1/ast_2", {
+				method: "DELETE",
+				headers: { host: machineHost },
+			});
+			expect(res.status).toBe(200);
 		});
 	});
 

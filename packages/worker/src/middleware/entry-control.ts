@@ -21,7 +21,21 @@ const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> 
 	{ method: "GET", path: "/api/me" },
 ];
 
+/**
+ * CLI asset route prefixes — all HTTP methods allowed on machine endpoint.
+ * Auth is delegated entirely to apiKeyAuth (CLI token scope enforcement).
+ */
+const CLI_MACHINE_PREFIXES = ["/api/agents", "/api/assets", "/api/bindings"];
+
+function isCliMachineRoute(path: string): boolean {
+	return CLI_MACHINE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 function isAllowedMachineRoute(method: string, path: string): boolean {
+	// CLI asset routes: any method, prefix match (auth delegated to apiKeyAuth)
+	if (isCliMachineRoute(path)) {
+		return true;
+	}
 	return MACHINE_ROUTES.some((route) => {
 		if (route.method !== method) {
 			return false;

@@ -1,7 +1,9 @@
 // Tests for CLI auth routes and token scope enforcement
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
+import { accessAuth } from "../middleware/access-auth.js";
 import { apiKeyAuth, isCliAssetsScopePath } from "../middleware/api-key.js";
+import { entryControl } from "../middleware/entry-control.js";
 import { findCliTokenByHash, hashToken } from "../services/cli-tokens.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import type { AppEnv } from "../types.js";
@@ -246,6 +248,7 @@ function makeBridgeCtx(
 	opts: {
 		queryParams?: Record<string, string>;
 		accessAuthenticated?: boolean;
+		host?: string;
 	} = {},
 ) {
 	const variables: Record<string, unknown> = {};
@@ -253,7 +256,9 @@ function makeBridgeCtx(
 		variables.accessAuthenticated = true;
 	}
 
-	const baseUrl = "https://bat.hexly.ai/api/auth/cli";
+	const host = opts.host ?? "bat.hexly.ai";
+	const protocol = host.startsWith("localhost") || host.startsWith("127.0.0.1") ? "http" : "https";
+	const baseUrl = `${protocol}://${host}/api/auth/cli`;
 	const url = new URL(baseUrl);
 	for (const [key, value] of Object.entries(opts.queryParams ?? {})) {
 		url.searchParams.set(key, value);
@@ -264,6 +269,12 @@ function makeBridgeCtx(
 		req: {
 			url: url.toString(),
 			method: "GET",
+			header: (name: string) => {
+				if (name === "host") {
+					return host;
+				}
+				return undefined;
+			},
 		},
 		get: (key: string) => variables[key],
 		set: (key: string, val: unknown) => {
@@ -310,7 +321,26 @@ describe("GET /api/auth/cli (browser bridge)", () => {
 		expect(redirectUrl.searchParams.get("api_key")).toBeTruthy();
 		expect(redirectUrl.searchParams.get("api_key")?.length).toBe(64);
 		expect(redirectUrl.searchParams.get("state")).toBe("csrf-nonce-abc");
-		expect(redirectUrl.searchParams.get("worker_url")).toBe("https://bat.hexly.ai");
+		// Dashboard origin (bat.hexly.ai) → CLI must use machine endpoint
+		expect(redirectUrl.searchParams.get("worker_url")).toBe("https://bat-ingest.worker.hexly.ai");
+	});
+
+	test("returns current origin as worker_url on localhost", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			host: "localhost:8787",
+			queryParams: {
+				callback: "http://127.0.0.1:12345/callback",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+
+		const location = res.headers.get("Location");
+		const redirectUrl = new URL(location as string);
+		// Localhost: no machine/dashboard split, use current origin
+		expect(redirectUrl.searchParams.get("worker_url")).toBe("http://localhost:8787");
 	});
 
 	test("minted token is stored in DB (hashed)", async () => {
@@ -788,5 +818,178 @@ describe("apiKeyAuth middleware — CLI token path", () => {
 	test("no token returns 401", async () => {
 		const res = await app.request(makeReq("GET", "/api/agents"));
 		expect(res.status).toBe(401);
+	});
+});
+
+// --- Full middleware chain: entryControl → accessAuth → apiKeyAuth ---
+// Regression: CLI token minted by bridge can access asset routes on machine endpoint.
+// Before this fix, the bridge returned the dashboard origin (bat.hexly.ai) as worker_url,
+// but dashboard's accessAuth requires CF Access JWT — CLI Bearer tokens would be rejected
+// at accessAuth before reaching apiKeyAuth.
+
+describe("full middleware chain — CLI token on machine endpoint", () => {
+	let db: D1Database;
+	let app: Hono<AppEnv>;
+	const machineHost = "bat-ingest.worker.hexly.ai";
+
+	beforeEach(() => {
+		db = createMockD1();
+		app = new Hono<AppEnv>();
+
+		// Inject mock env
+		app.use("*", async (c, next) => {
+			c.env = {
+				DB: db,
+				BAT_WRITE_KEY: "write-key",
+				BAT_READ_KEY: "read-key",
+			};
+			return next();
+		});
+
+		// Full production middleware chain
+		app.use("*", entryControl);
+		app.use("/api/*", accessAuth);
+		app.use("/api/*", apiKeyAuth);
+
+		// CLI asset routes
+		app.get("/api/agents", (c) => c.json({ ok: true }));
+		app.post("/api/agents", (c) => c.json({ ok: true }, 201));
+		app.get("/api/agents/:id", (c) => c.json({ ok: true }));
+		app.patch("/api/agents/:id", (c) => c.json({ ok: true }));
+		app.delete("/api/agents/:id", (c) => c.json({ ok: true }));
+		app.post("/api/agents/heartbeat", (c) => c.json({ ok: true }));
+		app.get("/api/assets", (c) => c.json({ ok: true }));
+		app.post("/api/assets", (c) => c.json({ ok: true }, 201));
+		app.get("/api/bindings", (c) => c.json({ ok: true }));
+		app.post("/api/bindings", (c) => c.json({ ok: true }, 201));
+		app.delete("/api/bindings/:agentId/:assetId", (c) => c.json({ ok: true }));
+
+		// Non-asset routes (should remain blocked on machine endpoint)
+		app.get("/api/hosts", (c) => c.json({ ok: true }));
+		app.get("/api/settings", (c) => c.json({ ok: true }));
+		app.post("/api/tags", (c) => c.json({ ok: true }));
+		app.get("/api/webhooks", (c) => c.json({ ok: true }));
+	});
+
+	async function insertCliToken(): Promise<string> {
+		const plaintext = `cli-test-${Math.random().toString(36).slice(2)}`;
+		const hash = await hashToken(plaintext);
+		await db
+			.prepare("INSERT INTO cli_tokens (token_hash, label, scope) VALUES (?, ?, ?)")
+			.bind(hash, "test", "assets")
+			.run();
+		return plaintext;
+	}
+
+	function req(method: string, path: string, token?: string): Request {
+		const headers: Record<string, string> = { host: machineHost };
+		if (token) {
+			headers.Authorization = `Bearer ${token}`;
+		}
+		return new Request(`https://${machineHost}${path}`, { method, headers });
+	}
+
+	// --- CLI token can access asset routes on machine endpoint ---
+
+	test("CLI token → GET /api/agents → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/agents", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → POST /api/agents → 201", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("POST", "/api/agents", token));
+		expect(res.status).toBe(201);
+	});
+
+	test("CLI token → GET /api/agents/:id → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/agents/agt_abc", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → PATCH /api/agents/:id → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("PATCH", "/api/agents/agt_abc", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → DELETE /api/agents/:id → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("DELETE", "/api/agents/agt_abc", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → POST /api/agents/heartbeat → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("POST", "/api/agents/heartbeat", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → GET /api/assets → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/assets", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → GET /api/bindings → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/bindings", token));
+		expect(res.status).toBe(200);
+	});
+
+	test("CLI token → POST /api/bindings → 201", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("POST", "/api/bindings", token));
+		expect(res.status).toBe(201);
+	});
+
+	test("CLI token → DELETE /api/bindings/:a/:b → 200", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("DELETE", "/api/bindings/agt_1/ast_2", token));
+		expect(res.status).toBe(200);
+	});
+
+	// --- Non-asset routes remain blocked on machine endpoint ---
+
+	test("GET /api/hosts blocked on machine endpoint → 403", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/hosts", token));
+		expect(res.status).toBe(403);
+		const body = await res.json();
+		expect(body.error).toBe("Route not allowed on machine endpoint");
+	});
+
+	test("GET /api/settings blocked on machine endpoint → 403", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/settings", token));
+		expect(res.status).toBe(403);
+	});
+
+	test("POST /api/tags blocked on machine endpoint → 403", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("POST", "/api/tags", token));
+		expect(res.status).toBe(403);
+	});
+
+	test("GET /api/webhooks blocked on machine endpoint → 403", async () => {
+		const token = await insertCliToken();
+		const res = await app.request(req("GET", "/api/webhooks", token));
+		expect(res.status).toBe(403);
+	});
+
+	// --- No token on machine endpoint → 401 ---
+
+	test("no token on machine endpoint → 401", async () => {
+		const res = await app.request(req("GET", "/api/agents"));
+		expect(res.status).toBe(401);
+	});
+
+	// --- Invalid token on machine endpoint → 403 ---
+
+	test("invalid CLI token on machine endpoint → 403", async () => {
+		const res = await app.request(req("GET", "/api/agents", "bogus-token"));
+		expect(res.status).toBe(403);
 	});
 });
