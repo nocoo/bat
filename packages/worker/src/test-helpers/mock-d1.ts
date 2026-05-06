@@ -44,6 +44,12 @@ const MIGRATION_MAINTENANCE_PATH = resolve(
 );
 const MIGRATION_TAGS_PATH = resolve(__dirname, "../../migrations/0010_tags.sql");
 const MIGRATION_SETTINGS_PATH = resolve(__dirname, "../../migrations/0018_settings.sql");
+const MIGRATION_AGENTS_PATH = resolve(__dirname, "../../migrations/0019_create_agents.sql");
+const MIGRATION_ASSETS_PATH = resolve(__dirname, "../../migrations/0020_create_assets.sql");
+const MIGRATION_BINDINGS_PATH = resolve(__dirname, "../../migrations/0021_create_bindings.sql");
+const MIGRATION_AGENT_TAGS_PATH = resolve(__dirname, "../../migrations/0022_create_agent_tags.sql");
+const MIGRATION_ASSET_TAGS_PATH = resolve(__dirname, "../../migrations/0023_create_asset_tags.sql");
+const MIGRATION_CLI_TOKENS_PATH = resolve(__dirname, "../../migrations/0024_create_cli_tokens.sql");
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -283,6 +289,60 @@ export function createMockD1(): D1Database {
 	// Apply settings migration
 	const settingsSchema = readFileSync(MIGRATION_SETTINGS_PATH, "utf-8");
 	for (const stmt of settingsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply agents migration
+	const agentsSchema = readFileSync(MIGRATION_AGENTS_PATH, "utf-8");
+	for (const stmt of agentsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply assets migration
+	const assetsSchema = readFileSync(MIGRATION_ASSETS_PATH, "utf-8");
+	for (const stmt of assetsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply bindings migration
+	const bindingsSchema = readFileSync(MIGRATION_BINDINGS_PATH, "utf-8");
+	for (const stmt of bindingsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply agent_tags migration
+	const agentTagsSchema = readFileSync(MIGRATION_AGENT_TAGS_PATH, "utf-8");
+	for (const stmt of agentTagsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply asset_tags migration
+	const assetTagsSchema = readFileSync(MIGRATION_ASSET_TAGS_PATH, "utf-8");
+	for (const stmt of assetTagsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply cli_tokens migration
+	const cliTokensSchema = readFileSync(MIGRATION_CLI_TOKENS_PATH, "utf-8");
+	for (const stmt of cliTokensSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
