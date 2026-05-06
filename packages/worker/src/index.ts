@@ -9,6 +9,8 @@ import {
 	hostAllowedPortsListRoute,
 	hostAllowedPortsRemoveRoute,
 } from "./routes/allowed-ports.js";
+import { cliAuthRoute } from "./routes/cli-auth.js";
+import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
 import { eventsListRoute } from "./routes/events-list.js";
 import { fleetStatusRoute } from "./routes/fleet-status.js";
@@ -116,6 +118,11 @@ app.delete("/api/webhooks/:id", webhooksDeleteRoute);
 app.post("/api/webhooks/:id/regenerate", webhooksRegenerateRoute);
 app.get("/api/settings", settingsGetRoute);
 app.put("/api/settings", settingsPutRoute);
+
+// CLI auth and token management (require CF Access JWT — browser only)
+app.post("/api/auth/cli", cliAuthRoute);
+app.get("/api/cli-tokens", cliTokensListRoute);
+app.delete("/api/cli-tokens/:id", cliTokensDeleteRoute);
 
 export default {
 	fetch: app.fetch,

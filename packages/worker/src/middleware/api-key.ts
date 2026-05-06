@@ -1,6 +1,8 @@
-// API Key auth middleware with read/write scope separation
+// API Key auth middleware with read/write scope separation + CLI token support
 // Write routes: POST /api/ingest, POST /api/identity, webhook CRUD → BAT_WRITE_KEY
 // Read routes: GET /api/hosts, GET /api/hosts/:id/metrics, GET /api/alerts → BAT_READ_KEY
+// CLI token (assets scope): /api/agents/*, /api/assets/*, /api/bindings/*, /api/assets/overview, /api/assets/map
+// CLI token (full scope): equivalent to BAT_WRITE_KEY
 // Public routes: GET /api/live → no auth required
 // Access-authenticated routes: browser endpoint with valid Access JWT → no API key required
 
@@ -16,6 +18,12 @@ const WRITE_ROUTES = ["/api/ingest", "/api/identity", "/api/tier2"];
 
 /** Routes that require read key on machine endpoint (BAT_READ_KEY) */
 const MACHINE_READ_ROUTES_PREFIX = "/api/monitoring";
+
+/**
+ * Routes accessible by CLI tokens with scope=assets.
+ * Prefix matching: /api/agents, /api/assets, /api/bindings
+ */
+const CLI_ASSETS_SCOPE_PREFIXES = ["/api/agents", "/api/assets", "/api/bindings"];
 
 function extractBearerToken(header: string | undefined): string | null {
 	if (!header) {
@@ -104,6 +112,13 @@ export function isMachineReadRoute(path: string): boolean {
 	return path.startsWith(MACHINE_READ_ROUTES_PREFIX);
 }
 
+/** Check if a path is within the CLI assets scope whitelist */
+export function isCliAssetsScopePath(path: string): boolean {
+	return CLI_ASSETS_SCOPE_PREFIXES.some(
+		(prefix) => path === prefix || path.startsWith(`${prefix}/`),
+	);
+}
+
 export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	const path = c.req.path;
 	const host = c.req.header("host") || "";
@@ -142,6 +157,7 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		return c.json({ error: "Missing or invalid Authorization header" }, 401);
 	}
 
+	// Check static keys first (fast path)
 	if (isWriteRequest(c.req.method, path)) {
 		// Write routes require BAT_WRITE_KEY
 		if (token === c.env.BAT_WRITE_KEY) {
@@ -151,16 +167,46 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		if (token === c.env.BAT_READ_KEY) {
 			return c.json({ error: "Read key cannot be used on write routes" }, 403);
 		}
+		// CLI tokens with full scope can do write operations on asset routes
+		// But NOT on probe ingest/settings/webhook routes — those are static key only
+		if (isCliAssetsScopePath(path)) {
+			// Defer to CLI token check below
+		} else {
+			return c.json({ error: "Invalid API key" }, 403);
+		}
+	} else {
+		// Read routes: check static read key first
+		if (token === c.env.BAT_READ_KEY) {
+			return next();
+		}
+		// Check if they used the write key on a read route
+		if (token === c.env.BAT_WRITE_KEY) {
+			return c.json({ error: "Write key cannot be used on read routes" }, 403);
+		}
+		// Fall through to CLI token check for asset routes
+		if (!isCliAssetsScopePath(path)) {
+			return c.json({ error: "Invalid API key" }, 403);
+		}
+	}
+
+	// CLI token validation path — only reached for asset scope routes
+	// Hash the token and look it up in D1
+	const { hashToken, findCliTokenByHash } = await import("../services/cli-tokens.js");
+	const tokenHash = await hashToken(token);
+	const cliToken = await findCliTokenByHash(c.env.DB, tokenHash);
+
+	if (!cliToken) {
 		return c.json({ error: "Invalid API key" }, 403);
 	}
 
-	// Read routes require BAT_READ_KEY
-	if (token === c.env.BAT_READ_KEY) {
-		return next();
+	// Scope enforcement
+	if (cliToken.scope === "assets") {
+		// assets scope: only /api/agents, /api/assets, /api/bindings paths
+		if (!isCliAssetsScopePath(path)) {
+			return c.json({ error: "Token scope insufficient for this route" }, 403);
+		}
 	}
-	// Check if they used the write key on a read route
-	if (token === c.env.BAT_WRITE_KEY) {
-		return c.json({ error: "Write key cannot be used on read routes" }, 403);
-	}
-	return c.json({ error: "Invalid API key" }, 403);
+	// scope === "full": all routes accessible (equivalent to write key for asset routes)
+
+	return next();
 }
