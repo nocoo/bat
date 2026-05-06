@@ -20,10 +20,10 @@ export class ApiError extends Error {
 	}
 }
 
-/** Authentication error (401 — invalid or expired token) */
+/** Authentication/authorization error (401 or 403 — invalid, expired, or insufficient token) */
 export class AuthError extends ApiError {
-	constructor(message: string) {
-		super(401, message);
+	constructor(status: number, message: string) {
+		super(status, message);
 		this.name = "AuthError";
 	}
 }
@@ -109,8 +109,8 @@ export class HttpClient {
 					// Ignore JSON parse failure — use status text
 				}
 
-				if (res.status === 401) {
-					throw new AuthError(message);
+				if (res.status === 401 || res.status === 403) {
+					throw new AuthError(res.status, message);
 				}
 				throw new ApiError(res.status, message);
 			}

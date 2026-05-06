@@ -2,12 +2,13 @@
 // bat-cli — CLI entry point
 // Usage: bat-cli <command> [options]
 
+import { BAT_VERSION } from "@bat/shared";
 import { defineCommand, runMain } from "@nocoo/cli-base";
 
 const main = defineCommand({
 	meta: {
 		name: "bat-cli",
-		version: "2.0.1",
+		version: BAT_VERSION,
 		description: "bat CLI — Agent & asset management for bat.hexly.ai",
 	},
 	subCommands: {
