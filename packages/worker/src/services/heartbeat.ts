@@ -2,6 +2,7 @@
 // Uses source_key as the installation boundary: only agents sharing the same
 // source_key are eligible for mark-missing within a single heartbeat cycle.
 
+import { generateId } from "@bat/shared";
 import type { AgentHeartbeatEntry, AgentHeartbeatResponse } from "@bat/shared";
 
 export interface HeartbeatResult extends AgentHeartbeatResponse {
@@ -14,11 +15,18 @@ export interface HeartbeatResult extends AgentHeartbeatResponse {
  * Logic:
  * 1. Find all existing agents with the given source_key.
  * 2. For each reported agent (by match_key):
- *    - If exists: update runtime_app, runtime_version, status, last_seen_at → "updated"
- *    - If not exists: create new agent → "created"
- * 3. For agents in DB with this source_key that were NOT reported: mark status='missing' → "missing"
+ *    - If exists: update only provided fields (status always, runtime_* only if present)
+ *    - If not exists: upsert via INSERT ... ON CONFLICT DO UPDATE (race-safe)
+ * 3. For agents in DB with this source_key that were NOT reported: mark status='missing'
+ *
+ * Field semantics for runtime_app / runtime_version:
+ *   - undefined: field absent from payload → preserve existing DB value
+ *   - null: explicitly sent as null → clear the field
+ *   - string: update to new value
  *
  * All writes execute in a single db.batch() for atomicity.
+ * The INSERT uses ON CONFLICT(source_key, match_key) DO UPDATE to be
+ * idempotent under concurrent/retry scenarios.
  */
 export async function processHeartbeat(
 	db: D1Database,
@@ -50,39 +58,41 @@ export async function processHeartbeat(
 
 		const existing = existingByMatchKey.get(entry.match_key);
 		if (existing) {
-			// Update existing agent
+			// Update existing agent — only SET fields that are provided
+			const setClauses: string[] = ["status = ?", "last_seen_at = ?"];
+			const bindings: unknown[] = [entry.status, now];
+
+			if ("runtime_app" in entry) {
+				setClauses.push("runtime_app = ?");
+				bindings.push(entry.runtime_app ?? null);
+			}
+			if ("runtime_version" in entry) {
+				setClauses.push("runtime_version = ?");
+				bindings.push(entry.runtime_version ?? null);
+			}
+
+			bindings.push(existing.id);
 			statements.push(
-				db
-					.prepare(
-						"UPDATE agents SET runtime_app = ?, runtime_version = ?, status = ?, last_seen_at = ? WHERE id = ?",
-					)
-					.bind(
-						entry.runtime_app ?? null,
-						entry.runtime_version ?? null,
-						entry.status,
-						now,
-						existing.id,
-					),
+				db.prepare(`UPDATE agents SET ${setClauses.join(", ")} WHERE id = ?`).bind(...bindings),
 			);
 			updated++;
 		} else {
-			// Create new agent (generate ID inline)
-			const { generateId } = await import("@bat/shared");
+			// Create new agent — use ON CONFLICT for idempotency under concurrent/retry
 			const id = generateId("agt_");
+			const runtimeApp = "runtime_app" in entry ? (entry.runtime_app ?? null) : null;
+			const runtimeVersion = "runtime_version" in entry ? (entry.runtime_version ?? null) : null;
 			statements.push(
 				db
 					.prepare(
-						"INSERT INTO agents (id, source_key, match_key, runtime_app, runtime_version, status, last_seen_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+						`INSERT INTO agents (id, source_key, match_key, runtime_app, runtime_version, status, last_seen_at)
+						 VALUES (?, ?, ?, ?, ?, ?, ?)
+						 ON CONFLICT(source_key, match_key) DO UPDATE SET
+						   runtime_app = COALESCE(excluded.runtime_app, agents.runtime_app),
+						   runtime_version = COALESCE(excluded.runtime_version, agents.runtime_version),
+						   status = excluded.status,
+						   last_seen_at = excluded.last_seen_at`,
 					)
-					.bind(
-						id,
-						sourceKey,
-						entry.match_key,
-						entry.runtime_app ?? null,
-						entry.runtime_version ?? null,
-						entry.status,
-						now,
-					),
+					.bind(id, sourceKey, entry.match_key, runtimeApp, runtimeVersion, entry.status, now),
 			);
 			created++;
 		}

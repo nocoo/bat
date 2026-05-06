@@ -129,12 +129,17 @@ export async function agentsHeartbeatRoute(c: Context<AppEnv>) {
 			);
 		}
 
-		agents.push({
+		const agentEntry: AgentHeartbeatEntry = {
 			match_key: e.match_key,
-			runtime_app: (e.runtime_app as string | null) ?? null,
-			runtime_version: (e.runtime_version as string | null) ?? null,
 			status: e.status as AgentStatus,
-		});
+		};
+		if (e.runtime_app !== undefined) {
+			agentEntry.runtime_app = (e.runtime_app as string) ?? null;
+		}
+		if (e.runtime_version !== undefined) {
+			agentEntry.runtime_version = (e.runtime_version as string) ?? null;
+		}
+		agents.push(agentEntry);
 	}
 
 	const validatedBody: AgentHeartbeatBody = {
