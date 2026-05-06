@@ -39,12 +39,14 @@ async function insertAgent(
 	sourceKey: string,
 	matchKey: string,
 	status = "running",
+	runtimeApp: string | null = null,
+	runtimeVersion: string | null = null,
 ) {
 	await db
 		.prepare(
-			"INSERT INTO agents (id, source_key, match_key, status, metadata) VALUES (?, ?, ?, ?, '{}')",
+			"INSERT INTO agents (id, source_key, match_key, status, runtime_app, runtime_version, metadata) VALUES (?, ?, ?, ?, ?, ?, '{}')",
 		)
-		.bind(id, sourceKey, matchKey, status)
+		.bind(id, sourceKey, matchKey, status, runtimeApp, runtimeVersion)
 		.run();
 }
 
@@ -400,5 +402,92 @@ describe("POST /api/agents/heartbeat (logic)", () => {
 		const row = await getAgent(db, "agt_1");
 		expect(row?.status).toBe("stopped");
 		expect(row?.runtime_app).toBeNull();
+	});
+
+	test("absent runtime fields preserve existing values", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "running", "cursor", "1.0");
+
+		// Heartbeat only sends match_key + status, no runtime fields
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk1", status: "running" }],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		const data = await parseJson(res);
+		expect(data.updated).toBe(1);
+
+		// runtime_app and runtime_version should still be their original values
+		const row = await db
+			.prepare("SELECT runtime_app, runtime_version FROM agents WHERE id = ?")
+			.bind("agt_1")
+			.first<{ runtime_app: string | null; runtime_version: string | null }>();
+		expect(row?.runtime_app).toBe("cursor");
+		expect(row?.runtime_version).toBe("1.0");
+	});
+
+	test("explicit null clears existing runtime fields", async () => {
+		await insertAgent(db, "agt_1", "sk1", "mk1", "running", "cursor", "1.0");
+
+		// Heartbeat sends explicit null
+		const ctx = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [
+					{
+						match_key: "mk1",
+						status: "running",
+						runtime_app: null,
+						runtime_version: null,
+					},
+				],
+			},
+		});
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+
+		const row = await db
+			.prepare("SELECT runtime_app, runtime_version FROM agents WHERE id = ?")
+			.bind("agt_1")
+			.first<{ runtime_app: string | null; runtime_version: string | null }>();
+		expect(row?.runtime_app).toBeNull();
+		expect(row?.runtime_version).toBeNull();
+	});
+
+	test("concurrent-safe: duplicate heartbeat with new match_key does not fail", async () => {
+		// First heartbeat creates the agent
+		const ctx1 = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk_concurrent", status: "running", runtime_app: "v1" }],
+			},
+		});
+		const res1 = await agentsHeartbeatRoute(ctx1);
+		expect(res1.status).toBe(200);
+		const data1 = await parseJson(res1);
+		expect(data1.created).toBe(1);
+
+		// Second identical heartbeat should not fail (ON CONFLICT handles it)
+		const ctx2 = makeCtx(db, {
+			body: {
+				source_key: "sk1",
+				agents: [{ match_key: "mk_concurrent", status: "stopped", runtime_app: "v2" }],
+			},
+		});
+		const res2 = await agentsHeartbeatRoute(ctx2);
+		expect(res2.status).toBe(200);
+		// Second call sees it as existing → update
+		const data2 = await parseJson(res2);
+		expect(data2.updated).toBe(1);
+
+		// Verify final state
+		const row = await db
+			.prepare("SELECT status, runtime_app FROM agents WHERE source_key = ? AND match_key = ?")
+			.bind("sk1", "mk_concurrent")
+			.first<{ status: string; runtime_app: string | null }>();
+		expect(row?.status).toBe("stopped");
+		expect(row?.runtime_app).toBe("v2");
 	});
 });
