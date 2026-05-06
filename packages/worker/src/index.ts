@@ -2,6 +2,13 @@ import { Hono } from "hono";
 import { accessAuth } from "./middleware/access-auth.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import { entryControl } from "./middleware/entry-control.js";
+import {
+	agentsCreateRoute,
+	agentsDeleteRoute,
+	agentsGetRoute,
+	agentsListRoute,
+	agentsUpdateRoute,
+} from "./routes/agents.js";
 import { alertsListRoute } from "./routes/alerts.js";
 import {
 	allowedPortsAllRoute,
@@ -123,6 +130,13 @@ app.put("/api/settings", settingsPutRoute);
 app.post("/api/auth/cli", cliAuthRoute);
 app.get("/api/cli-tokens", cliTokensListRoute);
 app.delete("/api/cli-tokens/:id", cliTokensDeleteRoute);
+
+// Agent CRUD (CLI token scope: assets)
+app.get("/api/agents", agentsListRoute);
+app.post("/api/agents", agentsCreateRoute);
+app.get("/api/agents/:id", agentsGetRoute);
+app.patch("/api/agents/:id", agentsUpdateRoute);
+app.delete("/api/agents/:id", agentsDeleteRoute);
 
 export default {
 	fetch: app.fetch,
