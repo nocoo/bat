@@ -201,36 +201,38 @@ describe("L2: agents CRUD", () => {
 		expect(createRes.status).toBe(201);
 		const created = (await createRes.json()) as AgentItem;
 
-		// Assign tag
-		const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
-			method: "PUT",
-			headers: writeHeaders(),
-			body: JSON.stringify({ tag_ids: [tag.id] }),
-		});
-		expect(putRes.status).toBe(200);
-		const tagged = (await putRes.json()) as AgentItem;
-		expect(tagged.tags).toHaveLength(1);
-		expect(tagged.tags[0].name).toBe(tagName);
+		try {
+			// Assign tag
+			const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+				method: "PUT",
+				headers: writeHeaders(),
+				body: JSON.stringify({ tag_ids: [tag.id] }),
+			});
+			expect(putRes.status).toBe(200);
+			const tagged = (await putRes.json()) as AgentItem;
+			expect(tagged.tags).toHaveLength(1);
+			expect(tagged.tags[0].name).toBe(tagName);
 
-		// Clear tags
-		const clearRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
-			method: "PUT",
-			headers: writeHeaders(),
-			body: JSON.stringify({ tag_ids: [] }),
-		});
-		expect(clearRes.status).toBe(200);
-		const cleared = (await clearRes.json()) as AgentItem;
-		expect(cleared.tags).toEqual([]);
-
-		// Cleanup agent and tag
-		await fetch(`${BASE}/api/agents/${created.id}`, {
-			method: "DELETE",
-			headers: writeHeaders(),
-		});
-		await fetch(`${BASE}/api/tags/${tag.id}`, {
-			method: "DELETE",
-			headers: writeHeaders(),
-		});
+			// Clear tags
+			const clearRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+				method: "PUT",
+				headers: writeHeaders(),
+				body: JSON.stringify({ tag_ids: [] }),
+			});
+			expect(clearRes.status).toBe(200);
+			const cleared = (await clearRes.json()) as AgentItem;
+			expect(cleared.tags).toEqual([]);
+		} finally {
+			// Cleanup agent and tag even if assertions fail
+			await fetch(`${BASE}/api/agents/${created.id}`, {
+				method: "DELETE",
+				headers: writeHeaders(),
+			});
+			await fetch(`${BASE}/api/tags/${tag.id}`, {
+				method: "DELETE",
+				headers: writeHeaders(),
+			});
+		}
 	});
 
 	test("PUT /api/agents/:id/tags → 400 (non-existent tags)", async () => {
@@ -246,18 +248,20 @@ describe("L2: agents CRUD", () => {
 		expect(createRes.status).toBe(201);
 		const created = (await createRes.json()) as AgentItem;
 
-		const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
-			method: "PUT",
-			headers: writeHeaders(),
-			body: JSON.stringify({ tag_ids: [99999] }),
-		});
-		expect(putRes.status).toBe(400);
-
-		// Cleanup
-		await fetch(`${BASE}/api/agents/${created.id}`, {
-			method: "DELETE",
-			headers: writeHeaders(),
-		});
+		try {
+			const putRes = await fetch(`${BASE}/api/agents/${created.id}/tags`, {
+				method: "PUT",
+				headers: writeHeaders(),
+				body: JSON.stringify({ tag_ids: [99999] }),
+			});
+			expect(putRes.status).toBe(400);
+		} finally {
+			// Cleanup
+			await fetch(`${BASE}/api/agents/${created.id}`, {
+				method: "DELETE",
+				headers: writeHeaders(),
+			});
+		}
 	});
 
 	test("DELETE /api/agents/:id → 204 (hard delete)", async () => {

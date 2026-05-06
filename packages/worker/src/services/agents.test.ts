@@ -1,10 +1,10 @@
-// Tests for agents service — focused on upsertAgent UNIQUE conflict handling
+// Tests for agents service — upsertAgent atomic ON CONFLICT behavior
 import { describe, expect, test } from "vitest";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import { createAgent, getAgent, upsertAgent } from "./agents.js";
 
 describe("upsertAgent", () => {
-	test("creates new agent when none exists", async () => {
+	test("creates new agent when no conflict", async () => {
 		const db = createMockD1();
 		const result = await upsertAgent(
 			db,
@@ -29,7 +29,7 @@ describe("upsertAgent", () => {
 
 	test("updates existing agent on duplicate source_key + match_key", async () => {
 		const db = createMockD1();
-		// First create
+		// First insert
 		const r1 = await upsertAgent(
 			db,
 			{ source_key: "src_dup", match_key: "mk_dup", nickname: "first" },
@@ -37,7 +37,7 @@ describe("upsertAgent", () => {
 		);
 		expect(r1.created).toBe(true);
 
-		// Second call with same keys
+		// Second call with same keys — ON CONFLICT fires
 		const r2 = await upsertAgent(
 			db,
 			{ source_key: "src_dup", match_key: "mk_dup", nickname: "second" },
@@ -50,98 +50,88 @@ describe("upsertAgent", () => {
 		expect(agent?.nickname).toBe("second");
 	});
 
-	test("handles UNIQUE conflict fallback (race condition)", async () => {
+	test("ON CONFLICT applies only provided updateFields (field presence)", async () => {
 		const db = createMockD1();
-
-		// Directly insert an agent to simulate a race where findAgentBySourceMatch
-		// returns null (hasn't been committed yet) but INSERT hits UNIQUE constraint
-		await createAgent(db, {
-			id: "agt_race_existing",
-			source_key: "src_race",
-			match_key: "mk_race",
-			nickname: "existing",
-			status: "unknown",
-		});
-
-		// Now call upsertAgent — it will find the existing agent via optimistic path
-		// But to truly test the UNIQUE fallback, we need the find to miss.
-		// We do this by inserting directly after the optimistic find would run.
-		// Since we can't easily mock the find, we instead verify the behavior:
-		// Call upsertAgent which will detect existing and update.
-		const result = await upsertAgent(
+		// Create with multiple fields
+		const r1 = await upsertAgent(
 			db,
-			{ source_key: "src_race", match_key: "mk_race", nickname: "updated" },
-			{ nickname: "updated", status: "running" },
+			{
+				source_key: "src_presence",
+				match_key: "mk_presence",
+				nickname: "original",
+				role: "worker",
+				status: "running",
+			},
+			{
+				nickname: "original",
+				role: "worker",
+				status: "running",
+			},
 		);
-		expect(result.created).toBe(false);
-		expect(result.id).toBe("agt_race_existing");
+		expect(r1.created).toBe(true);
 
-		const agent = await getAgent(db, result.id);
+		// Upsert with only nickname in updateFields — role and status should be untouched
+		const r2 = await upsertAgent(
+			db,
+			{ source_key: "src_presence", match_key: "mk_presence", nickname: "updated" },
+			{ nickname: "updated" }, // role and status are undefined → not in DO UPDATE SET
+		);
+		expect(r2.created).toBe(false);
+		expect(r2.id).toBe(r1.id);
+
+		const agent = await getAgent(db, r2.id);
 		expect(agent?.nickname).toBe("updated");
-		expect(agent?.status).toBe("running");
+		expect(agent?.role).toBe("worker"); // preserved
+		expect(agent?.status).toBe("running"); // preserved
 	});
 
-	test("UNIQUE conflict fallback preserves nullable clearing", async () => {
+	test("ON CONFLICT clears nullable field with explicit null", async () => {
 		const db = createMockD1();
+		// Create with nickname
+		const r1 = await upsertAgent(
+			db,
+			{
+				source_key: "src_null",
+				match_key: "mk_null",
+				nickname: "has-name",
+				role: "worker",
+			},
+			{ nickname: "has-name", role: "worker" },
+		);
+		expect(r1.created).toBe(true);
 
-		// Pre-create agent with a nickname
-		await createAgent(db, {
-			id: "agt_null_test",
-			source_key: "src_null",
-			match_key: "mk_null",
-			nickname: "has-name",
-			role: "worker",
-			status: "running",
-		});
-
-		// Upsert with nickname=null to clear it (simulate update fields)
-		const result = await upsertAgent(
+		// Upsert with nickname=null to clear it, role=undefined to preserve
+		const r2 = await upsertAgent(
 			db,
 			{ source_key: "src_null", match_key: "mk_null" },
-			{ nickname: null, role: undefined }, // nickname cleared, role untouched
+			{ nickname: null, role: undefined },
 		);
-		expect(result.created).toBe(false);
+		expect(r2.created).toBe(false);
+		expect(r2.id).toBe(r1.id);
 
-		const agent = await getAgent(db, result.id);
-		expect(agent?.nickname).toBeNull();
-		expect(agent?.role).toBe("worker"); // role was not in updateFields (undefined)
+		const agent = await getAgent(db, r2.id);
+		expect(agent?.nickname).toBeNull(); // explicitly cleared
+		expect(agent?.role).toBe("worker"); // untouched
 	});
 
-	test("UNIQUE conflict from direct insert triggers fallback path", async () => {
+	test("duplicate source_key + match_key via createAgent hits UNIQUE constraint", async () => {
 		const db = createMockD1();
 
-		// This test exercises the actual UNIQUE constraint catch.
-		// We directly INSERT a row first, then call upsertAgent which will:
-		// 1. findAgentBySourceMatch → finds it (because it's already there)
-		// 2. Updates it via normal path
-		// To test the catch branch, we need the find to miss. We accomplish this
-		// by simulating a scenario where the agent appears between find and insert.
-		//
-		// Strategy: manually insert with same source/match keys AFTER disabling
-		// the optimistic find check. Since we can't do that without mocking,
-		// we test the behavior indirectly by ensuring that if createAgent throws
-		// a UNIQUE error, the service function still returns a valid result.
-
-		// First: insert agent directly (bypassing upsertAgent)
 		await createAgent(db, {
-			id: "agt_conflict",
-			source_key: "src_conflict",
-			match_key: "mk_conflict",
-			nickname: "original",
-			status: "unknown",
+			id: "agt_first",
+			source_key: "src_uniq",
+			match_key: "mk_uniq",
+			nickname: "first",
 		});
 
-		// The optimistic find will detect it, so this tests the normal update path.
-		// For a true UNIQUE catch test, we use a lower-level approach:
-		// Try to create a second agent with same source_key+match_key directly
+		// Direct createAgent with same keys must throw UNIQUE
 		let caught = false;
 		try {
 			await createAgent(db, {
-				id: "agt_conflict_2",
-				source_key: "src_conflict",
-				match_key: "mk_conflict",
-				nickname: "conflict",
-				status: "running",
+				id: "agt_second",
+				source_key: "src_uniq",
+				match_key: "mk_uniq",
+				nickname: "second",
 			});
 		} catch (err: unknown) {
 			caught = true;
@@ -149,18 +139,54 @@ describe("upsertAgent", () => {
 			expect((err as Error).message).toContain("UNIQUE");
 		}
 		expect(caught).toBe(true);
+	});
 
-		// Now verify upsertAgent handles this gracefully (via optimistic find)
+	test("upsertAgent handles pre-existing row (inserted externally)", async () => {
+		const db = createMockD1();
+
+		// Simulate a row that already exists (e.g. created by another process)
+		await createAgent(db, {
+			id: "agt_external",
+			source_key: "src_ext",
+			match_key: "mk_ext",
+			nickname: "external",
+			status: "unknown",
+		});
+
+		// upsertAgent should detect conflict atomically and apply updates
 		const result = await upsertAgent(
 			db,
-			{ source_key: "src_conflict", match_key: "mk_conflict", nickname: "from-upsert" },
-			{ nickname: "from-upsert", status: "running" },
+			{ source_key: "src_ext", match_key: "mk_ext", nickname: "updated" },
+			{ nickname: "updated", status: "running" },
 		);
 		expect(result.created).toBe(false);
-		expect(result.id).toBe("agt_conflict");
+		expect(result.id).toBe("agt_external");
 
 		const agent = await getAgent(db, result.id);
-		expect(agent?.nickname).toBe("from-upsert");
+		expect(agent?.nickname).toBe("updated");
 		expect(agent?.status).toBe("running");
+	});
+
+	test("upsertAgent with no updateFields (empty DO UPDATE) still returns existing id", async () => {
+		const db = createMockD1();
+
+		const r1 = await upsertAgent(
+			db,
+			{ source_key: "src_noop", match_key: "mk_noop", nickname: "original" },
+			{ nickname: "original" },
+		);
+		expect(r1.created).toBe(true);
+
+		// Second call with no updateFields — row untouched but id returned
+		const r2 = await upsertAgent(
+			db,
+			{ source_key: "src_noop", match_key: "mk_noop" },
+			{}, // no fields to update
+		);
+		expect(r2.created).toBe(false);
+		expect(r2.id).toBe(r1.id);
+
+		const agent = await getAgent(db, r2.id);
+		expect(agent?.nickname).toBe("original"); // unchanged
 	});
 });
