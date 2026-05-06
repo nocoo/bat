@@ -3,15 +3,26 @@
 
 // --- ID generation ---
 
+const ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+const ID_SUFFIX_LENGTH = 21;
+
 /**
- * Generate a prefixed unique ID.
+ * Generate a prefixed unique ID using crypto-random bytes.
  * Format: prefix + 21 random alphanumeric chars (e.g. "agt_a1b2c3d4e5f6g7h8i9j0k")
+ * Prefix must match /^[a-z]+_$/ pattern.
  */
 export function generateId(prefix: string): string {
-	const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
+	if (!/^[a-z]+_$/.test(prefix)) {
+		throw new Error(
+			`Invalid ID prefix: "${prefix}" (must be lowercase letters + trailing underscore)`,
+		);
+	}
+	const bytes = new Uint8Array(ID_SUFFIX_LENGTH);
+	crypto.getRandomValues(bytes);
 	let id = prefix;
-	for (let i = 0; i < 21; i++) {
-		id += alphabet[Math.floor(Math.random() * alphabet.length)];
+	for (let i = 0; i < ID_SUFFIX_LENGTH; i++) {
+		const byte = bytes[i] ?? 0;
+		id += ID_ALPHABET[byte % ID_ALPHABET.length];
 	}
 	return id;
 }
@@ -67,18 +78,36 @@ export const VALID_CLI_TOKEN_SCOPES: readonly CliTokenScope[] = ["assets", "full
 export type ValidationResult<T> = { ok: true; value: T } | { ok: false; error: string };
 
 /**
- * Validate metadata: must be a plain object, max 4096 bytes when stringified.
- * Rejects arrays, primitives, and oversized payloads.
+ * Check if a value is a plain object (prototype is Object.prototype or null).
+ * Rejects Date, Map, Set, class instances, arrays, etc.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) {
+		return false;
+	}
+	const proto = Object.getPrototypeOf(value);
+	return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Validate metadata: must be a plain object, max 4096 UTF-8 bytes when stringified.
+ * Rejects arrays, primitives, Date, Map, class instances, circular refs, BigInt.
  */
 export function validateMetadata(input: unknown): ValidationResult<string> {
 	if (input === undefined || input === null) {
 		return { ok: true, value: "{}" };
 	}
-	if (typeof input !== "object" || Array.isArray(input)) {
+	if (!isPlainObject(input)) {
 		return { ok: false, error: "metadata must be a plain object" };
 	}
-	const json = JSON.stringify(input);
-	if (json.length > ASSET_METADATA_MAX_BYTES) {
+	let json: string;
+	try {
+		json = JSON.stringify(input);
+	} catch {
+		return { ok: false, error: "metadata contains unserializable values" };
+	}
+	const byteLength = new TextEncoder().encode(json).length;
+	if (byteLength > ASSET_METADATA_MAX_BYTES) {
 		return { ok: false, error: `metadata exceeds ${ASSET_METADATA_MAX_BYTES} bytes` };
 	}
 	return { ok: true, value: json };
@@ -381,15 +410,12 @@ export interface AssetMapTagEntry {
 export interface AssetsOverview {
 	agents: {
 		total: number;
-		running: number;
-		stopped: number;
-		missing: number;
+		by_status: Record<AgentStatus, number>;
 	};
 	assets: {
 		total: number;
 		by_type: Record<AssetType, number>;
-		active: number;
-		inactive: number;
+		by_status: Record<AssetStatus, number>;
 	};
 	bindings: number;
 }

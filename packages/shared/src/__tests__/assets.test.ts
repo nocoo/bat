@@ -24,7 +24,7 @@ describe("generateId", () => {
 	});
 
 	test("produces unique values", () => {
-		const ids = new Set(Array.from({ length: 100 }, () => generateId("x_")));
+		const ids = new Set(Array.from({ length: 100 }, () => generateId("ast_")));
 		expect(ids.size).toBe(100);
 	});
 
@@ -32,6 +32,22 @@ describe("generateId", () => {
 		const id = generateId("t_");
 		const suffix = id.slice(2);
 		expect(suffix).toMatch(/^[0-9a-z]{21}$/);
+	});
+
+	test("throws on invalid prefix (no trailing underscore)", () => {
+		expect(() => generateId("agt")).toThrow("Invalid ID prefix");
+	});
+
+	test("throws on invalid prefix (uppercase)", () => {
+		expect(() => generateId("AGT_")).toThrow("Invalid ID prefix");
+	});
+
+	test("throws on invalid prefix (numbers)", () => {
+		expect(() => generateId("a1_")).toThrow("Invalid ID prefix");
+	});
+
+	test("throws on empty prefix", () => {
+		expect(() => generateId("")).toThrow("Invalid ID prefix");
 	});
 });
 
@@ -98,6 +114,74 @@ describe("validateMetadata", () => {
 		}
 		const r = validateMetadata(payload);
 		expect(r.ok).toBe(true);
+	});
+
+	test("rejects Date objects", () => {
+		const r = validateMetadata(new Date());
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("plain object");
+		}
+	});
+
+	test("rejects Map instances", () => {
+		const r = validateMetadata(new Map([["key", "val"]]));
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("plain object");
+		}
+	});
+
+	test("rejects class instances", () => {
+		class Foo {
+			x = 1;
+		}
+		const r = validateMetadata(new Foo());
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("plain object");
+		}
+	});
+
+	test("rejects circular references", () => {
+		const obj: Record<string, unknown> = {};
+		Object.setPrototypeOf(obj, null); // make it "plain" proto-wise
+		obj.self = obj; // circular
+		const r = validateMetadata(obj);
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("unserializable");
+		}
+	});
+
+	test("rejects BigInt values", () => {
+		const obj = Object.create(null);
+		obj.big = BigInt(9007199254740991);
+		const r = validateMetadata(obj);
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("unserializable");
+		}
+	});
+
+	test("rejects non-ASCII content exceeding byte limit", () => {
+		// Each emoji "😀" is 4 UTF-8 bytes but 2 JS chars (surrogate pair)
+		// 1100 emojis × 4 bytes = 4400 bytes > 4096, but string length is ~2200 chars
+		const r = validateMetadata({ x: "😀".repeat(1100) });
+		expect(r.ok).toBe(false);
+		if (!r.ok) {
+			expect(r.error).toContain("exceeds");
+		}
+	});
+
+	test("accepts plain object with null prototype", () => {
+		const obj = Object.create(null);
+		obj.key = "value";
+		const r = validateMetadata(obj);
+		expect(r.ok).toBe(true);
+		if (r.ok) {
+			expect(JSON.parse(r.value)).toEqual({ key: "value" });
+		}
 	});
 });
 
