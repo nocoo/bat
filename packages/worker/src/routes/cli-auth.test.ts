@@ -17,6 +17,7 @@ function makeCtx(
 		body?: unknown;
 		accessAuthenticated?: boolean;
 		authorization?: string;
+		contentLength?: string;
 	} = {},
 ) {
 	const variables: Record<string, unknown> = {};
@@ -36,6 +37,9 @@ function makeCtx(
 			header: (name: string) => {
 				if (name === "Authorization") {
 					return opts.authorization;
+				}
+				if (name === "Content-Length") {
+					return opts.contentLength;
 				}
 				return undefined;
 			},
@@ -67,7 +71,8 @@ describe("/api/auth/cli", () => {
 	test("mints token when CF Access authenticated", async () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
-			body: { label: "my-cli", scope: "assets" },
+			body: { label: "my-cli" },
+			contentLength: "25",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(201);
@@ -118,21 +123,11 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(403);
 	});
 
-	test("rejects invalid scope", async () => {
-		const ctx = makeCtx(db, {
-			accessAuthenticated: true,
-			body: { scope: "admin" },
-		});
-		const res = await cliAuthRoute(ctx);
-		expect(res.status).toBe(400);
-		const data = await res.json();
-		expect(data.error).toContain("scope");
-	});
-
 	test("rejects overly long label", async () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
 			body: { label: "x".repeat(100) },
+			contentLength: "110",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(400);
@@ -140,8 +135,42 @@ describe("/api/auth/cli", () => {
 		expect(data.error).toContain("label");
 	});
 
+	test("rejects malformed JSON body", async () => {
+		// Simulate: Content-Length present but json() throws (invalid JSON)
+		const variables: Record<string, unknown> = { accessAuthenticated: true };
+		const ctx = {
+			env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+			req: {
+				json: async () => {
+					throw new SyntaxError("Unexpected token");
+				},
+				header: (name: string) => {
+					if (name === "Content-Length") {
+						return "15";
+					}
+					return undefined;
+				},
+				method: "POST",
+			},
+			get: (key: string) => variables[key],
+			set: (key: string, val: unknown) => {
+				variables[key] = val;
+			},
+			json: (data: unknown, status?: number) =>
+				new Response(JSON.stringify(data), {
+					status: status ?? 200,
+					headers: { "Content-Type": "application/json" },
+				}),
+			// biome-ignore lint/suspicious/noExplicitAny: test helper
+		} as any;
+		const res = await cliAuthRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("Invalid JSON");
+	});
+
 	test("stores hashed token (not plaintext)", async () => {
-		const ctx = makeCtx(db, { accessAuthenticated: true, body: {} });
+		const ctx = makeCtx(db, { accessAuthenticated: true, body: {}, contentLength: "2" });
 		const res = await cliAuthRoute(ctx);
 		const data = await res.json();
 		const plaintext = data.token;
@@ -155,15 +184,16 @@ describe("/api/auth/cli", () => {
 		expect(row?.token_hash).toBe(expectedHash);
 	});
 
-	test("supports scope=full", async () => {
+	test("always mints with scope=assets", async () => {
 		const ctx = makeCtx(db, {
 			accessAuthenticated: true,
-			body: { scope: "full" },
+			body: { label: "test" },
+			contentLength: "18",
 		});
 		const res = await cliAuthRoute(ctx);
 		expect(res.status).toBe(201);
 		const data = await res.json();
-		expect(data.scope).toBe("full");
+		expect(data.scope).toBe("assets");
 	});
 });
 
@@ -207,7 +237,7 @@ describe("/api/cli-tokens", () => {
 		const hash = await hashToken("test-token-456");
 		await db
 			.prepare("INSERT INTO cli_tokens (token_hash, label, scope) VALUES (?, ?, ?)")
-			.bind(hash, "to-delete", "full")
+			.bind(hash, "to-delete", "assets")
 			.run();
 
 		const ctx = makeCtx(db, { params: { id: "1" } });
@@ -349,7 +379,7 @@ describe("findCliTokenByHash", () => {
 		const hash = await hashToken("usage-tracking-token");
 		await db
 			.prepare("INSERT INTO cli_tokens (token_hash, label, scope) VALUES (?, ?, ?)")
-			.bind(hash, "track-me", "full")
+			.bind(hash, "track-me", "assets")
 			.run();
 
 		// First call — last_used_at should be updated
@@ -385,22 +415,26 @@ describe("apiKeyAuth middleware — CLI token path", () => {
 
 		app.use("/api/*", apiKeyAuth);
 
-		// Asset-scope routes
+		// Asset-scope routes (GET + mutation)
 		app.get("/api/agents", (c) => c.json({ ok: true }));
+		app.post("/api/agents", (c) => c.json({ ok: true }, 201));
 		app.get("/api/assets", (c) => c.json({ ok: true }));
+		app.post("/api/assets", (c) => c.json({ ok: true }, 201));
+		app.delete("/api/assets/:id", (c) => c.json({ ok: true }));
 		app.get("/api/bindings", (c) => c.json({ ok: true }));
+		app.delete("/api/bindings/:id", (c) => c.json({ ok: true }));
 
 		// Non-asset routes
 		app.get("/api/hosts", (c) => c.json({ ok: true }));
 		app.get("/api/settings", (c) => c.json({ ok: true }));
 	});
 
-	async function insertToken(scope: "assets" | "full"): Promise<string> {
+	async function insertToken(): Promise<string> {
 		const plaintext = `cli-test-token-${Math.random().toString(36).slice(2)}`;
 		const hash = await hashToken(plaintext);
 		await db
 			.prepare("INSERT INTO cli_tokens (token_hash, label, scope) VALUES (?, ?, ?)")
-			.bind(hash, "test", scope)
+			.bind(hash, "test", "assets")
 			.run();
 		return plaintext;
 	}
@@ -413,40 +447,60 @@ describe("apiKeyAuth middleware — CLI token path", () => {
 		return new Request(`https://bat.example.com${path}`, { method, headers });
 	}
 
-	test("assets-scope token can access /api/agents", async () => {
-		const token = await insertToken("assets");
+	test("assets-scope token can GET /api/agents", async () => {
+		const token = await insertToken();
 		const res = await app.request(makeReq("GET", "/api/agents", token));
 		expect(res.status).toBe(200);
 	});
 
-	test("assets-scope token can access /api/assets", async () => {
-		const token = await insertToken("assets");
+	test("assets-scope token can GET /api/assets", async () => {
+		const token = await insertToken();
 		const res = await app.request(makeReq("GET", "/api/assets", token));
 		expect(res.status).toBe(200);
 	});
 
-	test("assets-scope token can access /api/bindings", async () => {
-		const token = await insertToken("assets");
+	test("assets-scope token can GET /api/bindings", async () => {
+		const token = await insertToken();
 		const res = await app.request(makeReq("GET", "/api/bindings", token));
 		expect(res.status).toBe(200);
 	});
 
+	test("assets-scope token can POST /api/agents (write on asset route)", async () => {
+		const token = await insertToken();
+		const res = await app.request(makeReq("POST", "/api/agents", token));
+		expect(res.status).toBe(201);
+	});
+
+	test("assets-scope token can DELETE /api/assets/:id", async () => {
+		const token = await insertToken();
+		const res = await app.request(makeReq("DELETE", "/api/assets/ast_123", token));
+		expect(res.status).toBe(200);
+	});
+
 	test("assets-scope token CANNOT access /api/hosts", async () => {
-		const token = await insertToken("assets");
+		const token = await insertToken();
 		const res = await app.request(makeReq("GET", "/api/hosts", token));
 		expect(res.status).toBe(403);
 	});
 
-	test("full-scope token can access /api/agents", async () => {
-		const token = await insertToken("full");
-		const res = await app.request(makeReq("GET", "/api/agents", token));
-		expect(res.status).toBe(200);
+	test("read key CANNOT POST /api/agents (write on asset route)", async () => {
+		const res = await app.request(makeReq("POST", "/api/agents", "read-key"));
+		expect(res.status).toBe(403);
 	});
 
-	test("full-scope token can access /api/assets", async () => {
-		const token = await insertToken("full");
-		const res = await app.request(makeReq("GET", "/api/assets", token));
-		expect(res.status).toBe(200);
+	test("read key CANNOT DELETE /api/assets/:id", async () => {
+		const res = await app.request(makeReq("DELETE", "/api/assets/ast_123", "read-key"));
+		expect(res.status).toBe(403);
+	});
+
+	test("read key CANNOT DELETE /api/bindings/:id", async () => {
+		const res = await app.request(makeReq("DELETE", "/api/bindings/bnd_123", "read-key"));
+		expect(res.status).toBe(403);
+	});
+
+	test("write key can POST /api/agents", async () => {
+		const res = await app.request(makeReq("POST", "/api/agents", "write-key"));
+		expect(res.status).toBe(201);
 	});
 
 	test("invalid CLI token returns 403", async () => {

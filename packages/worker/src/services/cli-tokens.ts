@@ -62,7 +62,10 @@ export async function findCliTokenByHash(
 	if (!row) {
 		return null;
 	}
-	// Update last_used_at (fire and forget — don't block the request)
-	db.prepare("UPDATE cli_tokens SET last_used_at = unixepoch() WHERE id = ?").bind(row.id).run();
+	// Update last_used_at
+	await db
+		.prepare("UPDATE cli_tokens SET last_used_at = unixepoch() WHERE id = ?")
+		.bind(row.id)
+		.run();
 	return row;
 }

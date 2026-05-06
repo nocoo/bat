@@ -3,15 +3,11 @@
 // Static API keys (BAT_READ_KEY/BAT_WRITE_KEY) and existing CLI Bearer tokens
 // CANNOT mint new tokens — only authenticated browser sessions can.
 //
-// Request body: { label?: string, scope?: "assets" | "full" }
+// Request body: { label?: string }
 // Response: { token: string, id: number, label: string, scope: string }
 //   (token is plaintext, shown only once)
 
-import {
-	CLI_TOKEN_LABEL_MAX_LENGTH,
-	type CliTokenScope,
-	VALID_CLI_TOKEN_SCOPES,
-} from "@bat/shared";
+import { CLI_TOKEN_LABEL_MAX_LENGTH } from "@bat/shared";
 import type { Context } from "hono";
 import { createCliToken, generateCliToken, hashToken } from "../services/cli-tokens.js";
 import type { AppEnv } from "../types.js";
@@ -24,11 +20,18 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 		return c.json({ error: "CLI token minting requires browser authentication" }, 403);
 	}
 
-	// Parse optional body
+	// Parse optional body — distinguish empty body from malformed JSON
 	let label = "cli";
-	let scope: CliTokenScope = "assets";
-	try {
-		const body = await c.req.json<Record<string, unknown>>();
+	const contentLength = c.req.header("Content-Length");
+	const hasBody = contentLength !== undefined && contentLength !== "0";
+
+	if (hasBody) {
+		let body: Record<string, unknown>;
+		try {
+			body = await c.req.json<Record<string, unknown>>();
+		} catch {
+			return c.json({ error: "Invalid JSON body" }, 400);
+		}
 		if (typeof body.label === "string" && body.label.trim().length > 0) {
 			const trimmed = body.label.trim();
 			if (trimmed.length > CLI_TOKEN_LABEL_MAX_LENGTH) {
@@ -39,17 +42,6 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 			}
 			label = trimmed;
 		}
-		if (body.scope !== undefined) {
-			if (
-				typeof body.scope !== "string" ||
-				!VALID_CLI_TOKEN_SCOPES.includes(body.scope as CliTokenScope)
-			) {
-				return c.json({ error: `scope must be one of: ${VALID_CLI_TOKEN_SCOPES.join(", ")}` }, 400);
-			}
-			scope = body.scope as CliTokenScope;
-		}
-	} catch {
-		// No body or invalid JSON — use defaults
 	}
 
 	// Generate token + hash
@@ -57,7 +49,7 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 	const tokenHash = await hashToken(plaintext);
 
 	// Store in D1
-	const row = await createCliToken(c.env.DB, tokenHash, label, scope);
+	const row = await createCliToken(c.env.DB, tokenHash, label, "assets");
 
 	return c.json(
 		{
