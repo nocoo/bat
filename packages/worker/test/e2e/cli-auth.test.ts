@@ -16,6 +16,14 @@ describe("L2: CLI auth and token management", () => {
 		expect(res.status).toBe(403);
 	});
 
+	test("GET /api/auth/cli rejects without CF Access JWT", async () => {
+		const res = await fetch(
+			`${BASE}/api/auth/cli?callback=http://127.0.0.1:9999/callback&state=nonce`,
+		);
+		// Localhost bypasses API key auth but cliAuthBridgeRoute checks accessAuthenticated
+		expect(res.status).toBe(403);
+	});
+
 	test("GET /api/cli-tokens returns list", async () => {
 		const res = await fetch(`${BASE}/api/cli-tokens`, { headers: readHeaders() });
 		// Localhost bypass allows this — returns empty array or existing tokens

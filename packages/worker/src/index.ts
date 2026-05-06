@@ -32,7 +32,7 @@ import {
 	bindingsDeleteRoute,
 	bindingsListRoute,
 } from "./routes/bindings.js";
-import { cliAuthRoute } from "./routes/cli-auth.js";
+import { cliAuthBridgeRoute, cliAuthRoute } from "./routes/cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
 import { eventsListRoute } from "./routes/events-list.js";
@@ -144,6 +144,7 @@ app.get("/api/settings", settingsGetRoute);
 app.put("/api/settings", settingsPutRoute);
 
 // CLI auth and token management (require CF Access JWT — browser only)
+app.get("/api/auth/cli", cliAuthBridgeRoute);
 app.post("/api/auth/cli", cliAuthRoute);
 app.get("/api/cli-tokens", cliTokensListRoute);
 app.delete("/api/cli-tokens/:id", cliTokensDeleteRoute);

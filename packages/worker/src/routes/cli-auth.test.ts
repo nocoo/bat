@@ -5,7 +5,7 @@ import { apiKeyAuth, isCliAssetsScopePath } from "../middleware/api-key.js";
 import { findCliTokenByHash, hashToken } from "../services/cli-tokens.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import type { AppEnv } from "../types.js";
-import { cliAuthRoute } from "./cli-auth.js";
+import { cliAuthBridgeRoute, cliAuthRoute } from "./cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./cli-tokens.js";
 
 // --- Helpers ---
@@ -236,6 +236,241 @@ describe("/api/auth/cli", () => {
 		expect(res.status).toBe(201);
 		const data = await res.json();
 		expect(data.scope).toBe("assets");
+	});
+});
+
+// --- GET /api/auth/cli (browser login bridge) ---
+
+function makeBridgeCtx(
+	db: D1Database,
+	opts: {
+		queryParams?: Record<string, string>;
+		accessAuthenticated?: boolean;
+	} = {},
+) {
+	const variables: Record<string, unknown> = {};
+	if (opts.accessAuthenticated) {
+		variables.accessAuthenticated = true;
+	}
+
+	const baseUrl = "https://bat.hexly.ai/api/auth/cli";
+	const url = new URL(baseUrl);
+	for (const [key, value] of Object.entries(opts.queryParams ?? {})) {
+		url.searchParams.set(key, value);
+	}
+
+	return {
+		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+		req: {
+			url: url.toString(),
+			method: "GET",
+		},
+		get: (key: string) => variables[key],
+		set: (key: string, val: unknown) => {
+			variables[key] = val;
+		},
+		json: (data: unknown, status?: number) =>
+			new Response(JSON.stringify(data), {
+				status: status ?? 200,
+				headers: { "Content-Type": "application/json" },
+			}),
+		redirect: (redirectUrl: string, status: number) =>
+			new Response(null, {
+				status,
+				headers: { Location: redirectUrl },
+			}),
+		// biome-ignore lint/suspicious/noExplicitAny: test helper
+	} as any;
+}
+
+describe("GET /api/auth/cli (browser bridge)", () => {
+	let db: D1Database;
+
+	beforeEach(() => {
+		db = createMockD1();
+	});
+
+	test("redirects with api_key, state, and worker_url on success", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://127.0.0.1:12345/callback",
+				state: "csrf-nonce-abc",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+
+		const location = res.headers.get("Location");
+		expect(location).toBeTruthy();
+
+		const redirectUrl = new URL(location as string);
+		expect(redirectUrl.hostname).toBe("127.0.0.1");
+		expect(redirectUrl.pathname).toBe("/callback");
+		expect(redirectUrl.searchParams.get("api_key")).toBeTruthy();
+		expect(redirectUrl.searchParams.get("api_key")?.length).toBe(64);
+		expect(redirectUrl.searchParams.get("state")).toBe("csrf-nonce-abc");
+		expect(redirectUrl.searchParams.get("worker_url")).toBe("https://bat.hexly.ai");
+	});
+
+	test("minted token is stored in DB (hashed)", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://localhost:9999/callback",
+				state: "nonce123",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+
+		const location = res.headers.get("Location");
+		const redirectUrl = new URL(location as string);
+		const token = redirectUrl.searchParams.get("api_key") as string;
+
+		// Verify token was stored hashed
+		const expectedHash = await hashToken(token);
+		const row = await db
+			.prepare("SELECT token_hash, scope, label FROM cli_tokens WHERE token_hash = ?")
+			.bind(expectedHash)
+			.first<{ token_hash: string; scope: string; label: string }>();
+		expect(row).not.toBeNull();
+		expect(row?.scope).toBe("assets");
+		expect(row?.label).toBe("cli");
+	});
+
+	test("accepts localhost callback", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://localhost:8080/callback",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+	});
+
+	test("accepts [::1] callback", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://[::1]:5678/callback",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+	});
+
+	test("accepts custom label", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://127.0.0.1:1234/callback",
+				state: "nonce",
+				label: "my-machine",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(302);
+
+		// Check label in DB
+		const row = await db.prepare("SELECT label FROM cli_tokens LIMIT 1").first<{ label: string }>();
+		expect(row?.label).toBe("my-machine");
+	});
+
+	test("rejects when NOT CF Access authenticated", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: false,
+			queryParams: {
+				callback: "http://127.0.0.1:1234/callback",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(403);
+		const data = await res.json();
+		expect(data.error).toContain("browser authentication");
+	});
+
+	test("rejects missing callback parameter", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: { state: "nonce" },
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("callback");
+	});
+
+	test("rejects missing state parameter", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: { callback: "http://127.0.0.1:1234/callback" },
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("state");
+	});
+
+	test("rejects non-loopback callback (external host)", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "https://evil.example.com/steal",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("loopback");
+
+		// No token should be created
+		const count = await db.prepare("SELECT COUNT(*) as n FROM cli_tokens").first<{ n: number }>();
+		expect(count?.n).toBe(0);
+	});
+
+	test("rejects non-loopback callback (IP address)", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://192.168.1.1:8080/callback",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("rejects invalid callback URL", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "not-a-url",
+				state: "nonce",
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+	});
+
+	test("rejects overly long label", async () => {
+		const ctx = makeBridgeCtx(db, {
+			accessAuthenticated: true,
+			queryParams: {
+				callback: "http://127.0.0.1:1234/callback",
+				state: "nonce",
+				label: "x".repeat(100),
+			},
+		});
+		const res = await cliAuthBridgeRoute(ctx);
+		expect(res.status).toBe(400);
+		const data = await res.json();
+		expect(data.error).toContain("label");
 	});
 });
 
