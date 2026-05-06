@@ -103,8 +103,19 @@ export async function cliAuthBridgeRoute(c: Context<AppEnv>) {
 	redirectUrl.searchParams.set("api_key", plaintext);
 	redirectUrl.searchParams.set("state", state);
 
-	// Derive worker_url from the current request origin
-	const workerUrl = url.origin;
+	// Derive worker_url — CLI must use the machine endpoint (bat-ingest),
+	// NOT the dashboard (bat.hexly.ai), because the dashboard's accessAuth
+	// middleware requires CF Access JWT which CLI Bearer tokens don't have.
+	const host = c.req.header("host") || "";
+	let workerUrl: string;
+	if (host === "bat.hexly.ai") {
+		workerUrl = "https://bat-ingest.worker.hexly.ai";
+	} else if (host.includes("bat-ingest")) {
+		workerUrl = url.origin;
+	} else {
+		// localhost / dev: no machine/dashboard split, use current origin
+		workerUrl = url.origin;
+	}
 	redirectUrl.searchParams.set("worker_url", workerUrl);
 
 	return c.redirect(redirectUrl.toString(), 302);
