@@ -4,6 +4,8 @@
 
 import { BAT_VERSION } from "@bat/shared";
 import { defineCommand, runMain } from "@nocoo/cli-base";
+import login from "../commands/login.js";
+import status from "../commands/status.js";
 
 const main = defineCommand({
 	meta: {
@@ -12,8 +14,8 @@ const main = defineCommand({
 		description: "bat CLI — Agent & asset management for bat.hexly.ai",
 	},
 	subCommands: {
-		// Commands will be added in subsequent phases:
-		// Phase 2B: login, status
+		login,
+		status,
 		// Phase 2C: agent
 		// Phase 2D: asset, binding
 		// Phase 2E: service
