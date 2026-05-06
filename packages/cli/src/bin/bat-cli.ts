@@ -4,6 +4,7 @@
 
 import { BAT_VERSION } from "@bat/shared";
 import { defineCommand, runMain } from "@nocoo/cli-base";
+import agent from "../commands/agent/index.js";
 import login from "../commands/login.js";
 import status from "../commands/status.js";
 
@@ -16,7 +17,7 @@ const main = defineCommand({
 	subCommands: {
 		login,
 		status,
-		// Phase 2C: agent
+		agent,
 		// Phase 2D: asset, binding
 		// Phase 2E: service
 	},
