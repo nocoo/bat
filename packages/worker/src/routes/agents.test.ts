@@ -185,9 +185,7 @@ describe("POST /api/agents (create)", () => {
 		expect(await countAgents(db)).toBe(1);
 	});
 
-	test("handles unique constraint conflict gracefully (race fallback)", async () => {
-		// Simulate race: directly insert agent with same source_key + match_key,
-		// then call agentsCreateRoute which will try INSERT and hit UNIQUE conflict
+	test("upsert via service handles duplicate gracefully", async () => {
 		const ctx1 = makeCtx(db, {
 			body: { source_key: "race_src", match_key: "race_mk", nickname: "first" },
 		});
@@ -195,15 +193,11 @@ describe("POST /api/agents (create)", () => {
 		expect(res1.status).toBe(201);
 		const data1 = await parseJson(res1);
 
-		// Now the "race" scenario: findAgentBySourceMatch would normally find it,
-		// but to test the conflict fallback, we directly insert a second row bypassing
-		// the check. Since we can't bypass the find in unit tests easily, verify the
-		// upsert path still works correctly (200 not 500)
+		// Second POST with same keys goes through upsertAgent service
 		const ctx2 = makeCtx(db, {
 			body: { source_key: "race_src", match_key: "race_mk", nickname: "raced" },
 		});
 		const res2 = await agentsCreateRoute(ctx2);
-		// Should be 200 (upsert via normal find path)
 		expect(res2.status).toBe(200);
 		const data2 = await parseJson(res2);
 		expect(data2.id).toBe(data1.id);

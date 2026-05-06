@@ -1,5 +1,6 @@
 // Agent CRUD service — D1 operations for the agents table.
 
+import { generateId } from "@bat/shared";
 import type { AgentItem, AgentRow } from "@bat/shared";
 
 /** List all agents with hostname join and tags. */
@@ -167,6 +168,86 @@ export async function findAgentBySourceMatch(
 		.prepare("SELECT * FROM agents WHERE source_key = ? AND match_key = ?")
 		.bind(sourceKey, matchKey)
 		.first<AgentRow>();
+}
+
+export interface UpsertAgentParams {
+	source_key: string;
+	match_key: string;
+	host_id?: string | null;
+	nickname?: string | null;
+	role?: string | null;
+	runtime_app?: string | null;
+	runtime_version?: string | null;
+	status?: string;
+	metadata?: string;
+}
+
+export interface UpsertAgentUpdateFields {
+	host_id?: string | null | undefined;
+	nickname?: string | null | undefined;
+	role?: string | null | undefined;
+	runtime_app?: string | null | undefined;
+	runtime_version?: string | null | undefined;
+	status?: string | undefined;
+	metadata?: string | undefined;
+}
+
+export interface UpsertResult {
+	id: string;
+	created: boolean;
+}
+
+/**
+ * Atomic upsert: try INSERT, on UNIQUE(source_key, match_key) conflict
+ * fall back to find + update. Returns the agent ID and whether it was created.
+ */
+export async function upsertAgent(
+	db: D1Database,
+	createParams: UpsertAgentParams,
+	updateFields: UpsertAgentUpdateFields,
+): Promise<UpsertResult> {
+	// Optimistic path: check if agent already exists
+	const existing = await findAgentBySourceMatch(
+		db,
+		createParams.source_key,
+		createParams.match_key,
+	);
+	if (existing) {
+		await updateAgent(db, existing.id, updateFields);
+		return { id: existing.id, created: false };
+	}
+
+	// Try to create — handle UNIQUE race
+	const id = generateId("agt_");
+	try {
+		await createAgent(db, {
+			id,
+			source_key: createParams.source_key,
+			match_key: createParams.match_key,
+			host_id: createParams.host_id ?? null,
+			nickname: createParams.nickname ?? null,
+			role: createParams.role ?? null,
+			runtime_app: createParams.runtime_app ?? null,
+			runtime_version: createParams.runtime_version ?? null,
+			status: createParams.status ?? "unknown",
+			metadata: createParams.metadata ?? "{}",
+		});
+		return { id, created: true };
+	} catch (err: unknown) {
+		if (err instanceof Error && err.message.includes("UNIQUE")) {
+			// Race: another request inserted between our find and insert
+			const raced = await findAgentBySourceMatch(
+				db,
+				createParams.source_key,
+				createParams.match_key,
+			);
+			if (raced) {
+				await updateAgent(db, raced.id, updateFields);
+				return { id: raced.id, created: false };
+			}
+		}
+		throw err;
+	}
 }
 
 /** Replace all tags for an agent. Validates that all tag IDs exist. */
