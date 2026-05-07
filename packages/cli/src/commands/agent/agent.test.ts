@@ -1,4 +1,4 @@
-// Tests for bat-cli agent commands (list, create, update, delete, heartbeat)
+// Tests for bat-cli agent commands (list, create, update, delete, heartbeat, tags)
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,6 +10,7 @@ import { runAgentCreate } from "./create.js";
 import { runAgentDelete } from "./delete.js";
 import { runAgentHeartbeat } from "./heartbeat.js";
 import { runAgentList } from "./list.js";
+import { runAgentTags } from "./tags.js";
 import { runAgentUpdate } from "./update.js";
 
 // Mock fetch globally
@@ -456,5 +457,306 @@ describe("runAgentHeartbeat", () => {
 		const body = JSON.parse(init.body as string);
 		expect(body.agents[0].match_key).toBe("agent1");
 		expect(body.agents[1].match_key).toBe("agent2");
+	});
+});
+
+// --- agent update: status validation (Blocking 3) ---
+
+describe("runAgentUpdate — status validation", () => {
+	test("accepts valid status 'running'", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, status: "running" }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "running" });
+		expect(exitCode).toBe(0);
+	});
+
+	test("accepts valid status 'stopped'", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, status: "stopped" }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "stopped" });
+		expect(exitCode).toBe(0);
+	});
+
+	test("accepts valid status 'missing'", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, status: "missing" }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "missing" });
+		expect(exitCode).toBe(0);
+	});
+
+	test("accepts valid status 'unknown'", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, status: "unknown" }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "unknown" });
+		expect(exitCode).toBe(0);
+	});
+
+	test("rejects invalid status — does not call fetch", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "invalid" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects empty-like invalid status", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { status: "active" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+});
+
+// --- agent update: clear-runtime-* and mutual exclusion (Blocking 2) ---
+
+describe("runAgentUpdate — clear runtime fields", () => {
+	test("--clear-runtime-app sends null", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, runtime_app: null }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { clearRuntimeApp: true });
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string);
+		expect(body.runtime_app).toBeNull();
+	});
+
+	test("--clear-runtime-version sends null", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, runtime_version: null }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", { clearRuntimeVersion: true });
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string);
+		expect(body.runtime_version).toBeNull();
+	});
+
+	test("rejects --runtime-app with --clear-runtime-app", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", {
+			runtimeApp: "foo",
+			clearRuntimeApp: true,
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects --runtime-version with --clear-runtime-version", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", {
+			runtimeVersion: "1.0",
+			clearRuntimeVersion: true,
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects --nickname with --clear-nickname", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", {
+			nickname: "foo",
+			clearNickname: true,
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects --role with --clear-role", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentUpdate(manager, "agt_abc", {
+			role: "monitor",
+			clearRole: true,
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+});
+
+// --- agent tags (Blocking 1) ---
+
+describe("runAgentTags", () => {
+	test("returns 1 when no config", async () => {
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,2" });
+		expect(exitCode).toBe(1);
+	});
+
+	test("sets tag IDs on agent", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const agentWithTags = {
+			...MOCK_AGENT,
+			tags: [
+				{ id: 1, name: "web", color: 0 },
+				{ id: 3, name: "prod", color: 1 },
+			],
+		};
+		mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(agentWithTags), { status: 200 }));
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,3" });
+		expect(exitCode).toBe(0);
+
+		const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		expect(url).toBe("https://bat-ingest.worker.hexly.ai/api/agents/agt_abc/tags");
+		expect(init.method).toBe("PUT");
+		const body = JSON.parse(init.body as string);
+		expect(body.tag_ids).toEqual([1, 3]);
+	});
+
+	test("deduplicates tag IDs", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(MOCK_AGENT), { status: 200 }));
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,2,1,3,2" });
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string);
+		expect(body.tag_ids).toEqual([1, 2, 3]);
+	});
+
+	test("clears all tags with --clear", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, tags: [] }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { clear: true });
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string);
+		expect(body.tag_ids).toEqual([]);
+	});
+
+	test("clears with empty tag-ids string", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, tags: [] }), { status: 200 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "" });
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		const body = JSON.parse(init.body as string);
+		expect(body.tag_ids).toEqual([]);
+	});
+
+	test("rejects non-integer tag IDs", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,abc,3" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects negative tag IDs", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,-2" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects zero tag ID", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "0,1" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 when no --tag-ids and no --clear", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", {});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on 404", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: "Agent not found" }), { status: 404 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_nonexistent", { tagIds: "1" });
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on auth error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: "Invalid API key" }), { status: 403 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1" });
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1" });
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on 400 (missing tag IDs from server)", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: "Tag IDs not found: 999" }), { status: 400 }),
+		);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "999" });
+		expect(exitCode).toBe(1);
 	});
 });

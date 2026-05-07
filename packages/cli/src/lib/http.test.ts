@@ -97,6 +97,21 @@ describe("HttpClient", () => {
 		});
 	});
 
+	describe("PUT requests", () => {
+		test("sends PUT with body", async () => {
+			mockFetch.mockResolvedValueOnce(mockResponse(200, { ok: true }));
+
+			const client = new HttpClient("https://bat.hexly.ai", "token");
+			await client.put("/api/agents/agt_123/tags", { tag_ids: [1, 2] });
+
+			const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+			expect(url).toBe("https://bat.hexly.ai/api/agents/agt_123/tags");
+			expect(init.method).toBe("PUT");
+			const body = JSON.parse(init.body as string);
+			expect(body.tag_ids).toEqual([1, 2]);
+		});
+	});
+
 	describe("DELETE requests", () => {
 		test("handles 204 No Content", async () => {
 			mockFetch.mockResolvedValueOnce(mockResponse(204));

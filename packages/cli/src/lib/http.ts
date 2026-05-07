@@ -64,6 +64,11 @@ export class HttpClient {
 		return this.request<T>("PATCH", path, body);
 	}
 
+	/** PUT request */
+	async put<T>(path: string, body?: unknown): Promise<T> {
+		return this.request<T>("PUT", path, body);
+	}
+
 	/** DELETE request — returns void for 204, otherwise parses JSON */
 	async delete<T = void>(path: string): Promise<T> {
 		return this.request<T>("DELETE", path);
