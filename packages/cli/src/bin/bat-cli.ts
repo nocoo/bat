@@ -5,6 +5,8 @@
 import { BAT_VERSION } from "@bat/shared";
 import { defineCommand, runMain } from "@nocoo/cli-base";
 import agent from "../commands/agent/index.js";
+import asset from "../commands/asset/index.js";
+import binding from "../commands/binding/index.js";
 import login from "../commands/login.js";
 import status from "../commands/status.js";
 
@@ -18,7 +20,8 @@ const main = defineCommand({
 		login,
 		status,
 		agent,
-		// Phase 2D: asset, binding
+		asset,
+		binding,
 		// Phase 2E: service
 	},
 });
