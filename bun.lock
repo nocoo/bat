@@ -22,14 +22,14 @@
     },
     "packages/shared": {
       "name": "@bat/shared",
-      "version": "1.1.1",
+      "version": "2.0.1",
       "devDependencies": {
         "typescript": "^5.8.2",
       },
     },
     "packages/ui": {
       "name": "@bat/ui",
-      "version": "1.1.1",
+      "version": "2.0.1",
       "dependencies": {
         "@bat/shared": "workspace:*",
         "@radix-ui/react-avatar": "^1.1.11",
@@ -63,10 +63,10 @@
     },
     "packages/worker": {
       "name": "@bat/worker",
-      "version": "1.1.1",
+      "version": "2.0.1",
       "dependencies": {
         "@bat/shared": "workspace:*",
-        "hono": "^4.7.0",
+        "hono": "^4.12.18",
         "jose": "^6.2.2",
       },
       "devDependencies": {
@@ -737,7 +737,7 @@
 
     "has-flag": ["has-flag@4.0.0", "", {}, "sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ=="],
 
-    "hono": ["hono@4.12.15", "", {}, "sha512-qM0jDhFEaCBb4TxoW7f53Qrpv9RBiayUHo0S52JudprkhvpjIrGoU1mnnr29Fvd1U335ZFPZQY1wlkqgfGXyLg=="],
+    "hono": ["hono@4.12.18", "", {}, "sha512-RWzP96k/yv0PQfyXnWjs6zot20TqfpfsNXhOnev8d1InAxubW93L11/oNUc3tQqn2G0bSdAOBpX+2uDFHV7kdQ=="],
 
     "html-escaper": ["html-escaper@2.0.2", "", {}, "sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg=="],
 
