@@ -66,6 +66,12 @@ export async function runAgentTags(
 		return 1;
 	}
 
+	// Mutual exclusion: --tag-ids and --clear
+	if (opts.clear && opts.tagIds !== undefined) {
+		error("Cannot use --tag-ids and --clear together");
+		return 1;
+	}
+
 	// Determine tag IDs to set
 	let ids: number[];
 	if (opts.clear) {
