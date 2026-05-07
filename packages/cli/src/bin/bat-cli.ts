@@ -8,6 +8,7 @@ import agent from "../commands/agent/index.js";
 import asset from "../commands/asset/index.js";
 import binding from "../commands/binding/index.js";
 import login from "../commands/login.js";
+import service from "../commands/service/index.js";
 import status from "../commands/status.js";
 
 const main = defineCommand({
@@ -22,7 +23,7 @@ const main = defineCommand({
 		agent,
 		asset,
 		binding,
-		// Phase 2E: service
+		service,
 	},
 });
 
