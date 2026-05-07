@@ -4,7 +4,7 @@
 // Mutual exclusion: --field and --clear-field for the same field is an error.
 
 import type { AssetItem, AssetStatus, AssetUpdateBody } from "@bat/shared";
-import { VALID_ASSET_STATUSES } from "@bat/shared";
+import { VALID_ASSET_STATUSES, validateMetadata } from "@bat/shared";
 import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
@@ -71,15 +71,27 @@ export async function runAssetUpdate(
 		}
 	}
 
-	// Parse metadata JSON if provided
+	// Parse and validate metadata if provided
 	let metadata: Record<string, unknown> | undefined;
 	if (opts.metadata) {
+		let parsed: unknown;
 		try {
-			metadata = JSON.parse(opts.metadata) as Record<string, unknown>;
+			parsed = JSON.parse(opts.metadata);
 		} catch {
 			error("Invalid metadata — must be valid JSON");
 			return 1;
 		}
+		// CLI requires an explicit plain object — reject null, arrays, primitives
+		if (parsed === null || parsed === undefined) {
+			error("Invalid metadata — metadata must be a plain object");
+			return 1;
+		}
+		const result = validateMetadata(parsed);
+		if (!result.ok) {
+			error(`Invalid metadata — ${result.error}`);
+			return 1;
+		}
+		metadata = parsed as Record<string, unknown>;
 	}
 
 	// Build update body — only include fields explicitly provided

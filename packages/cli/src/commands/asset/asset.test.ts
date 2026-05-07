@@ -200,6 +200,60 @@ describe("runAssetCreate", () => {
 		expect(mockFetch).not.toHaveBeenCalled();
 	});
 
+	test("rejects metadata that is an array", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetCreate(manager, {
+			type: "domain",
+			name: "test",
+			metadata: "[1,2,3]",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects metadata that is null", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetCreate(manager, {
+			type: "domain",
+			name: "test",
+			metadata: "null",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects metadata that is a primitive", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetCreate(manager, {
+			type: "domain",
+			name: "test",
+			metadata: '"hello"',
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects oversized metadata", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		// 4096 byte limit — create a value that exceeds it
+		const big = JSON.stringify({ data: "x".repeat(5000) });
+		const exitCode = await runAssetCreate(manager, {
+			type: "domain",
+			name: "test",
+			metadata: big,
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
 	test("returns 1 on auth error", async () => {
 		writeConfig(tempDir, VALID_CONFIG);
 		mockFetch.mockResolvedValueOnce(
@@ -363,6 +417,43 @@ describe("runAssetUpdate", () => {
 
 		const manager = createConfigManager(tempDir);
 		const exitCode = await runAssetUpdate(manager, "ast_abc", { metadata: "not-json" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects metadata that is an array", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetUpdate(manager, "ast_abc", { metadata: "[1,2]" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects metadata that is null", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetUpdate(manager, "ast_abc", { metadata: "null" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects metadata that is a primitive", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAssetUpdate(manager, "ast_abc", { metadata: "42" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects oversized metadata", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const big = JSON.stringify({ data: "x".repeat(5000) });
+		const exitCode = await runAssetUpdate(manager, "ast_abc", { metadata: big });
 		expect(exitCode).toBe(1);
 		expect(mockFetch).not.toHaveBeenCalled();
 	});
