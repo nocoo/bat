@@ -759,4 +759,24 @@ describe("runAgentTags", () => {
 		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "999" });
 		expect(exitCode).toBe(1);
 	});
+
+	test("rejects --tag-ids and --clear together", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", { tagIds: "1,2", clear: true });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects more than MAX_TAGS_PER_AGENT unique IDs", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runAgentTags(manager, "agt_abc", {
+			tagIds: "1,2,3,4,5,6,7,8,9,10,11",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
 });
