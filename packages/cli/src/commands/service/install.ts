@@ -9,9 +9,22 @@ import type { ConfigManager } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, getHeartbeatInterval, validateConfig } from "../../lib/config.js";
 import { error, info, success, warn } from "../../lib/output.js";
+import { parseAgentsArg } from "./run.js";
 
 const PLIST_LABEL = "ai.hexly.bat-cli";
 const LAUNCH_AGENTS_DIR = join(homedir(), "Library", "LaunchAgents");
+
+/**
+ * Escape a string for safe embedding in XML text nodes.
+ */
+export function escapeXml(str: string): string {
+	return str
+		.replace(/&/g, "&amp;")
+		.replace(/</g, "&lt;")
+		.replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;")
+		.replace(/'/g, "&apos;");
+}
 
 /**
  * Get the plist file path.
@@ -22,6 +35,7 @@ export function getPlistPath(dir?: string): string {
 
 /**
  * Generate the launchd plist XML content.
+ * All interpolated strings are XML-escaped.
  */
 export function generatePlist(opts: {
 	label: string;
@@ -35,13 +49,13 @@ export function generatePlist(opts: {
 <plist version="1.0">
 <dict>
 	<key>Label</key>
-	<string>${opts.label}</string>
+	<string>${escapeXml(opts.label)}</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>${opts.batCliPath}</string>
+		<string>${escapeXml(opts.batCliPath)}</string>
 		<string>service</string>
 		<string>run</string>
-		<string>${opts.agents}</string>
+		<string>${escapeXml(opts.agents)}</string>
 	</array>
 	<key>StartInterval</key>
 	<integer>${opts.intervalSec}</integer>
@@ -50,9 +64,9 @@ export function generatePlist(opts: {
 	<key>KeepAlive</key>
 	<true/>
 	<key>StandardOutPath</key>
-	<string>${opts.logPath}</string>
+	<string>${escapeXml(opts.logPath)}</string>
 	<key>StandardErrorPath</key>
-	<string>${opts.logPath}</string>
+	<string>${escapeXml(opts.logPath)}</string>
 </dict>
 </plist>
 `;
@@ -77,6 +91,13 @@ export async function runServiceInstall(
 	const validationError = validateConfig(config);
 	if (validationError) {
 		error(validationError);
+		return 1;
+	}
+
+	// Validate agents arg before writing plist
+	const parsed = parseAgentsArg(agentsArg);
+	if (!parsed.ok) {
+		error(parsed.error);
 		return 1;
 	}
 
