@@ -1,7 +1,7 @@
 // bat-cli service uninstall — Remove the macOS launchd plist and bootout the service.
 // Tries launchctl bootout first, then removes the plist file.
 
-import { execSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
 import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
@@ -10,12 +10,16 @@ import { createConfigManager } from "../../lib/config.js";
 import { error, info, success, warn } from "../../lib/output.js";
 import { getPlistPath } from "./install.js";
 
-/** Command runner type — injectable for testing */
-export type CommandRunner = (cmd: string) => void;
+/** Command runner type — injectable for testing (argv-based, no shell) */
+export type CommandRunner = (cmd: string, args: string[]) => void;
 
-/** Default command runner using execSync */
-const defaultRunner: CommandRunner = (cmd: string) => {
-	execSync(cmd, { stdio: "pipe" });
+/** Default command runner using spawnSync (no shell interpolation) */
+const defaultRunner: CommandRunner = (cmd: string, args: string[]) => {
+	const result = spawnSync(cmd, args, { stdio: "pipe" });
+	if (result.status !== 0) {
+		const msg = result.stderr?.toString().trim() || `exit code ${result.status}`;
+		throw new Error(msg);
+	}
 };
 
 /**
@@ -36,8 +40,9 @@ export async function runServiceUninstall(
 	}
 
 	// Try launchctl bootout — tolerate "not loaded" errors
+	const uid = process.getuid?.();
 	try {
-		run(`launchctl bootout gui/$(id -u) ${plistPath}`);
+		run("launchctl", ["bootout", `gui/${uid}`, plistPath]);
 		info("Service unloaded from launchd.");
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);
