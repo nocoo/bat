@@ -151,59 +151,86 @@ export async function runServiceLoop(
 		agents: parsed.agents,
 	};
 
-	info(
-		`Service started (PID ${pid}), heartbeat every ${intervalSec}s for ${parsed.agents.length} agent(s)`,
-	);
-
-	// Send initial heartbeat immediately
-	await sendHeartbeat(client, body);
-
-	// Set up interval
 	const cleanup = () => {
 		removePidFile(pidPath);
 		info("Service stopped.");
 	};
 
-	// Use AbortSignal for testability, or real signals in production
-	if (opts.signal) {
-		// Test mode: wait for abort signal
-		const signal = opts.signal;
-		await new Promise<void>((resolve) => {
-			const timer = setInterval(async () => {
-				if (signal.aborted) {
-					clearInterval(timer);
-					cleanup();
-					resolve();
-					return;
-				}
-				await sendHeartbeat(client, body);
-			}, intervalSec * 1000);
+	try {
+		info(
+			`Service started (PID ${pid}), heartbeat every ${intervalSec}s for ${parsed.agents.length} agent(s)`,
+		);
 
-			signal.addEventListener(
-				"abort",
-				() => {
-					clearInterval(timer);
-					cleanup();
-					resolve();
-				},
-				{ once: true },
-			);
-		});
-	} else {
-		// Production mode: real signal handlers
-		await new Promise<void>((resolve) => {
-			const timer = setInterval(async () => {
-				await sendHeartbeat(client, body);
-			}, intervalSec * 1000);
+		// Use AbortSignal for testability, or real signals in production
+		if (opts.signal) {
+			const signal = opts.signal;
 
-			const onSignal = () => {
-				clearInterval(timer);
-				cleanup();
-				resolve();
-			};
-			process.on("SIGINT", onSignal);
-			process.on("SIGTERM", onSignal);
-		});
+			// Handle already-aborted signal
+			if (signal.aborted) {
+				return 0;
+			}
+
+			// Register abort handler before initial heartbeat
+			await new Promise<void>((resolve) => {
+				let timer: ReturnType<typeof setInterval> | null = null;
+				let stopped = false;
+
+				const stop = () => {
+					if (stopped) {
+						return;
+					}
+					stopped = true;
+					if (timer !== null) {
+						clearInterval(timer);
+					}
+					resolve();
+				};
+
+				signal.addEventListener("abort", stop, { once: true });
+
+				// Send initial heartbeat, then start interval
+				sendHeartbeat(client, body).then(() => {
+					if (!stopped) {
+						timer = setInterval(async () => {
+							await sendHeartbeat(client, body);
+						}, intervalSec * 1000);
+					}
+				});
+			});
+		} else {
+			// Production mode: register signal handlers before initial heartbeat
+			await new Promise<void>((resolve) => {
+				let timer: ReturnType<typeof setInterval> | null = null;
+				let stopped = false;
+
+				const onSignal = () => {
+					if (stopped) {
+						return;
+					}
+					stopped = true;
+					if (timer !== null) {
+						clearInterval(timer);
+					}
+					process.removeListener("SIGINT", onSignal);
+					process.removeListener("SIGTERM", onSignal);
+					resolve();
+				};
+
+				process.on("SIGINT", onSignal);
+				process.on("SIGTERM", onSignal);
+
+				// Send initial heartbeat, then start interval
+				sendHeartbeat(client, body).then(() => {
+					if (!stopped) {
+						timer = setInterval(async () => {
+							await sendHeartbeat(client, body);
+						}, intervalSec * 1000);
+					}
+				});
+			});
+		}
+	} finally {
+		cleanup();
 	}
 
 	return 0;
