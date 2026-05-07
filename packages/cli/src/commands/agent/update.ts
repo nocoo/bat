@@ -1,7 +1,10 @@
 // bat-cli agent update — Update an existing agent's fields.
 // Only fields explicitly provided are sent; absent fields are left unchanged.
+// Null semantics: --clear-* flags send null to clear a field; --field sets a value.
+// Mutual exclusion: --field and --clear-field for the same field is an error.
 
-import type { AgentItem, AgentUpdateBody } from "@bat/shared";
+import type { AgentItem, AgentStatus, AgentUpdateBody } from "@bat/shared";
+import { VALID_AGENT_STATUSES } from "@bat/shared";
 import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
@@ -23,7 +26,9 @@ export async function runAgentUpdate(
 		role?: string;
 		clearRole?: boolean;
 		runtimeApp?: string;
+		clearRuntimeApp?: boolean;
 		runtimeVersion?: string;
+		clearRuntimeVersion?: boolean;
 		status?: string;
 	},
 ): Promise<number> {
@@ -39,6 +44,32 @@ export async function runAgentUpdate(
 		return 1;
 	}
 
+	// Mutual exclusion: set and clear for the same field
+	if (opts.nickname && opts.clearNickname) {
+		error("Cannot use --nickname and --clear-nickname together");
+		return 1;
+	}
+	if (opts.role && opts.clearRole) {
+		error("Cannot use --role and --clear-role together");
+		return 1;
+	}
+	if (opts.runtimeApp && opts.clearRuntimeApp) {
+		error("Cannot use --runtime-app and --clear-runtime-app together");
+		return 1;
+	}
+	if (opts.runtimeVersion && opts.clearRuntimeVersion) {
+		error("Cannot use --runtime-version and --clear-runtime-version together");
+		return 1;
+	}
+
+	// Validate status against VALID_AGENT_STATUSES
+	if (opts.status) {
+		if (!(VALID_AGENT_STATUSES as readonly string[]).includes(opts.status)) {
+			error(`Invalid status "${opts.status}" — must be one of: ${VALID_AGENT_STATUSES.join(", ")}`);
+			return 1;
+		}
+	}
+
 	// Build update body — only include fields explicitly provided
 	const body: AgentUpdateBody = {};
 	if (opts.clearNickname) {
@@ -51,14 +82,18 @@ export async function runAgentUpdate(
 	} else if (opts.role) {
 		body.role = opts.role;
 	}
-	if (opts.runtimeApp) {
+	if (opts.clearRuntimeApp) {
+		body.runtime_app = null;
+	} else if (opts.runtimeApp) {
 		body.runtime_app = opts.runtimeApp;
 	}
-	if (opts.runtimeVersion) {
+	if (opts.clearRuntimeVersion) {
+		body.runtime_version = null;
+	} else if (opts.runtimeVersion) {
 		body.runtime_version = opts.runtimeVersion;
 	}
 	if (opts.status) {
-		body.status = opts.status as "running" | "stopped" | "missing" | "unknown";
+		body.status = opts.status as AgentStatus;
 	}
 
 	const client = new HttpClient(config.worker_url, config.api_key);
@@ -118,9 +153,17 @@ export default defineCommand({
 			type: "string",
 			description: "Runtime application name",
 		},
+		"clear-runtime-app": {
+			type: "boolean",
+			description: "Clear runtime app (set to null)",
+		},
 		"runtime-version": {
 			type: "string",
 			description: "Runtime version",
+		},
+		"clear-runtime-version": {
+			type: "boolean",
+			description: "Clear runtime version (set to null)",
 		},
 		status: {
 			type: "string",
@@ -145,8 +188,14 @@ export default defineCommand({
 		if (args["runtime-app"]) {
 			opts.runtimeApp = args["runtime-app"];
 		}
+		if (args["clear-runtime-app"]) {
+			opts.clearRuntimeApp = true;
+		}
 		if (args["runtime-version"]) {
 			opts.runtimeVersion = args["runtime-version"];
+		}
+		if (args["clear-runtime-version"]) {
+			opts.clearRuntimeVersion = true;
 		}
 		if (args.status) {
 			opts.status = args.status;
