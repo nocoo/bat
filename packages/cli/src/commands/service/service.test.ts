@@ -478,14 +478,14 @@ describe("runServiceUninstall", () => {
 		const manager = createConfigManager(tempDir);
 		const exitCode = await runServiceUninstall(manager, {
 			plistDir: join(tempDir, "LaunchAgents"),
-			runCommand: () => {
+			runCommand: (_cmd, _args) => {
 				/* noop */
 			},
 		});
 		expect(exitCode).toBe(1);
 	});
 
-	test("calls launchctl bootout then removes plist", async () => {
+	test("passes plistPath as separate argv (no shell interpolation)", async () => {
 		writeConfig(tempDir, VALID_CONFIG);
 		const plistDir = join(tempDir, "LaunchAgents");
 
@@ -493,23 +493,48 @@ describe("runServiceUninstall", () => {
 		// Install first
 		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
 
-		// Track bootout command
-		const commands: string[] = [];
-		const trackingRunner: CommandRunner = (cmd: string) => {
-			commands.push(cmd);
+		// Track argv
+		const calls: { cmd: string; args: string[] }[] = [];
+		const trackingRunner: CommandRunner = (cmd: string, args: string[]) => {
+			calls.push({ cmd, args });
 		};
 
 		// Uninstall
 		const exitCode = await runServiceUninstall(manager, { plistDir, runCommand: trackingRunner });
 		expect(exitCode).toBe(0);
 
-		// Verify bootout was called
-		expect(commands).toHaveLength(1);
-		expect(commands[0]).toContain("launchctl bootout");
+		// Verify argv-based call
+		expect(calls).toHaveLength(1);
+		expect(calls[0].cmd).toBe("launchctl");
+		expect(calls[0].args[0]).toBe("bootout");
+		expect(calls[0].args[1]).toMatch(/^gui\/\d+$/);
+		// plistPath is a separate arg, not concatenated into a shell string
+		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat-cli.plist"));
 
 		// Verify plist removed
 		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
 		expect(existsSync(plistPath)).toBe(false);
+	});
+
+	test("plistDir with spaces is passed as single argv element", async () => {
+		const spacedDir = join(tempDir, "path with spaces");
+		const plistDir = join(spacedDir, "LaunchAgents");
+
+		writeConfig(tempDir, VALID_CONFIG);
+		const manager = createConfigManager(tempDir);
+		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
+
+		const calls: { cmd: string; args: string[] }[] = [];
+		const trackingRunner: CommandRunner = (cmd: string, args: string[]) => {
+			calls.push({ cmd, args });
+		};
+
+		const exitCode = await runServiceUninstall(manager, { plistDir, runCommand: trackingRunner });
+		expect(exitCode).toBe(0);
+
+		// plistPath with spaces stays as one arg, not split by shell
+		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat-cli.plist"));
+		expect(calls[0].args[2]).toContain("path with spaces");
 	});
 
 	test("tolerates bootout 'not loaded' error and still removes plist", async () => {
@@ -520,7 +545,7 @@ describe("runServiceUninstall", () => {
 		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
 
 		// Simulate "not loaded" error
-		const notLoadedRunner: CommandRunner = () => {
+		const notLoadedRunner: CommandRunner = (_cmd, _args) => {
 			throw new Error("Could not find specified service");
 		};
 
@@ -542,13 +567,13 @@ describe("runServiceUninstall", () => {
 		await runServiceInstall(manager, "a:running", {
 			plistDir,
 			batCliPath: "/bin/bat-cli",
-			runCommand: () => {
+			runCommand: (_cmd, _args) => {
 				/* noop */
 			},
 		});
 
 		// Simulate unexpected error
-		const failRunner: CommandRunner = () => {
+		const failRunner: CommandRunner = (_cmd, _args) => {
 			throw new Error("Permission denied");
 		};
 
