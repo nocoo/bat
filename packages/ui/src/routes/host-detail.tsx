@@ -1,3 +1,4 @@
+import { patchAPI } from "@/api";
 import {
 	CpuChart,
 	DiskBars,
@@ -22,7 +23,7 @@ import { formatMemory, formatUptime } from "@/lib/host-card-format";
 import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
 import { hashHostId } from "@bat/shared";
 import { AlertTriangle, Info } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useParams } from "react-router";
 
 const TIME_RANGES = [
@@ -69,6 +70,64 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 
 /** Format CPU label — "AMD EPYC 7763 (4 cores, 8 threads)" */
 
+function DescriptionEditor({
+	hid,
+	value,
+	onSaved,
+}: { hid: string; value: string | null; onSaved: (v: string | null) => void }) {
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState(value ?? "");
+	const inputRef = useRef<HTMLInputElement>(null);
+
+	const startEdit = useCallback(() => {
+		setDraft(value ?? "");
+		setEditing(true);
+		setTimeout(() => inputRef.current?.focus(), 0);
+	}, [value]);
+
+	const save = useCallback(async () => {
+		const trimmed = draft.trim();
+		const desc = trimmed || null;
+		await patchAPI(`/api/hosts/${hid}/description`, { description: desc });
+		onSaved(desc);
+		setEditing(false);
+	}, [draft, hid, onSaved]);
+
+	const cancel = useCallback(() => {
+		setEditing(false);
+		setDraft(value ?? "");
+	}, [value]);
+
+	if (editing) {
+		return (
+			<input
+				ref={inputRef}
+				type="text"
+				maxLength={200}
+				value={draft}
+				onChange={(e) => setDraft(e.target.value)}
+				onKeyDown={(e) => {
+					if (e.key === "Enter") save();
+					if (e.key === "Escape") cancel();
+				}}
+				onBlur={save}
+				className="w-full rounded border border-border bg-secondary px-2 py-0.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
+				placeholder="Add description..."
+			/>
+		);
+	}
+
+	return (
+		<button
+			type="button"
+			onClick={startEdit}
+			className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
+		>
+			{value || "Add description..."}
+		</button>
+	);
+}
+
 export function HostDetailPage() {
 	const params = useParams<{ id: string }>();
 	const hid = params.id ?? "";
@@ -80,12 +139,21 @@ export function HostDetailPage() {
 	const from = now - rangeSeconds;
 
 	const { data: hosts } = useHosts();
-	const { data: detail } = useHostDetail(hid);
+	const { data: detail, mutate: mutateDetail } = useHostDetail(hid);
 	const { data: alerts } = useAlerts();
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: tier2 } = useHostTier2(hid);
 
 	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
+
+	const handleDescriptionSaved = useCallback(
+		(desc: string | null) => {
+			if (detail) {
+				mutateDetail({ ...detail, description: desc }, false);
+			}
+		},
+		[detail, mutateDetail],
+	);
 
 	return (
 		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
@@ -98,6 +166,13 @@ export function HostDetailPage() {
 					</div>
 					<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />
 				</div>
+				{detail && (
+					<DescriptionEditor
+						hid={hid}
+						value={detail.description}
+						onSaved={handleDescriptionSaved}
+					/>
+				)}
 
 				{/* Metrics — simplified for now */}
 				{metricsLoading && !metricsResponse ? (
