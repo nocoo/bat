@@ -50,6 +50,10 @@ const MIGRATION_BINDINGS_PATH = resolve(__dirname, "../../migrations/0021_create
 const MIGRATION_AGENT_TAGS_PATH = resolve(__dirname, "../../migrations/0022_create_agent_tags.sql");
 const MIGRATION_ASSET_TAGS_PATH = resolve(__dirname, "../../migrations/0023_create_asset_tags.sql");
 const MIGRATION_CLI_TOKENS_PATH = resolve(__dirname, "../../migrations/0024_create_cli_tokens.sql");
+const MIGRATION_HOST_DESCRIPTION_PATH = resolve(
+	__dirname,
+	"../../migrations/0025_host_description.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -343,6 +347,15 @@ export function createMockD1(): D1Database {
 	// Apply cli_tokens migration
 	const cliTokensSchema = readFileSync(MIGRATION_CLI_TOKENS_PATH, "utf-8");
 	for (const stmt of cliTokensSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply host description migration
+	const hostDescriptionSchema = readFileSync(MIGRATION_HOST_DESCRIPTION_PATH, "utf-8");
+	for (const stmt of hostDescriptionSchema
 		.split(";")
 		.map((s) => s.trim())
 		.filter(Boolean)) {
