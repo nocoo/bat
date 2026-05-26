@@ -5,9 +5,37 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostTags, useHosts, useTags } from "@/hooks";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
+import type { HostOverviewItem } from "@bat/shared";
 import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
+
+type SortKey = "name-asc" | "name-desc" | "cpu" | "mem" | "disk";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+	{ value: "name-asc", label: "Name A→Z" },
+	{ value: "name-desc", label: "Name Z→A" },
+	{ value: "cpu", label: "CPU ↓" },
+	{ value: "mem", label: "Memory ↓" },
+	{ value: "disk", label: "Disk ↓" },
+];
+
+function sortHosts(hosts: HostOverviewItem[], key: SortKey): HostOverviewItem[] {
+	return [...hosts].sort((a, b) => {
+		switch (key) {
+			case "name-asc":
+				return a.hostname.localeCompare(b.hostname);
+			case "name-desc":
+				return b.hostname.localeCompare(a.hostname);
+			case "cpu":
+				return (b.cpu_usage_pct ?? -1) - (a.cpu_usage_pct ?? -1);
+			case "mem":
+				return (b.mem_used_pct ?? -1) - (a.mem_used_pct ?? -1);
+			case "disk":
+				return (b.disk_root_used_pct ?? -1) - (a.disk_root_used_pct ?? -1);
+		}
+	});
+}
 
 function HostsLoading() {
 	return (
@@ -58,6 +86,7 @@ export function HostsPage() {
 	const { data: allTags } = useTags();
 	const { data: alerts } = useAlerts();
 	const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
+	const [sortKey, setSortKey] = useState<SortKey>("name-asc");
 
 	const handleToggleTag = useCallback((tagId: number) => {
 		setSelectedTagIds((prev) =>
@@ -65,24 +94,23 @@ export function HostsPage() {
 		);
 	}, []);
 
-	// Filter hosts by selected tags (AND logic)
+	// Filter hosts by selected tags (AND logic), then sort
 	const filteredHosts = useMemo(() => {
 		if (!hosts) {
 			return [];
 		}
-		if (selectedTagIds.length === 0) {
-			return hosts;
+		let filtered: HostOverviewItem[];
+		if (selectedTagIds.length === 0 || !hostTagsMap) {
+			filtered = hosts;
+		} else {
+			filtered = hosts.filter((host) => {
+				const tags = hostTagsMap[host.host_id] ?? [];
+				const tagIds = new Set(tags.map((t) => t.id));
+				return selectedTagIds.every((id) => tagIds.has(id));
+			});
 		}
-		if (!hostTagsMap) {
-			return hosts;
-		}
-
-		return hosts.filter((host) => {
-			const tags = hostTagsMap[host.host_id] ?? [];
-			const tagIds = new Set(tags.map((t) => t.id));
-			return selectedTagIds.every((id) => tagIds.has(id));
-		});
-	}, [hosts, selectedTagIds, hostTagsMap]);
+		return sortHosts(filtered, sortKey);
+	}, [hosts, selectedTagIds, hostTagsMap, sortKey]);
 
 	// Only show filter bar when there are tags defined
 	const showFilterBar = allTags && allTags.length > 0;
@@ -97,9 +125,22 @@ export function HostsPage() {
 				<HostsEmpty />
 			) : (
 				<div className="space-y-3">
-					{showFilterBar && (
-						<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
-					)}
+					<div className="flex items-center justify-between gap-3 flex-wrap">
+						{showFilterBar && (
+							<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
+						)}
+						<select
+							value={sortKey}
+							onChange={(e) => setSortKey(e.target.value as SortKey)}
+							className="ml-auto rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
+						>
+							{SORT_OPTIONS.map((opt) => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
+						</select>
+					</div>
 					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{filteredHosts.map((host, index) => (
 							<div
