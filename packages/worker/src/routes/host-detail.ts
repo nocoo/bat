@@ -30,6 +30,7 @@ interface DetailRow {
 	dns_resolvers: string | null;
 	dns_search: string | null;
 	public_ip: string | null;
+	description: string | null;
 	// Maintenance window
 	maintenance_start: string | null;
 	maintenance_end: string | null;
@@ -66,7 +67,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 			`SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen,
        probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
        virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search, public_ip,
+       timezone, dns_resolvers, dns_search, public_ip, description,
        maintenance_start, maintenance_end, maintenance_reason
 FROM hosts WHERE host_id = ? AND is_active = 1`,
 		)
@@ -142,6 +143,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 		cpu_sparkline: null, // detail page uses its own metrics endpoint
 		mem_sparkline: null,
 		net_sparkline: null,
+		description: host.description,
 		swap_total_bytes: host.swap_total_bytes,
 		boot_mode: host.boot_mode,
 		timezone: host.timezone,
