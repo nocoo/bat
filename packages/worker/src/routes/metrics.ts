@@ -39,7 +39,7 @@ export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metric
 
 	const db = c.env.DB;
 
-	const hostId = await resolveHostIdByHash(db, idParam);
+	const hostId = await resolveHostIdByHash(c.var.repos.hosts, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}

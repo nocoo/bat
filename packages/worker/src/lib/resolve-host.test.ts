@@ -1,5 +1,6 @@
 import { hashHostId } from "@bat/shared";
 import { describe, expect, test } from "vitest";
+import type { HostsRepository } from "../repos/types.js";
 import { isOpaqueHid, resolveHostIdByHash, resolveHostRecord } from "./resolve-host";
 
 describe("isOpaqueHid", () => {
@@ -27,93 +28,72 @@ describe("isOpaqueHid", () => {
 	});
 });
 
-// --- D1 stub for resolveHostIdByHash tests ---
-interface StubRow {
-	host_id: string;
-}
-function makeDb(rows: StubRow[]): D1Database {
-	const db: Partial<D1Database> = {
-		prepare(_sql: string) {
-			return {
-				all: async <T = StubRow>() => ({ results: rows as T[], success: true, meta: {} }),
-			} as unknown as D1PreparedStatement;
+function stubRepo(rows: { host_id: string; is_active?: number }[]): HostsRepository {
+	const repo: Partial<HostsRepository> = {
+		listActiveHostIds: async () =>
+			rows.filter((r) => (r.is_active ?? 1) === 1).map((r) => ({ host_id: r.host_id })),
+		listAllHostIdsWithActive: async () =>
+			rows.map((r) => ({ host_id: r.host_id, is_active: r.is_active ?? 1 })),
+		getActiveFlag: async (hostId: string) => {
+			const row = rows.find((r) => r.host_id === hostId);
+			return row ? { host_id: row.host_id, is_active: row.is_active ?? 1 } : null;
 		},
 	};
-	return db as D1Database;
+	return repo as HostsRepository;
 }
 
 describe("resolveHostIdByHash", () => {
 	test("returns raw id unchanged when it's not an 8-char hex", async () => {
-		const db = makeDb([]);
-		expect(await resolveHostIdByHash(db, "web-01")).toBe("web-01");
-		expect(await resolveHostIdByHash(db, "i-0123456789abcdef0")).toBe("i-0123456789abcdef0");
+		const repo = stubRepo([]);
+		expect(await resolveHostIdByHash(repo, "web-01")).toBe("web-01");
+		expect(await resolveHostIdByHash(repo, "i-0123456789abcdef0")).toBe("i-0123456789abcdef0");
 	});
 
 	test("resolves a hid to the matching host_id", async () => {
 		const hostId = "web-01.example.com";
 		const hid = hashHostId(hostId);
-		const db = makeDb([{ host_id: hostId }, { host_id: "other.example.com" }]);
-		expect(await resolveHostIdByHash(db, hid)).toBe(hostId);
+		const repo = stubRepo([{ host_id: hostId }, { host_id: "other.example.com" }]);
+		expect(await resolveHostIdByHash(repo, hid)).toBe(hostId);
 	});
 
 	test("returns null when no active host matches the hid", async () => {
-		const db = makeDb([{ host_id: "web-01" }, { host_id: "db-01" }]);
-		expect(await resolveHostIdByHash(db, "deadbeef")).toBeNull();
+		const repo = stubRepo([{ host_id: "web-01" }, { host_id: "db-01" }]);
+		expect(await resolveHostIdByHash(repo, "deadbeef")).toBeNull();
 	});
 
 	test("returns null when the active-hosts table is empty", async () => {
-		const db = makeDb([]);
-		expect(await resolveHostIdByHash(db, "deadbeef")).toBeNull();
+		const repo = stubRepo([]);
+		expect(await resolveHostIdByHash(repo, "deadbeef")).toBeNull();
 	});
 });
 
 describe("resolveHostRecord", () => {
-	type Row = { host_id: string; is_active: number };
-	function makeRecordDb(rows: Row[]): D1Database {
-		const db: Partial<D1Database> = {
-			prepare(sql: string) {
-				const isFilter = sql.includes("WHERE host_id = ?");
-				let bound: string | undefined;
-				const stmt = {
-					bind: (v: string) => {
-						bound = v;
-						return stmt;
-					},
-					first: async () => (isFilter ? (rows.find((r) => r.host_id === bound) ?? null) : null),
-					all: async () => ({ results: rows, success: true, meta: {} }),
-				};
-				return stmt as unknown as D1PreparedStatement;
-			},
-		};
-		return db as D1Database;
-	}
-
 	test("returns raw host record by direct host_id match", async () => {
-		const db = makeRecordDb([
+		const repo = stubRepo([
 			{ host_id: "web-01", is_active: 1 },
 			{ host_id: "db-01", is_active: 0 },
 		]);
-		expect(await resolveHostRecord(db, "web-01")).toEqual({ host_id: "web-01", is_active: 1 });
-		expect(await resolveHostRecord(db, "db-01")).toEqual({ host_id: "db-01", is_active: 0 });
+		expect(await resolveHostRecord(repo, "web-01")).toEqual({ host_id: "web-01", is_active: 1 });
+		expect(await resolveHostRecord(repo, "db-01")).toEqual({ host_id: "db-01", is_active: 0 });
 	});
 
 	test("returns null when raw host_id is unknown", async () => {
-		const db = makeRecordDb([{ host_id: "web-01", is_active: 1 }]);
-		expect(await resolveHostRecord(db, "missing")).toBeNull();
+		const repo = stubRepo([{ host_id: "web-01", is_active: 1 }]);
+		expect(await resolveHostRecord(repo, "missing")).toBeNull();
 	});
 
 	test("resolves hid to the matching host record (including retired hosts)", async () => {
 		const hostId = "retired.example.com";
 		const hid = hashHostId(hostId);
-		const db = makeRecordDb([
+		const repo = stubRepo([
 			{ host_id: "other", is_active: 1 },
 			{ host_id: hostId, is_active: 0 },
 		]);
-		expect(await resolveHostRecord(db, hid)).toEqual({ host_id: hostId, is_active: 0 });
+		expect(await resolveHostRecord(repo, hid)).toEqual({ host_id: hostId, is_active: 0 });
 	});
 
 	test("returns null when hid matches no host", async () => {
-		const db = makeRecordDb([{ host_id: "web-01", is_active: 1 }]);
-		expect(await resolveHostRecord(db, "deadbeef")).toBeNull();
+		const repo = stubRepo([{ host_id: "web-01", is_active: 1 }]);
+		expect(await resolveHostRecord(repo, "deadbeef")).toBeNull();
 	});
 });

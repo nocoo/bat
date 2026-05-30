@@ -32,8 +32,131 @@ import type {
 	WebhookConfigRow,
 } from "@bat/shared";
 
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface HostsRepository {}
+/**
+ * Host inventory + read-model primitives. Powers `/api/hosts`,
+ * `/api/hosts/:id`, the four `/api/monitoring/*` endpoints, the
+ * `/api/live` DB probe, and `/api/fleet/status`. Plus the cross-route
+ * `host_id` / `hid` resolver. All write paths (metrics raw insert,
+ * heartbeat/host upsert, host_description PATCH, retirement) remain
+ * for C10 — see `docs/20-d1-to-kv-migration.md` v6 §3.4.
+ */
+export interface HostsRepository {
+	/** SELECT 1 — used by `/api/live` to confirm the binding is reachable. */
+	probe(): Promise<void>;
+
+	/** Active-host scan; the resolver compares `hashHostId(row.host_id)` against
+	 *  the 8-char hid hash. Used when the route param looks like a hid. */
+	listActiveHostIds(): Promise<{ host_id: string }[]>;
+
+	/** All-hosts scan (active + retired); used by the maintenance / retire
+	 *  routes that need to 403 a known-but-retired host. */
+	listAllHostIdsWithActive(): Promise<{ host_id: string; is_active: number }[]>;
+
+	/** Look up a single host's `(host_id, is_active)` by raw host_id. */
+	getActiveFlag(hostId: string): Promise<{ host_id: string; is_active: number } | null>;
+
+	/** Active-host inventory used by `/api/hosts` list. */
+	listOverviewRows(): Promise<HostOverviewRow[]>;
+
+	/** Active-host inventory used by `/api/fleet/status` and the four
+	 *  monitoring routes (only the small status-derivation columns). */
+	listStatusRows(): Promise<HostStatusRow[]>;
+
+	/** Single active host with the full inventory required by
+	 *  `/api/hosts/:id`. Returns null when missing or retired. */
+	getDetailRow(hostId: string): Promise<HostDetailRow | null>;
+
+	/** Single active host with just the columns the monitoring host-detail
+	 *  route needs. Returns null when missing or retired. */
+	getStatusRow(hostId: string): Promise<HostStatusRow | null>;
+
+	/** Latest metrics_raw row for the hosts list / host-detail page. */
+	getLatestMetricsBatch(hostIds: string[]): Promise<HostLatestMetricsRow[]>;
+
+	/** Latest uptime_seconds for the monitoring host-detail route. */
+	getLatestUptime(hostId: string): Promise<number | null>;
+
+	/** 24h hourly sparkline rows for the hosts list. */
+	listSparklineRowsSince(hostIds: string[], sinceSeconds: number): Promise<HostSparklineRow[]>;
+}
+
+/** Subset of `hosts` columns required by the `/api/hosts` overview list. */
+export interface HostOverviewRow {
+	host_id: string;
+	hostname: string;
+	os: string | null;
+	kernel: string | null;
+	arch: string | null;
+	cpu_model: string | null;
+	boot_time: number | null;
+	last_seen: number;
+	cpu_logical: number | null;
+	cpu_physical: number | null;
+	mem_total_bytes: number | null;
+	virtualization: string | null;
+	public_ip: string | null;
+	probe_version: string | null;
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+	maintenance_reason: string | null;
+}
+
+/** Subset used for status derivation (fleet + monitoring). */
+export interface HostStatusRow {
+	host_id: string;
+	hostname: string;
+	last_seen: number;
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+}
+
+/** Full row required by `/api/hosts/:id` detail. */
+export interface HostDetailRow {
+	host_id: string;
+	hostname: string;
+	os: string | null;
+	kernel: string | null;
+	arch: string | null;
+	cpu_model: string | null;
+	boot_time: number | null;
+	last_seen: number;
+	probe_version: string | null;
+	cpu_logical: number | null;
+	cpu_physical: number | null;
+	mem_total_bytes: number | null;
+	swap_total_bytes: number | null;
+	virtualization: string | null;
+	net_interfaces: string | null;
+	disks: string | null;
+	boot_mode: string | null;
+	timezone: string | null;
+	dns_resolvers: string | null;
+	dns_search: string | null;
+	public_ip: string | null;
+	description: string | null;
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+	maintenance_reason: string | null;
+}
+
+export interface HostLatestMetricsRow {
+	host_id: string;
+	cpu_usage_pct: number | null;
+	mem_used_pct: number | null;
+	uptime_seconds: number | null;
+	cpu_load1: number | null;
+	swap_used_pct: number | null;
+	disk_json: string | null;
+	net_json: string | null;
+}
+
+export interface HostSparklineRow {
+	host_id: string;
+	ts: number;
+	cpu: number | null;
+	mem: number | null;
+	net: number | null;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface MetricsRepository {}
 /**

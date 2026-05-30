@@ -47,12 +47,13 @@ describe("createD1Repositories", () => {
 		const a = createD1Repositories({} as D1Database);
 		const b = createD1Repositories({} as D1Database);
 		// Slots that haven't migrated yet share the frozen-empty singleton.
-		expect(a.hosts).toBe(b.hosts);
+		expect(a.metrics).toBe(b.metrics);
 		expect(a.aggregation).toBe(b.aggregation);
-		// Concrete adapters (settings, webhooks) are fresh instances per call,
-		// each closed over its own db reference.
+		// Concrete adapters (settings, webhooks, hosts) are fresh instances per
+		// call, each closed over its own db reference.
 		expect(a.settings).not.toBe(b.settings);
 		expect(a.webhooks).not.toBe(b.webhooks);
+		expect(a.hosts).not.toBe(b.hosts);
 	});
 });
 

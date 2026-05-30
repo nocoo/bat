@@ -6,9 +6,7 @@ import type { AppEnv } from "../types.js";
 export async function hostTier2Route(c: Context<AppEnv, "/api/hosts/:id/tier2">) {
 	const idParam = c.req.param("id");
 
-	// hid → host_id resolution still lives in lib/resolve-host.ts (C9 folds
-	// it into HostsRepository).
-	const hostId = await resolveHostIdByHash(c.env.DB, idParam);
+	const hostId = await resolveHostIdByHash(c.var.repos.hosts, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}

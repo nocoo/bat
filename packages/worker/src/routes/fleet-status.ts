@@ -6,13 +6,6 @@ import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./monitoring.js";
 
-interface HostRow {
-	host_id: string;
-	last_seen: number;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-}
-
 interface AlertRow {
 	host_id: string;
 	severity: string;
@@ -27,15 +20,10 @@ interface AllowedPortRow {
 
 export async function fleetStatusRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
+	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
-	// Get all active hosts
-	const hostsResult = await db
-		.prepare(
-			"SELECT host_id, last_seen, maintenance_start, maintenance_end FROM hosts WHERE is_active = 1",
-		)
-		.all<HostRow>();
-	const hosts = hostsResult.results;
+	const hosts = await repos.hosts.listStatusRows();
 
 	if (hosts.length === 0) {
 		const response: HealthResponse = {

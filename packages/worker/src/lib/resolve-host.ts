@@ -3,11 +3,9 @@
 // Route params may arrive as either a raw `host_id` or as an 8-char
 // opaque hex `hid` (FNV-1a hash of host_id). This helper normalizes to
 // the real host_id so every route can work uniformly.
-//
-// Duplicated across host-detail / metrics / monitoring / tier2-read
-// until this consolidation.
 
 import { hashHostId } from "@bat/shared";
+import type { HostsRepository } from "../repos/types.js";
 
 const HID_RE = /^[0-9a-f]{8}$/;
 
@@ -17,21 +15,22 @@ export function isOpaqueHid(id: string): boolean {
 }
 
 /**
- * Resolve a route param to a real `host_id`.
+ * Resolve a route param to a real `host_id` via a `HostsRepository`.
  *
  * - If `id` is not a hid, it's returned as-is (caller still needs to
  *   verify the host exists if that matters).
  * - If `id` is a hid, scan active hosts and match by `hashHostId`.
  *   Returns `null` when no active host matches.
  */
-export async function resolveHostIdByHash(db: D1Database, id: string): Promise<string | null> {
+export async function resolveHostIdByHash(
+	repo: HostsRepository,
+	id: string,
+): Promise<string | null> {
 	if (!isOpaqueHid(id)) {
 		return id;
 	}
-	const result = await db
-		.prepare("SELECT host_id FROM hosts WHERE is_active = 1")
-		.all<{ host_id: string }>();
-	for (const row of result.results) {
+	const rows = await repo.listActiveHostIds();
+	for (const row of rows) {
 		if (hashHostId(row.host_id) === id) {
 			return row.host_id;
 		}
@@ -45,20 +44,14 @@ export async function resolveHostIdByHash(db: D1Database, id: string): Promise<s
  * (used by maintenance routes that need to 403 on retired hosts).
  */
 export async function resolveHostRecord(
-	db: D1Database,
+	repo: HostsRepository,
 	id: string,
 ): Promise<{ host_id: string; is_active: number } | null> {
 	if (!isOpaqueHid(id)) {
-		const row = await db
-			.prepare("SELECT host_id, is_active FROM hosts WHERE host_id = ?")
-			.bind(id)
-			.first<{ host_id: string; is_active: number }>();
-		return row ?? null;
+		return repo.getActiveFlag(id);
 	}
-	const result = await db
-		.prepare("SELECT host_id, is_active FROM hosts")
-		.all<{ host_id: string; is_active: number }>();
-	for (const row of result.results) {
+	const rows = await repo.listAllHostIdsWithActive();
+	for (const row of rows) {
 		if (hashHostId(row.host_id) === id) {
 			return row;
 		}

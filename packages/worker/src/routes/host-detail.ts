@@ -8,45 +8,6 @@ import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { getMaintenanceWindow } from "./monitoring.js";
 
-interface DetailRow {
-	host_id: string;
-	hostname: string;
-	os: string | null;
-	kernel: string | null;
-	arch: string | null;
-	cpu_model: string | null;
-	boot_time: number | null;
-	last_seen: number;
-	probe_version: string | null;
-	cpu_logical: number | null;
-	cpu_physical: number | null;
-	mem_total_bytes: number | null;
-	swap_total_bytes: number | null;
-	virtualization: string | null;
-	net_interfaces: string | null;
-	disks: string | null;
-	boot_mode: string | null;
-	timezone: string | null;
-	dns_resolvers: string | null;
-	dns_search: string | null;
-	public_ip: string | null;
-	description: string | null;
-	// Maintenance window
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-	maintenance_reason: string | null;
-}
-
-interface LatestMetrics {
-	cpu_usage_pct: number | null;
-	mem_used_pct: number | null;
-	uptime_seconds: number | null;
-	cpu_load1: number | null;
-	swap_used_pct: number | null;
-	disk_json: string | null;
-	net_json: string | null;
-}
-
 interface AlertRow {
 	severity: string;
 	rule_id: string;
@@ -56,38 +17,23 @@ interface AlertRow {
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const idParam = c.req.param("id");
 	const db = c.env.DB;
+	const repos = c.var.repos;
 
-	const hostId = await resolveHostIdByHash(db, idParam);
+	const hostId = await resolveHostIdByHash(repos.hosts, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	const host = await db
-		.prepare(
-			`SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen,
-       probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
-       virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search, public_ip, description,
-       maintenance_start, maintenance_end, maintenance_reason
-FROM hosts WHERE host_id = ? AND is_active = 1`,
-		)
-		.bind(hostId)
-		.first<DetailRow>();
-
+	const host = await repos.hosts.getDetailRow(hostId);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
 	const now = Math.floor(Date.now() / 1000);
 
-	// Latest metrics
-	const metrics = await db
-		.prepare(
-			`SELECT cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
-FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
-		)
-		.bind(hostId)
-		.first<LatestMetrics>();
+	// Latest metrics (single host — reuse the batch helper for SQL parity).
+	const [latest] = await repos.hosts.getLatestMetricsBatch([hostId]);
+	const metrics = latest ?? null;
 
 	// Alerts for status derivation + count
 	const alertsResult = await db

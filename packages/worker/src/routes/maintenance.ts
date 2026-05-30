@@ -53,7 +53,7 @@ export function validateMaintenanceBody(body: unknown): MaintenanceBodyResult {
 export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(c.env.DB, idParam);
+	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -73,7 +73,7 @@ export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(c.env.DB, idParam);
+	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -102,7 +102,7 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(c.env.DB, idParam);
+	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
