@@ -14,23 +14,21 @@ import type {
 	HostsRepository,
 	MetricsRepository,
 	Repositories,
-	TagsRepository,
-	Tier2Repository,
 } from "../../repos/types.js";
 import { D1PortAllowlistRepository } from "./allowed-ports.js";
 import { D1MaintenanceRepository } from "./maintenance.js";
 import { D1SettingsRepository } from "./settings.js";
+import { D1TagsRepository } from "./tags.js";
+import { D1Tier2Repository } from "./tier2.js";
 import { D1WebhooksRepository } from "./webhooks.js";
 
 const EMPTY_HOSTS: HostsRepository = Object.freeze({});
 const EMPTY_METRICS: MetricsRepository = Object.freeze({});
 const EMPTY_ALERTS: AlertsRepository = Object.freeze({});
 const EMPTY_EVENTS: EventsRepository = Object.freeze({});
-const EMPTY_TAGS: TagsRepository = Object.freeze({});
 const EMPTY_AGENTS: AgentsRepository = Object.freeze({});
 const EMPTY_ASSETS: AssetsRepository = Object.freeze({});
 const EMPTY_BINDINGS: BindingsRepository = Object.freeze({});
-const EMPTY_TIER2: Tier2Repository = Object.freeze({});
 const EMPTY_CLI_TOKENS: CliTokensRepository = Object.freeze({});
 const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
 
@@ -47,13 +45,13 @@ export function createD1Repositories(db: D1Database): Repositories {
 		events: EMPTY_EVENTS,
 		webhooks: new D1WebhooksRepository(db),
 		ports: new D1PortAllowlistRepository(db),
-		tags: EMPTY_TAGS,
+		tags: new D1TagsRepository(db),
 		settings: new D1SettingsRepository(db),
 		maintenance: new D1MaintenanceRepository(db),
 		agents: EMPTY_AGENTS,
 		assets: EMPTY_ASSETS,
 		bindings: EMPTY_BINDINGS,
-		tier2: EMPTY_TIER2,
+		tier2: new D1Tier2Repository(db),
 		cliTokens: EMPTY_CLI_TOKENS,
 		aggregation: EMPTY_AGGREGATION,
 	};

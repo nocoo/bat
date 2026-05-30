@@ -2,6 +2,7 @@ import { hashHostId } from "@bat/shared";
 import type { Tier2Snapshot } from "@bat/shared";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import { hostTier2Route } from "./tier2-read";
@@ -12,6 +13,7 @@ function createApp(db: D1Database) {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
 		c.env = { DB: db, BAT_WRITE_KEY: "wk", BAT_READ_KEY: READ_KEY };
+		c.set("repos", createD1Repositories(db));
 		return next();
 	});
 	app.get("/api/hosts/:id/tier2", hostTier2Route);

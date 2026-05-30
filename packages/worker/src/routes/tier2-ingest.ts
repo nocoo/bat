@@ -3,7 +3,6 @@ import type { Tier2Payload } from "@bat/shared";
 import type { Context } from "hono";
 import { ensureHostExists, updateHostLastSeen } from "../services/metrics.js";
 import { evaluateTier2Alerts } from "../services/tier2-alerts.js";
-import { insertTier2Snapshot } from "../services/tier2-metrics.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -59,6 +58,7 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
 
 	// Check if host is retired
+	// Hosts-domain SQL — migrates in C9/C10 alongside the rest of hosts/metrics.
 	const existing = await db
 		.prepare("SELECT is_active FROM hosts WHERE host_id = ?")
 		.bind(body.host_id)
@@ -68,11 +68,11 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Ensure host record exists (FK target)
+	// Ensure host record exists (FK target). Hosts/metrics SQL — C10.
 	await ensureHostExists(db, body.host_id, body.host_id, workerNow);
 
 	// Insert tier2 snapshot — returns false if duplicate (same host_id + ts)
-	const inserted = await insertTier2Snapshot(db, body.host_id, body);
+	const inserted = await c.var.repos.tier2.insertSnapshot(body.host_id, body);
 
 	// Only update last_seen and evaluate alerts for genuinely new data
 	if (inserted) {
@@ -80,6 +80,7 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
 
 		// Merge slow-drift inventory fields into hosts table (2-state wire semantics)
+		// Hosts-domain SQL — migrates in C10 with the rest of hosts write paths.
 		const raw = body as unknown as Record<string, unknown>;
 		const clauses: string[] = [];
 		const values: unknown[] = [];

@@ -1,6 +1,7 @@
 import type { Tier2Payload } from "@bat/shared";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import { tier2IngestRoute } from "./tier2-ingest";
@@ -37,6 +38,7 @@ function createApp(db: D1Database) {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
 		c.env = { DB: db, BAT_WRITE_KEY: WRITE_KEY, BAT_READ_KEY: "rk" };
+		c.set("repos", createD1Repositories(db));
 		return next();
 	});
 	app.post("/api/tier2", tier2IngestRoute);

@@ -10,7 +10,14 @@
 // outside `adapters/d1/**`. Routes/middleware/cron consume only these
 // interfaces.
 
-import type { AllowedPort, RetentionDays, WebhookConfigRow } from "@bat/shared";
+import type {
+	AllowedPort,
+	HostTag,
+	RetentionDays,
+	Tier2Payload,
+	Tier2Snapshot,
+	WebhookConfigRow,
+} from "@bat/shared";
 
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface HostsRepository {}
@@ -88,8 +95,86 @@ export interface PortAllowlistRepository {
 	/** Remove a port from a host's allowlist. Returns true on hit, false on miss. */
 	removeFromHost(hostId: string, port: number): Promise<boolean>;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface TagsRepository {}
+/**
+ * Tags + host-tag edges. Host existence is enforced inside the adapter so
+ * routes never run cross-domain SQL. Per-host routes accept raw `host_id`
+ * (not the 8-char hid hash) by design — see `routes/tags.ts`.
+ */
+export interface TagsRepository {
+	/** All tags with a derived host_count, ordered by name. */
+	list(): Promise<Array<{ id: number; name: string; color: number; host_count: number }>>;
+
+	/**
+	 * Create a tag. Color rotates when null.
+	 * - `{ ok: true, row }` on success.
+	 * - `{ ok: "duplicate" }` on UNIQUE name conflict.
+	 */
+	create(
+		name: string,
+		color: number | null,
+	): Promise<{ ok: true; row: { id: number; name: string; color: number } } | { ok: "duplicate" }>;
+
+	/**
+	 * Partial update (rename / recolor). Both fields optional but the
+	 * caller must already have validated that at least one is provided.
+	 * - `{ ok: true, row }` on success.
+	 * - `{ ok: "not_found" }` if the id doesn't exist.
+	 * - `{ ok: "duplicate" }` on UNIQUE name conflict.
+	 */
+	update(
+		id: number,
+		fields: { name?: string; color?: number },
+	): Promise<
+		| { ok: true; row: { id: number; name: string; color: number } }
+		| { ok: "not_found" }
+		| { ok: "duplicate" }
+	>;
+
+	/** Delete by id (cascades host_tags via FK). Returns true on hit, false on miss. */
+	delete(id: number): Promise<boolean>;
+
+	/** All host→tags mappings grouped by host_id, tags ordered by name. */
+	byHostsAll(): Promise<Record<string, HostTag[]>>;
+
+	/** Tags assigned to a single host, ordered by name. */
+	listForHost(hostId: string): Promise<HostTag[]>;
+
+	/**
+	 * Add a tag to a host's tag set. Idempotent.
+	 * - `{ ok: true, tag }` on success.
+	 * - `{ ok: "host_not_found" }` if the host id doesn't exist.
+	 * - `{ ok: "tag_not_found" }` if the tag id doesn't exist.
+	 * - `{ ok: "limit_exceeded", max }` when the host already has the
+	 *   maximum number of tags.
+	 */
+	addToHost(
+		hostId: string,
+		tagId: number,
+	): Promise<
+		| { ok: true; tag: HostTag }
+		| { ok: "host_not_found" }
+		| { ok: "tag_not_found" }
+		| { ok: "limit_exceeded"; max: number }
+	>;
+
+	/**
+	 * Replace a host's tag set (DELETE then INSERT semantics).
+	 * - `{ ok: true, tags }` on success (returns updated list).
+	 * - `{ ok: "host_not_found" }` if the host id doesn't exist.
+	 * - `{ ok: "tags_not_found", missing }` if any tag id is unknown.
+	 */
+	replaceForHost(
+		hostId: string,
+		tagIds: number[],
+	): Promise<
+		| { ok: true; tags: HostTag[] }
+		| { ok: "host_not_found" }
+		| { ok: "tags_not_found"; missing: number[] }
+	>;
+
+	/** Remove an edge. Returns true on hit, false on miss. */
+	removeFromHost(hostId: string, tagId: number): Promise<boolean>;
+}
 
 /** Settings KV-style store. `retention_days` is the only key in use today. */
 export interface SettingsRepository {
@@ -124,8 +209,17 @@ export interface AgentsRepository {}
 export interface AssetsRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface BindingsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface Tier2Repository {}
+/**
+ * Tier 2 snapshot insert + read. Snapshot inserts are idempotent on
+ * `(host_id, ts)`. The latest read joins host inventory columns
+ * (timezone / dns) into the returned snapshot.
+ */
+export interface Tier2Repository {
+	/** Insert a new tier 2 snapshot; returns true on insert, false on duplicate. */
+	insertSnapshot(hostId: string, payload: Tier2Payload): Promise<boolean>;
+	/** Latest snapshot for a host, or null. */
+	getLatestForHost(hostId: string): Promise<Tier2Snapshot | null>;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface CliTokensRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
