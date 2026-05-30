@@ -3,12 +3,7 @@
 // atomic commit (C2–C11); slots not yet migrated remain frozen empty
 // objects so the wiring is stable across commits.
 
-import type {
-	AggregationRepository,
-	HostsRepository,
-	MetricsRepository,
-	Repositories,
-} from "../../repos/types.js";
+import type { AggregationRepository, MetricsRepository, Repositories } from "../../repos/types.js";
 import { D1AgentsRepository } from "./agents.js";
 import { D1AlertsRepository } from "./alerts.js";
 import { D1PortAllowlistRepository } from "./allowed-ports.js";
@@ -16,13 +11,13 @@ import { D1AssetsRepository } from "./assets.js";
 import { D1BindingsRepository } from "./bindings.js";
 import { D1CliTokensRepository } from "./cli-tokens.js";
 import { D1EventsRepository } from "./events.js";
+import { D1HostsRepository } from "./hosts.js";
 import { D1MaintenanceRepository } from "./maintenance.js";
 import { D1SettingsRepository } from "./settings.js";
 import { D1TagsRepository } from "./tags.js";
 import { D1Tier2Repository } from "./tier2.js";
 import { D1WebhooksRepository } from "./webhooks.js";
 
-const EMPTY_HOSTS: HostsRepository = Object.freeze({});
 const EMPTY_METRICS: MetricsRepository = Object.freeze({});
 const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
 
@@ -33,7 +28,7 @@ const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
  */
 export function createD1Repositories(db: D1Database): Repositories {
 	return {
-		hosts: EMPTY_HOSTS,
+		hosts: new D1HostsRepository(db),
 		metrics: EMPTY_METRICS,
 		alerts: new D1AlertsRepository(db),
 		events: new D1EventsRepository(db),

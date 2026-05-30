@@ -9,14 +9,6 @@ import type { AppEnv } from "../types.js";
 
 // --- Shared types ---
 
-interface HostRow {
-	host_id: string;
-	hostname: string;
-	last_seen: number;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-}
-
 export interface AlertRow {
 	host_id: string;
 	severity: string;
@@ -53,15 +45,6 @@ export function getMaintenanceWindow(host: {
 const CACHE_HEADERS = { "Cache-Control": "private, no-store" };
 
 // --- Shared query helpers ---
-
-async function queryActiveHosts(db: D1Database): Promise<HostRow[]> {
-	const result = await db
-		.prepare(
-			"SELECT host_id, hostname, last_seen, maintenance_start, maintenance_end FROM hosts WHERE is_active = 1",
-		)
-		.all<HostRow>();
-	return result.results;
-}
 
 async function queryAlerts(db: D1Database, hostIds: string[]): Promise<AlertRow[]> {
 	if (hostIds.length === 0) {
@@ -173,9 +156,10 @@ export function worstTier(a: HostStatus, b: HostStatus): HostStatus {
 /** GET /api/monitoring/hosts — list all hosts with health tier and alerts */
 export async function monitoringHostsRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
+	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
-	const hosts = await queryActiveHosts(db);
+	const hosts = await repos.hosts.listStatusRows();
 	if (hosts.length === 0) {
 		return c.json(
 			{
@@ -265,34 +249,27 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 /** GET /api/monitoring/hosts/:id — single host health for keyword monitoring */
 export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitoring/hosts/:id">) {
 	const db = c.env.DB;
+	const repos = c.var.repos;
 	const idParam = c.req.param("id");
 	const now = Math.floor(Date.now() / 1000);
 
-	const hostId = await resolveHostIdByHash(db, idParam);
+	const hostId = await resolveHostIdByHash(repos.hosts, idParam);
 	if (!hostId) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	const host = await db
-		.prepare(
-			"SELECT host_id, hostname, last_seen, maintenance_start, maintenance_end FROM hosts WHERE host_id = ? AND is_active = 1",
-		)
-		.bind(hostId)
-		.first<HostRow>();
+	const host = await repos.hosts.getStatusRow(hostId);
 
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
 	// Parallel queries
-	const [alertRows, allowlistRows, tagRows, metrics] = await Promise.all([
+	const [alertRows, allowlistRows, tagRows, uptime] = await Promise.all([
 		queryAlerts(db, [hostId]),
 		queryAllowlist(db, [hostId]),
 		queryTags(db, [hostId]),
-		db
-			.prepare("SELECT uptime_seconds FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1")
-			.bind(hostId)
-			.first<{ uptime_seconds: number | null }>(),
+		repos.hosts.getLatestUptime(hostId),
 	]);
 
 	const hostAlerts = alertRows.filter((a) => a.host_id === hostId);
@@ -310,7 +287,7 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 			hostname: host.hostname,
 			tier,
 			last_seen: host.last_seen,
-			uptime_seconds: metrics?.uptime_seconds ?? null,
+			uptime_seconds: uptime,
 			alert_count: inMaintenance ? 0 : hostAlerts.length,
 			alerts: inMaintenance ? [] : formatAlerts(hostAlerts),
 			tags,
@@ -323,9 +300,10 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 /** GET /api/monitoring/groups — aggregate health by tag group */
 export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
+	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
-	const hosts = await queryActiveHosts(db);
+	const hosts = await repos.hosts.listStatusRows();
 	if (hosts.length === 0) {
 		return c.json({ status: "ok", groups: [] }, 200, CACHE_HEADERS);
 	}

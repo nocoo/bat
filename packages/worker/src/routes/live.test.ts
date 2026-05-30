@@ -1,30 +1,35 @@
 import { BAT_VERSION, type LiveResponse } from "@bat/shared";
 import { Hono } from "hono";
 import { describe, expect, test } from "vitest";
+import type { HostsRepository } from "../repos/types";
 import type { AppEnv } from "../types";
 import { liveRoute } from "./live";
 
-function createApp(dbMock?: { prepare: () => { first: () => Promise<unknown> } }) {
+function createApp(repo: Partial<HostsRepository>) {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
-		c.env = { DB: dbMock } as unknown as AppEnv["Bindings"];
+		c.env = {} as unknown as AppEnv["Bindings"];
+		c.set("repos", { hosts: repo as HostsRepository } as unknown as AppEnv["Variables"]["repos"]);
 		await next();
 	});
 	app.get("/api/live", liveRoute);
 	return app;
 }
 
-function mockD1Ok() {
-	return { prepare: () => ({ first: () => Promise.resolve({ probe: 1 }) }) };
-}
-
-function mockD1Fail(message: string) {
-	return { prepare: () => ({ first: () => Promise.reject(new Error(message)) }) };
+const probeOk: Partial<HostsRepository> = {
+	probe: async () => {
+		// no-op — healthy DB
+	},
+};
+function probeFail(message: string): Partial<HostsRepository> {
+	return {
+		probe: () => Promise.reject(new Error(message)),
+	};
 }
 
 describe("GET /api/live", () => {
 	test("returns 200 with full response when DB is healthy", async () => {
-		const app = createApp(mockD1Ok());
+		const app = createApp(probeOk);
 		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as LiveResponse;
@@ -37,7 +42,7 @@ describe("GET /api/live", () => {
 	});
 
 	test("returns 503 when DB probe fails", async () => {
-		const app = createApp(mockD1Fail("connection refused"));
+		const app = createApp(probeFail("connection refused"));
 		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.status).toBe(503);
 		const body = (await res.json()) as LiveResponse;
@@ -47,14 +52,14 @@ describe("GET /api/live", () => {
 	});
 
 	test("sanitizes 'ok' in error messages to prevent false positives", async () => {
-		const app = createApp(mockD1Fail("lookup ok.example.com failed"));
+		const app = createApp(probeFail("lookup ok.example.com failed"));
 		const res = await app.request(new Request("http://localhost/api/live"));
 		const body = (await res.json()) as LiveResponse;
 		expect(body.database?.error).toBe("lookup ***.example.com failed");
 	});
 
 	test("includes Cache-Control: no-store header", async () => {
-		const app = createApp(mockD1Ok());
+		const app = createApp(probeOk);
 		const res = await app.request(new Request("http://localhost/api/live"));
 		expect(res.headers.get("Cache-Control")).toBe("no-store");
 	});

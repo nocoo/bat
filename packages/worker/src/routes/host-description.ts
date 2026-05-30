@@ -2,13 +2,11 @@ import type { Context } from "hono";
 import { resolveHostRecord } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
-export async function hostDescriptionPatchRoute(
-	c: Context<AppEnv, "/api/hosts/:id/description">,
-) {
+export async function hostDescriptionPatchRoute(c: Context<AppEnv, "/api/hosts/:id/description">) {
 	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(db, idParam);
+	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -17,7 +15,7 @@ export async function hostDescriptionPatchRoute(
 	}
 
 	const body = await c.req.json<{ description?: unknown }>().catch(() => null);
-	if (!body || !("description" in body)) {
+	if (!(body && "description" in body)) {
 		return c.json({ error: "description field is required" }, 400);
 	}
 

@@ -11,7 +11,7 @@ export async function liveRoute(c: Context<AppEnv>) {
 	let database: { connected: boolean; error?: string } = { connected: false };
 
 	try {
-		await c.env.DB.prepare("SELECT 1 AS probe").first();
+		await c.var.repos.hosts.probe();
 		database = { connected: true };
 	} catch (err) {
 		const msg = err instanceof Error ? err.message : String(err);

@@ -55,44 +55,6 @@ export function normalizeNetSparkline(
 	return points.map((p) => ({ ts: p.ts, v: 0 }));
 }
 
-interface HostRow {
-	host_id: string;
-	hostname: string;
-	os: string | null;
-	kernel: string | null;
-	arch: string | null;
-	cpu_model: string | null;
-	boot_time: number | null;
-	last_seen: number;
-	// Host inventory scalar fields
-	cpu_logical: number | null;
-	cpu_physical: number | null;
-	mem_total_bytes: number | null;
-	virtualization: string | null;
-	public_ip: string | null;
-	probe_version: string | null;
-	// Maintenance window
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-	maintenance_reason: string | null;
-}
-
-interface LatestMetrics {
-	host_id: string;
-	cpu_usage_pct: number | null;
-	mem_used_pct: number | null;
-	uptime_seconds: number | null;
-	cpu_load1: number | null;
-	swap_used_pct: number | null;
-	disk_json: string | null;
-	net_json: string | null;
-}
-
-interface AlertCount {
-	host_id: string;
-	alert_count: number;
-}
-
 interface AlertRow {
 	host_id: string;
 	severity: string;
@@ -115,15 +77,10 @@ export interface SparklineRow {
 
 export async function hostsListRoute(c: Context<AppEnv>) {
 	const db = c.env.DB;
+	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
-	// 1. Get all active hosts
-	const hostsResult = await db
-		.prepare(
-			"SELECT host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, probe_version, maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE is_active = 1",
-		)
-		.all<HostRow>();
-	const hosts = hostsResult.results;
+	const hosts = await repos.hosts.listOverviewRows();
 
 	if (hosts.length === 0) {
 		return c.json([]);
@@ -132,25 +89,8 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	const hostIds = hosts.map((h) => h.host_id);
 	const placeholders = hostIds.map(() => "?").join(", ");
 
-	// 2. Latest metrics per host — use per-host LIMIT 1 queries to leverage index
-	// This reduces rows_read from O(total_rows) to O(host_count) by avoiding full table scan
-	const metricsQueries = hostIds.map((hostId) =>
-		db
-			.prepare(
-				`SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json
-FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
-			)
-			.bind(hostId),
-	);
-	const metricsResults = await db.batch(metricsQueries);
-
-	const metricsMap = new Map<string, LatestMetrics>();
-	for (const result of metricsResults) {
-		const row = result.results?.[0] as LatestMetrics | undefined;
-		if (row) {
-			metricsMap.set(row.host_id, row);
-		}
-	}
+	const metricsRows = await repos.hosts.getLatestMetricsBatch(hostIds);
+	const metricsMap = new Map(metricsRows.map((row) => [row.host_id, row]));
 
 	// 3. Alert counts per host
 	const alertCountResult = await db
@@ -158,7 +98,7 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 			`SELECT host_id, COUNT(*) as alert_count FROM alert_states WHERE host_id IN (${placeholders}) GROUP BY host_id`,
 		)
 		.bind(...hostIds)
-		.all<AlertCount>();
+		.all<{ host_id: string; alert_count: number }>();
 
 	const alertCountMap = new Map<string, number>();
 	for (const a of alertCountResult.results) {
@@ -184,20 +124,8 @@ FROM metrics_raw WHERE host_id = ? ORDER BY ts DESC LIMIT 1`,
 	const allowedByHost = buildAllowedByHost(allowlistResult.results);
 
 	// 5. Sparkline data — last 24h hourly aggregates
-	const sparklineCutoff = now - 86400;
-	const sparklineResult = await db
-		.prepare(
-			`SELECT host_id, hour_ts as ts, cpu_usage_avg as cpu, mem_used_pct_avg as mem,
-	CASE WHEN net_rx_bytes_avg IS NOT NULL AND net_tx_bytes_avg IS NOT NULL
-		THEN net_rx_bytes_avg + net_tx_bytes_avg ELSE NULL END as net
-FROM metrics_hourly
-WHERE host_id IN (${placeholders}) AND hour_ts >= ?
-ORDER BY host_id, hour_ts ASC`,
-		)
-		.bind(...hostIds, sparklineCutoff)
-		.all<SparklineRow>();
-
-	const sparklinesByHost = buildSparklinesByHost(sparklineResult.results);
+	const sparklineRows = await repos.hosts.listSparklineRowsSince(hostIds, now - 86400);
+	const sparklinesByHost = buildSparklinesByHost(sparklineRows);
 
 	// 6. Build response
 	const nowHHMM = toUtcHHMM(now);
