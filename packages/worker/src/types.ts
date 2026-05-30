@@ -1,4 +1,6 @@
 // Worker environment bindings
+import type { Repositories } from "./repos/types.js";
+
 export type Bindings = {
 	DB: D1Database;
 	BAT_WRITE_KEY: string;
@@ -12,6 +14,10 @@ export type Bindings = {
 export type Variables = {
 	// Set by accessAuth middleware when JWT signature is verified
 	accessAuthenticated?: boolean;
+	// Set by reposMiddleware on every request — the typed D1 repository bundle.
+	// During the C1–C11 refactor, individual repos are populated incrementally;
+	// callers should treat missing methods as "this domain hasn't migrated yet".
+	repos: Repositories;
 };
 
 export type AppEnv = { Bindings: Bindings; Variables: Variables };
