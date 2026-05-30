@@ -1,14 +1,23 @@
 // Tests for CLI auth routes and token scope enforcement
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
+import { D1CliTokensRepository } from "../adapters/d1/cli-tokens.js";
+import { createD1Repositories } from "../adapters/d1/factory.js";
+import { hashToken } from "../domain/cli-token.js";
 import { accessAuth } from "../middleware/access-auth.js";
 import { apiKeyAuth, isCliAssetsScopePath } from "../middleware/api-key.js";
 import { entryControl } from "../middleware/entry-control.js";
-import { findCliTokenByHash, hashToken } from "../services/cli-tokens.js";
+import { reposMiddleware } from "../middleware/repos.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import type { AppEnv } from "../types.js";
 import { cliAuthBridgeRoute, cliAuthRoute } from "./cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./cli-tokens.js";
+
+/** Adapter shim for the legacy `findCliTokenByHash(db, hash)` call shape
+ *  used by the section of tests that exercises the repo's read+touch path. */
+function findCliTokenByHash(db: D1Database, hash: string) {
+	return new D1CliTokensRepository(db).findByHashAndTouch(hash);
+}
 
 // --- Helpers ---
 
@@ -22,7 +31,9 @@ function makeCtx(
 		authorization?: string;
 	} = {},
 ) {
-	const variables: Record<string, unknown> = {};
+	const variables: Record<string, unknown> = {
+		repos: createD1Repositories(db),
+	};
 	if (opts.accessAuthenticated) {
 		variables.accessAuthenticated = true;
 	}
@@ -56,6 +67,9 @@ function makeCtx(
 		set: (key: string, val: unknown) => {
 			variables[key] = val;
 		},
+		// Hono's c.var is a Proxy backed by the same Variables map; in tests we
+		// pre-populate `repos` so route handlers can call c.var.repos.* directly.
+		var: variables,
 		json: (data: unknown, status?: number) =>
 			new Response(JSON.stringify(data), {
 				status: status ?? 200,
@@ -251,7 +265,9 @@ function makeBridgeCtx(
 		host?: string;
 	} = {},
 ) {
-	const variables: Record<string, unknown> = {};
+	const variables: Record<string, unknown> = {
+		repos: createD1Repositories(db),
+	};
 	if (opts.accessAuthenticated) {
 		variables.accessAuthenticated = true;
 	}
@@ -280,6 +296,9 @@ function makeBridgeCtx(
 		set: (key: string, val: unknown) => {
 			variables[key] = val;
 		},
+		// Hono's c.var is a Proxy backed by the same Variables map; in tests we
+		// pre-populate `repos` so route handlers can call c.var.repos.* directly.
+		var: variables,
 		json: (data: unknown, status?: number) =>
 			new Response(JSON.stringify(data), {
 				status: status ?? 200,
@@ -720,6 +739,7 @@ describe("apiKeyAuth middleware — CLI token path", () => {
 			return next();
 		});
 
+		app.use("*", reposMiddleware);
 		app.use("/api/*", apiKeyAuth);
 
 		// Asset-scope routes (GET + mutation)
@@ -847,6 +867,7 @@ describe("full middleware chain — CLI token on machine endpoint", () => {
 		});
 
 		// Full production middleware chain
+		app.use("*", reposMiddleware);
 		app.use("*", entryControl);
 		app.use("/api/*", accessAuth);
 		app.use("/api/*", apiKeyAuth);

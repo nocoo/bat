@@ -11,7 +11,7 @@
 
 import { CLI_TOKEN_LABEL_MAX_LENGTH } from "@bat/shared";
 import type { Context } from "hono";
-import { createCliToken, generateCliToken, hashToken } from "../services/cli-tokens.js";
+import { generateCliToken, hashToken } from "../domain/cli-token.js";
 import type { AppEnv } from "../types.js";
 
 /**
@@ -96,7 +96,7 @@ export async function cliAuthBridgeRoute(c: Context<AppEnv>) {
 	// Mint token
 	const plaintext = generateCliToken();
 	const tokenHash = await hashToken(plaintext);
-	await createCliToken(c.env.DB, tokenHash, label, "assets");
+	await c.var.repos.cliTokens.create(tokenHash, label, "assets");
 
 	// Build redirect URL: callback + api_key + state + worker_url
 	const redirectUrl = new URL(callbackUrl.toString());
@@ -161,7 +161,7 @@ export async function cliAuthRoute(c: Context<AppEnv>) {
 	const tokenHash = await hashToken(plaintext);
 
 	// Store in D1
-	const row = await createCliToken(c.env.DB, tokenHash, label, "assets");
+	const row = await c.var.repos.cliTokens.create(tokenHash, label, "assets");
 
 	return c.json(
 		{

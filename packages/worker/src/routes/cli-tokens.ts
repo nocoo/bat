@@ -6,11 +6,10 @@
 
 import type { CliTokenItem } from "@bat/shared";
 import type { Context } from "hono";
-import { deleteCliToken, listCliTokens } from "../services/cli-tokens.js";
 import type { AppEnv } from "../types.js";
 
 export async function cliTokensListRoute(c: Context<AppEnv>) {
-	const rows = await listCliTokens(c.env.DB);
+	const rows = await c.var.repos.cliTokens.list();
 	const items: CliTokenItem[] = rows.map((row) => ({
 		id: row.id,
 		label: row.label,
@@ -28,7 +27,7 @@ export async function cliTokensDeleteRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid token ID" }, 400);
 	}
 
-	const deleted = await deleteCliToken(c.env.DB, id);
+	const deleted = await c.var.repos.cliTokens.delete(id);
 	if (!deleted) {
 		return c.json({ error: "Token not found" }, 404);
 	}
