@@ -10,8 +10,8 @@ import type {
 	TcpMetrics,
 } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
-import { createMockD1 } from "../test-helpers/mock-d1";
-import { evaluateAlerts, evaluateRules } from "./alerts";
+import { createMockD1 } from "../../test-helpers/mock-d1";
+import { evaluateAlerts, evaluateRules } from "./_alerts-tier1";
 
 function makePayload(
 	overrides?: Partial<{

@@ -1,12 +1,12 @@
 import type { Tier2Payload } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
-import { createMockD1 } from "../test-helpers/mock-d1";
+import { createMockD1 } from "../../test-helpers/mock-d1";
 import {
 	type AlertEvalResult,
 	evaluateTier2Alerts,
 	evaluateTier2Rules,
 	handleDurationRule,
-} from "./tier2-alerts";
+} from "./_alerts-tier2";
 
 function makePayload(overrides?: Partial<Tier2Payload>): Tier2Payload {
 	const now = Math.floor(Date.now() / 1000);

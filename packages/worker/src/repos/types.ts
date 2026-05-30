@@ -24,6 +24,7 @@ import type {
 	CliTokenRow,
 	CliTokenScope,
 	HostTag,
+	MetricsPayload,
 	RetentionDays,
 	Tier2Payload,
 	Tier2Snapshot,
@@ -34,8 +35,46 @@ import type {
 export interface HostsRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface MetricsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface AlertsRepository {}
+/**
+ * Alert state read + reconciliation. Pure rule evaluators live in
+ * `domain/alerts/{evaluate,tier2}.ts`; this repo only owns the D1 persistence
+ * (alert_states + alert_pending) and the joined-with-hosts read for the list
+ * route. Maintenance-window filtering stays in the route since it depends on
+ * wall-clock semantics.
+ */
+export interface AlertsRepository {
+	/** Active alerts joined with host inventory + maintenance window for the
+	 *  /api/alerts list route; ordered by triggered_at desc. */
+	listActiveJoinedHosts(): Promise<AlertActiveJoinedRow[]>;
+	/** Evaluate tier-1 / signal-expansion / tier-3 rules and reconcile
+	 *  alert_states + alert_pending in a single batch. No-op when nothing
+	 *  changed. */
+	evaluateAndApply(hostId: string, payload: MetricsPayload, now: number): Promise<void>;
+	/** Evaluate tier-2 rules (uses the host's per-host port allowlist) and
+	 *  reconcile alert_states + alert_pending in a single batch. */
+	evaluateAndApplyTier2(hostId: string, payload: Tier2Payload, now: number): Promise<void>;
+	/**
+	 * Clear all pending duration-rule timers for a host. Used by ingest when a
+	 * host enters its maintenance window — we suppress alert evaluation but
+	 * still need to drop accumulated `alert_pending.first_seen` so the
+	 * post-maintenance baseline is clean. Does not touch `alert_states`
+	 * (already-fired alerts persist; the maintenance filter on the list route
+	 * hides them).
+	 */
+	clearPendingForHost(hostId: string): Promise<void>;
+}
+
+export interface AlertActiveJoinedRow {
+	host_id: string;
+	hostname: string;
+	rule_id: string;
+	severity: string;
+	value: number | null;
+	triggered_at: number;
+	message: string | null;
+	maintenance_start: string | null;
+	maintenance_end: string | null;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface EventsRepository {}
 
