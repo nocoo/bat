@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import { getRetentionDays, settingsGetRoute, settingsPutRoute } from "./settings";
@@ -8,6 +9,7 @@ function mount(db: D1Database): Hono<AppEnv> {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
 		c.env = { DB: db, BAT_WRITE_KEY: "w", BAT_READ_KEY: "r" };
+		c.set("repos", createD1Repositories(db));
 		return next();
 	});
 	app.get("/api/settings", settingsGetRoute);

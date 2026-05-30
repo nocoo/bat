@@ -10,6 +10,8 @@
 // outside `adapters/d1/**`. Routes/middleware/cron consume only these
 // interfaces.
 
+import type { RetentionDays, WebhookConfigRow } from "@bat/shared";
+
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface HostsRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
@@ -18,14 +20,48 @@ export interface MetricsRepository {}
 export interface AlertsRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface EventsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface WebhooksRepository {}
+
+/**
+ * Webhook config CRUD. Each method touches `webhook_configs`; FK existence
+ * checks (host present) are handled inside the adapter so routes never
+ * reach into other domains via raw SQL.
+ */
+export interface WebhooksRepository {
+	/** List configs joined with hostname, ordered by created_at desc. */
+	list(): Promise<(WebhookConfigRow & { hostname: string })[]>;
+
+	/**
+	 * Create a config for `hostId`. Result discriminator:
+	 * - `{ ok: true, row }` on success.
+	 * - `{ ok: "host_not_found" }` if the FK target host doesn't exist.
+	 * - `{ ok: "duplicate" }` if a config already exists for this host
+	 *   (UNIQUE constraint on host_id).
+	 */
+	create(
+		hostId: string,
+		nowSeconds: number,
+	): Promise<{ ok: true; row: WebhookConfigRow } | { ok: "host_not_found" } | { ok: "duplicate" }>;
+
+	/** Delete by id. Returns true on hit, false when missing. */
+	delete(configId: number): Promise<boolean>;
+
+	/** Rotate the token. Returns the new token, or null when id is missing. */
+	regenerateToken(configId: number, nowSeconds: number): Promise<string | null>;
+}
+
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface PortAllowlistRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface TagsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface SettingsRepository {}
+
+/** Settings KV-style store. `retention_days` is the only key in use today. */
+export interface SettingsRepository {
+	/** Read retention_days. Returns DEFAULT_RETENTION_DAYS on missing/bad/error. */
+	getRetentionDays(): Promise<RetentionDays>;
+	/** Upsert retention_days. */
+	setRetentionDays(value: RetentionDays): Promise<void>;
+}
+
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface MaintenanceRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits

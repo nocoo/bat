@@ -43,12 +43,16 @@ describe("createD1Repositories", () => {
 		}
 	});
 
-	test("repo slots are immutable across calls (factory returns frozen objects)", () => {
+	test("placeholder repo slots are frozen-singleton across calls; concrete adapter slots are per-call instances", () => {
 		const a = createD1Repositories({} as D1Database);
 		const b = createD1Repositories({} as D1Database);
-		// Slot identities are stable (frozen singletons) — cheap factory call.
+		// Slots that haven't migrated yet share the frozen-empty singleton.
 		expect(a.hosts).toBe(b.hosts);
 		expect(a.aggregation).toBe(b.aggregation);
+		// Concrete adapters (settings, webhooks) are fresh instances per call,
+		// each closed over its own db reference.
+		expect(a.settings).not.toBe(b.settings);
+		expect(a.webhooks).not.toBe(b.webhooks);
 	});
 });
 

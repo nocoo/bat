@@ -5,12 +5,6 @@
 // POST /api/webhooks/:id/regenerate — regenerate token
 import type { WebhookConfig, WebhookConfigRow } from "@bat/shared";
 import type { Context } from "hono";
-import {
-	createWebhookConfig,
-	deleteWebhookConfig,
-	listWebhookConfigs,
-	regenerateWebhookToken,
-} from "../services/events.js";
 import type { AppEnv } from "../types.js";
 
 /**
@@ -57,20 +51,15 @@ export function validateWebhookCreateBody(body: unknown): WebhookCreateBodyResul
 }
 
 export async function webhooksListRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
-	const rows = await listWebhookConfigs(db);
-
+	const rows = await c.var.repos.webhooks.list();
 	const configs: (WebhookConfig & { hostname: string })[] = rows.map((r) => ({
 		...toWebhookConfig(r),
 		hostname: r.hostname,
 	}));
-
 	return c.json(configs);
 }
 
 export async function webhooksCreateRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
-
 	let body: unknown;
 	try {
 		body = await c.req.json();
@@ -83,38 +72,25 @@ export async function webhooksCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: result.error }, 400);
 	}
 
-	// Verify host exists
-	const host = await db
-		.prepare("SELECT host_id FROM hosts WHERE host_id = ?")
-		.bind(result.host_id)
-		.first<{ host_id: string }>();
+	const nowSeconds = Math.floor(Date.now() / 1000);
+	const created = await c.var.repos.webhooks.create(result.host_id, nowSeconds);
 
-	if (!host) {
+	if (created.ok === "host_not_found") {
 		return c.json({ error: "Host not found" }, 404);
 	}
-
-	const nowSeconds = Math.floor(Date.now() / 1000);
-
-	try {
-		const row = await createWebhookConfig(db, result.host_id, nowSeconds);
-		return c.json(toWebhookConfig(row), 201);
-	} catch (err) {
-		// UNIQUE constraint on host_id
-		if (err instanceof Error && err.message.includes("UNIQUE")) {
-			return c.json({ error: "Webhook config already exists for this host" }, 409);
-		}
-		throw err;
+	if (created.ok === "duplicate") {
+		return c.json({ error: "Webhook config already exists for this host" }, 409);
 	}
+	return c.json(toWebhookConfig(created.row), 201);
 }
 
 export async function webhooksDeleteRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const id = parseWebhookId(c.req.param("id"));
 	if (id === null) {
 		return c.json({ error: "Invalid webhook ID" }, 400);
 	}
 
-	const deleted = await deleteWebhookConfig(db, id);
+	const deleted = await c.var.repos.webhooks.delete(id);
 	if (!deleted) {
 		return c.json({ error: "Webhook config not found" }, 404);
 	}
@@ -123,14 +99,13 @@ export async function webhooksDeleteRoute(c: Context<AppEnv>) {
 }
 
 export async function webhooksRegenerateRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const id = parseWebhookId(c.req.param("id"));
 	if (id === null) {
 		return c.json({ error: "Invalid webhook ID" }, 400);
 	}
 
 	const nowSeconds = Math.floor(Date.now() / 1000);
-	const newToken = await regenerateWebhookToken(db, id, nowSeconds);
+	const newToken = await c.var.repos.webhooks.regenerateToken(id, nowSeconds);
 
 	if (!newToken) {
 		return c.json({ error: "Webhook config not found" }, 404);

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 // Handler-level tests for /api/events (list + ingest).
 import { beforeEach, describe, expect, test } from "vitest";
-import { createWebhookConfig } from "../services/events";
+import { D1WebhooksRepository } from "../adapters/d1/webhooks";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import { eventsIngestRoute } from "./events-ingest";
@@ -32,8 +32,11 @@ async function seedHost(db: D1Database, hostId: string, publicIp: string | null)
 }
 
 async function createToken(db: D1Database, hostId: string): Promise<string> {
-	const row = await createWebhookConfig(db, hostId, NOW);
-	return row.token;
+	const result = await new D1WebhooksRepository(db).create(hostId, NOW);
+	if (result.ok !== true) {
+		throw new Error(`createToken failed: ${result.ok}`);
+	}
+	return result.row.token;
 }
 
 function ingestReq(token: string, ip: string | null, body: unknown): Request {
