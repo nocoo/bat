@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Tier2Row, rowToTier2Snapshot } from "./tier2-metrics";
+import { type Tier2Row, rowToTier2Snapshot } from "../adapters/d1/tier2";
 
 const emptyRow: Tier2Row = {
 	host_id: "web-01",

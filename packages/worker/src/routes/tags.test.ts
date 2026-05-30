@@ -1,5 +1,6 @@
 // Tests for tags route handlers
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import {
 	hostTagsAddRoute,
@@ -29,6 +30,7 @@ function makeCtx(
 	const _hasBody = opts.body !== undefined || opts.bodyRaw !== undefined;
 	return {
 		env: { DB: db },
+		var: { repos: createD1Repositories(db) },
 		req: {
 			param: (key: string) => opts.params?.[key] ?? "",
 			json: async () => {
