@@ -1,360 +1,174 @@
-# 20 — D1 → CF KV Migration Design
+# 20 — Storage Layer Repository Abstraction (D1-only, behavior-preserving)
 
-> Status: Draft v3 (v2 + 4 reviewer patches) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
-> KV namespace: `bat` (id `57d8209ea2394f4cb76436a964b5618b`); proposed binding name **`BAT_KV`**.
+> Status: Draft v4 · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
+> Replaces v1–v3 (which proposed a KV migration). KV is **out of scope** for this task. v1–v3 design remains in git history (`00ec0a8`, `3b74fda`, `975ff57`) for future reference if engine switch is reconsidered.
 
-## 0. Changelog
+## 0. Scope
 
-### v2 → v3
+- **Goal**: Refactor the worker's storage access into a `routes → repos → adapters/d1` layering. **D1 stays as the only storage engine.**
+- **Constraints (per @zheng-li)**:
+  1. **Architecture must simplify** — fewer concepts, not more.
+  2. **Test coverage must be very high** — at least the existing 95% line/branch gate, ideally higher on the repo and adapter layers.
+  3. **Behaviour must not change** — every API contract, response shape, status code, alert evaluation result, cron output, and DB write is identical before and after.
 
-| # | v2 issue (reviewer) | v3 fix |
+What this is **not**:
+
+- No KV layout, no KV adapter, no Miniflare KV setup.
+- No metric compression / delta-suppression / forward-fill (those were KV-economic measures).
+- No schema changes, no migrations.
+- No retention policy changes — D1 keeps its current 7d raw / 90d hourly behaviour as is.
+
+## 1. Why this is worth doing on its own
+
+Even without KV, the codebase pays a real tax today:
+
+- 78 direct `c.env.DB` references in 25 route files. Every new route copies SQL plumbing alongside business logic.
+- `services/*.ts` is a flat dumping ground (~15 files) where some files own DB writes (`metrics.ts`, `agents.ts`), some own pure compute (`aggregation.ts` mixed with both), and the boundary is fuzzy.
+- Route tests today either spin up a real D1 and assert on rows, or mock individual SQL strings. There is no sharp seam to mock or to swap.
+- Adding an integration test for a new route (the kind we just had to add for `PATCH /api/hosts/:id/description`) requires understanding the full D1 schema, not just the relevant repo's contract.
+
+A repo layer fixes all four with one concept: **a typed contract per domain, with one concrete adapter today (D1), implemented behind it.** Routes consume the contract; tests target the contract; future engine swaps (if ever) target the contract.
+
+## 2. Target shape
+
+```
+routes/*  ──►  repos/*  ──►  adapters/d1/*  ──►  c.env.DB
+   (HTTP,        (typed         (SQL — the
+   validation,   contracts +    statements
+   response      types in       lifted from
+   shape)        @bat/shared    today's
+                 or worker)     services/)
+```
+
+- **`packages/worker/src/repos/`** — one file per domain. Each file exports an interface and a public type set. Routes import only from here. No SQL strings.
+- **`packages/worker/src/adapters/d1/`** — one file per repo, implementing the contract by talking to D1. This is where today's `services/*.ts` SQL ends up, organized by domain instead of mixed.
+- **`Repositories`** bundle assembled in `index.ts` and stored on `c.var.repos`; routes use `c.var.repos.<domain>.<method>(...)`.
+
+## 3. Domain inventory
+
+Same call-pattern survey as v3, but **only the methods the existing code actually calls**. We are not building speculative methods.
+
+| Repo | Methods (typed) | Backed-by today |
 |---|---|---|
-| P1 | KV described as "prefix list with start/end cursors" misreads KV's API | §4 reworded — exact-key get + cursor-paginated prefix list, no lexical range scan |
-| P2 | `m:latest` mismatched durable in §4.1 vs ephemeral in §11 | Unified as ephemeral telemetry projection (TTL 7d+1h); host record stays durable; §5.1 clarifies dashboard fallback (§4.1, §5.1) |
-| P3 | `agents.upsertBy` race only described post-hoc reconciliation | §8 updated — list/get **filter by canonical sentinel id**, orphan records can never appear in caller-visible reads; loser deletes its own `agent:{id}` best-effort |
-| P4 | All route tests mocked repos, no real-engine integration | §9.5 split into unit (mockable) and a new integration suite running each route end-to-end against both real D1 and real KV repos via Miniflare |
-
-### v1 → v2
-
-| # | v1 problem | v2 fix |
-|---|---|---|
-| B1 | One KV key per metric tick → list/get explosion | **Bucket-per-hour value** holding tick array; per-host `latest` and `last-ref` keys (§5) |
-| B2 | Generic `Store{get/put/list/...}` interface mis-models business queries | Primary abstraction is **domain repositories**; `KeyValueStore` is internal to the KV adapter only (§3) |
-| B3 | 1% **relative** threshold misreads the user's CPU example | Per-field **comparator policy**: percentage-point threshold for `*_pct`, relative+floor for bytes/rates, always-write for counters (§6) |
-| B4 | Hourly aggregator over sparse rows produces biased stats | Hourly uses **time-weighted aggregation** over expanded series; `sample_count` semantics defined (§7) |
-| B5 | "7d on every dataset" conflates telemetry with config | Datasets split into **ephemeral** (TTL 7d) vs **durable** (no TTL); user-facing question reflects this (§4, §11) |
-| B6 | Secondary indexes had no lifecycle | Each index has explicit create / replace / delete / TTL rules and a current-pointer key (§4.5) |
-| B7 | Concurrency story too optimistic | Concurrency table per operation; idempotent designs called out; `m:last:{host}` TTL covers downtime (§8) |
-
-## 1. Goals & Constraints (unchanged from v1)
-
-| # | Requirement |
-|---|---|
-| G1 | Replace D1 with CF KV as the worker's primary store |
-| G2 | Retain only the **last 7 days** of **ephemeral** datasets (telemetry, events) — see §4 / §11 for the durable-data carve-out |
-| G3 | **No D1 → KV data migration** (greenfield switch) |
-| G4 | Refactor first to a **domain-repo API layer**, then swap engines |
-| G5 | ≥ 95% line/branch coverage, clean layering |
-| G6 | Per-field delta-suppression on ingest; reader fills gaps |
-| G7 | API surfaces unchanged from caller perspective |
-
-## 2. Storage surface (concrete contracts, not generic CRUD)
-
-To address B2, this is the actual call-pattern inventory the repos must satisfy. Each row is a **business operation** the routes/cron use today; the new `repos/*` layer exposes exactly these as typed methods.
-
-### 2.1 Hosts (durable)
-
-| Op | Caller | Notes |
-|---|---|---|
-| `getById(host_id)` | `host-detail.ts`, `host-description.ts` | hot |
-| `listActive()` returns `HostRecord[]` ordered by `last_seen` desc | `hosts.ts:121-126` | foundation for the dashboard list |
-| `upsertIdentity(host_id, identityFields, now)` | `identity.ts` | merges identity + inventory |
-| `touchHeartbeat(host_id, now)` | `heartbeat.ts`, `metrics.ts` | sets `last_seen` |
-| `setDescription(host_id, value)` | `host-description.ts` | already wired |
-| `retire(host_id)` / `unretire(host_id)` | admin paths | flips `is_active` |
-
-### 2.2 Metrics (ephemeral, telemetry — TTL 7d)
-
-| Op | Caller | Notes |
-|---|---|---|
-| `appendTick(host_id, payload)` returns `{persisted: bool}` | `ingest.ts` | applies §6 delta-suppression; updates last-ref + latest atomically (§8) |
-| `getLatest(host_id)` returns `LatestMetrics \| null` | `hosts.ts:135-153` | served from a single key (§5.3) — no series scan |
-| `readWindow(host_id, fromTs, toTs)` returns `Tick[]` | `metrics.ts:47-115`, host detail charts | reads ≤ N hour-buckets (§5.2) and slices |
-| `readWindowExpanded(host_id, fromTs, toTs, stepSec)` returns `Tick[]` | UI helper / hourly cron | uses `expandSeries` (§6.2) |
-| `readHourly(host_id, fromHour, toHour)` returns `HourlyRow[]` | `metrics.ts` | reads 1 day-bucket per 24h (§5.4) |
-| `getActiveHostIdsInHour(hourTs)` returns `string[]` | cron aggregator | used by §7 |
-
-### 2.3 Alerts (durable for active state, ephemeral history)
-
-| Op | Caller | Notes |
-|---|---|---|
-| `getActive()`, `getActiveByHost(host_id)` | `hosts.ts:156-175`, `alerts.ts` | full active set is small |
-| `setActive(host_id, rule_id, AlertState)` | alert evaluator | overwrite |
-| `clearActive(host_id, rule_id)` | alert evaluator | delete |
-| `getPending(...)` / `setPending(...)` / `clearPending(...)` | alert evaluator | symmetric |
-
-### 2.4 Events (ephemeral — TTL 7d)
-
-| Op | Caller | Notes |
-|---|---|---|
-| `append(host_id, EventRecord)` | `events-ingest.ts` | bucket-per-day write (§5.5) |
-| `listForHost(host_id, fromTs, toTs)` | `events-list.ts` | bucket scan |
-| `listFleet(fromTs, toTs, limit)` | dashboards | maintained "recent fleet events" rolling buffer key (§5.5) |
-
-### 2.5 Webhooks / Allowed-ports / Tags / Settings / Maintenance (durable)
-
-Standard CRUD with small cardinalities. Each repo exposes `list()`, `getById(id)`, `upsert(...)`, `delete(id)`. Tag edges (`host_tags`, `agent_tags`, `asset_tags`) are modeled as bidirectional indexes (§4.5) and exposed as `addEdge` / `removeEdge` / `byEntity(entity_id)` / `byTag(tag_id)`.
-
-### 2.6 Agents / Assets / Bindings / CLI tokens (durable, with uniqueness)
-
-| Op | Caller | Notes |
-|---|---|---|
-| `agents.upsertBy(source_key, match_key, fields)` | `services/agents.ts:188-202` | replaces `ON CONFLICT(source_key, match_key)`; uses uniqueness index (§4.5) |
-| `agents.heartbeat(id, now)` | `agents.ts` | overwrite `last_heartbeat` |
-| `agents.listWithHostJoin()` | `services/agents.ts:7-41` | repo-side join: read agents + tag edges + linked hosts in parallel |
-| `assets.list/get/upsert/delete` | `assets.ts` | + secondary index by status/type (§4.5) |
-| `bindings.upsert(agent_id, asset_id, fields)` | `bindings.ts` | both-direction index (`bind:` + `bindrev:`) |
-| `bindings.byAgent(id)` / `byAsset(id)` | `bindings.ts` | uses the right index |
-| `cli_tokens.create(token, ttl)` | `cli-auth.ts` | TTL = expiry |
-| `cli_tokens.lookupByHash(hash)` | `cli-auth.ts` | direct key |
-
-This list is the v2 contract. Repo files mirror it 1:1.
-
-## 3. Architecture: domain-repo first, KV primitives second
-
-```
-routes/*  ──►  repos/*  ──►  adapters/*   ──►  bindings
-   (HTTP)      (domain ops:    (D1 OR KV impl     (D1Database
-               typed contracts  of one repo)       OR KVNamespace)
-               in §2)
-```
-
-- **`repos/`** — typed contract per domain (one file per repo). Routes import only from `repos/`. Repos define the public interface (e.g. `HostsRepository`, `MetricsRepository`).
-- **`adapters/d1/`** — `D1HostsRepository`, `D1MetricsRepository`, … each implementing the matching contract by talking to D1 (largely existing SQL, lifted out of `services/`).
-- **`adapters/kv/`** — same set of classes implementing the same contracts via KV. **Inside** the KV adapter we use a small private helper:
-  ```ts
-  // adapters/kv/_kv-store.ts — adapter-internal, NOT exported as a public storage abstraction
-  interface KeyValueStore { get<T>(k): Promise<T|null>; put<T>(k, v, opts?); delete(k); list(prefix, opts?); }
-  ```
-  This is implementation glue, not the cross-cutting business interface that v1 mistakenly elevated.
-- **Wiring** — `index.ts` builds a `Repositories` bundle from the configured engine. Routes read `c.env.REPOS` (or `c.var.repos`); they never see `c.env.DB` or `c.env.BAT_KV` directly after the migration.
+| `HostsRepository` | `getById`, `listActive`, `upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`, `unretire` | `routes/hosts.ts`, `routes/host-detail.ts`, `routes/identity.ts`, `routes/heartbeat.ts`, `routes/host-description.ts` |
+| `MetricsRepository` | `appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour` | `routes/ingest.ts`, `routes/metrics.ts`, `services/metrics.ts`, `services/aggregation.ts` |
+| `AlertsRepository` | `listActive`, `listActiveByHost`, `setActive`, `clearActive`, `getPending`, `setPending`, `clearPending`, `countByHost` | `services/alerts.ts`, dashboard hosts list |
+| `EventsRepository` | `append`, `listForHost`, `listFleet` | `routes/events-ingest.ts`, `routes/events-list.ts` |
+| `WebhooksRepository` | `list`, `getById`, `upsert`, `delete` | `routes/webhooks.ts` |
+| `PortAllowlistRepository` | `list`, `upsert`, `delete` | `routes/allowed-ports.ts` |
+| `TagsRepository` | `list`, `getById`, `upsert`, `delete`, `addEdge`, `removeEdge`, `byEntity`, `byTag` | `routes/tags.ts`, `services/agents.ts` (tag join) |
+| `SettingsRepository` | `get`, `set`, `delete` | `routes/settings.ts` |
+| `MaintenanceRepository` | `list`, `getById`, `upsert`, `delete`, `activeAt(now)` | `routes/maintenance.ts`, alert evaluator |
+| `AgentsRepository` | `list`, `listWithJoins`, `getById`, `upsertBy(source, match)`, `heartbeat`, `delete` | `services/agents.ts`, `routes/agents.ts` |
+| `AssetsRepository` | `list`, `getById`, `upsert`, `delete` | `routes/assets.ts`, `services/assets.ts` |
+| `BindingsRepository` | `list`, `byAgent`, `byAsset`, `upsert`, `delete` | `routes/bindings.ts`, `services/bindings.ts` |
+| `Tier2Repository` | `getSnapshot`, `upsertSnapshot` | `routes/tier2-ingest.ts`, `routes/tier2-read.ts` |
+| `CliTokensRepository` | `create`, `lookupByHash`, `revoke`, `prune(now)` | `routes/cli-auth.ts`, `services/cli-tokens.ts` |
+| `AggregationRepository` (cron-only) | `aggregateHour(hourTs)`, `purgeRaw(olderThan)`, `purgeHourly(olderThan)` | `services/aggregation.ts`, cron handler |
 
-The repo contracts are the only thing the rest of the codebase depends on. D1 and KV are interchangeable behind them.
+Total: **15 repositories**, all method names mirror existing call sites. **No new domain operations are added.**
 
-## 4. KV layout
+## 4. Architecture-simplification checks
 
-KV has only **point keys** (exact-key `get`/`put`/`delete`) + **prefix list with cursor pagination** — there is no D1-style lexical range scan. We design every read pattern to fit in either "exact key get" or "small bounded prefix list (≤ a few hundred keys, paginated by cursor)".
+The reviewer constraint is "架构简化" — easy to fail. Concrete tests we apply to the design:
 
-### 4.1 Key prefix table
+1. **Net file count goes down or stays flat.** Today: ~25 route files + ~15 services + ~12 service test files. After: same routes + 15 repos + 15 adapters + ~15 contract tests. We *delete* the `services/*` files in the same commit that introduces the equivalent adapter — never both at once. Net change ≈ 0.
+2. **No new abstraction levels.** Routes call repos. Repos call adapters. Adapters call D1. Three levels, one engine, no factory soup.
+3. **No "Store" or "engine selector" interface.** With one engine there is nothing to select. `Repositories` is a plain record `{ hosts, metrics, alerts, ... }` instantiated once in `index.ts`. Adapters are imported directly; no DI container.
+4. **Methods are concrete, not generic.** `metricsRepo.appendTick(host, payload)` not `store.put('m:r:'+host, ...)`. Generic `get/put/list` does not appear at the repo layer. Reviewer's v1 blocker on this stands.
+5. **Routes lose all SQL.** Grep for `c.env.DB` and `db.prepare` outside `adapters/d1/` after the refactor → must be zero.
+6. **Cron stays in one place.** `AggregationRepository.aggregateHour` is what the scheduled handler calls. No business logic in `index.ts`.
 
-| Logical store | Key shape | Value | Lifecycle |
-|---|---|---|---|
-| Host record | `host:{host_id}` | `HostRecord` JSON | durable |
-| Active hosts index | `idx:host:active:{host_id}` | `{ last_seen }` | durable; rewritten on heartbeat (replaces a sortable secondary key — see §4.5) |
-| **Latest metric tick** | `m:latest:{host_id}` | `LatestMetrics` (small) | telemetry projection — TTL = 7d + 1h (overwritten on every persisted tick; expires alongside its source bucket). Host record stays durable. |
-| **Last-persisted ref** (per-field, drives delta-suppression) | `m:last:{host_id}` | `LastRef` JSON | TTL = 7d + 1h slack (B7 — covers downtime gaps) |
-| **Raw metric bucket** | `m:r:{host_id}:{hourBucket}` | `{ ticks: Tick[] }` (1 hour of persisted ticks) | TTL = 7d + 1h |
-| Hourly bucket | `m:h:{host_id}:{dayBucket}` | `{ hours: HourlyRow[24] }` (1 day of hourly rows) | TTL = 7d + 1d |
-| Tier-2 snapshot | `t2:{host_id}` | `Tier2Snapshot` JSON | durable |
-| Alert state (active) | `alert:state:{host_id}:{rule_id}` | `AlertState` JSON | durable; deleted on clear |
-| Alert pending | `alert:pending:{host_id}:{rule_id}` | `AlertPending` JSON | durable; deleted on clear |
-| **Event bucket** | `evt:{host_id}:{dayBucket}` | `{ events: EventRecord[] }` | TTL = 7d + 1d |
-| Fleet recent-events ring | `evt:fleet:recent` | rolling N events (capped, e.g. 500) | durable rewrite |
-| Webhook config | `wh:{id}` | `WebhookConfig` | durable |
-| Port allowlist entry | `port:{id}` | `PortAllowlist` | durable |
-| Tag | `tag:{tag_id}` | `Tag` | durable |
-| Tag edge (host) | `tagedge:host:{host_id}:{tag_id}` | `""` | durable |
-| Tag edge (agent) | `tagedge:agent:{agent_id}:{tag_id}` | `""` | durable |
-| Tag edge (asset) | `tagedge:asset:{asset_id}:{tag_id}` | `""` | durable |
-| Tag reverse (by tag) | `tagrev:{tag_id}:{kind}:{entity_id}` | `""` | durable; written together with `tagedge:` |
-| Setting | `set:{key}` | scalar/JSON | durable |
-| Maintenance | `maint:{id}` | `MaintenanceWindow` | durable |
-| Agent | `agent:{id}` | `Agent` | durable |
-| Agent uniqueness | `agentkey:{source_key}:{match_key}` | `{ id }` | durable; used by upsertBy (§4.5) |
-| Asset | `asset:{id}` | `Asset` | durable |
-| Asset by status/type | `assetidx:{status}:{type}:{id}` | `""` | durable |
-| Binding | `bind:{agent_id}:{asset_id}` | `Binding` | durable |
-| Binding reverse | `bindrev:{asset_id}:{agent_id}` | `""` | durable; written/deleted with `bind:` |
-| CLI token | `cli:tok:{hash}` | `CliToken` | TTL = token expiry |
+## 5. Test strategy
 
-`hourBucket` and `dayBucket` are zero-padded so `list({prefix, start, end})` returns chronological order. Conventions:
+The constraint "测试覆盖率极高" plus "逻辑完全不变" gives a clear test pyramid:
 
-```
-hourBucket = Math.floor(ts / 3600).toString().padStart(10, "0")
-dayBucket  = Math.floor(ts / 86400).toString().padStart(7, "0")
-```
+### 5.1 Repo contract tests (the load-bearing tier)
 
-### 4.2 Why bucket-per-hour for raw, bucket-per-day for hourly
+For every repo: `packages/worker/test/repos/<domain>.contract.test.ts`. Tests are written against the **interface**, instantiated once per concrete adapter (today: only D1 via Miniflare's `D1Database` shim — same harness as the existing e2e tests). When a future engine is added, the same test file re-runs against it; for v4 we have one engine and one execution per test.
 
-Probe interval is 30 s; even with **no** suppression a host emits 120 ticks/h ≈ a few KB JSON per bucket. With suppression it's much smaller. A 24 h chart hits **24 buckets** and an HD detail page (1 h) hits **1 bucket**. A 7 d chart hits 168 buckets — still well under any list-pagination concern.
+What every contract test must cover:
 
-Hourly bucketed by day means a 7 d hourly query is **7 keys**.
+- Round-trip: write → read returns equal value.
+- List ordering and pagination semantics for any list method.
+- `upsertBy` / uniqueness behaviour (agents, settings, tags) — including the exact same conflict behaviour as today's `ON CONFLICT`.
+- Index lifecycle: when an entity changes a key field that drives a join (e.g. `agents.match_key`), reads still return the right answer.
+- Idempotency: calling `appendTick` twice with the same `(host_id, ts)` yields one row, like today's `INSERT OR IGNORE`.
+- Negative paths: missing parent (FK), unknown id returning `null`, oversize input rejected by validation (where today's route enforces it).
 
-### 4.3 Concurrent writers within one bucket
+### 5.2 Adapter unit tests
 
-The single-host single-probe assumption holds today (probe is one process per host). Append within a bucket is **read-modify-write**:
+Per-adapter SQL-correctness sanity (`adapters/d1/*.test.ts`). These largely **port** the existing `services/*.test.ts` suites file-by-file. Since the SQL is unchanged, we expect every existing service test to lift to its adapter test with only an import-path change.
 
-```
-b = get(m:r:{host}:{hourBucket}) ?? { ticks: [] }
-if (!b.ticks.find(t => t.ts === payload.ts)) b.ticks.push(payload)
-b.ticks.sort(by ts)
-put(m:r:{host}:{hourBucket}, b, ttl)
-```
+### 5.3 Route tests stay where they are
 
-Because (a) one writer per host, (b) `ts` is a natural idempotency key, and (c) we sort on every put, the operation is **idempotent under retries**. If a probe re-sends the same `ts`, the dedupe filter above suppresses it. The only failure mode is two concurrent writes from the same host within KV's edge propagation window — see §8 for mitigation (write-then-read-back verify is **not** required because retries are idempotent).
+`packages/worker/src/routes/*.test.ts` keeps using a real Miniflare D1 (the existing setup). The only change: routes inject through `c.var.repos`. Test bodies do not change because behaviour does not change.
 
-### 4.4 No journal or migration writes
+### 5.4 Existing E2E suite
 
-We do **not** journal incoming raw payloads to a side store; the bucket *is* the durable record. `m:last` and `m:latest` are derived state — both can be rebuilt from a recent bucket scan on demand, so we never block ingest waiting for them.
+`test/e2e/` runs unchanged against the real worker. Coverage of routes / pages gates stay green. We do **not** rely on E2E to catch repo-layer regressions; the contract tests do that.
 
-### 4.5 Secondary indexes: lifecycle rules (B6)
+### 5.5 Coverage targets
 
-Every secondary index lists explicit create/replace/delete rules. Repos own their indexes; routes never write index keys directly.
+- Existing project gate: 95% line/branch (TS), 95% line (Rust). Untouched.
+- New `repos/` (interface-only files; trivial): 100% by virtue of being type-only after compilation.
+- New `adapters/d1/`: target **≥ 98% line + branch**. These are pure SQL functions; every branch is exercisable. Any line that we cannot test (e.g. a defensive "should never happen" return) gets explicit `/* c8 ignore next */` and a comment, never a coverage drop.
+- Cron path (`AggregationRepository`): we add a Vitest scheduled-event test exercising one full hour's aggregation against synthetic raw rows.
 
-| Index | Create | Replace / update | Delete |
-|---|---|---|---|
-| `idx:host:active:{host_id}` (heartbeat-touched) | `hosts.upsertIdentity` | `hosts.touchHeartbeat` overwrites the value (last_seen) — same key, no churn | `hosts.retire` deletes |
-| `agentkey:{source_key}:{match_key}` | `agents.upsertBy` first hit (uniqueness sentinel) | If a later upsertBy mutates source/match keys, **delete old sentinel + create new** in one repo call | `agents.delete` deletes both `agent:{id}` and any sentinel that points to it |
-| `assetidx:{status}:{type}:{id}` | `assets.upsert` | If status or type changes: delete old idx key, write new one in the same repo call | `assets.delete` |
-| `tagedge:` + `tagrev:` (paired) | `tags.addEdge(kind, entity_id, tag_id)` writes both | n/a (edges are unique) | `tags.removeEdge` deletes both |
-| `bind:` + `bindrev:` (paired) | `bindings.upsert` writes both | If keys change: delete old pair, create new pair | `bindings.delete` deletes both |
+## 6. Behaviour preservation
 
-Index keys never carry mutable data in their key path **except** when that mutation is the index's purpose (e.g. `assetidx` by status). For status changes we delete-then-write inside one repo method; this is non-atomic across KV but is a single-writer admin path with retries that converge.
+This is the constraint with the highest blast radius if violated. Mitigations:
 
-Sortable by-recency lists (e.g. dashboard hosts) are **not** built on KV-ordered keys (which would churn one key per heartbeat). Instead we list the index keys, fetch values in parallel, and sort in memory. With ≤ a few hundred active hosts this is cheap; for higher cardinalities we add a paginated bucketed index.
+1. **No SQL change.** Adapter methods carry today's SQL string verbatim from `services/*` and `routes/*` — line-for-line. Where SQL was inline in a route, we move it whole to the adapter; we do not rewrite or merge.
+2. **No timestamp / RNG change.** Both `Date.now()` and any `crypto.randomUUID()` callers move to the same call sites in adapters; we don't introduce a clock or id factory.
+3. **No JSON shape change.** Repos return the same DTOs the routes already construct today (most are typed in `@bat/shared`).
+4. **Contract tests assert on row-level state.** After every write, contract tests query the underlying D1 directly and compare to expected state. This is the strongest possible assertion that the adapter has not silently regressed something.
+5. **Diff sanity per commit.** Every C-step commit includes a `RUN_DIFF.md` artifact (added then removed in the cleanup commit) listing: every public function added, every public function removed, every test renamed. Reviewer reads this list before approving.
+6. **Behaviour-equivalence sweep before C-final.** Before the last commit lands, we run the full e2e suite plus a snapshot test that hits every read endpoint with a fixed seed and compares JSON output bit-for-bit against the pre-refactor baseline (snapshot captured in C0).
 
-## 5. Metrics in detail
+## 7. Phasing
 
-### 5.1 Latest
-
-Single key per host, overwritten on every persisted tick:
-
-```
-m:latest:{host_id} → LatestMetrics
-```
-
-`LatestMetrics` is a denormalized projection of the last persisted tick — `cpu_usage_pct`, `mem_used_pct`, `uptime_seconds`, `cpu_load1`, `swap_used_pct`, `disk_json`, `net_json`, plus `ts`. The dashboard list (`hosts.ts:135-153`) becomes one `getLatest` per host (parallelized by `Promise.all`), no series scan.
-
-`m:latest` is **ephemeral** (TTL 7d+1h, same lifetime as the source bucket): if a host stops emitting for >7d, its latest projection expires and `getLatest` returns `null`. The dashboard renders this as "no recent metrics" and continues showing the durable host record from `host:{host_id}`.
-
-### 5.2 Raw bucket
-
-```
-m:r:{host_id}:{hourBucket} → { ticks: Tick[] }
-```
-
-`Tick` keeps only the fields we already persist after suppression. A 24 h read fetches 24 keys (or 25 with the boundary hour) and concatenates. A range read becomes a parallel `Promise.all` of `get(...)` plus an in-memory slice on `(fromTs, toTs)`.
-
-### 5.3 Last-persisted ref
-
-```
-m:last:{host_id} → {
-  ts: number,
-  fields: { cpu_usage_pct, cpu_load1, cpu_load5, cpu_load15,
-            mem_used_pct, swap_used_pct,
-            disk: Record<mount, used_pct>,
-            net: Record<iface, { rx_rate, tx_rate }> }
-}
-```
-
-TTL = 7d + 1h. Rationale: if a host is offline ≥ 7d, its last-ref expires; the next sample is treated as the first sample (always recorded) — exactly the desired behaviour per §6.3.
-
-### 5.4 Hourly day-bucket
-
-```
-m:h:{host_id}:{dayBucket} → { hours: { [hourTsString]: HourlyRow } }
-```
-
-Hourly cron writes one key per host per day (idempotent — overwrite). 7d = 7 keys per host. The `HourlyRow` schema mirrors today's `metrics_hourly` columns.
-
-### 5.5 Events
-
-```
-evt:{host_id}:{dayBucket} → { events: EventRecord[] }   (TTL 7d+1d)
-evt:fleet:recent          → { events: EventRecord[<=500] }   (durable, rolling)
-```
-
-Append uses the same read-modify-write pattern as raw buckets. `evt:fleet:recent` is the dashboard "recent events" feed; we maintain it as a capped ring on append.
-
-## 6. Per-field comparator policy (delta-suppression)
-
-### 6.1 Threshold rules per field family (B3)
-
-| Field family | Comparator | Default threshold | Rationale |
-|---|---|---|---|
-| `*_pct` (cpu_usage_pct, mem_used_pct, swap_used_pct, mount.used_pct) | absolute percentage points | **1.0 pp** (config-able; floor 0.5 pp for fields where idle noise matters) | Matches the user's "12% → 13%" example; relative threshold under-suppresses near 0 and over-suppresses near 100 |
-| `cpu_load*`, rates (`*_sec`, `*_bytes_rate`) | relative + absolute floor | 5% relative, 0.05 absolute floor | Loads are scale-free; relative makes sense |
-| Bytes / sizes (`mem_total`, `disk total/avail`) | relative | 1% | Slow-moving levels |
-| Counters / deltas (`*_delta`, `oom_kills`, retransmits) | always-write | n/a | Lossy aggregation if dropped |
-| Inventory-shaped (cpu_count, mem_total, hostname, etc.) | always-write | n/a | Rare, important changes |
-
-`shouldRecord(prev, next, kind)` is implemented as a **dispatch table** keyed by field; per-field overrides are configurable (settings store) but we do **not** plumb that through in v2's first commits — defaults only.
-
-### 6.2 Read-side expansion
-
-`expandSeries(rows, fromTs, toTs, stepSec)` is a **pure** helper in `@bat/shared` that:
-
-1. Returns rows verbatim when `stepSec` is `null` (the API default).
-2. When `stepSec` is set, walks `[fromTs, toTs]` and emits the most recent prior `Tick` at each step, otherwise interpolates by **forward-fill** (no linear interpolation — a sample being absent means "unchanged").
-
-This is what powers `readWindowExpanded` and the time-weighted aggregator.
-
-### 6.3 Boundary semantics
-
-- First sample after probe restart (`boot_time` change OR `m:last` absent) is always recorded.
-- Heartbeat anchor: if `now - m:last.ts >= 3600`, the sample is always recorded. This guarantees the hourly aggregator has at least one anchor per hour even on a perfectly flat host.
-- On host retire (`is_active=0`), suppress all writes — keeps a retired host from drifting.
-
-## 7. Hourly aggregation (B4)
-
-Aggregation runs on **time-weighted** values, not raw row arithmetic.
-
-```
-expandSeries(rows, hourTs, hourTs+3600, 1)            // 3600 second-by-second levels (cheap; values are forward-filled)
-=> per-second array
-=> compute avg / max / min / p95 over the array      // unbiased on sparse data
-```
-
-`sample_count` semantics in v2: **persisted samples in the hour** (i.e. how many ticks survived suppression). We add a separate `expanded_seconds` field for transparency. UI label remains "samples" pointing at `sample_count`.
-
-If a probe was offline part of the hour (`expandSeries` would forward-fill from the prior hour), aggregator detects "no prior anchor within 1 h" and reports nulls for that hour rather than synthesizing data — matches today's "no metrics" hourly behaviour.
-
-## 8. Concurrency & consistency (B7)
-
-KV is eventually consistent; all writes are last-write-wins per key.
-
-| Operation | Concurrency profile | Strategy |
-|---|---|---|
-| `metrics.appendTick` (raw bucket + last + latest) | Single writer (probe) per host | RMW with idempotent dedupe by `ts` (§4.3); ordering across the 3 writes is "bucket → last → latest" with each step independently safe under retries |
-| `hosts.upsertIdentity` / `touchHeartbeat` | Probe + admin can race in theory | Heartbeat overwrites `last_seen`; admin identity merges into the same record — both are last-write-wins on `host:{id}` and the index points to the same record |
-| `agents.upsertBy(source_key, match_key)` | Concurrent ingest from multiple agents possible | **Sentinel-first, canonical-id reads.** (a) `get(agentkey:{source}:{match})`; (b) if exists, `put(agent:{id})` (merge); (c) else generate `id`, `put(agentkey:..., {id})`, then read it back — if the read-back returns a different `id` (race lost), **delete our just-written `agent:{id}` best-effort in the same repo call** and merge into the winner's id. **All `agents.list()` / `agents.getById()` reads are gated by the sentinel**: a record is only returned if `agentkey:{source}:{match}.id === record.id`; orphan `agent:{id}` records that never won the sentinel are filtered out and never visible to callers. Idempotent on retry; reconciliation is a defense-in-depth follow-up, not the primary defense. |
-| Alerts state set/clear | Single-writer (cron alert evaluator) | No race expected; treat as last-write-wins |
-| Tag edge add/remove (paired) | Admin path | Best-effort; if one half fails, repo logs and a periodic reconciliation (post-migration follow-up) cleans orphans |
-| Cli tokens create | Single create per token | TTL on key, no race |
-
-We accept a small probability of orphan reverse-index keys after partial failures; a `repos.reconcile()` background task is post-migration cleanup work, tracked in `docs/20-d1-to-kv-migration.md` follow-ups.
-
-## 9. Test strategy (G5)
-
-1. **Repo contract suite** under `packages/worker/test/repos/*.contract.test.ts`. Each repo has one suite, instantiated twice — once with `D1*Repository`, once with `KV*Repository`. Same assertions, two engines. Until C7, both adapters must pass.
-2. **KV adapter unit tests** use **Miniflare**'s `KVNamespace` shim. We test bucket boundary behaviour, TTL on writes (Miniflare exposes the configured TTL), index lifecycle, and the agents `upsertBy` race.
-3. **D1 adapter unit tests** are largely the existing `services/*.test.ts` suite, ported under `adapters/d1/*.test.ts`.
-4. **Pure-function coverage**: `expandSeries`, `shouldRecord`, `computeHourly` all live in `@bat/shared` with full table-driven unit tests.
-5. **Route tests** (`packages/worker/src/routes/*.test.ts`) split into two tiers:
-   - *Unit*: mock `Repositories` for fast handler-shape tests (validation, status codes, response envelopes) — keeps current style.
-   - *Integration*: a dedicated `test/routes-integration/` suite that runs each route handler end-to-end against **real** repos (one run with `D1*Repository` on Miniflare D1, one with `KV*Repository` on Miniflare KV). Required coverage at minimum: ingest (`/api/metrics`, `/api/identity`, `/api/events`), hosts list (`/api/hosts` — exercises latest projection + alert join), metrics window (`/api/hosts/:id/metrics` — exercises bucket reads + expandSeries), and agents/assets/bindings CRUD (exercises uniqueness sentinel + paired indexes). Mocks are not allowed below the repo boundary in this suite.
-6. **E2E** (`test/e2e/*`) — unchanged surface. Adds: `expandSeries` correctness path, time-weighted hourly correctness, agents upsertBy parallel race, retired-host suppression, post-7d expiry lookup returns 404.
-
-Coverage gate: 95% TS (including new `repos/` and `adapters/`), 95% Rust (probe), enforced by existing `scripts/check-coverage.sh`.
-
-## 10. Phasing & atomic commits
-
-Each commit ships green: `lint` + `typecheck` + `test` + `gate:routes` + `gate:pages` + `gate:security`.
+Eight atomic commits. Every commit ships green for the full pre-commit + pre-push gate stack (`lint`, `typecheck`, `test`, `gate:routes`, `gate:pages`, `gate:security`, coverage thresholds).
 
 | # | Commit | Surface | Risk |
 |---|---|---|---|
-| C1 | `repos/` interfaces and a thin `Repositories` bundle wired into `c.var.repos` (no engine yet — `Repositories` defaulting to D1 stubs that delegate to existing services) | type contracts + wiring | none |
-| C2 | Move route handlers off `c.env.DB` and onto `c.var.repos` + add a `D1*Repository` per domain (hosts, alerts, events, webhook, ports, tags, settings, maintenance, agents, assets, bindings, tokens, tier2). `services/*` delete in a follow-up | per-route | low — same engine, new entry |
-| C3 | `MetricsRepository` D1 impl + `expandSeries` + `shouldRecord` + `computeHourly` pure helpers in `@bat/shared` (table-driven tests). No behavioural change yet — D1 still stores every tick. | pure code + repo | low |
-| C4 | `KV*Repository` set + Miniflare contract tests; **not wired** in production binding yet | new files | low |
-| C5 | Cron path: KV-native `aggregateHour` using time-weighted aggregator; D1 path stays as fallback for the repo's hourly read | cron | medium |
-| C6 | Add KV binding `BAT_KV` to dev `wrangler.toml`; default `c.var.repos` to KV in dev only; CI gates run against KV | config | medium |
-| C7 | Production cutover: add `BAT_KV` to `[env.production]`, switch `Repositories` factory to KV. **Keep** D1 binding for one release as read-only rollback (B7 reviewer ask). | config | high — gated by user sign-off |
-| C8 | Soak window over: drop D1 binding, delete D1 adapters and `services/*`, remove unused migrations from worker source tree (history kept) | cleanup | low (post-soak) |
+| C0 | Snapshot baseline test: capture JSON output of every read endpoint with a fixed-seeded D1, plus row counts after each write endpoint. Test asserts equal-to-snapshot. | new test file only | none — establishes the regression baseline used by C1–C7 |
+| C1 | Add `repos/` interfaces (type-only) and an empty `Repositories` bundle wired into `c.var.repos`. No route uses it yet. | type contracts | none |
+| C2 | Migrate **read-only** repos: `HostsRepository`, `WebhooksRepository`, `PortAllowlistRepository`, `SettingsRepository`, `MaintenanceRepository`, `Tier2Repository`. Adapters carry SQL verbatim from existing services. Their routes switch to `c.var.repos`. Old service files deleted in this same commit. | per-route | low — same SQL, new entry point |
+| C3 | Migrate `TagsRepository`, `AssetsRepository`, `BindingsRepository`. Includes paired-edge / reverse-index methods (still SQL today, but exposed via the contract that a future KV adapter would honour). | per-route | low |
+| C4 | Migrate `AgentsRepository`, `CliTokensRepository`. `upsertBy` uses today's `ON CONFLICT(source_key, match_key)` — no change. | per-route | low |
+| C5 | Migrate `AlertsRepository`, `EventsRepository`. Both have specific list shapes and TTL-equivalent purge calls; preserve verbatim. | per-route | low |
+| C6 | Migrate `MetricsRepository` + `AggregationRepository`. This is the largest single move (`metrics_raw` insert, hourly aggregation, purges). SQL unchanged. | cron + ingest | medium — most rows-touched |
+| C7 | Cleanup: delete remaining `services/` files, remove dead imports, lift shared row types into `@bat/shared` if any duplicated. Re-run C0 snapshot test as the final equivalence check. | cleanup | low |
 
-## 11. Open questions for @zheng-li
+Estimated total: ~3-5 working days. C2-C5 can each be a half-day each if reviewer pace allows.
 
-1. **Datasets that should be 7-day TTL vs durable** (B5):
-   - Ephemeral (proposed TTL 7d): raw metrics, hourly metrics, events, last-ref, latest projection.
-   - Durable (proposed no TTL): hosts, alert states, webhook configs, port allowlist, tags, settings, maintenance, agents, assets, bindings, tier2 snapshots, CLI tokens (own expiry).
-   Confirm — or tell me which durable items should also expire.
-2. **C7 cutover** — one-shot is fine (no D1 → KV backfill, per G3), but plan keeps the D1 binding bound at C7 for **one release** as read-only rollback. C8 drops it after soak. OK?
-3. **`BAT_KV` binding name** in `wrangler.toml` (dev + prod) — confirm or override.
-4. **Per-field default thresholds** (§6.1) — confirm 1.0 pp absolute for `*_pct`, 5% relative + 0.05 floor for loads/rates, always-write for counters. Tunable via settings later, defaults for now.
+## 8. Architecture simplification — concrete deletions
 
-## 12. Non-goals
+What gets removed by the time C7 lands:
 
-- No D1 backfill (G3).
-- No DOs / R2 / Queues — KV alone.
-- No UI API contract changes; charts stay backward-compatible after `expandSeries` lands client-side.
-- No production cutover before reviewer + user sign-off on this v2.
+- `packages/worker/src/services/*.ts` — fully replaced by `adapters/d1/*.ts`. ~15 files net **moved**, not duplicated.
+- All `c.env.DB` reads in `routes/*.ts` (currently 78 occurrences) — zero after C7.
+- Inline SQL in route handlers — every `db.prepare(...)` outside `adapters/d1/` deleted.
+- Repeated row-type definitions in routes — lifted into the adapter or `@bat/shared`.
+
+What gets added:
+
+- `packages/worker/src/repos/<15 files>.ts` — interfaces only, no logic.
+- `packages/worker/src/adapters/d1/<15 files>.ts` — SQL, lifted from services.
+- `packages/worker/test/repos/<15 contract test files>.ts`.
+
+## 9. Open questions for @zheng-li
+
+The previous question set is obsolete. Three new ones:
+
+1. Confirm the C0 snapshot baseline approach is acceptable as the behaviour-equivalence gate. The alternative is a hand-written before/after request log; snapshot is cheaper and stricter.
+2. Confirm that **deleting** `services/*.ts` in the same commit that adds the equivalent `adapters/d1/*.ts` is preferred over a deprecation period. (My recommendation: delete in same commit — one engine, no parallel paths to maintain.)
+3. Confirm whether to keep the `services/` import alias for the migration window in case downstream tools (lint configs, IDE jump-to) reference it. (My recommendation: no alias; clean break inside one PR series.)
+
+## 10. Non-goals (re-emphasized)
+
+- No KV. No engine swap. No retention change.
+- No new public API. No new domain operations beyond what current call sites already use.
+- No coverage regression — the gate stays at 95% and we expect to clear it comfortably.
+- No silent behaviour change. Anything visible to a caller, including alert evaluation timing and cron purge cadence, is identical.
