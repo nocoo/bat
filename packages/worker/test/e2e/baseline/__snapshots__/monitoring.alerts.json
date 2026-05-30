@@ -1,7 +1,7 @@
 {
   "alerts": [
     {
-      "duration_seconds": 0,
+      "duration_seconds": "<DURATION>",
       "host_id": "bl-host-001",
       "hostname": "h1.bl.example.com",
       "message": "Disk / at 90.0%",

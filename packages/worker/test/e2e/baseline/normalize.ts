@@ -48,7 +48,7 @@ const HASH_KEYS = new Set(["hid", "token_hash", "source_key_short"]);
 
 const TOKEN_KEYS = new Set(["token"]);
 
-const DURATION_KEYS = new Set(["uptime", "uptime_seconds"]);
+const DURATION_KEYS = new Set(["uptime", "uptime_seconds", "duration_seconds"]);
 
 const STABLE_SORT_KEYS = [
 	"host_id",
