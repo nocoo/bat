@@ -94,6 +94,7 @@
     },
   },
   "trustedDependencies": [
+    "better-sqlite3",
     "esbuild",
     "@biomejs/biome",
     "workerd",
