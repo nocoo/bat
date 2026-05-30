@@ -6,19 +6,10 @@
 // GET    /api/assets/overview       — lightweight counters
 
 import type { Context } from "hono";
-import {
-	agentExists,
-	assetExists,
-	createBinding,
-	deleteBinding,
-	getAssetMap,
-	getAssetsOverview,
-	listBindings,
-} from "../services/bindings.js";
 import type { AppEnv } from "../types.js";
 
 export async function bindingsListRoute(c: Context<AppEnv>) {
-	const items = await listBindings(c.env.DB);
+	const items = await c.var.repos.bindings.list();
 	return c.json(items);
 }
 
@@ -39,7 +30,6 @@ export async function bindingsCreateRoute(c: Context<AppEnv>) {
 	}
 	const obj = body as Record<string, unknown>;
 
-	// Validate required fields
 	if (typeof obj.agent_id !== "string" || obj.agent_id.length === 0) {
 		return c.json({ error: "agent_id must be a non-empty string" }, 400);
 	}
@@ -47,10 +37,9 @@ export async function bindingsCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: "asset_id must be a non-empty string" }, 400);
 	}
 
-	// Validate FK existence
 	const [agentOk, assetOk] = await Promise.all([
-		agentExists(c.env.DB, obj.agent_id),
-		assetExists(c.env.DB, obj.asset_id),
+		c.var.repos.bindings.agentExists(obj.agent_id),
+		c.var.repos.bindings.assetExists(obj.asset_id),
 	]);
 	if (!agentOk) {
 		return c.json({ error: `agent_id "${obj.agent_id}" does not exist` }, 400);
@@ -59,7 +48,7 @@ export async function bindingsCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: `asset_id "${obj.asset_id}" does not exist` }, 400);
 	}
 
-	const result = await createBinding(c.env.DB, obj.agent_id, obj.asset_id);
+	const result = await c.var.repos.bindings.create(obj.agent_id, obj.asset_id);
 	return c.json({ agent_id: obj.agent_id, asset_id: obj.asset_id }, result.created ? 201 : 200);
 }
 
@@ -67,7 +56,7 @@ export async function bindingsDeleteRoute(c: Context<AppEnv>) {
 	const agentId = c.req.param("agentId") ?? "";
 	const assetId = c.req.param("assetId") ?? "";
 
-	const deleted = await deleteBinding(c.env.DB, agentId, assetId);
+	const deleted = await c.var.repos.bindings.delete(agentId, assetId);
 	if (!deleted) {
 		return c.json({ error: "Binding not found" }, 404);
 	}
@@ -75,11 +64,11 @@ export async function bindingsDeleteRoute(c: Context<AppEnv>) {
 }
 
 export async function assetsMapRoute(c: Context<AppEnv>) {
-	const data = await getAssetMap(c.env.DB);
+	const data = await c.var.repos.bindings.getAssetMap();
 	return c.json(data);
 }
 
 export async function assetsOverviewRoute(c: Context<AppEnv>) {
-	const data = await getAssetsOverview(c.env.DB);
+	const data = await c.var.repos.bindings.getOverview();
 	return c.json(data);
 }

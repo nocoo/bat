@@ -12,6 +12,11 @@
 
 import type {
 	AllowedPort,
+	AssetItem,
+	AssetMapResponse,
+	AssetRow,
+	AssetsOverview,
+	BindingItem,
 	HostTag,
 	RetentionDays,
 	Tier2Payload,
@@ -205,10 +210,82 @@ export interface MaintenanceWindow {
 }
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface AgentsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface AssetsRepository {}
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface BindingsRepository {}
+/**
+ * Asset CRUD + asset_tags edges. Host FK existence is exposed as a
+ * dedicated method so routes never inline a hosts SELECT.
+ */
+export interface AssetsRepository {
+	/** All assets with hostname join + tags, ordered by created_at desc. */
+	list(): Promise<AssetItem[]>;
+	/** Single asset with hostname + tags, or null. */
+	getById(id: string): Promise<AssetItem | null>;
+	/**
+	 * Create. The caller has already validated payload shape. Returns the
+	 * raw inserted row (route re-reads through `getById` for the wire DTO).
+	 */
+	create(params: {
+		id: string;
+		host_id?: string | null;
+		type: string;
+		subtype?: string | null;
+		name: string;
+		provider?: string | null;
+		status?: string;
+		metadata?: string;
+	}): Promise<AssetRow>;
+	/**
+	 * Partial update; bumps `updated_at`. Returns the updated row or null
+	 * when the id doesn't exist. Falls back to the current row when no
+	 * fields are provided (legacy behaviour preserved).
+	 */
+	update(
+		id: string,
+		fields: {
+			host_id?: string | null | undefined;
+			name?: string | undefined;
+			subtype?: string | null | undefined;
+			provider?: string | null | undefined;
+			status?: string | undefined;
+			metadata?: string | undefined;
+		},
+	): Promise<AssetRow | null>;
+	/** Hard delete. Returns true on hit. */
+	delete(id: string): Promise<boolean>;
+	/**
+	 * Replace asset_tags edges. Validates all tag ids exist; returns the
+	 * missing list otherwise. Empty list clears the edge set.
+	 */
+	replaceTags(
+		assetId: string,
+		tagIds: number[],
+	): Promise<{ ok: true } | { ok: "tags_not_found"; missing: number[] }>;
+	/** FK helper: is this host_id present? Used by create/update validation. */
+	hostExists(hostId: string): Promise<boolean>;
+}
+/**
+ * Agent ↔ Asset bindings + the read-model views (`/assets/map`,
+ * `/assets/overview`). FK existence helpers are exposed so routes
+ * stay free of inline SQL.
+ */
+export interface BindingsRepository {
+	/** All bindings with denormalized agent nickname + asset name/type. */
+	list(): Promise<BindingItem[]>;
+	/**
+	 * Idempotent create. `{ created: true }` on insert, `{ created: false }`
+	 * on UNIQUE conflict.
+	 */
+	create(agentId: string, assetId: string): Promise<{ created: boolean }>;
+	/** Delete a binding. Returns true on hit. */
+	delete(agentId: string, assetId: string): Promise<boolean>;
+	/** Full graph view for visualisation. */
+	getAssetMap(): Promise<AssetMapResponse>;
+	/** Lightweight counters. */
+	getOverview(): Promise<AssetsOverview>;
+	/** FK helper: agent presence. */
+	agentExists(agentId: string): Promise<boolean>;
+	/** FK helper: asset presence. */
+	assetExists(assetId: string): Promise<boolean>;
+}
 /**
  * Tier 2 snapshot insert + read. Snapshot inserts are idempotent on
  * `(host_id, ts)`. The latest read joins host inventory columns

@@ -13,33 +13,24 @@ import {
 	MAX_TAGS_PER_ASSET,
 	VALID_ASSET_STATUSES,
 	VALID_ASSET_TYPES,
+	generateId,
 	validateEnum,
 	validateMetadata,
 	validateOptionalEnum,
 	validateOptionalString,
 	validateString,
 } from "@bat/shared";
-import { generateId } from "@bat/shared";
 import type { Context } from "hono";
-import {
-	createAsset,
-	deleteAsset,
-	getAsset,
-	hostExists,
-	listAssets,
-	replaceAssetTags,
-	updateAsset,
-} from "../services/assets.js";
 import type { AppEnv } from "../types.js";
 
 export async function assetsListRoute(c: Context<AppEnv>) {
-	const items = await listAssets(c.env.DB);
+	const items = await c.var.repos.assets.list();
 	return c.json(items);
 }
 
 export async function assetsGetRoute(c: Context<AppEnv>) {
 	const id = c.req.param("id") ?? "";
-	const item = await getAsset(c.env.DB, id);
+	const item = await c.var.repos.assets.getById(id);
 	if (!item) {
 		return c.json({ error: "Asset not found" }, 404);
 	}
@@ -63,7 +54,6 @@ export async function assetsCreateRoute(c: Context<AppEnv>) {
 	}
 	const obj = body as Record<string, unknown>;
 
-	// Validate required fields
 	const typeResult = validateEnum(
 		"type",
 		obj.type,
@@ -77,7 +67,6 @@ export async function assetsCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: nameResult.error }, 400);
 	}
 
-	// Validate optional fields
 	const subtypeResult = validateOptionalString("subtype", obj.subtype, ASSET_SUBTYPE_MAX_LENGTH);
 	if (!subtypeResult.ok) {
 		return c.json({ error: subtypeResult.error }, 400);
@@ -99,7 +88,6 @@ export async function assetsCreateRoute(c: Context<AppEnv>) {
 		return c.json({ error: statusResult.error }, 400);
 	}
 
-	// Validate metadata
 	let metadataJson = "{}";
 	if (obj.metadata !== undefined) {
 		const metaResult = validateMetadata(obj.metadata);
@@ -109,19 +97,18 @@ export async function assetsCreateRoute(c: Context<AppEnv>) {
 		metadataJson = metaResult.value;
 	}
 
-	// Validate host_id FK if provided
 	if (obj.host_id !== undefined && obj.host_id !== null) {
 		if (typeof obj.host_id !== "string" || obj.host_id.length === 0) {
 			return c.json({ error: "host_id must be a non-empty string or null" }, 400);
 		}
-		const exists = await hostExists(c.env.DB, obj.host_id);
+		const exists = await c.var.repos.assets.hostExists(obj.host_id);
 		if (!exists) {
 			return c.json({ error: `host_id "${obj.host_id}" does not exist` }, 400);
 		}
 	}
 
 	const id = generateId("ast_");
-	await createAsset(c.env.DB, {
+	await c.var.repos.assets.create({
 		id,
 		host_id: (obj.host_id as string | null) ?? null,
 		type: typeResult.value,
@@ -132,15 +119,14 @@ export async function assetsCreateRoute(c: Context<AppEnv>) {
 		metadata: metadataJson,
 	});
 
-	const item = await getAsset(c.env.DB, id);
+	const item = await c.var.repos.assets.getById(id);
 	return c.json(item, 201);
 }
 
 export async function assetsUpdateRoute(c: Context<AppEnv>) {
 	const id = c.req.param("id") ?? "";
 
-	// Verify asset exists
-	const existing = await getAsset(c.env.DB, id);
+	const existing = await c.var.repos.assets.getById(id);
 	if (!existing) {
 		return c.json({ error: "Asset not found" }, 404);
 	}
@@ -161,7 +147,6 @@ export async function assetsUpdateRoute(c: Context<AppEnv>) {
 	}
 	const obj = body as Record<string, unknown>;
 
-	// Validate optional fields
 	const nameResult =
 		obj.name !== undefined
 			? validateString("name", obj.name, ASSET_NAME_MAX_LENGTH)
@@ -190,7 +175,6 @@ export async function assetsUpdateRoute(c: Context<AppEnv>) {
 		return c.json({ error: statusResult.error }, 400);
 	}
 
-	// Validate metadata
 	let metadataJson: string | undefined;
 	if (obj.metadata !== undefined) {
 		const metaResult = validateMetadata(obj.metadata);
@@ -200,18 +184,17 @@ export async function assetsUpdateRoute(c: Context<AppEnv>) {
 		metadataJson = metaResult.value;
 	}
 
-	// Validate host_id FK if provided
 	if (obj.host_id !== undefined && obj.host_id !== null) {
 		if (typeof obj.host_id !== "string" || obj.host_id.length === 0) {
 			return c.json({ error: "host_id must be a non-empty string or null" }, 400);
 		}
-		const exists = await hostExists(c.env.DB, obj.host_id);
+		const exists = await c.var.repos.assets.hostExists(obj.host_id);
 		if (!exists) {
 			return c.json({ error: `host_id "${obj.host_id}" does not exist` }, 400);
 		}
 	}
 
-	await updateAsset(c.env.DB, id, {
+	await c.var.repos.assets.update(id, {
 		host_id: obj.host_id !== undefined ? (obj.host_id as string | null) : undefined,
 		name: obj.name !== undefined ? nameResult.value : undefined,
 		subtype: obj.subtype !== undefined ? subtypeResult.value : undefined,
@@ -220,13 +203,13 @@ export async function assetsUpdateRoute(c: Context<AppEnv>) {
 		metadata: metadataJson,
 	});
 
-	const item = await getAsset(c.env.DB, id);
+	const item = await c.var.repos.assets.getById(id);
 	return c.json(item);
 }
 
 export async function assetsDeleteRoute(c: Context<AppEnv>) {
 	const id = c.req.param("id") ?? "";
-	const deleted = await deleteAsset(c.env.DB, id);
+	const deleted = await c.var.repos.assets.delete(id);
 	if (!deleted) {
 		return c.json({ error: "Asset not found" }, 404);
 	}
@@ -236,8 +219,7 @@ export async function assetsDeleteRoute(c: Context<AppEnv>) {
 export async function assetsTagsReplaceRoute(c: Context<AppEnv>) {
 	const id = c.req.param("id") ?? "";
 
-	// Verify asset exists
-	const existing = await getAsset(c.env.DB, id);
+	const existing = await c.var.repos.assets.getById(id);
 	if (!existing) {
 		return c.json({ error: "Asset not found" }, 404);
 	}
@@ -258,7 +240,6 @@ export async function assetsTagsReplaceRoute(c: Context<AppEnv>) {
 	}
 	const obj = body as Record<string, unknown>;
 
-	// Validate tag_ids: must be an array of numbers
 	if (!Array.isArray(obj.tag_ids)) {
 		return c.json({ error: "tag_ids must be an array" }, 400);
 	}
@@ -272,12 +253,12 @@ export async function assetsTagsReplaceRoute(c: Context<AppEnv>) {
 	if (uniqueIds.length > MAX_TAGS_PER_ASSET) {
 		return c.json({ error: `tag_ids exceeds maximum of ${MAX_TAGS_PER_ASSET}` }, 400);
 	}
-	// Replace tags (validates all tag IDs exist)
-	const result = await replaceAssetTags(c.env.DB, id, uniqueIds);
-	if (!result.ok) {
-		return c.json({ error: result.error }, 400);
+
+	const result = await c.var.repos.assets.replaceTags(id, uniqueIds);
+	if (result.ok === "tags_not_found") {
+		return c.json({ error: `tag_ids not found: ${result.missing.join(", ")}` }, 400);
 	}
 
-	const item = await getAsset(c.env.DB, id);
+	const item = await c.var.repos.assets.getById(id);
 	return c.json(item);
 }
