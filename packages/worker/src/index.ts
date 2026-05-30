@@ -80,7 +80,6 @@ import {
 	webhooksListRoute,
 	webhooksRegenerateRoute,
 } from "./routes/webhooks.js";
-import { aggregateHour, runScheduledMaintenance } from "./services/aggregation.js";
 import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
@@ -183,13 +182,13 @@ app.delete("/api/bindings/:agentId/:assetId", bindingsDeleteRoute);
 export default {
 	fetch: app.fetch,
 	async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
-		// Build the repositories bundle for the cron path. It's the same factory
-		// used by reposMiddleware. Aggregation / maintenance still take the raw
-		// D1 binding for now; they migrate to `repos.aggregation.*` in C11.
-		createD1Repositories(env.DB);
+		// Composition root for the cron path: build the per-run repositories
+		// bundle and hand it to the aggregation entry point. Cron body never
+		// touches `env.DB` directly.
+		const repos = createD1Repositories(env.DB);
 		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
-		await aggregateHour(env.DB, hourTs);
-		await runScheduledMaintenance(env.DB, Math.floor(Date.now() / 1000));
+		await repos.aggregation.aggregateHour(hourTs);
+		await repos.aggregation.runScheduledMaintenance(Math.floor(Date.now() / 1000));
 	},
 };
 

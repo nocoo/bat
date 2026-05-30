@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { createMockD1 } from "../test-helpers/mock-d1";
-import { aggregateHour, purgeOldData, runScheduledMaintenance } from "./aggregation";
+import { createMockD1 } from "../../test-helpers/mock-d1";
+import { D1AggregationRepository } from "./aggregation";
 
 async function insertHost(db: D1Database, hostId: string, lastSeen: number) {
 	await db
@@ -165,7 +165,7 @@ describe("aggregateHour", () => {
 			uptime: 86200,
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -197,7 +197,7 @@ describe("aggregateHour", () => {
 		await insertRawMetrics(db, "host-001", hourTs + 400);
 		await insertRawMetrics(db, "host-001", hourTs + 500);
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -223,7 +223,7 @@ describe("aggregateHour", () => {
 		await insertRawMetrics(db, "host-001", hourTs + 100, { netJson: net1 });
 		await insertRawMetrics(db, "host-001", hourTs + 200, { netJson: net2 });
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -251,7 +251,7 @@ describe("aggregateHour", () => {
 		await insertRawMetrics(db, "host-001", hourTs + 200, { cpuPct: 30 });
 
 		// First aggregation
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 		const first = await db
 			.prepare(
 				"SELECT cpu_usage_avg, sample_count FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?",
@@ -263,7 +263,7 @@ describe("aggregateHour", () => {
 
 		// Add another sample and re-aggregate
 		await insertRawMetrics(db, "host-001", hourTs + 300, { cpuPct: 50 });
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const second = await db
 			.prepare(
@@ -291,7 +291,7 @@ describe("aggregateHour", () => {
 			.run();
 		await insertRawMetrics(db, "host-retired", hourTs + 100);
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ?")
@@ -308,7 +308,7 @@ describe("aggregateHour", () => {
 		await insertRawMetrics(db, "host-001", hourTs + 100, { cpuPct: 10 });
 		await insertRawMetrics(db, "host-002", hourTs + 100, { cpuPct: 40 });
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const results = await db
 			.prepare(
@@ -339,7 +339,7 @@ describe("aggregateHour", () => {
 			psiMemAvg60: 8,
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -399,7 +399,7 @@ describe("aggregateHour", () => {
 			]),
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT disk_io_json FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -430,7 +430,7 @@ describe("aggregateHour", () => {
 		await insertRawMetrics(db, "host-001", hourTs + 100);
 		await insertRawMetrics(db, "host-001", hourTs + 200);
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT disk_io_json FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -457,7 +457,7 @@ describe("aggregateHour", () => {
 			tcpAllocated: 30,
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -491,7 +491,7 @@ describe("aggregateHour", () => {
 			oomKills: 2,
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -520,7 +520,7 @@ describe("aggregateHour", () => {
 			fdMax: 1048576,
 		});
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -539,7 +539,7 @@ describe("aggregateHour", () => {
 		// Insert without T3 fields
 		await insertRawMetrics(db, "host-001", hourTs + 100);
 
-		await aggregateHour(db, hourTs);
+		await new D1AggregationRepository(db).aggregateHour(hourTs);
 
 		const row = await db
 			.prepare("SELECT * FROM metrics_hourly WHERE host_id = ? AND hour_ts = ?")
@@ -611,7 +611,7 @@ describe("purgeOldData — unified retention", () => {
 		await insertEvent(db, "h1", oldTs);
 		await insertEvent(db, "h1", recentTs);
 
-		await purgeOldData(db, now, 7);
+		await new D1AggregationRepository(db).purgeOldData(now, 7);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);
@@ -644,7 +644,7 @@ describe("purgeOldData — unified retention", () => {
 		await insertEvent(db, "h1", oldTs);
 		await insertEvent(db, "h1", recentTs);
 
-		await purgeOldData(db, now, 1);
+		await new D1AggregationRepository(db).purgeOldData(now, 1);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);
@@ -667,7 +667,7 @@ describe("purgeOldData — unified retention", () => {
 		await insertHourly(db, "h1", oldTs);
 		await insertHourly(db, "h1", recentTs);
 
-		await purgeOldData(db, now, 30);
+		await new D1AggregationRepository(db).purgeOldData(now, 30);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);
@@ -687,7 +687,7 @@ describe("purgeOldData — unified retention", () => {
 		const exactCutoff = now - 7 * 86400; // exactly 7 days ago
 		await insertRawMetrics(db, "h1", exactCutoff);
 
-		await purgeOldData(db, now, 7);
+		await new D1AggregationRepository(db).purgeOldData(now, 7);
 
 		// ts == cutoff should NOT be deleted (DELETE WHERE ts < cutoff)
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
@@ -702,7 +702,7 @@ describe("purgeOldData — unified retention", () => {
 		const justBefore = now - 7 * 86400 - 1; // 1 second before cutoff
 		await insertRawMetrics(db, "h1", justBefore);
 
-		await purgeOldData(db, now, 7);
+		await new D1AggregationRepository(db).purgeOldData(now, 7);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(0);
@@ -725,7 +725,7 @@ describe("runScheduledMaintenance", () => {
 		await insertRawMetrics(db, "h1", oldTs);
 		await insertRawMetrics(db, "h1", recentTs);
 
-		await runScheduledMaintenance(db, now);
+		await new D1AggregationRepository(db).runScheduledMaintenance(now);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);
@@ -744,7 +744,7 @@ describe("runScheduledMaintenance", () => {
 		await insertRawMetrics(db, "h1", oldTs);
 		await insertRawMetrics(db, "h1", recentTs);
 
-		await runScheduledMaintenance(db, now);
+		await new D1AggregationRepository(db).runScheduledMaintenance(now);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);
@@ -762,7 +762,7 @@ describe("runScheduledMaintenance", () => {
 		await insertRawMetrics(db, "h1", oldTs);
 		await insertRawMetrics(db, "h1", recentTs);
 
-		await runScheduledMaintenance(db, now);
+		await new D1AggregationRepository(db).runScheduledMaintenance(now);
 
 		const raw = await db.prepare("SELECT ts FROM metrics_raw").all<{ ts: number }>();
 		expect(raw.results).toHaveLength(1);

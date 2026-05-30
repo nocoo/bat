@@ -1,8 +1,10 @@
-// D1-backed MetricsRepository. SQL lifted verbatim from
-// `routes/metrics.ts` (raw + hourly SELECTs) and `services/metrics.ts`
-// (raw INSERT OR IGNORE). Host upsert paired with the raw insert lives
-// in `D1HostsRepository`; this module composes the two via `db.batch`
-// to preserve atomic ingest semantics.
+// D1-backed MetricsRepository. Owns the raw + hourly SELECTs lifted
+// from the previous `routes/metrics.ts` and the `metrics_raw INSERT
+// OR IGNORE` lifted from the now-deleted `services/metrics.ts`. The
+// `insertRawWithHostUpsert` method composes the host upsert SQL
+// directly here (rather than depending on `D1HostsRepository`) so the
+// two statements run as a single `db.batch` and stay atomic across the
+// FK target.
 
 import type { MetricsPayload } from "@bat/shared";
 import type { MetricsHourlyRow, MetricsRawRow, MetricsRepository } from "../../repos/types.js";

@@ -33,12 +33,14 @@ import type {
 } from "@bat/shared";
 
 /**
- * Host inventory + read-model primitives. Powers `/api/hosts`,
- * `/api/hosts/:id`, the four `/api/monitoring/*` endpoints, the
- * `/api/live` DB probe, and `/api/fleet/status`. Plus the cross-route
- * `host_id` / `hid` resolver. All write paths (metrics raw insert,
- * heartbeat/host upsert, host_description PATCH, retirement) remain
- * for C10 — see `docs/20-d1-to-kv-migration.md` v6 §3.4.
+ * Host inventory + read/write surface. Powers the host overview/detail/
+ * status routes, the four `/api/monitoring/*` endpoints, the `/api/live`
+ * DB probe, `/api/fleet/status`, the `host_id` / `hid` cross-route
+ * resolver, and the host-side write paths (`/api/identity` upsert,
+ * tier2 ensure-exists + last_seen + slow-drift inventory,
+ * `/api/hosts/:id/description` PATCH). The metrics raw insert is
+ * batched with a host upsert via `MetricsRepository.insertRawWithHostUpsert`,
+ * which composes both repos' SQL into a single `db.batch` for atomicity.
  */
 export interface HostsRepository {
 	/** SELECT 1 — used by `/api/live` to confirm the binding is reachable. */
@@ -701,8 +703,28 @@ export interface CliTokensRepository {
 	 */
 	findByHashAndTouch(tokenHash: string): Promise<CliTokenRow | null>;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface AggregationRepository {}
+/**
+ * Hourly aggregation + retention purge. Used by the scheduled cron path.
+ * Pure number-crunching helpers live in `domain/aggregation.ts`; this
+ * repo owns reading raw rows, writing the hourly upsert, and running
+ * the unified retention purge across `metrics_raw`, `metrics_hourly`,
+ * `tier2_snapshots`, and `events`.
+ */
+export interface AggregationRepository {
+	/** Aggregate raw metrics for all active hosts in the given hour and
+	 *  upsert their `metrics_hourly` rows. No-op for hosts with zero
+	 *  samples in the window. */
+	aggregateHour(hourTs: number): Promise<void>;
+	/** Delete rows older than `nowSeconds - retentionDays * 86400` from
+	 *  metrics_raw / metrics_hourly / tier2_snapshots / events. */
+	purgeOldData(
+		nowSeconds: number,
+		retentionDays: import("@bat/shared").RetentionDays,
+	): Promise<void>;
+	/** Scheduled cron entry point: reads `retention_days` from settings
+	 *  then calls `purgeOldData`. */
+	runScheduledMaintenance(nowSeconds: number): Promise<void>;
+}
 
 export interface Repositories {
 	hosts: HostsRepository;

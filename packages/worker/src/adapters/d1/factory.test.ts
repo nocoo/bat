@@ -43,17 +43,16 @@ describe("createD1Repositories", () => {
 		}
 	});
 
-	test("placeholder repo slots are frozen-singleton across calls; concrete adapter slots are per-call instances", () => {
+	test("every repo slot is a fresh per-call instance closed over its own db reference", () => {
 		const a = createD1Repositories({} as D1Database);
 		const b = createD1Repositories({} as D1Database);
-		// Slots that haven't migrated yet share the frozen-empty singleton.
-		expect(a.aggregation).toBe(b.aggregation);
-		// Concrete adapters (settings, webhooks, hosts, metrics) are fresh
-		// instances per call, each closed over its own db reference.
+		// All slots are concrete adapters now (Phase 1 complete) — every
+		// call returns fresh instances, no shared mutable state.
 		expect(a.settings).not.toBe(b.settings);
 		expect(a.webhooks).not.toBe(b.webhooks);
 		expect(a.hosts).not.toBe(b.hosts);
 		expect(a.metrics).not.toBe(b.metrics);
+		expect(a.aggregation).not.toBe(b.aggregation);
 	});
 });
 

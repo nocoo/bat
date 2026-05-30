@@ -1,10 +1,10 @@
 // D1 adapter bundle factory. Returns a `Repositories` instance backed by
-// the worker's D1 binding. Each repo's concrete adapter lands in its own
-// atomic commit (C2–C11); slots not yet migrated remain frozen empty
-// objects so the wiring is stable across commits.
+// the worker's D1 binding. Phase 1 of the D1 refactor lands the full
+// adapter set in C2–C11; this is the composition root that wires them.
 
-import type { AggregationRepository, Repositories } from "../../repos/types.js";
+import type { Repositories } from "../../repos/types.js";
 import { D1AgentsRepository } from "./agents.js";
+import { D1AggregationRepository } from "./aggregation.js";
 import { D1AlertsRepository } from "./alerts.js";
 import { D1PortAllowlistRepository } from "./allowed-ports.js";
 import { D1AssetsRepository } from "./assets.js";
@@ -18,8 +18,6 @@ import { D1SettingsRepository } from "./settings.js";
 import { D1TagsRepository } from "./tags.js";
 import { D1Tier2Repository } from "./tier2.js";
 import { D1WebhooksRepository } from "./webhooks.js";
-
-const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
 
 /**
  * Build the D1-backed `Repositories` bundle. Adapter constructors are
@@ -42,6 +40,6 @@ export function createD1Repositories(db: D1Database): Repositories {
 		bindings: new D1BindingsRepository(db),
 		tier2: new D1Tier2Repository(db),
 		cliTokens: new D1CliTokensRepository(db),
-		aggregation: EMPTY_AGGREGATION,
+		aggregation: new D1AggregationRepository(db),
 	};
 }
