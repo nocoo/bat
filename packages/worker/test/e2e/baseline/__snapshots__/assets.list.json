@@ -1,0 +1,16 @@
+[
+  {
+    "created_at": "<TS>",
+    "host_id": "bl-host-001",
+    "hostname": "h1.bl.example.com",
+    "id": "<ID>",
+    "metadata": {},
+    "name": "bl-asset",
+    "provider": null,
+    "status": "active",
+    "subtype": "workers",
+    "tags": [],
+    "type": "cloud_service",
+    "updated_at": null
+  }
+]

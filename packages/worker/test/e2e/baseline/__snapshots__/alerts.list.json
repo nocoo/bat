@@ -1,0 +1,14 @@
+[
+  {
+    "hid": "<HASH>",
+    "host_id": "bl-host-001",
+    "hostname": "h1.bl.example.com",
+    "maintenance_end": "02:00",
+    "maintenance_start": "01:00",
+    "message": "Disk / at 90.0%",
+    "rule_id": "disk_full",
+    "severity": "critical",
+    "triggered_at": "<TS>",
+    "value": 90
+  }
+]

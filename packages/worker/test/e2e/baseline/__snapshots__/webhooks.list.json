@@ -1,0 +1,12 @@
+[
+  {
+    "created_at": "<TS>",
+    "host_id": "bl-host-001",
+    "hostname": "h1.bl.example.com",
+    "id": "<NID>",
+    "is_active": true,
+    "rate_limit": 10,
+    "token": "<TOKEN>",
+    "updated_at": "<TS>"
+  }
+]

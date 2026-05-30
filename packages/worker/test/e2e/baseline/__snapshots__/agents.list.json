@@ -1,0 +1,18 @@
+[
+  {
+    "created_at": "<TS>",
+    "host_id": "bl-host-001",
+    "hostname": "h1.bl.example.com",
+    "id": "<ID>",
+    "last_seen_at": null,
+    "match_key": "bl_match",
+    "metadata": {},
+    "nickname": "bl-agent",
+    "role": null,
+    "runtime_app": null,
+    "runtime_version": null,
+    "source_key_short": "<HASH>",
+    "status": "unknown",
+    "tags": []
+  }
+]
