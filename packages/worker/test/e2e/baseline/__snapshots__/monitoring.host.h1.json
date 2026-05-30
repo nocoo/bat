@@ -1,0 +1,21 @@
+{
+  "alert_count": 1,
+  "alerts": [
+    {
+      "message": "Disk / at 90.0%",
+      "rule_id": "disk_full",
+      "severity": "critical",
+      "triggered_at": "<TS>",
+      "value": 90
+    }
+  ],
+  "host_id": "bl-host-001",
+  "hostname": "h1.bl.example.com",
+  "last_seen": "<TS>",
+  "status": "ok",
+  "tags": [
+    "bl-prod"
+  ],
+  "tier": "critical",
+  "uptime_seconds": "<DURATION>"
+}

@@ -1,0 +1,57 @@
+{
+  "alert_count": 1,
+  "arch": "x86_64",
+  "boot_mode": "uefi",
+  "boot_time": "<TS>",
+  "cpu_load1": 0.5,
+  "cpu_logical": 8,
+  "cpu_model": "AMD EPYC bl",
+  "cpu_physical": 4,
+  "cpu_sparkline": null,
+  "cpu_usage_pct": 25.5,
+  "description": "bl-baseline-desc",
+  "disk_root_used_pct": 90,
+  "disks": [
+    {
+      "device": "sda",
+      "rotational": false,
+      "size_bytes": 500000000000
+    }
+  ],
+  "dns_resolvers": null,
+  "dns_search": null,
+  "hid": "<HASH>",
+  "host_id": "bl-host-001",
+  "hostname": "h1.bl.example.com",
+  "kernel": "6.8.0-bl",
+  "last_seen": "<TS>",
+  "maintenance_end": "02:00",
+  "maintenance_reason": "bl-baseline",
+  "maintenance_start": "01:00",
+  "mem_sparkline": null,
+  "mem_total_bytes": 16000000000,
+  "mem_used_pct": 50,
+  "net_interfaces": [
+    {
+      "iface": "eth0",
+      "ipv4": [
+        "10.0.0.1"
+      ],
+      "ipv6": [],
+      "mac": "aa:bb:cc:00:00:01",
+      "speed_mbps": 1000
+    }
+  ],
+  "net_rx_rate": 1000000,
+  "net_sparkline": null,
+  "net_tx_rate": 500000,
+  "os": "Ubuntu 24.04 LTS",
+  "probe_version": null,
+  "public_ip": "203.0.113.1",
+  "status": "critical",
+  "swap_total_bytes": 2000000000,
+  "swap_used_pct": 5,
+  "timezone": null,
+  "uptime_seconds": "<DURATION>",
+  "virtualization": "kvm"
+}

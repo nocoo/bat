@@ -1,0 +1,10 @@
+{
+  "component": "worker",
+  "database": {
+    "connected": true
+  },
+  "status": "ok",
+  "timestamp": "<TS>",
+  "uptime": "<DURATION>",
+  "version": "2.0.1"
+}

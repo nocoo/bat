@@ -1,0 +1,28 @@
+{
+  "groups": [
+    {
+      "alert_count": 1,
+      "by_tier": {
+        "critical": 1,
+        "healthy": 1,
+        "maintenance": 0,
+        "offline": 0,
+        "warning": 0
+      },
+      "host_count": 2,
+      "hosts": [
+        {
+          "host_id": "bl-host-001",
+          "hostname": "h1.bl.example.com"
+        },
+        {
+          "host_id": "bl-host-002",
+          "hostname": "h2.bl.example.com"
+        }
+      ],
+      "tag": "bl-prod",
+      "tier": "critical"
+    }
+  ],
+  "status": "ok"
+}

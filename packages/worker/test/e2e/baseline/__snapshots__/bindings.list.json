@@ -1,0 +1,10 @@
+[
+  {
+    "agent_id": "<ID>",
+    "agent_nickname": "bl-agent",
+    "asset_id": "<ID>",
+    "asset_name": "bl-asset",
+    "asset_type": "cloud_service",
+    "created_at": "<TS>"
+  }
+]

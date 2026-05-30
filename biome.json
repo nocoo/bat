@@ -65,7 +65,8 @@
 			"probe/target",
 			".agents",
 			".claude/skills",
-			"packages/worker/static"
+			"packages/worker/static",
+			"packages/worker/test/e2e/baseline/__snapshots__"
 		]
 	}
 }

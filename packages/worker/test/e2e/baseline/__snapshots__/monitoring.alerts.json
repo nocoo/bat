@@ -1,0 +1,18 @@
+{
+  "alerts": [
+    {
+      "duration_seconds": 0,
+      "host_id": "bl-host-001",
+      "hostname": "h1.bl.example.com",
+      "message": "Disk / at 90.0%",
+      "rule_id": "disk_full",
+      "severity": "critical",
+      "tags": [
+        "bl-prod"
+      ],
+      "triggered_at": "<TS>",
+      "value": 90
+    }
+  ],
+  "status": "ok"
+}
