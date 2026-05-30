@@ -1,6 +1,9 @@
 // Tests for generateWebhookToken — pure fn over crypto.getRandomValues.
+// Helper lives in `domain/webhook-token.ts`; this file stays under
+// `services/` for now so the test history grouping doesn't churn during
+// the C2–C8 refactor sequence.
 import { describe, expect, test } from "vitest";
-import { generateWebhookToken } from "./events";
+import { generateWebhookToken } from "../domain/webhook-token";
 
 describe("generateWebhookToken", () => {
 	test("returns a 32-character string", () => {
