@@ -1,7 +1,9 @@
 import { Hono } from "hono";
+import { createD1Repositories } from "./adapters/d1/factory.js";
 import { accessAuth } from "./middleware/access-auth.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import { entryControl } from "./middleware/entry-control.js";
+import { reposMiddleware } from "./middleware/repos.js";
 import {
 	agentsCreateRoute,
 	agentsDeleteRoute,
@@ -84,9 +86,11 @@ import type { AppEnv } from "./types.js";
 const app = new Hono<AppEnv>();
 
 // Global middleware chain:
+// 0. reposMiddleware: build per-request `c.var.repos` D1 adapter bundle
 // 1. entryControl: route requests based on hostname (whitelist machine routes)
 // 2. accessAuth: verify Access JWT for browser endpoint
 // 3. apiKeyAuth: verify API key (with Access JWT bypass for browser reads/writes)
+app.use("*", reposMiddleware);
 app.use("*", entryControl);
 app.use("/api/*", accessAuth);
 app.use("/api/*", apiKeyAuth);
@@ -179,6 +183,10 @@ app.delete("/api/bindings/:agentId/:assetId", bindingsDeleteRoute);
 export default {
 	fetch: app.fetch,
 	async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
+		// Build the repositories bundle for the cron path. It's the same factory
+		// used by reposMiddleware. Aggregation / maintenance still take the raw
+		// D1 binding for now; they migrate to `repos.aggregation.*` in C11.
+		createD1Repositories(env.DB);
 		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
 		await aggregateHour(env.DB, hourTs);
 		await runScheduledMaintenance(env.DB, Math.floor(Date.now() / 1000));
