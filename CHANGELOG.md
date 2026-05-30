@@ -1,5 +1,106 @@
 # Changelog
 
+## v2.0.2
+
+### Added
+- Inline-editable description on host detail page
+- PATCH /api/hosts/:id/description endpoint
+- Add description column to hosts table
+- Add sort selector to hosts list page
+- Phase 2E — service run/status/install/uninstall commands
+- Phase 2D — asset + binding CRUD commands
+- Phase 2C — agent list/create/update/delete/heartbeat commands
+- Phase 2B — GET /api/auth/cli bridge + login/status commands
+- Phase 2A scaffold — packages/cli with config, HTTP client, output helpers
+- Phase 1F — POST /api/agents/heartbeat + mark-missing
+- Phase 1E — Binding CRUD + map/overview read models
+- Phase 1D — Asset CRUD routes + service + tests
+- Phase 1C — Agent CRUD routes + service + tests
+- Phase 1B — CLI token management + Bearer scope enforcement
+- Phase 1A — D1 schema + shared types and validators
+- Add Data Retention settings page
+- Unify data retention with dynamic settings
+- Add settings table, GET/PUT /api/settings routes
+- Add retention settings types, parser, and constants
+- Add CI green continuous deployment
+- Add static coverage gates (gate:routes + gate:pages)
+
+### Changed
+- Sync bun.lock trustedDependencies with package.json
+- Redact duration_seconds in baseline normalizer
+- C11 — migrate aggregation/cron to AggregationRepository
+- C10 — migrate metrics + hosts write paths to repos
+- C9 — migrate hosts read paths to D1HostsRepository
+- C8 — migrate events to D1EventsRepository
+- C7 move alerts persistence to D1 repo and pure rules to domain
+- C6 move agents and CLI token DB access to D1 repos
+- C5 move assets and bindings DB access to D1 repos
+- C4 move tier2 and tags DB access to D1 repos
+- C3 move allowed ports and maintenance DB access to D1 repos
+- C2 move settings and webhooks DB access to D1 repos
+- C1 wire Repositories type, D1 factory, and repos middleware
+- C0 baseline normalized API snapshot for D1 repo refactor
+- D1 repo refactor v6 — zero SQL outside adapters, full DB callsite inventory, fixed snapshot endpoints
+- D1 repo refactor v5 — services classification, 11 atomic commits, c.var.repos wiring, normalized snapshot
+- Rewrite as Phase 1 — D1-only repo abstraction (no KV)
+- D1→KV design v3 — KV API wording, latest TTL, race orphans, real-engine route integration tests
+- D1→KV design v2 — bucket keys, domain repos, comparator policy
+- Design — D1 → CF KV storage migration
+- Upgrade turbo 2.9.6 → 2.9.16 to fix CVEs
+- Add e2e coverage for PATCH /api/hosts/:id/description
+- Add --ignore-scripts to custom workflows (Shai-Hulud defense)
+- Extract upsertAgent service + dedicated unit tests
+- Add DB count assertions for body validation rejections
+- Bump version to 2.0.1
+- Raise branch coverage threshold to 95%
+- Fix HTML title language to match UI (bat - VPS Monitoring Dashboard)
+- Unify HTML title to "bat - VPS 监控面板"
+- Unify G2 security gate into single entry point
+- Automate Probe binary release on tag push
+- Strengthen deploy-main health check to verify version
+- Fix D1 isolation documentation drift
+- Add coverage gates as explicit CI job
+- Standardize E2E port convention (L2: 17025, L3: 27025)
+- Formalize L2 isolation chain — add env guard + docs
+- Supplement L2 coverage for me/setup/maintenance/fleet/monitoring/tier2-read
+- Split L2 E2E into per-route files + globalSetup
+
+### Fixed
+- Exclude @bat/cli from `bun dev` to avoid one-shot exit failing turbo
+- Bump ws to 8.20.1 (GHSA-58qx-3vcg-4xpx)
+- Upgrade hono to 4.12.16+ (GHSA-69xw, GHSA-9vqf)
+- Use argv-based runner for launchctl bootout, no shell interp
+- Phase 2E blocking fixes — XML escape, signal safety, bootout
+- Validate metadata with shared validateMetadata, reject non-objects
+- Reject --tag-ids and --clear together, test MAX_TAGS cap
+- Address Phase 2C review blocking issues
+- Bridge returns machine endpoint URL, entry-control allows CLI routes
+- Add CLI to release version targets, extend AuthError to cover 401+403
+- Dynamic ON CONFLICT SET for correct null/absent semantics
+- Preserve absent runtime fields, use ON CONFLICT for creates
+- Restrict status to running/stopped, fix E2E cleanup scope
+- Use hashHostId for map hid, fix E2E idempotency
+- Replace find→create→catch with atomic ON CONFLICT upsert
+- Atomic upsert race handling, binding cascade test, tag dedup order
+- Address 1C review — nullable clearing, shared constants, tag assignment
+- Validate parsed body is plain object before minting
+- Use raw text for body detection, remove residual full-scope comment
+- Address Phase 1B review — scope, write detection, JSON, await
+- Address Phase 1A review — metadata, overview, generateId
+- Prevent long disk labels from expanding Overview column
+- Install nightly for rust coverage gate
+- Install rust coverage tool before quality gate
+- Restore Cargo.lock, only bump bat-probe version
+- Make Playwright data-retention tests parallel-safe
+- Review feedback — save interaction tests, E2E restore, radio semantics
+- Fail coverage gate when cargo-llvm-cov is missing
+- Update E2E assertion for new HTML title
+- Isolate _test_marker from production migration stream
+
+### Removed
+- C9 follow-up — drop alerts/ports/tags inline SQL from C9 routes
+- Remove unused cloud test resources — E2E is fully local
+
 ## v2.0.0
 
 ### Added
