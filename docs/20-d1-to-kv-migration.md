@@ -1,9 +1,20 @@
 # 20 — D1 → CF KV Migration Design
 
-> Status: Draft v2 (addresses v1 reviewer blockers) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
+> Status: Draft v3 (v2 + 4 reviewer patches) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
 > KV namespace: `bat` (id `57d8209ea2394f4cb76436a964b5618b`); proposed binding name **`BAT_KV`**.
 
-## 0. v1 → v2 changelog
+## 0. Changelog
+
+### v2 → v3
+
+| # | v2 issue (reviewer) | v3 fix |
+|---|---|---|
+| P1 | KV described as "prefix list with start/end cursors" misreads KV's API | §4 reworded — exact-key get + cursor-paginated prefix list, no lexical range scan |
+| P2 | `m:latest` mismatched durable in §4.1 vs ephemeral in §11 | Unified as ephemeral telemetry projection (TTL 7d+1h); host record stays durable; §5.1 clarifies dashboard fallback (§4.1, §5.1) |
+| P3 | `agents.upsertBy` race only described post-hoc reconciliation | §8 updated — list/get **filter by canonical sentinel id**, orphan records can never appear in caller-visible reads; loser deletes its own `agent:{id}` best-effort |
+| P4 | All route tests mocked repos, no real-engine integration | §9.5 split into unit (mockable) and a new integration suite running each route end-to-end against both real D1 and real KV repos via Miniflare |
+
+### v1 → v2
 
 | # | v1 problem | v2 fix |
 |---|---|---|
@@ -112,7 +123,7 @@ The repo contracts are the only thing the rest of the codebase depends on. D1 an
 
 ## 4. KV layout
 
-KV has only **point keys** + **prefix list with `start`/`end` cursors**. We design every read pattern to fit in either "exact key get" or "small bounded prefix list".
+KV has only **point keys** (exact-key `get`/`put`/`delete`) + **prefix list with cursor pagination** — there is no D1-style lexical range scan. We design every read pattern to fit in either "exact key get" or "small bounded prefix list (≤ a few hundred keys, paginated by cursor)".
 
 ### 4.1 Key prefix table
 
@@ -120,7 +131,7 @@ KV has only **point keys** + **prefix list with `start`/`end` cursors**. We desi
 |---|---|---|---|
 | Host record | `host:{host_id}` | `HostRecord` JSON | durable |
 | Active hosts index | `idx:host:active:{host_id}` | `{ last_seen }` | durable; rewritten on heartbeat (replaces a sortable secondary key — see §4.5) |
-| **Latest metric tick** | `m:latest:{host_id}` | `LatestMetrics` (small) | durable rewrite per persisted tick |
+| **Latest metric tick** | `m:latest:{host_id}` | `LatestMetrics` (small) | telemetry projection — TTL = 7d + 1h (overwritten on every persisted tick; expires alongside its source bucket). Host record stays durable. |
 | **Last-persisted ref** (per-field, drives delta-suppression) | `m:last:{host_id}` | `LastRef` JSON | TTL = 7d + 1h slack (B7 — covers downtime gaps) |
 | **Raw metric bucket** | `m:r:{host_id}:{hourBucket}` | `{ ticks: Tick[] }` (1 hour of persisted ticks) | TTL = 7d + 1h |
 | Hourly bucket | `m:h:{host_id}:{dayBucket}` | `{ hours: HourlyRow[24] }` (1 day of hourly rows) | TTL = 7d + 1d |
@@ -203,6 +214,8 @@ m:latest:{host_id} → LatestMetrics
 ```
 
 `LatestMetrics` is a denormalized projection of the last persisted tick — `cpu_usage_pct`, `mem_used_pct`, `uptime_seconds`, `cpu_load1`, `swap_used_pct`, `disk_json`, `net_json`, plus `ts`. The dashboard list (`hosts.ts:135-153`) becomes one `getLatest` per host (parallelized by `Promise.all`), no series scan.
+
+`m:latest` is **ephemeral** (TTL 7d+1h, same lifetime as the source bucket): if a host stops emitting for >7d, its latest projection expires and `getLatest` returns `null`. The dashboard renders this as "no recent metrics" and continues showing the durable host record from `host:{host_id}`.
 
 ### 5.2 Raw bucket
 
@@ -294,7 +307,7 @@ KV is eventually consistent; all writes are last-write-wins per key.
 |---|---|---|
 | `metrics.appendTick` (raw bucket + last + latest) | Single writer (probe) per host | RMW with idempotent dedupe by `ts` (§4.3); ordering across the 3 writes is "bucket → last → latest" with each step independently safe under retries |
 | `hosts.upsertIdentity` / `touchHeartbeat` | Probe + admin can race in theory | Heartbeat overwrites `last_seen`; admin identity merges into the same record — both are last-write-wins on `host:{id}` and the index points to the same record |
-| `agents.upsertBy(source_key, match_key)` | Concurrent ingest from multiple agents possible | (a) `get(agentkey:{source}:{match})`; (b) if exists, `put(agent:{id})` (merge); (c) else generate id, write `agentkey:` and `agent:{id}`. Race between two creates can result in two `agent:{id}` records — mitigated by writing `agentkey:` first as a sentinel and re-reading it after; if it now points to a different id, abandon ours and merge into the winner. Idempotent on retry. |
+| `agents.upsertBy(source_key, match_key)` | Concurrent ingest from multiple agents possible | **Sentinel-first, canonical-id reads.** (a) `get(agentkey:{source}:{match})`; (b) if exists, `put(agent:{id})` (merge); (c) else generate `id`, `put(agentkey:..., {id})`, then read it back — if the read-back returns a different `id` (race lost), **delete our just-written `agent:{id}` best-effort in the same repo call** and merge into the winner's id. **All `agents.list()` / `agents.getById()` reads are gated by the sentinel**: a record is only returned if `agentkey:{source}:{match}.id === record.id`; orphan `agent:{id}` records that never won the sentinel are filtered out and never visible to callers. Idempotent on retry; reconciliation is a defense-in-depth follow-up, not the primary defense. |
 | Alerts state set/clear | Single-writer (cron alert evaluator) | No race expected; treat as last-write-wins |
 | Tag edge add/remove (paired) | Admin path | Best-effort; if one half fails, repo logs and a periodic reconciliation (post-migration follow-up) cleans orphans |
 | Cli tokens create | Single create per token | TTL on key, no race |
@@ -307,7 +320,9 @@ We accept a small probability of orphan reverse-index keys after partial failure
 2. **KV adapter unit tests** use **Miniflare**'s `KVNamespace` shim. We test bucket boundary behaviour, TTL on writes (Miniflare exposes the configured TTL), index lifecycle, and the agents `upsertBy` race.
 3. **D1 adapter unit tests** are largely the existing `services/*.test.ts` suite, ported under `adapters/d1/*.test.ts`.
 4. **Pure-function coverage**: `expandSeries`, `shouldRecord`, `computeHourly` all live in `@bat/shared` with full table-driven unit tests.
-5. **Route tests** (`packages/worker/src/routes/*.test.ts`) keep passing unchanged: they use a mock `Repositories` bundle, so they don't care about engines.
+5. **Route tests** (`packages/worker/src/routes/*.test.ts`) split into two tiers:
+   - *Unit*: mock `Repositories` for fast handler-shape tests (validation, status codes, response envelopes) — keeps current style.
+   - *Integration*: a dedicated `test/routes-integration/` suite that runs each route handler end-to-end against **real** repos (one run with `D1*Repository` on Miniflare D1, one with `KV*Repository` on Miniflare KV). Required coverage at minimum: ingest (`/api/metrics`, `/api/identity`, `/api/events`), hosts list (`/api/hosts` — exercises latest projection + alert join), metrics window (`/api/hosts/:id/metrics` — exercises bucket reads + expandSeries), and agents/assets/bindings CRUD (exercises uniqueness sentinel + paired indexes). Mocks are not allowed below the repo boundary in this suite.
 6. **E2E** (`test/e2e/*`) — unchanged surface. Adds: `expandSeries` correctness path, time-weighted hourly correctness, agents upsertBy parallel race, retired-host suppression, post-7d expiry lookup returns 404.
 
 Coverage gate: 95% TS (including new `repos/` and `adapters/`), 95% Rust (probe), enforced by existing `scripts/check-coverage.sh`.
