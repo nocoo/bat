@@ -1,6 +1,7 @@
 import type { IdentityPayload } from "@bat/shared";
 // POST /api/identity — upsert host identity
 import type { Context } from "hono";
+import type { HostInventoryUpdate } from "../repos/types.js";
 import type { AppEnv } from "../types.js";
 
 /** Lightweight validation — checks required fields exist and are correct types */
@@ -26,54 +27,39 @@ export function validateIdentityPayload(body: unknown): body is IdentityPayload 
 }
 
 /**
- * Build a conditional UPDATE that only sets inventory fields actually present
- * in the payload (2-state wire semantics: present = update, absent = no-op).
+ * Pick the inventory fields actually present on the wire (2-state semantics:
+ * present = update, absent = no-op). Pure — exported for unit tests.
  */
-export function buildInventoryUpdate(body: Record<string, unknown>): {
-	clauses: string[];
-	values: unknown[];
-} {
-	const clauses: string[] = [];
-	const values: unknown[] = [];
-
+export function pickInventoryFields(body: Record<string, unknown>): HostInventoryUpdate {
+	const fields: HostInventoryUpdate = {};
 	if ("cpu_logical" in body) {
-		clauses.push("cpu_logical = ?");
-		values.push(body.cpu_logical);
+		fields.cpu_logical = body.cpu_logical as number | null;
 	}
 	if ("cpu_physical" in body) {
-		clauses.push("cpu_physical = ?");
-		values.push(body.cpu_physical);
+		fields.cpu_physical = body.cpu_physical as number | null;
 	}
 	if ("mem_total_bytes" in body) {
-		clauses.push("mem_total_bytes = ?");
-		values.push(body.mem_total_bytes);
+		fields.mem_total_bytes = body.mem_total_bytes as number | null;
 	}
 	if ("swap_total_bytes" in body) {
-		clauses.push("swap_total_bytes = ?");
-		values.push(body.swap_total_bytes);
+		fields.swap_total_bytes = body.swap_total_bytes as number | null;
 	}
 	if ("virtualization" in body) {
-		clauses.push("virtualization = ?");
-		values.push(body.virtualization);
+		fields.virtualization = body.virtualization as string | null;
 	}
 	if ("net_interfaces" in body) {
-		clauses.push("net_interfaces = ?");
-		values.push(JSON.stringify(body.net_interfaces));
+		fields.net_interfaces = body.net_interfaces;
 	}
 	if ("disks" in body) {
-		clauses.push("disks = ?");
-		values.push(JSON.stringify(body.disks));
+		fields.disks = body.disks;
 	}
 	if ("boot_mode" in body) {
-		clauses.push("boot_mode = ?");
-		values.push(body.boot_mode);
+		fields.boot_mode = body.boot_mode as string | null;
 	}
 	if ("public_ip" in body) {
-		clauses.push("public_ip = ?");
-		values.push(body.public_ip);
+		fields.public_ip = body.public_ip as string | null;
 	}
-
-	return { clauses, values };
+	return fields;
 }
 
 export async function identityRoute(c: Context<AppEnv>) {
@@ -88,14 +74,10 @@ export async function identityRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid identity payload" }, 400);
 	}
 
-	const db = c.env.DB;
+	const repos = c.var.repos;
 
 	// Check if host is retired
-	const existing = await db
-		.prepare("SELECT is_active FROM hosts WHERE host_id = ?")
-		.bind(body.host_id)
-		.first<{ is_active: number }>();
-
+	const existing = await repos.hosts.getActiveFlag(body.host_id);
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);
 	}
@@ -103,44 +85,21 @@ export async function identityRoute(c: Context<AppEnv>) {
 	// Worker time, not Probe time
 	const now = Math.floor(Date.now() / 1000);
 
-	await db
-		.prepare(
-			`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, probe_version)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(host_id) DO UPDATE SET
-  hostname = excluded.hostname,
-  os = excluded.os,
-  kernel = excluded.kernel,
-  arch = excluded.arch,
-  cpu_model = excluded.cpu_model,
-  boot_time = excluded.boot_time,
-  last_seen = excluded.last_seen,
-  identity_updated_at = excluded.identity_updated_at,
-  probe_version = excluded.probe_version`,
-		)
-		.bind(
-			body.host_id,
-			body.hostname,
-			body.os,
-			body.kernel,
-			body.arch,
-			body.cpu_model,
-			body.boot_time,
-			now,
-			now,
-			body.probe_version ?? null,
-		)
-		.run();
+	await repos.hosts.upsertIdentity({
+		hostId: body.host_id,
+		hostname: body.hostname,
+		os: body.os,
+		kernel: body.kernel,
+		arch: body.arch,
+		cpuModel: body.cpu_model,
+		bootTime: body.boot_time,
+		probeVersion: body.probe_version ?? null,
+		nowSeconds: now,
+	});
 
 	// Conditionally merge inventory fields (2-state wire semantics)
-	const raw = body as unknown as Record<string, unknown>;
-	const { clauses, values } = buildInventoryUpdate(raw);
-	if (clauses.length > 0) {
-		await db
-			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
-			.bind(...values, body.host_id)
-			.run();
-	}
+	const inventory = pickInventoryFields(body as unknown as Record<string, unknown>);
+	await repos.hosts.updateInventory(body.host_id, inventory);
 
 	return c.body(null, 204);
 }

@@ -4,7 +4,7 @@ import type { IdentityPayload, MetricsPayload, Tier2Payload } from "@bat/shared"
 // functions (no HTTP fixture needed).
 import { describe, expect, test as it, test } from "vitest";
 import { validateAllowedPortBody } from "./allowed-ports";
-import { buildInventoryUpdate, validateIdentityPayload } from "./identity";
+import { pickInventoryFields, validateIdentityPayload } from "./identity";
 import { validateMetricsPayload } from "./ingest";
 import { validateMaintenanceBody } from "./maintenance";
 import { validateTier2Payload } from "./tier2-ingest";
@@ -53,34 +53,34 @@ describe("validateIdentityPayload", () => {
 	});
 });
 
-// --- buildInventoryUpdate ---
+// --- pickInventoryFields ---
 
-describe("buildInventoryUpdate", () => {
-	test("returns empty clauses/values for an empty body", () => {
-		expect(buildInventoryUpdate({})).toEqual({ clauses: [], values: [] });
+describe("pickInventoryFields", () => {
+	test("returns an empty object for an empty body", () => {
+		expect(pickInventoryFields({})).toEqual({});
 	});
 
-	test("emits clauses only for fields present in the body", () => {
-		const { clauses, values } = buildInventoryUpdate({ cpu_logical: 8, virtualization: "kvm" });
-		expect(clauses).toEqual(["cpu_logical = ?", "virtualization = ?"]);
-		expect(values).toEqual([8, "kvm"]);
+	test("emits only fields present in the body (ignores absent keys)", () => {
+		expect(pickInventoryFields({ cpu_logical: 8, virtualization: "kvm" })).toEqual({
+			cpu_logical: 8,
+			virtualization: "kvm",
+		});
 	});
 
-	test("serializes net_interfaces / disks as JSON", () => {
+	test("passes net_interfaces / disks through verbatim (adapter handles JSON.stringify)", () => {
 		const ifaces = [{ name: "eth0" }];
 		const disks = [{ name: "sda" }];
-		const { clauses, values } = buildInventoryUpdate({ net_interfaces: ifaces, disks });
-		expect(clauses).toEqual(["net_interfaces = ?", "disks = ?"]);
-		expect(values).toEqual([JSON.stringify(ifaces), JSON.stringify(disks)]);
+		expect(pickInventoryFields({ net_interfaces: ifaces, disks })).toEqual({
+			net_interfaces: ifaces,
+			disks,
+		});
 	});
 
 	test("preserves null values (2-state semantics: key-present ≠ value-non-null)", () => {
-		const { clauses, values } = buildInventoryUpdate({ public_ip: null });
-		expect(clauses).toEqual(["public_ip = ?"]);
-		expect(values).toEqual([null]);
+		expect(pickInventoryFields({ public_ip: null })).toEqual({ public_ip: null });
 	});
 
-	test("all 9 inventory keys are handled", () => {
+	test("all 9 inventory keys are picked when present", () => {
 		const body = {
 			cpu_logical: 1,
 			cpu_physical: 1,
@@ -92,8 +92,7 @@ describe("buildInventoryUpdate", () => {
 			boot_mode: "",
 			public_ip: "",
 		};
-		const { clauses } = buildInventoryUpdate(body);
-		expect(clauses).toHaveLength(9);
+		expect(Object.keys(pickInventoryFields(body))).toHaveLength(9);
 	});
 });
 

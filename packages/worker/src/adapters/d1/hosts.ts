@@ -5,10 +5,12 @@
 
 import type {
 	HostDetailRow,
+	HostInventoryUpdate,
 	HostLatestMetricsRow,
 	HostOverviewRow,
 	HostSparklineRow,
 	HostStatusRow,
+	HostTier2Inventory,
 	HostsRepository,
 } from "../../repos/types.js";
 
@@ -135,5 +137,158 @@ ORDER BY host_id, hour_ts ASC`,
 			.bind(...hostIds, sinceSeconds)
 			.all<HostSparklineRow>();
 		return result.results;
+	}
+
+	async getActiveAndMaintenance(hostId: string): Promise<{
+		is_active: number;
+		maintenance_start: string | null;
+		maintenance_end: string | null;
+	} | null> {
+		return this.db
+			.prepare("SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?")
+			.bind(hostId)
+			.first<{
+				is_active: number;
+				maintenance_start: string | null;
+				maintenance_end: string | null;
+			}>();
+	}
+
+	async upsertIdentity(params: {
+		hostId: string;
+		hostname: string;
+		os: string;
+		kernel: string;
+		arch: string;
+		cpuModel: string;
+		bootTime: number;
+		probeVersion: string | null;
+		nowSeconds: number;
+	}): Promise<void> {
+		await this.db
+			.prepare(
+				`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, probe_version)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(host_id) DO UPDATE SET
+  hostname = excluded.hostname,
+  os = excluded.os,
+  kernel = excluded.kernel,
+  arch = excluded.arch,
+  cpu_model = excluded.cpu_model,
+  boot_time = excluded.boot_time,
+  last_seen = excluded.last_seen,
+  identity_updated_at = excluded.identity_updated_at,
+  probe_version = excluded.probe_version`,
+			)
+			.bind(
+				params.hostId,
+				params.hostname,
+				params.os,
+				params.kernel,
+				params.arch,
+				params.cpuModel,
+				params.bootTime,
+				params.nowSeconds,
+				params.nowSeconds,
+				params.probeVersion,
+			)
+			.run();
+	}
+
+	async updateInventory(hostId: string, fields: HostInventoryUpdate): Promise<void> {
+		const clauses: string[] = [];
+		const values: unknown[] = [];
+		if ("cpu_logical" in fields) {
+			clauses.push("cpu_logical = ?");
+			values.push(fields.cpu_logical);
+		}
+		if ("cpu_physical" in fields) {
+			clauses.push("cpu_physical = ?");
+			values.push(fields.cpu_physical);
+		}
+		if ("mem_total_bytes" in fields) {
+			clauses.push("mem_total_bytes = ?");
+			values.push(fields.mem_total_bytes);
+		}
+		if ("swap_total_bytes" in fields) {
+			clauses.push("swap_total_bytes = ?");
+			values.push(fields.swap_total_bytes);
+		}
+		if ("virtualization" in fields) {
+			clauses.push("virtualization = ?");
+			values.push(fields.virtualization);
+		}
+		if ("net_interfaces" in fields) {
+			clauses.push("net_interfaces = ?");
+			values.push(JSON.stringify(fields.net_interfaces));
+		}
+		if ("disks" in fields) {
+			clauses.push("disks = ?");
+			values.push(JSON.stringify(fields.disks));
+		}
+		if ("boot_mode" in fields) {
+			clauses.push("boot_mode = ?");
+			values.push(fields.boot_mode);
+		}
+		if ("public_ip" in fields) {
+			clauses.push("public_ip = ?");
+			values.push(fields.public_ip);
+		}
+		if (clauses.length === 0) {
+			return;
+		}
+		await this.db
+			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
+			.bind(...values, hostId)
+			.run();
+	}
+
+	async updateTier2Inventory(hostId: string, fields: HostTier2Inventory): Promise<void> {
+		const clauses: string[] = [];
+		const values: unknown[] = [];
+		if ("timezone" in fields) {
+			clauses.push("timezone = ?");
+			values.push(fields.timezone);
+		}
+		if ("dns_resolvers" in fields) {
+			clauses.push("dns_resolvers = ?");
+			values.push(JSON.stringify(fields.dns_resolvers));
+		}
+		if ("dns_search" in fields) {
+			clauses.push("dns_search = ?");
+			values.push(JSON.stringify(fields.dns_search));
+		}
+		if (clauses.length === 0) {
+			return;
+		}
+		await this.db
+			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
+			.bind(...values, hostId)
+			.run();
+	}
+
+	async updateDescription(hostId: string, description: string | null): Promise<void> {
+		await this.db
+			.prepare("UPDATE hosts SET description = ? WHERE host_id = ?")
+			.bind(description, hostId)
+			.run();
+	}
+
+	async ensureExists(hostId: string, hostname: string, nowSeconds: number): Promise<void> {
+		await this.db
+			.prepare(
+				`INSERT INTO hosts (host_id, hostname, last_seen)
+VALUES (?, ?, ?)
+ON CONFLICT(host_id) DO NOTHING`,
+			)
+			.bind(hostId, hostname, nowSeconds)
+			.run();
+	}
+
+	async touchLastSeen(hostId: string, nowSeconds: number): Promise<void> {
+		await this.db
+			.prepare("UPDATE hosts SET last_seen = ? WHERE host_id = ?")
+			.bind(nowSeconds, hostId)
+			.run();
 	}
 }
