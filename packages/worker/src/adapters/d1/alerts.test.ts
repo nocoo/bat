@@ -229,4 +229,36 @@ describe("D1AlertsRepository", () => {
 			await expect(repo.clearPendingForHost(HOST_A)).resolves.toBeUndefined();
 		});
 	});
+
+	describe("listForHosts + countByHost (read-model for hosts list/detail/fleet/monitoring)", () => {
+		test("listForHosts returns alert read rows scoped to the given hosts", async () => {
+			await insertActiveAlert(db, HOST_A, "cpu_high", "warning", 80, NOW + 1, "cpu");
+			await insertActiveAlert(db, HOST_B, "mem_high", "critical", 90, NOW + 2, "mem");
+			const rows = await repo.listForHosts([HOST_A]);
+			expect(rows.map((r) => r.rule_id)).toEqual(["cpu_high"]);
+			expect(rows[0]).toMatchObject({
+				host_id: HOST_A,
+				severity: "warning",
+				rule_id: "cpu_high",
+				message: "cpu",
+				value: 80,
+				triggered_at: NOW + 1,
+			});
+		});
+		test("listForHosts empty input → empty without DB call", async () => {
+			expect(await repo.listForHosts([])).toEqual([]);
+		});
+		test("countByHost returns counts grouped by host (only for hosts with alerts)", async () => {
+			await insertActiveAlert(db, HOST_A, "r1", "warning", 1, NOW, "");
+			await insertActiveAlert(db, HOST_A, "r2", "critical", 1, NOW, "");
+			await insertActiveAlert(db, HOST_B, "r3", "warning", 1, NOW, "");
+			const counts = await repo.countByHost([HOST_A, HOST_B, "host-c"]);
+			expect(counts.get(HOST_A)).toBe(2);
+			expect(counts.get(HOST_B)).toBe(1);
+			expect(counts.has("host-c")).toBe(false);
+		});
+		test("countByHost empty input → empty map without DB call", async () => {
+			expect((await repo.countByHost([])).size).toBe(0);
+		});
+	});
 });

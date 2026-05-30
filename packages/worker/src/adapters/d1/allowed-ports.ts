@@ -96,6 +96,27 @@ export class D1PortAllowlistRepository implements PortAllowlistRepository {
 		return (result.meta?.changes ?? 0) > 0;
 	}
 
+	async listForHosts(hostIds: string[]): Promise<Map<string, Set<number>>> {
+		if (hostIds.length === 0) {
+			return new Map();
+		}
+		const placeholders = hostIds.map(() => "?").join(", ");
+		const result = await this.db
+			.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
+			.bind(...hostIds)
+			.all<{ host_id: string; port: number }>();
+		const map = new Map<string, Set<number>>();
+		for (const row of result.results) {
+			let set = map.get(row.host_id);
+			if (!set) {
+				set = new Set();
+				map.set(row.host_id, set);
+			}
+			set.add(row.port);
+		}
+		return map;
+	}
+
 	private async hostExists(hostId: string): Promise<boolean> {
 		const row = await this.db
 			.prepare("SELECT host_id FROM hosts WHERE host_id = ? LIMIT 1")

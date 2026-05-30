@@ -8,7 +8,7 @@
 // pure wall-clock comparison and doesn't belong in the persistence layer.
 
 import type { MetricsPayload, Tier2Payload } from "@bat/shared";
-import type { AlertActiveJoinedRow, AlertsRepository } from "../../repos/types.js";
+import type { AlertActiveJoinedRow, AlertReadRow, AlertsRepository } from "../../repos/types.js";
 import { evaluateAlerts } from "./_alerts-tier1.js";
 import { evaluateTier2Alerts } from "./_alerts-tier2.js";
 
@@ -43,5 +43,37 @@ ORDER BY a.triggered_at DESC`,
 
 	async clearPendingForHost(hostId: string): Promise<void> {
 		await this.db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(hostId).run();
+	}
+
+	async listForHosts(hostIds: string[]): Promise<AlertReadRow[]> {
+		if (hostIds.length === 0) {
+			return [];
+		}
+		const placeholders = hostIds.map(() => "?").join(", ");
+		const result = await this.db
+			.prepare(
+				`SELECT host_id, severity, rule_id, message, value, triggered_at FROM alert_states WHERE host_id IN (${placeholders})`,
+			)
+			.bind(...hostIds)
+			.all<AlertReadRow>();
+		return result.results;
+	}
+
+	async countByHost(hostIds: string[]): Promise<Map<string, number>> {
+		if (hostIds.length === 0) {
+			return new Map();
+		}
+		const placeholders = hostIds.map(() => "?").join(", ");
+		const result = await this.db
+			.prepare(
+				`SELECT host_id, COUNT(*) as alert_count FROM alert_states WHERE host_id IN (${placeholders}) GROUP BY host_id`,
+			)
+			.bind(...hostIds)
+			.all<{ host_id: string; alert_count: number }>();
+		const map = new Map<string, number>();
+		for (const row of result.results) {
+			map.set(row.host_id, row.alert_count);
+		}
+		return map;
 	}
 }

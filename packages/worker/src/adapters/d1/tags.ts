@@ -216,6 +216,29 @@ export class D1TagsRepository implements TagsRepository {
 		return (result.meta?.changes ?? 0) > 0;
 	}
 
+	async listNamesForHosts(hostIds: string[]): Promise<Map<string, string[]>> {
+		if (hostIds.length === 0) {
+			return new Map();
+		}
+		const placeholders = hostIds.map(() => "?").join(", ");
+		const result = await this.db
+			.prepare(
+				`SELECT ht.host_id, t.name FROM host_tags ht JOIN tags t ON ht.tag_id = t.id WHERE ht.host_id IN (${placeholders}) ORDER BY t.name ASC`,
+			)
+			.bind(...hostIds)
+			.all<{ host_id: string; name: string }>();
+		const map = new Map<string, string[]>();
+		for (const row of result.results) {
+			const list = map.get(row.host_id);
+			if (list) {
+				list.push(row.name);
+			} else {
+				map.set(row.host_id, [row.name]);
+			}
+		}
+		return map;
+	}
+
 	private async hostExists(hostId: string): Promise<boolean> {
 		const row = await this.db
 			.prepare("SELECT host_id FROM hosts WHERE host_id = ?")
