@@ -23,6 +23,7 @@ import type {
 	BindingItem,
 	CliTokenRow,
 	CliTokenScope,
+	EventRow,
 	HostTag,
 	MetricsPayload,
 	RetentionDays,
@@ -75,8 +76,36 @@ export interface AlertActiveJoinedRow {
 	maintenance_start: string | null;
 	maintenance_end: string | null;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface EventsRepository {}
+/**
+ * Webhook event ingest + read. Powers `POST /api/events` (token lookup,
+ * IP validation, rate limit, event insert) and `GET /api/events`
+ * (paginated list). Webhook config CRUD itself is owned by
+ * `WebhooksRepository`.
+ */
+export interface EventsRepository {
+	/** Look up an active webhook config by token. */
+	findActiveWebhookByToken(token: string): Promise<WebhookConfigRow | null>;
+	/** Read a host's `public_ip` for the ingest IP-match check. Cross-domain
+	 *  read kept here to keep the ingest path's SQL inside `adapters/d1/`. */
+	getHostPublicIp(hostId: string): Promise<string | null>;
+	/** Sliding-window rate limiter. Returns true when the call is within
+	 *  the configured per-minute limit. */
+	checkRateLimit(configId: number, rateLimit: number, nowSeconds: number): Promise<boolean>;
+	/** Persist a new event row. */
+	insertEvent(
+		hostId: string,
+		configId: number,
+		title: string,
+		body: string,
+		tags: string[],
+		sourceIp: string,
+		nowSeconds: number,
+	): Promise<void>;
+	/** Total event count, optionally filtered by host_id. */
+	count(hostId: string | undefined): Promise<number>;
+	/** List events with hostname join, ordered by created_at desc. */
+	list(hostId: string | undefined, limit: number, offset: number): Promise<EventRow[]>;
+}
 
 /**
  * Webhook config CRUD. Each method touches `webhook_configs`; FK existence

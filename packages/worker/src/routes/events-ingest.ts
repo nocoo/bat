@@ -8,7 +8,6 @@ import {
 	EVENT_TITLE_MAX_LENGTH,
 } from "@bat/shared";
 import type { Context } from "hono";
-import { checkRateLimit, findWebhookByToken, insertEvent } from "../services/events.js";
 import type { AppEnv } from "../types.js";
 
 export function extractBearerToken(header: string | undefined): string | null {
@@ -81,8 +80,7 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Missing or invalid Authorization header" }, 401);
 	}
 
-	const db = c.env.DB;
-	const config = await findWebhookByToken(db, token);
+	const config = await c.var.repos.events.findActiveWebhookByToken(token);
 	if (!config) {
 		return c.json({ error: "Invalid webhook token" }, 403);
 	}
@@ -94,16 +92,13 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 	if (!sourceIp) {
 		return c.json({ error: "Missing CF-Connecting-IP header" }, 400);
 	}
-	const host = await db
-		.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
-		.bind(config.host_id)
-		.first<{ public_ip: string | null }>();
+	const publicIp = await c.var.repos.events.getHostPublicIp(config.host_id);
 
-	if (!host?.public_ip) {
+	if (!publicIp) {
 		return c.json({ error: "Host has no public IP registered" }, 403);
 	}
 
-	if (sourceIp !== host.public_ip) {
+	if (sourceIp !== publicIp) {
 		return c.json({ error: "Source IP does not match host" }, 403);
 	}
 
@@ -124,13 +119,25 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 
 	// 4. Rate limiting — after payload validation so bad requests don't consume quota
 	const nowSeconds = Math.floor(Date.now() / 1000);
-	const withinLimit = await checkRateLimit(db, config.id, config.rate_limit, nowSeconds);
+	const withinLimit = await c.var.repos.events.checkRateLimit(
+		config.id,
+		config.rate_limit,
+		nowSeconds,
+	);
 	if (!withinLimit) {
 		return c.json({ error: "Rate limit exceeded" }, 429);
 	}
 
 	// 5. Insert event
-	await insertEvent(db, config.host_id, config.id, title, bodyStr, tags, sourceIp, nowSeconds);
+	await c.var.repos.events.insertEvent(
+		config.host_id,
+		config.id,
+		title,
+		bodyStr,
+		tags,
+		sourceIp,
+		nowSeconds,
+	);
 
 	return c.body(null, 204);
 }

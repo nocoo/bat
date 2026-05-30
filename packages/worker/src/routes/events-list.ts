@@ -1,5 +1,5 @@
 // GET /api/events — list events with optional host_id filter and pagination
-import type { EventItem, EventRow, EventsListResponse } from "@bat/shared";
+import type { EventItem, EventsListResponse } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
@@ -33,51 +33,13 @@ export function parsePagination(
 }
 
 export async function eventsListRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
-
 	const hostId = c.req.query("host_id");
 	const { limit, offset } = parsePagination(c.req.query("limit"), c.req.query("offset"));
 
-	// Query total count
-	let totalResult: D1Result<{ count: number }>;
-	if (hostId) {
-		totalResult = await db
-			.prepare("SELECT COUNT(*) as count FROM events WHERE host_id = ?")
-			.bind(hostId)
-			.all<{ count: number }>();
-	} else {
-		totalResult = await db.prepare("SELECT COUNT(*) as count FROM events").all<{ count: number }>();
-	}
-	const total = totalResult.results[0]?.count ?? 0;
+	const total = await c.var.repos.events.count(hostId);
+	const rows = await c.var.repos.events.list(hostId, limit, offset);
 
-	// Query events
-	let result: D1Result<EventRow>;
-	if (hostId) {
-		result = await db
-			.prepare(
-				`SELECT e.id, e.host_id, h.hostname, e.title, e.body, e.tags, e.source_ip, e.created_at
-FROM events e
-JOIN hosts h ON e.host_id = h.host_id
-WHERE e.host_id = ?
-ORDER BY e.created_at DESC
-LIMIT ? OFFSET ?`,
-			)
-			.bind(hostId, limit, offset)
-			.all<EventRow>();
-	} else {
-		result = await db
-			.prepare(
-				`SELECT e.id, e.host_id, h.hostname, e.title, e.body, e.tags, e.source_ip, e.created_at
-FROM events e
-JOIN hosts h ON e.host_id = h.host_id
-ORDER BY e.created_at DESC
-LIMIT ? OFFSET ?`,
-			)
-			.bind(limit, offset)
-			.all<EventRow>();
-	}
-
-	const items: EventItem[] = result.results.map((row) => ({
+	const items: EventItem[] = rows.map((row) => ({
 		...row,
 		tags: parseTags(row.tags),
 	}));
