@@ -7,8 +7,6 @@ import type {
 	AgentsRepository,
 	AggregationRepository,
 	AlertsRepository,
-	AssetsRepository,
-	BindingsRepository,
 	CliTokensRepository,
 	EventsRepository,
 	HostsRepository,
@@ -16,6 +14,8 @@ import type {
 	Repositories,
 } from "../../repos/types.js";
 import { D1PortAllowlistRepository } from "./allowed-ports.js";
+import { D1AssetsRepository } from "./assets.js";
+import { D1BindingsRepository } from "./bindings.js";
 import { D1MaintenanceRepository } from "./maintenance.js";
 import { D1SettingsRepository } from "./settings.js";
 import { D1TagsRepository } from "./tags.js";
@@ -27,8 +27,6 @@ const EMPTY_METRICS: MetricsRepository = Object.freeze({});
 const EMPTY_ALERTS: AlertsRepository = Object.freeze({});
 const EMPTY_EVENTS: EventsRepository = Object.freeze({});
 const EMPTY_AGENTS: AgentsRepository = Object.freeze({});
-const EMPTY_ASSETS: AssetsRepository = Object.freeze({});
-const EMPTY_BINDINGS: BindingsRepository = Object.freeze({});
 const EMPTY_CLI_TOKENS: CliTokensRepository = Object.freeze({});
 const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
 
@@ -49,8 +47,8 @@ export function createD1Repositories(db: D1Database): Repositories {
 		settings: new D1SettingsRepository(db),
 		maintenance: new D1MaintenanceRepository(db),
 		agents: EMPTY_AGENTS,
-		assets: EMPTY_ASSETS,
-		bindings: EMPTY_BINDINGS,
+		assets: new D1AssetsRepository(db),
+		bindings: new D1BindingsRepository(db),
 		tier2: new D1Tier2Repository(db),
 		cliTokens: EMPTY_CLI_TOKENS,
 		aggregation: EMPTY_AGGREGATION,
