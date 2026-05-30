@@ -5,7 +5,7 @@ import type { Context } from "hono";
 import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
-import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./monitoring.js";
+import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
 
 /**
  * Pure helper: group sparkline rows into per-host CPU/mem/net arrays,
@@ -55,18 +55,6 @@ export function normalizeNetSparkline(
 	return points.map((p) => ({ ts: p.ts, v: 0 }));
 }
 
-interface AlertRow {
-	host_id: string;
-	severity: string;
-	rule_id: string;
-	message: string | null;
-}
-
-interface AllowedPortRow {
-	host_id: string;
-	port: number;
-}
-
 export interface SparklineRow {
 	host_id: string;
 	ts: number;
@@ -76,7 +64,6 @@ export interface SparklineRow {
 }
 
 export async function hostsListRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
@@ -87,44 +74,17 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const placeholders = hostIds.map(() => "?").join(", ");
 
-	const metricsRows = await repos.hosts.getLatestMetricsBatch(hostIds);
+	const [metricsRows, alertCountMap, alertRows, allowedByHost, sparklineRows] = await Promise.all([
+		repos.hosts.getLatestMetricsBatch(hostIds),
+		repos.alerts.countByHost(hostIds),
+		repos.alerts.listForHosts(hostIds),
+		repos.ports.listForHosts(hostIds),
+		repos.hosts.listSparklineRowsSince(hostIds, now - 86400),
+	]);
+
 	const metricsMap = new Map(metricsRows.map((row) => [row.host_id, row]));
-
-	// 3. Alert counts per host
-	const alertCountResult = await db
-		.prepare(
-			`SELECT host_id, COUNT(*) as alert_count FROM alert_states WHERE host_id IN (${placeholders}) GROUP BY host_id`,
-		)
-		.bind(...hostIds)
-		.all<{ host_id: string; alert_count: number }>();
-
-	const alertCountMap = new Map<string, number>();
-	for (const a of alertCountResult.results) {
-		alertCountMap.set(a.host_id, a.alert_count);
-	}
-
-	// 4. All alerts for status derivation
-	const alertsResult = await db
-		.prepare(
-			`SELECT host_id, severity, rule_id, message FROM alert_states WHERE host_id IN (${placeholders})`,
-		)
-		.bind(...hostIds)
-		.all<AlertRow>();
-
-	const alertsByHost = buildAlertsByHost(alertsResult.results);
-
-	// 4b. Per-host port allowlist for status derivation
-	const allowlistResult = await db
-		.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
-		.bind(...hostIds)
-		.all<AllowedPortRow>();
-
-	const allowedByHost = buildAllowedByHost(allowlistResult.results);
-
-	// 5. Sparkline data — last 24h hourly aggregates
-	const sparklineRows = await repos.hosts.listSparklineRowsSince(hostIds, now - 86400);
+	const alertsByHost = buildAlertsByHost(alertRows);
 	const sparklinesByHost = buildSparklinesByHost(sparklineRows);
 
 	// 6. Build response

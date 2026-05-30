@@ -8,15 +8,8 @@ import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { getMaintenanceWindow } from "./monitoring.js";
 
-interface AlertRow {
-	severity: string;
-	rule_id: string;
-	message: string | null;
-}
-
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const idParam = c.req.param("id");
-	const db = c.env.DB;
 	const repos = c.var.repos;
 
 	const hostId = await resolveHostIdByHash(repos.hosts, idParam);
@@ -31,26 +24,13 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 
 	const now = Math.floor(Date.now() / 1000);
 
-	// Latest metrics (single host — reuse the batch helper for SQL parity).
-	const [latest] = await repos.hosts.getLatestMetricsBatch([hostId]);
-	const metrics = latest ?? null;
-
-	// Alerts for status derivation + count
-	const alertsResult = await db
-		.prepare("SELECT severity, rule_id, message FROM alert_states WHERE host_id = ?")
-		.bind(hostId)
-		.all<AlertRow>();
-	const alerts = alertsResult.results;
-
-	// Per-host port allowlist for status derivation
-	const allowlistResult = await db
-		.prepare("SELECT port FROM port_allowlist WHERE host_id = ?")
-		.bind(hostId)
-		.all<{ port: number }>();
-	const allowedPorts =
-		allowlistResult.results.length > 0
-			? new Set(allowlistResult.results.map((r) => r.port))
-			: undefined;
+	const [latestRows, alerts, allowedByHost] = await Promise.all([
+		repos.hosts.getLatestMetricsBatch([hostId]),
+		repos.alerts.listForHosts([hostId]),
+		repos.ports.listForHosts([hostId]),
+	]);
+	const metrics = latestRows[0] ?? null;
+	const allowedPorts = allowedByHost.get(hostId);
 
 	const maintenance = getMaintenanceWindow(host);
 	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);

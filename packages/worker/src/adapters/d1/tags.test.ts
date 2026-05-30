@@ -293,4 +293,31 @@ describe("D1TagsRepository", () => {
 			expect(await repo.listForHost("ghost")).toEqual([]);
 		});
 	});
+
+	describe("listNamesForHosts (read-model for monitoring routes)", () => {
+		test("groups names by host_id, ordered by name", async () => {
+			const prod = await repo.create("prod", 0);
+			const web = await repo.create("web", 1);
+			const db_tag = await repo.create("db", 2);
+			if (prod.ok !== true || web.ok !== true || db_tag.ok !== true) {
+				return;
+			}
+			expect((await repo.addToHost(HOST_A, prod.row.id)).ok).toBe(true);
+			expect((await repo.addToHost(HOST_A, web.row.id)).ok).toBe(true);
+			expect((await repo.addToHost(HOST_B, db_tag.row.id)).ok).toBe(true);
+
+			const map = await repo.listNamesForHosts([HOST_A, HOST_B]);
+			expect(map.get(HOST_A)).toEqual(["prod", "web"]);
+			expect(map.get(HOST_B)).toEqual(["db"]);
+		});
+
+		test("absent hosts (no edges) are not in the map", async () => {
+			const map = await repo.listNamesForHosts([HOST_A, HOST_B]);
+			expect(map.size).toBe(0);
+		});
+
+		test("empty input → empty map without DB call", async () => {
+			expect((await repo.listNamesForHosts([])).size).toBe(0);
+		});
+	});
 });

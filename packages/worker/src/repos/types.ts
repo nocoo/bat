@@ -186,6 +186,26 @@ export interface AlertsRepository {
 	 * hides them).
 	 */
 	clearPendingForHost(hostId: string): Promise<void>;
+	/** Read-model: alerts for the given hosts, used by hosts list, host
+	 *  detail, fleet-status, and the monitoring routes. Empty input → empty
+	 *  output without a DB call. */
+	listForHosts(hostIds: string[]): Promise<AlertReadRow[]>;
+	/** Per-host alert counts (`COUNT(*) GROUP BY host_id`) for the hosts
+	 *  list. Hosts with zero alerts are absent from the returned map. */
+	countByHost(hostIds: string[]): Promise<Map<string, number>>;
+}
+
+/** Subset of `alert_states` consumed by the read-model routes. `value` and
+ *  `triggered_at` are always selected so the same SELECT serves the
+ *  monitoring routes too; the hosts/host-detail/fleet-status callers ignore
+ *  those fields. */
+export interface AlertReadRow {
+	host_id: string;
+	severity: string;
+	rule_id: string;
+	message: string | null;
+	value: number | null;
+	triggered_at: number;
 }
 
 export interface AlertActiveJoinedRow {
@@ -296,6 +316,11 @@ export interface PortAllowlistRepository {
 
 	/** Remove a port from a host's allowlist. Returns true on hit, false on miss. */
 	removeFromHost(hostId: string, port: number): Promise<boolean>;
+	/** Read-model: ports for the given hosts, grouped by host_id, ordered by
+	 *  `(host_id, port)`. Used by hosts list / host-detail / fleet-status /
+	 *  monitoring for status derivation. Empty input → empty map without a
+	 *  DB call. */
+	listForHosts(hostIds: string[]): Promise<Map<string, Set<number>>>;
 }
 /**
  * Tags + host-tag edges. Host existence is enforced inside the adapter so
@@ -376,6 +401,10 @@ export interface TagsRepository {
 
 	/** Remove an edge. Returns true on hit, false on miss. */
 	removeFromHost(hostId: string, tagId: number): Promise<boolean>;
+	/** Read-model: tag names for the given hosts, grouped by host_id, ordered
+	 *  by name. Used by the monitoring routes. Empty input → empty map
+	 *  without a DB call. */
+	listNamesForHosts(hostIds: string[]): Promise<Map<string, string[]>>;
 }
 
 /** Settings KV-style store. `retention_days` is the only key in use today. */

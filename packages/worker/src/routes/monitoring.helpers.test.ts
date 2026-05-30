@@ -6,11 +6,7 @@ import type { HostStatus } from "@bat/shared";
 import { describe, expect, test } from "vitest";
 import {
 	type AlertRow,
-	type AllowedPortRow,
-	type TagRow,
 	buildAlertsByHost,
-	buildAllowedByHost,
-	buildTagsByHost,
 	formatAlerts,
 	getMaintenanceWindow,
 	worstTier,
@@ -41,37 +37,6 @@ describe("buildAlertsByHost", () => {
 
 	test("returns empty map for empty input", () => {
 		expect(buildAlertsByHost([]).size).toBe(0);
-	});
-});
-
-describe("buildAllowedByHost", () => {
-	test("collects ports into a Set per host, deduplicating", () => {
-		const rows: AllowedPortRow[] = [
-			{ host_id: "a", port: 80 },
-			{ host_id: "a", port: 443 },
-			{ host_id: "a", port: 80 }, // duplicate
-			{ host_id: "b", port: 22 },
-		];
-		const m = buildAllowedByHost(rows);
-		expect(m.get("a")).toEqual(new Set([80, 443]));
-		expect(m.get("b")).toEqual(new Set([22]));
-	});
-
-	test("empty input → empty map", () => {
-		expect(buildAllowedByHost([]).size).toBe(0);
-	});
-});
-
-describe("buildTagsByHost", () => {
-	test("groups tag names per host, preserving order", () => {
-		const rows: TagRow[] = [
-			{ host_id: "a", name: "prod" },
-			{ host_id: "a", name: "db" },
-			{ host_id: "b", name: "staging" },
-		];
-		const m = buildTagsByHost(rows);
-		expect(m.get("a")).toEqual(["prod", "db"]);
-		expect(m.get("b")).toEqual(["staging"]);
 	});
 });
 

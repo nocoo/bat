@@ -4,22 +4,9 @@ import type { Context } from "hono";
 import { summarizeHostStatuses } from "../lib/fleet-summary.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
-import { buildAlertsByHost, buildAllowedByHost, getMaintenanceWindow } from "./monitoring.js";
-
-interface AlertRow {
-	host_id: string;
-	severity: string;
-	rule_id: string;
-	message: string | null;
-}
-
-interface AllowedPortRow {
-	host_id: string;
-	port: number;
-}
+import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
 
 export async function fleetStatusRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
@@ -40,25 +27,12 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const placeholders = hostIds.map(() => "?").join(", ");
+	const [alertRows, allowedByHost] = await Promise.all([
+		repos.alerts.listForHosts(hostIds),
+		repos.ports.listForHosts(hostIds),
+	]);
 
-	// Get all alerts for active hosts
-	const alertsResult = await db
-		.prepare(
-			`SELECT host_id, severity, rule_id, message FROM alert_states WHERE host_id IN (${placeholders})`,
-		)
-		.bind(...hostIds)
-		.all<AlertRow>();
-
-	const alertsByHost = buildAlertsByHost(alertsResult.results);
-
-	// Per-host port allowlist for status derivation
-	const allowlistResult = await db
-		.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
-		.bind(...hostIds)
-		.all<AllowedPortRow>();
-
-	const allowedByHost = buildAllowedByHost(allowlistResult.results);
+	const alertsByHost = buildAlertsByHost(alertRows);
 
 	// Derive status for each host, then summarise into fleet-level counts
 	const statuses: HostStatus[] = hosts.map((host) => {

@@ -4,29 +4,13 @@ import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { HostStatus } from "@bat/shared";
 import type { Context } from "hono";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
+import type { AlertReadRow } from "../repos/types.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 
 // --- Shared types ---
 
-export interface AlertRow {
-	host_id: string;
-	severity: string;
-	rule_id: string;
-	message: string | null;
-	value: number | null;
-	triggered_at: number;
-}
-
-export interface AllowedPortRow {
-	host_id: string;
-	port: number;
-}
-
-export interface TagRow {
-	host_id: string;
-	name: string;
-}
+export type AlertRow = AlertReadRow;
 
 /**
  * Pure helper: convert a host row's maintenance_start/end fields into the
@@ -44,48 +28,6 @@ export function getMaintenanceWindow(host: {
 
 const CACHE_HEADERS = { "Cache-Control": "private, no-store" };
 
-// --- Shared query helpers ---
-
-async function queryAlerts(db: D1Database, hostIds: string[]): Promise<AlertRow[]> {
-	if (hostIds.length === 0) {
-		return [];
-	}
-	const placeholders = hostIds.map(() => "?").join(", ");
-	const result = await db
-		.prepare(
-			`SELECT host_id, severity, rule_id, message, value, triggered_at FROM alert_states WHERE host_id IN (${placeholders})`,
-		)
-		.bind(...hostIds)
-		.all<AlertRow>();
-	return result.results;
-}
-
-async function queryAllowlist(db: D1Database, hostIds: string[]): Promise<AllowedPortRow[]> {
-	if (hostIds.length === 0) {
-		return [];
-	}
-	const placeholders = hostIds.map(() => "?").join(", ");
-	const result = await db
-		.prepare(`SELECT host_id, port FROM port_allowlist WHERE host_id IN (${placeholders})`)
-		.bind(...hostIds)
-		.all<AllowedPortRow>();
-	return result.results;
-}
-
-async function queryTags(db: D1Database, hostIds: string[]): Promise<TagRow[]> {
-	if (hostIds.length === 0) {
-		return [];
-	}
-	const placeholders = hostIds.map(() => "?").join(", ");
-	const result = await db
-		.prepare(
-			`SELECT ht.host_id, t.name FROM host_tags ht JOIN tags t ON ht.tag_id = t.id WHERE ht.host_id IN (${placeholders})`,
-		)
-		.bind(...hostIds)
-		.all<TagRow>();
-	return result.results;
-}
-
 // --- Map builders ---
 
 export function buildAlertsByHost<T extends { host_id: string }>(alerts: T[]): Map<string, T[]> {
@@ -94,29 +36,6 @@ export function buildAlertsByHost<T extends { host_id: string }>(alerts: T[]): M
 		const list = map.get(a.host_id) ?? [];
 		list.push(a);
 		map.set(a.host_id, list);
-	}
-	return map;
-}
-
-export function buildAllowedByHost(rows: AllowedPortRow[]): Map<string, Set<number>> {
-	const map = new Map<string, Set<number>>();
-	for (const row of rows) {
-		let s = map.get(row.host_id);
-		if (!s) {
-			s = new Set();
-			map.set(row.host_id, s);
-		}
-		s.add(row.port);
-	}
-	return map;
-}
-
-export function buildTagsByHost(rows: TagRow[]): Map<string, string[]> {
-	const map = new Map<string, string[]>();
-	for (const row of rows) {
-		const list = map.get(row.host_id) ?? [];
-		list.push(row.name);
-		map.set(row.host_id, list);
 	}
 	return map;
 }
@@ -155,7 +74,6 @@ export function worstTier(a: HostStatus, b: HostStatus): HostStatus {
 
 /** GET /api/monitoring/hosts — list all hosts with health tier and alerts */
 export async function monitoringHostsRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
@@ -174,13 +92,12 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const [alerts, allowlistRows] = await Promise.all([
-		queryAlerts(db, hostIds),
-		queryAllowlist(db, hostIds),
+	const [alerts, allowedByHost] = await Promise.all([
+		repos.alerts.listForHosts(hostIds),
+		repos.ports.listForHosts(hostIds),
 	]);
 
 	const alertsByHost = buildAlertsByHost(alerts);
-	const allowedByHost = buildAllowedByHost(allowlistRows);
 
 	// Query params
 	const tierFilter = c.req.query("tier") as HostStatus | undefined;
@@ -189,8 +106,7 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 	// Tags needed only for tag filtering
 	let tagsByHost: Map<string, string[]> | null = null;
 	if (tagFilters.length > 0) {
-		const tagRows = await queryTags(db, hostIds);
-		tagsByHost = buildTagsByHost(tagRows);
+		tagsByHost = await repos.tags.listNamesForHosts(hostIds);
 	}
 
 	const byTier: Record<string, number> = {
@@ -248,7 +164,6 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 
 /** GET /api/monitoring/hosts/:id — single host health for keyword monitoring */
 export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitoring/hosts/:id">) {
-	const db = c.env.DB;
 	const repos = c.var.repos;
 	const idParam = c.req.param("id");
 	const now = Math.floor(Date.now() / 1000);
@@ -264,21 +179,18 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	// Parallel queries
-	const [alertRows, allowlistRows, tagRows, uptime] = await Promise.all([
-		queryAlerts(db, [hostId]),
-		queryAllowlist(db, [hostId]),
-		queryTags(db, [hostId]),
+	const [hostAlerts, allowedByHost, tagsByHost, uptime] = await Promise.all([
+		repos.alerts.listForHosts([hostId]),
+		repos.ports.listForHosts([hostId]),
+		repos.tags.listNamesForHosts([hostId]),
 		repos.hosts.getLatestUptime(hostId),
 	]);
 
-	const hostAlerts = alertRows.filter((a) => a.host_id === hostId);
-	const allowedPorts =
-		allowlistRows.length > 0 ? new Set(allowlistRows.map((r) => r.port)) : undefined;
+	const allowedPorts = allowedByHost.get(hostId);
 	const mw = getMaintenanceWindow(host);
 	const tier = deriveHostStatus(host.last_seen, now, hostAlerts, allowedPorts, mw);
 	const inMaintenance = tier === "maintenance";
-	const tags = tagRows.map((t) => t.name).sort();
+	const tags = (tagsByHost.get(hostId) ?? []).slice().sort();
 
 	return c.json(
 		{
@@ -299,7 +211,6 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 
 /** GET /api/monitoring/groups — aggregate health by tag group */
 export async function monitoringGroupsRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
 	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
@@ -309,15 +220,13 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const [alerts, allowlistRows, tagRows] = await Promise.all([
-		queryAlerts(db, hostIds),
-		queryAllowlist(db, hostIds),
-		queryTags(db, hostIds),
+	const [alerts, allowedByHost, tagsByHost] = await Promise.all([
+		repos.alerts.listForHosts(hostIds),
+		repos.ports.listForHosts(hostIds),
+		repos.tags.listNamesForHosts(hostIds),
 	]);
 
 	const alertsByHost = buildAlertsByHost(alerts);
-	const allowedByHost = buildAllowedByHost(allowlistRows);
-	const tagsByHost = buildTagsByHost(tagRows);
 
 	// Derive tier per host
 	const hostTiers = new Map<string, HostStatus>();
@@ -498,26 +407,16 @@ export function buildMonitoringAlertsResult(
 }
 
 export async function monitoringAlertsRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
+	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
-	const alertResult = await db
-		.prepare(
-			`SELECT a.host_id, a.rule_id, a.severity, a.value, a.triggered_at, a.message,
-       h.hostname, h.maintenance_start, h.maintenance_end
-FROM alert_states a
-JOIN hosts h ON a.host_id = h.host_id
-WHERE h.is_active = 1
-ORDER BY a.triggered_at DESC`,
-		)
-		.all<MonitoringAlertRow>();
+	const alertRows = (await repos.alerts.listActiveJoinedHosts()) as MonitoringAlertRow[];
 
 	const nowHHMM = toUtcHHMM(now);
-	const nonMaintenanceAlerts = filterNonMaintenanceAlerts(alertResult.results, nowHHMM);
+	const nonMaintenanceAlerts = filterNonMaintenanceAlerts(alertRows, nowHHMM);
 
 	const hostIds = [...new Set(nonMaintenanceAlerts.map((a) => a.host_id))];
-	const tagRows = await queryTags(db, hostIds);
-	const tagsByHost = buildTagsByHost(tagRows);
+	const tagsByHost = await repos.tags.listNamesForHosts(hostIds);
 
 	const result = buildMonitoringAlertsResult(
 		nonMaintenanceAlerts,

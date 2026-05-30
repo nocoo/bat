@@ -133,4 +133,23 @@ describe("D1PortAllowlistRepository", () => {
 			expect(await repo.removeFromHost("ghost", 22)).toBe(false);
 		});
 	});
+
+	describe("listForHosts (read-model for hosts list/detail/fleet/monitoring)", () => {
+		test("returns ports grouped by host_id as Sets", async () => {
+			await repo.addToHost(HOST_A, 80, "web");
+			await repo.addToHost(HOST_A, 443, "web-tls");
+			await repo.addToHost(HOST_B, 22, "ssh");
+			const map = await repo.listForHosts([HOST_A, HOST_B]);
+			expect(map.get(HOST_A)).toEqual(new Set([80, 443]));
+			expect(map.get(HOST_B)).toEqual(new Set([22]));
+		});
+		test("absent hosts (no rows) are not in the map", async () => {
+			await repo.addToHost(HOST_A, 80, "web");
+			const map = await repo.listForHosts([HOST_A, HOST_B]);
+			expect(map.has(HOST_B)).toBe(false);
+		});
+		test("empty input → empty map without DB call", async () => {
+			expect((await repo.listForHosts([])).size).toBe(0);
+		});
+	});
 });
