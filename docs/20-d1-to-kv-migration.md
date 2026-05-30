@@ -1,174 +1,302 @@
-# 20 — Storage Layer Repository Abstraction (D1-only, behavior-preserving)
+# 20 — Phase 1: D1 Repository Refactor (v5)
 
-> Status: Draft v4 · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
-> Replaces v1–v3 (which proposed a KV migration). KV is **out of scope** for this task. v1–v3 design remains in git history (`00ec0a8`, `3b74fda`, `975ff57`) for future reference if engine switch is reconsidered.
+> Status: Draft v5 (v4 + 5 reviewer execution-edge fixes) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
+> Phase 1 = D1-only. **No KV** in this design. v1–v3 KV designs remain in git history (`00ec0a8`, `3b74fda`, `975ff57`) for if/when engine swap is revisited.
 
-## 0. Scope
+## 0. Changelog
 
-- **Goal**: Refactor the worker's storage access into a `routes → repos → adapters/d1` layering. **D1 stays as the only storage engine.**
-- **Constraints (per @zheng-li)**:
-  1. **Architecture must simplify** — fewer concepts, not more.
-  2. **Test coverage must be very high** — at least the existing 95% line/branch gate, ideally higher on the repo and adapter layers.
-  3. **Behaviour must not change** — every API contract, response shape, status code, alert evaluation result, cron output, and DB write is identical before and after.
+### v4 → v5 (this revision)
 
-What this is **not**:
-
-- No KV layout, no KV adapter, no Miniflare KV setup.
-- No metric compression / delta-suppression / forward-fill (those were KV-economic measures).
-- No schema changes, no migrations.
-- No retention policy changes — D1 keeps its current 7d raw / 90d hourly behaviour as is.
-
-## 1. Why this is worth doing on its own
-
-Even without KV, the codebase pays a real tax today:
-
-- 78 direct `c.env.DB` references in 25 route files. Every new route copies SQL plumbing alongside business logic.
-- `services/*.ts` is a flat dumping ground (~15 files) where some files own DB writes (`metrics.ts`, `agents.ts`), some own pure compute (`aggregation.ts` mixed with both), and the boundary is fuzzy.
-- Route tests today either spin up a real D1 and assert on rows, or mock individual SQL strings. There is no sharp seam to mock or to swap.
-- Adding an integration test for a new route (the kind we just had to add for `PATCH /api/hosts/:id/description`) requires understanding the full D1 schema, not just the relevant repo's contract.
-
-A repo layer fixes all four with one concept: **a typed contract per domain, with one concrete adapter today (D1), implemented behind it.** Routes consume the contract; tests target the contract; future engine swaps (if ever) target the contract.
-
-## 2. Target shape
-
-```
-routes/*  ──►  repos/*  ──►  adapters/d1/*  ──►  c.env.DB
-   (HTTP,        (typed         (SQL — the
-   validation,   contracts +    statements
-   response      types in       lifted from
-   shape)        @bat/shared    today's
-                 or worker)     services/)
-```
-
-- **`packages/worker/src/repos/`** — one file per domain. Each file exports an interface and a public type set. Routes import only from here. No SQL strings.
-- **`packages/worker/src/adapters/d1/`** — one file per repo, implementing the contract by talking to D1. This is where today's `services/*.ts` SQL ends up, organized by domain instead of mixed.
-- **`Repositories`** bundle assembled in `index.ts` and stored on `c.var.repos`; routes use `c.var.repos.<domain>.<method>(...)`.
-
-## 3. Domain inventory
-
-Same call-pattern survey as v3, but **only the methods the existing code actually calls**. We are not building speculative methods.
-
-| Repo | Methods (typed) | Backed-by today |
+| # | v4 issue (reviewer) | v5 fix |
 |---|---|---|
-| `HostsRepository` | `getById`, `listActive`, `upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`, `unretire` | `routes/hosts.ts`, `routes/host-detail.ts`, `routes/identity.ts`, `routes/heartbeat.ts`, `routes/host-description.ts` |
-| `MetricsRepository` | `appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour` | `routes/ingest.ts`, `routes/metrics.ts`, `services/metrics.ts`, `services/aggregation.ts` |
-| `AlertsRepository` | `listActive`, `listActiveByHost`, `setActive`, `clearActive`, `getPending`, `setPending`, `clearPending`, `countByHost` | `services/alerts.ts`, dashboard hosts list |
-| `EventsRepository` | `append`, `listForHost`, `listFleet` | `routes/events-ingest.ts`, `routes/events-list.ts` |
-| `WebhooksRepository` | `list`, `getById`, `upsert`, `delete` | `routes/webhooks.ts` |
-| `PortAllowlistRepository` | `list`, `upsert`, `delete` | `routes/allowed-ports.ts` |
-| `TagsRepository` | `list`, `getById`, `upsert`, `delete`, `addEdge`, `removeEdge`, `byEntity`, `byTag` | `routes/tags.ts`, `services/agents.ts` (tag join) |
-| `SettingsRepository` | `get`, `set`, `delete` | `routes/settings.ts` |
-| `MaintenanceRepository` | `list`, `getById`, `upsert`, `delete`, `activeAt(now)` | `routes/maintenance.ts`, alert evaluator |
-| `AgentsRepository` | `list`, `listWithJoins`, `getById`, `upsertBy(source, match)`, `heartbeat`, `delete` | `services/agents.ts`, `routes/agents.ts` |
-| `AssetsRepository` | `list`, `getById`, `upsert`, `delete` | `routes/assets.ts`, `services/assets.ts` |
-| `BindingsRepository` | `list`, `byAgent`, `byAsset`, `upsert`, `delete` | `routes/bindings.ts`, `services/bindings.ts` |
-| `Tier2Repository` | `getSnapshot`, `upsertSnapshot` | `routes/tier2-ingest.ts`, `routes/tier2-read.ts` |
-| `CliTokensRepository` | `create`, `lookupByHash`, `revoke`, `prune(now)` | `routes/cli-auth.ts`, `services/cli-tokens.ts` |
-| `AggregationRepository` (cron-only) | `aggregateHour(hourTs)`, `purgeRaw(olderThan)`, `purgeHourly(olderThan)` | `services/aggregation.ts`, cron handler |
+| P1 | "Delete `services/*` wholesale" conflates DB access with business logic & middleware glue | §3 splits `services/*` into three buckets: **DB access** → `adapters/d1/*`, **pure business/derivation** → `domain/*`, **stay put** (used by middleware) → `services/*` remains. Acceptance becomes "routes/middleware/cron never touch `c.env.DB` directly; SQL only lives in `adapters/d1/`". |
+| P2 | C2 too wide; C6 too wide | §7 phasing rewritten as **11 atomic commits**, each touches 1–2 domains. `hosts`, `metrics`, `aggregation` each get their own commit. |
+| P3 | `c.var.repos` wiring under-specified | §4 adds the typing for `Variables`, a `reposMiddleware`, fake-repo injection pattern for route unit tests, and the scheduled-handler wiring. Concrete code shape included. |
+| P4 | "bit-for-bit every read endpoint" snapshot is brittle | §6 reframes C0 as **normalized snapshots** — fixed clock + fixed seed + fixed auth keys, redacted volatile fields (timestamps, generated ids), explicit list of covered endpoints. Not all endpoints; the critical reads only. |
+| P5 | "methods mirror call sites" risks shallow SQL wrappers | §3.5 adds the **repo inclusion rule**: only logic with SQL **and** (joins / FK / invariant / multi-route reuse / non-trivial test value) goes through a repo. Thin one-shot SQL stays inline OR moves to a domain helper; we don't create a method just to host a single-statement select. |
 
-Total: **15 repositories**, all method names mirror existing call sites. **No new domain operations are added.**
+## 1. Goal & non-negotiables
 
-## 4. Architecture-simplification checks
+- **Goal**: Move D1 access behind a domain-repository layer so routes / middleware / cron never call `c.env.DB` directly.
+- **Hard constraints** (per @zheng-li):
+  1. **Architecture must simplify** — fewer entities, sharper boundaries.
+  2. **Test coverage stays ≥ 95%**; adapters target ≥ 98%.
+  3. **Zero behaviour change.** Every API response, status code, alert fire, cron output, and DB write is identical before and after.
+- **Out of scope**: KV, retention changes, compression, schema changes, new public endpoints, new domain methods beyond current call sites.
 
-The reviewer constraint is "架构简化" — easy to fail. Concrete tests we apply to the design:
+## 2. Why this is worth doing alone
 
-1. **Net file count goes down or stays flat.** Today: ~25 route files + ~15 services + ~12 service test files. After: same routes + 15 repos + 15 adapters + ~15 contract tests. We *delete* the `services/*` files in the same commit that introduces the equivalent adapter — never both at once. Net change ≈ 0.
-2. **No new abstraction levels.** Routes call repos. Repos call adapters. Adapters call D1. Three levels, one engine, no factory soup.
-3. **No "Store" or "engine selector" interface.** With one engine there is nothing to select. `Repositories` is a plain record `{ hosts, metrics, alerts, ... }` instantiated once in `index.ts`. Adapters are imported directly; no DI container.
-4. **Methods are concrete, not generic.** `metricsRepo.appendTick(host, payload)` not `store.put('m:r:'+host, ...)`. Generic `get/put/list` does not appear at the repo layer. Reviewer's v1 blocker on this stands.
-5. **Routes lose all SQL.** Grep for `c.env.DB` and `db.prepare` outside `adapters/d1/` after the refactor → must be zero.
-6. **Cron stays in one place.** `AggregationRepository.aggregateHour` is what the scheduled handler calls. No business logic in `index.ts`.
+(Unchanged from v4.) 78 `c.env.DB` references in 25 route files; `services/*` is a mixed bag of DB code + pure business logic; route tests have no shared seam to mock. A repo layer fixes all of this with one concept and is independently valuable even with one engine.
 
-## 5. Test strategy
+## 3. Where current `services/*` lives in v5
 
-The constraint "测试覆盖率极高" plus "逻辑完全不变" gives a clear test pyramid:
+`services/*` is **not a single bucket**. We classify each file by what it actually does and route it accordingly. Acceptance criterion is **not** "`services/` directory is empty" — it is **"routes/middleware/cron never touch `c.env.DB` directly; SQL only lives in `adapters/d1/`"**.
 
-### 5.1 Repo contract tests (the load-bearing tier)
+### 3.1 Classification
 
-For every repo: `packages/worker/test/repos/<domain>.contract.test.ts`. Tests are written against the **interface**, instantiated once per concrete adapter (today: only D1 via Miniflare's `D1Database` shim — same harness as the existing e2e tests). When a future engine is added, the same test file re-runs against it; for v4 we have one engine and one execution per test.
+| File | Today's content | v5 destination |
+|---|---|---|
+| `services/metrics.ts` | D1 insert builders for `metrics_raw`, host upsert | `adapters/d1/metrics.ts` |
+| `services/agents.ts` | List/get/upsert/heartbeat agents with FK joins, ON CONFLICT | `adapters/d1/agents.ts` |
+| `services/assets.ts` | Asset CRUD over D1 | `adapters/d1/assets.ts` |
+| `services/bindings.ts` | Binding CRUD over D1 | `adapters/d1/bindings.ts` |
+| `services/cli-tokens.ts` | Token create/lookup over D1 (used by `middleware/api-key.ts` via dynamic import) | `adapters/d1/cli-tokens.ts`; middleware gets the repo via `c.var.repos` (no dynamic import) |
+| `services/aggregation.ts` | Hourly aggregation + purge — mixes D1 reads/writes with pure compute | Split: SQL parts → `adapters/d1/aggregation.ts`; pure roll-up math → `domain/aggregation.ts` |
+| `services/events.ts` | Event insert + list over D1 | `adapters/d1/events.ts` |
+| `services/heartbeat.ts` | Host `last_seen` update | folded into `adapters/d1/hosts.ts` |
+| `services/alerts.ts` | Alert evaluation (pure rules from MetricsPayload + thresholds) | `domain/alerts/evaluate.ts` (pure); persistence (`alert_states`, `alert_pending`) moves to `adapters/d1/alerts.ts` |
+| `services/tier2-alerts.ts` | Pure tier-2 evaluation rules | `domain/alerts/tier2.ts` |
+| `services/tier2-metrics.ts` | Tier2 snapshot upsert/read | `adapters/d1/tier2.ts` |
+| `services/status.ts` | Pure host-status derivation from alerts | `domain/status.ts` (pure; no DB) |
 
-What every contract test must cover:
+Two files **keep their name and path** because they have neither SQL nor non-trivial business logic: none, after classification. So after v5 lands, the `services/` directory is empty and can be removed.
 
-- Round-trip: write → read returns equal value.
-- List ordering and pagination semantics for any list method.
-- `upsertBy` / uniqueness behaviour (agents, settings, tags) — including the exact same conflict behaviour as today's `ON CONFLICT`.
-- Index lifecycle: when an entity changes a key field that drives a join (e.g. `agents.match_key`), reads still return the right answer.
-- Idempotency: calling `appendTick` twice with the same `(host_id, ts)` yields one row, like today's `INSERT OR IGNORE`.
-- Negative paths: missing parent (FK), unknown id returning `null`, oversize input rejected by validation (where today's route enforces it).
+But the acceptance is not "directory removal"; that's just the natural consequence of correct classification.
 
-### 5.2 Adapter unit tests
+### 3.2 `domain/` is new and pure
 
-Per-adapter SQL-correctness sanity (`adapters/d1/*.test.ts`). These largely **port** the existing `services/*.test.ts` suites file-by-file. Since the SQL is unchanged, we expect every existing service test to lift to its adapter test with only an import-path change.
+Files in `packages/worker/src/domain/` are **pure functions** — no I/O, no `c.env`, no `D1Database`. They take typed inputs and return typed outputs. They're trivially testable.
 
-### 5.3 Route tests stay where they are
+Today's pure logic that ends up in `domain/`:
+- `domain/status.ts` (host status derivation)
+- `domain/alerts/evaluate.ts` (tier-1 / signal-expansion / tier-3 rules)
+- `domain/alerts/tier2.ts`
+- `domain/aggregation.ts` (the compute part of `aggregateHour`)
 
-`packages/worker/src/routes/*.test.ts` keeps using a real Miniflare D1 (the existing setup). The only change: routes inject through `c.var.repos`. Test bodies do not change because behaviour does not change.
+`domain/` is not a repo. Routes / repos can both call into it without coupling.
 
-### 5.4 Existing E2E suite
+### 3.3 Middleware that needs a repo
 
-`test/e2e/` runs unchanged against the real worker. Coverage of routes / pages gates stay green. We do **not** rely on E2E to catch repo-layer regressions; the contract tests do that.
+`middleware/api-key.ts` currently does a **dynamic** `import('../services/cli-tokens.js')`. In v5 the middleware reads `c.var.repos.cliTokens.lookupByHash(...)`. No dynamic imports. This is part of the C1 wiring.
 
-### 5.5 Coverage targets
+### 3.4 Acceptance for §3
 
-- Existing project gate: 95% line/branch (TS), 95% line (Rust). Untouched.
-- New `repos/` (interface-only files; trivial): 100% by virtue of being type-only after compilation.
-- New `adapters/d1/`: target **≥ 98% line + branch**. These are pure SQL functions; every branch is exercisable. Any line that we cannot test (e.g. a defensive "should never happen" return) gets explicit `/* c8 ignore next */` and a comment, never a coverage drop.
-- Cron path (`AggregationRepository`): we add a Vitest scheduled-event test exercising one full hour's aggregation against synthetic raw rows.
+After C11:
 
-## 6. Behaviour preservation
+```bash
+# These should all return 0
+grep -rn "c\.env\.DB" packages/worker/src/routes packages/worker/src/middleware
+grep -rn "db\.prepare\|D1Database" packages/worker/src/routes packages/worker/src/middleware packages/worker/src/domain
+```
 
-This is the constraint with the highest blast radius if violated. Mitigations:
+And the `gate:routes`/`gate:pages` coverage gates plus the 95% unit-coverage gate stay green at every commit boundary.
 
-1. **No SQL change.** Adapter methods carry today's SQL string verbatim from `services/*` and `routes/*` — line-for-line. Where SQL was inline in a route, we move it whole to the adapter; we do not rewrite or merge.
-2. **No timestamp / RNG change.** Both `Date.now()` and any `crypto.randomUUID()` callers move to the same call sites in adapters; we don't introduce a clock or id factory.
-3. **No JSON shape change.** Repos return the same DTOs the routes already construct today (most are typed in `@bat/shared`).
-4. **Contract tests assert on row-level state.** After every write, contract tests query the underlying D1 directly and compare to expected state. This is the strongest possible assertion that the adapter has not silently regressed something.
-5. **Diff sanity per commit.** Every C-step commit includes a `RUN_DIFF.md` artifact (added then removed in the cleanup commit) listing: every public function added, every public function removed, every test renamed. Reviewer reads this list before approving.
-6. **Behaviour-equivalence sweep before C-final.** Before the last commit lands, we run the full e2e suite plus a snapshot test that hits every read endpoint with a fixed seed and compares JSON output bit-for-bit against the pre-refactor baseline (snapshot captured in C0).
+### 3.5 Repo inclusion rule (P5)
 
-## 7. Phasing
+A `Repository` method exists **only if** it carries SQL **and** at least one of:
 
-Eight atomic commits. Every commit ships green for the full pre-commit + pre-push gate stack (`lint`, `typecheck`, `test`, `gate:routes`, `gate:pages`, `gate:security`, coverage thresholds).
+- a JOIN or FK-aware read that is hard to inline,
+- a uniqueness / invariant (`ON CONFLICT`, derived-id generation, ordered side-effects),
+- reuse across ≥ 2 routes or by cron / middleware,
+- non-trivial behaviour worth its own contract test.
 
-| # | Commit | Surface | Risk |
-|---|---|---|---|
-| C0 | Snapshot baseline test: capture JSON output of every read endpoint with a fixed-seeded D1, plus row counts after each write endpoint. Test asserts equal-to-snapshot. | new test file only | none — establishes the regression baseline used by C1–C7 |
-| C1 | Add `repos/` interfaces (type-only) and an empty `Repositories` bundle wired into `c.var.repos`. No route uses it yet. | type contracts | none |
-| C2 | Migrate **read-only** repos: `HostsRepository`, `WebhooksRepository`, `PortAllowlistRepository`, `SettingsRepository`, `MaintenanceRepository`, `Tier2Repository`. Adapters carry SQL verbatim from existing services. Their routes switch to `c.var.repos`. Old service files deleted in this same commit. | per-route | low — same SQL, new entry point |
-| C3 | Migrate `TagsRepository`, `AssetsRepository`, `BindingsRepository`. Includes paired-edge / reverse-index methods (still SQL today, but exposed via the contract that a future KV adapter would honour). | per-route | low |
-| C4 | Migrate `AgentsRepository`, `CliTokensRepository`. `upsertBy` uses today's `ON CONFLICT(source_key, match_key)` — no change. | per-route | low |
-| C5 | Migrate `AlertsRepository`, `EventsRepository`. Both have specific list shapes and TTL-equivalent purge calls; preserve verbatim. | per-route | low |
-| C6 | Migrate `MetricsRepository` + `AggregationRepository`. This is the largest single move (`metrics_raw` insert, hourly aggregation, purges). SQL unchanged. | cron + ingest | medium — most rows-touched |
-| C7 | Cleanup: delete remaining `services/` files, remove dead imports, lift shared row types into `@bat/shared` if any duplicated. Re-run C0 snapshot test as the final equivalence check. | cleanup | low |
+A one-shot `db.prepare("SELECT 1 FROM settings WHERE key = ?")` does **not** become a repo method unless it meets the rule. The route or a `domain/` helper holds it. We are not auto-generating thin wrappers.
 
-Estimated total: ~3-5 working days. C2-C5 can each be a half-day each if reviewer pace allows.
+This is the rule reviewers should hold us to in C2-C9.
 
-## 8. Architecture simplification — concrete deletions
+## 4. `c.var.repos` wiring (concrete)
 
-What gets removed by the time C7 lands:
+### 4.1 Types
 
-- `packages/worker/src/services/*.ts` — fully replaced by `adapters/d1/*.ts`. ~15 files net **moved**, not duplicated.
-- All `c.env.DB` reads in `routes/*.ts` (currently 78 occurrences) — zero after C7.
-- Inline SQL in route handlers — every `db.prepare(...)` outside `adapters/d1/` deleted.
-- Repeated row-type definitions in routes — lifted into the adapter or `@bat/shared`.
+```ts
+// packages/worker/src/repos/types.ts
+export interface Repositories {
+  hosts: HostsRepository;
+  metrics: MetricsRepository;
+  alerts: AlertsRepository;
+  events: EventsRepository;
+  webhooks: WebhooksRepository;
+  ports: PortAllowlistRepository;
+  tags: TagsRepository;
+  settings: SettingsRepository;
+  maintenance: MaintenanceRepository;
+  agents: AgentsRepository;
+  assets: AssetsRepository;
+  bindings: BindingsRepository;
+  tier2: Tier2Repository;
+  cliTokens: CliTokensRepository;
+  aggregation: AggregationRepository;
+}
+```
 
-What gets added:
+```ts
+// packages/worker/src/types.ts
+export type Variables = {
+  accessAuthenticated?: boolean;
+  repos: Repositories; // ← added in C1
+};
+```
 
-- `packages/worker/src/repos/<15 files>.ts` — interfaces only, no logic.
-- `packages/worker/src/adapters/d1/<15 files>.ts` — SQL, lifted from services.
-- `packages/worker/test/repos/<15 contract test files>.ts`.
+### 4.2 Factory + middleware
 
-## 9. Open questions for @zheng-li
+```ts
+// packages/worker/src/repos/factory.ts
+import { D1HostsRepository } from "../adapters/d1/hosts.js";
+// … one import per adapter …
 
-The previous question set is obsolete. Three new ones:
+export function createD1Repositories(db: D1Database): Repositories {
+  return {
+    hosts:       new D1HostsRepository(db),
+    metrics:     new D1MetricsRepository(db),
+    // … one per repo …
+  };
+}
+```
 
-1. Confirm the C0 snapshot baseline approach is acceptable as the behaviour-equivalence gate. The alternative is a hand-written before/after request log; snapshot is cheaper and stricter.
-2. Confirm that **deleting** `services/*.ts` in the same commit that adds the equivalent `adapters/d1/*.ts` is preferred over a deprecation period. (My recommendation: delete in same commit — one engine, no parallel paths to maintain.)
-3. Confirm whether to keep the `services/` import alias for the migration window in case downstream tools (lint configs, IDE jump-to) reference it. (My recommendation: no alias; clean break inside one PR series.)
+```ts
+// packages/worker/src/middleware/repos.ts
+import type { MiddlewareHandler } from "hono";
+import type { AppEnv } from "../types.js";
+import { createD1Repositories } from "../repos/factory.js";
 
-## 10. Non-goals (re-emphasized)
+export const reposMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
+  c.set("repos", createD1Repositories(c.env.DB));
+  await next();
+};
+```
 
-- No KV. No engine swap. No retention change.
-- No new public API. No new domain operations beyond what current call sites already use.
-- No coverage regression — the gate stays at 95% and we expect to clear it comfortably.
-- No silent behaviour change. Anything visible to a caller, including alert evaluation timing and cron purge cadence, is identical.
+Mounted once near the top of the route tree in `index.ts`, **before** `entry-control` / `access-auth` so all downstream middleware (including `api-key`) can read `c.var.repos`.
+
+Adapter constructors are cheap (just store the `db` reference); per-request instantiation is fine and avoids any global-state cache.
+
+### 4.3 Scheduled handler
+
+```ts
+// packages/worker/src/index.ts
+async scheduled(event, env, ctx) {
+  const repos = createD1Repositories(env.DB);
+  await repos.aggregation.aggregateHour(currentHourStart());
+  await repos.metrics.purgeRawOlderThan(now - 7 * 86400);
+  // …
+}
+```
+
+No `c.var.repos` here because there's no Hono context — we use the factory directly. Same `Repositories` type, same adapters.
+
+### 4.4 Route unit-test injection
+
+```ts
+// packages/worker/test/helpers/fakeRepos.ts
+export function makeFakeRepos(overrides: Partial<Repositories> = {}): Repositories {
+  return { hosts: stubHosts(), metrics: stubMetrics(), /* … */, ...overrides };
+}
+```
+
+Route unit tests construct a Hono app, set `c.var.repos = makeFakeRepos({ hosts: customStub })`, and assert on stubbed calls / response shape. Real-D1 route tests (existing setup) inject `createD1Repositories(env.DB)` via the same middleware path — no test change there.
+
+## 5. Domain inventory (unchanged shape from v4, refined per §3.5)
+
+15 repos, methods strictly tied to current call sites. Same table as v4 §3. Two refinements:
+
+- `SettingsRepository.{get,set,delete}` stays as a repo because settings are used from multiple routes and middleware (`getRetentionDays` used by cron and by the settings endpoint). Even though each method is a single statement, it meets the "reuse across ≥ 2 callers" bar.
+- `HostsRepository` does **not** get a `getStatus(...)` method — status derivation is pure (`domain/status.ts`) and routes call the pure helper after fetching the rows they need. The repo only returns rows.
+
+## 6. Test strategy + C0 normalized snapshot (P4)
+
+### 6.1 Contract tests
+
+Every repo has `test/repos/<domain>.contract.test.ts`. They run against the real (Miniflare) D1 binding and assert the same observable behaviour as today's services tests. The contract test file is the **source of truth** for what each method must do; reviewers point at it during route migrations.
+
+### 6.2 Adapter SQL tests
+
+Existing `services/*.test.ts` files lift to `adapters/d1/*.test.ts` with import paths updated. SQL is unchanged → assertions are unchanged. Coverage target ≥ 98% line + branch.
+
+### 6.3 Route tests (real D1) stay; route unit tests (fake repos) optional
+
+We don't *replace* the existing route-against-real-D1 tests — they're our integration safety net. New route-unit tests with `makeFakeRepos` may be added where the route logic is complex enough (validation tables, branching responses); we add them opportunistically, not as a mandate.
+
+### 6.4 C0 normalized snapshot baseline (replaces v4's bit-for-bit)
+
+A single file `packages/worker/test/baseline/api-snapshot.test.ts` that:
+
+1. Sets up a fixed seed:
+   - Clock pinned via `vi.useFakeTimers().setSystemTime(new Date('2026-05-30T00:00:00Z'))`.
+   - Auth headers fixed (the test `BAT_*_KEY` from `globalSetup`).
+   - Database seeded by a small fixture: 3 hosts, 30 raw rows / host, 2 alerts, 1 webhook, 1 maintenance window, 2 agents, 2 assets, 2 bindings, 1 cli token.
+2. Hits a **defined set of read endpoints** (the critical ones — listed in §6.5).
+3. For each response, normalizes:
+   - Strip `timestamp`, `created_at`, `updated_at`, `last_seen`, `triggered_at`, etc. to `"<TS>"`.
+   - Strip generated ids (`agent.id`, `asset.id`, `binding.id`, `cli_token.id`) to `"<ID>"`.
+   - Sort arrays whose order is documented as unstable.
+4. Compares to a checked-in JSON snapshot.
+
+The snapshot is captured **once** at C0, before any refactor; every subsequent commit must keep it green. C11 deletes nothing about this file — it's a permanent regression guard.
+
+### 6.5 C0 coverage list
+
+The C0 snapshot covers:
+
+- `GET /api/hosts`
+- `GET /api/hosts/:id`
+- `GET /api/hosts/:id/metrics?window=24h`
+- `GET /api/hosts/:id/metrics?window=7d`
+- `GET /api/alerts`
+- `GET /api/maintenance`
+- `GET /api/webhooks`
+- `GET /api/allowed-ports`
+- `GET /api/agents`
+- `GET /api/assets`
+- `GET /api/bindings`
+- `GET /api/tags`
+- `GET /api/settings`
+- `GET /api/fleet-status`
+- `GET /api/live` (limit 10)
+
+Write endpoints aren't snapshotted directly (volatile by design); instead the snapshot test does `PATCH /api/hosts/:id/description`, then re-fetches `GET /api/hosts/:id`, then asserts the description changed and the rest of the JSON did not. Similar pattern for `POST /api/identity`, `POST /api/metrics`, `POST /api/events`, `POST /api/maintenance`, the agents/assets/bindings CRUD, and the cron `aggregateHour` invocation.
+
+This is the realistic version of "bit-for-bit": targeted, normalized, fast, deterministic.
+
+## 7. Phasing — 11 atomic commits (P2)
+
+Each commit ships green for `lint` + `typecheck` + `test` + `gate:routes` + `gate:pages` + `gate:security` + coverage gates. Each commit has a single reviewable theme.
+
+| # | Commit | Scope |
+|---|---|---|
+| C0 | **Baseline snapshot test** (§6.4) — pre-refactor capture | new test file only |
+| C1 | `Repositories` type, `createD1Repositories` factory, `reposMiddleware`, `Variables.repos` wired into Hono; scheduled handler uses factory directly. No routes consume it yet; adapters are empty stubs (re-exporting today's service functions to make wiring compile + green). | wiring only |
+| C2 | `SettingsRepository` + `WebhooksRepository`. Smallest blast radius. Includes their contract tests. Adapters carry SQL verbatim. Routes switch. Old service files deleted. | 2 domains |
+| C3 | `PortAllowlistRepository` + `MaintenanceRepository` (incl. `activeAt(now)` used by alerts cron). | 2 domains |
+| C4 | `Tier2Repository` + `TagsRepository` (tags include paired edge/reverse SQL). | 2 domains |
+| C5 | `AssetsRepository` + `BindingsRepository`. | 2 domains |
+| C6 | `AgentsRepository` + `CliTokensRepository`. `upsertBy` keeps today's `ON CONFLICT(source_key, match_key)`. Middleware `api-key` switches to `c.var.repos.cliTokens` (drops dynamic import). | 2 domains |
+| C7 | `AlertsRepository` (state + pending CRUD only). Move alert evaluation pure logic to `domain/alerts/{evaluate,tier2}.ts` in the same commit (no behaviour change; same inputs, same outputs). | 1 domain + 1 domain helper extraction |
+| C8 | `EventsRepository`. | 1 domain |
+| C9 | `HostsRepository` — read paths (`list`, `getById`) + status helper extraction to `domain/status.ts`. Dashboard list logic stays in route; only the data access moves. | 1 domain (read) |
+| C10 | `MetricsRepository` (`appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour`) + remaining write paths on `HostsRepository` (`upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`/`unretire`). Largest single move (`metrics_raw` insert). | 1 large domain + finish hosts |
+| C11 | `AggregationRepository` (`aggregateHour`, `purgeRaw`, `purgeHourly`). Pure roll-up math lives in `domain/aggregation.ts`. Cron handler uses the factory. Final cleanup: remove `services/` if empty, delete `RUN_DIFF.md`, re-run C0 snapshot test. | cron + cleanup |
+
+Total: **11 commits + 1 baseline (C0)**. Reviewer-friendly per-commit scope, no single commit larger than ~600-800 LOC including tests. Estimated 4–7 working days end-to-end depending on review pace.
+
+## 8. Architecture-simplification checks (with concrete targets)
+
+After C11, the following invariants hold and are enforced by grep tests in CI:
+
+1. `grep -rn "c\.env\.DB" packages/worker/src/{routes,middleware,domain}` → **0 hits**.
+2. `grep -rn "db\.prepare\|D1Database" packages/worker/src/{routes,middleware,domain}` → **0 hits**.
+3. `services/` directory is empty or deleted.
+4. Total `packages/worker/src` LOC: **delta ≤ +5%** vs pre-refactor (we move > add).
+5. Route file LOC delta: **≤ -10%** on average (SQL strings move out).
+6. Existing test count grows (contract + baseline) but **per-test setup LOC shrinks** in route tests — measured as average lines between `describe(` and the first `test(` block.
+
+## 9. Behaviour preservation guards (re-emphasized)
+
+1. SQL strings copied verbatim into adapters.
+2. Clock/RNG call sites unchanged.
+3. JSON shape unchanged (existing types in `@bat/shared` are reused).
+4. Contract tests assert on D1 row state after each write.
+5. C0 normalized snapshot runs after every commit.
+6. `RUN_DIFF.md` per commit lists new/removed/renamed public symbols.
+
+## 10. Open questions for @zheng-li
+
+None remaining — the previous v4 §9 questions were answered in your "同意，开始 v5" message:
+
+1. C0 normalized snapshot is the gate ✓
+2. Same-commit delete of moved `services/*` ✓
+3. No alias for `services/` ✓
+
+The fourth item from v4 — what to do with files like `services/status.ts` and `services/alerts.ts` that aren't DB access — is resolved by §3 above (they move to `domain/`, not `adapters/d1/`).
+
+## 11. Non-goals (unchanged from v4)
+
+No KV, no engine swap, no retention change, no new public API, no new domain methods beyond current call sites, no coverage regression, no silent behaviour change.
