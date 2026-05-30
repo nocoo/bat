@@ -5,13 +5,13 @@
 
 import type {
 	AggregationRepository,
-	AlertsRepository,
 	EventsRepository,
 	HostsRepository,
 	MetricsRepository,
 	Repositories,
 } from "../../repos/types.js";
 import { D1AgentsRepository } from "./agents.js";
+import { D1AlertsRepository } from "./alerts.js";
 import { D1PortAllowlistRepository } from "./allowed-ports.js";
 import { D1AssetsRepository } from "./assets.js";
 import { D1BindingsRepository } from "./bindings.js";
@@ -24,7 +24,6 @@ import { D1WebhooksRepository } from "./webhooks.js";
 
 const EMPTY_HOSTS: HostsRepository = Object.freeze({});
 const EMPTY_METRICS: MetricsRepository = Object.freeze({});
-const EMPTY_ALERTS: AlertsRepository = Object.freeze({});
 const EMPTY_EVENTS: EventsRepository = Object.freeze({});
 const EMPTY_AGGREGATION: AggregationRepository = Object.freeze({});
 
@@ -37,7 +36,7 @@ export function createD1Repositories(db: D1Database): Repositories {
 	return {
 		hosts: EMPTY_HOSTS,
 		metrics: EMPTY_METRICS,
-		alerts: EMPTY_ALERTS,
+		alerts: new D1AlertsRepository(db),
 		events: EMPTY_EVENTS,
 		webhooks: new D1WebhooksRepository(db),
 		ports: new D1PortAllowlistRepository(db),

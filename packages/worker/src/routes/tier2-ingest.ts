@@ -2,7 +2,6 @@
 import type { Tier2Payload } from "@bat/shared";
 import type { Context } from "hono";
 import { ensureHostExists, updateHostLastSeen } from "../services/metrics.js";
-import { evaluateTier2Alerts } from "../services/tier2-alerts.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -77,7 +76,7 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 	// Only update last_seen and evaluate alerts for genuinely new data
 	if (inserted) {
 		await updateHostLastSeen(db, body.host_id, workerNow);
-		await evaluateTier2Alerts(db, body.host_id, body, workerNow);
+		await c.var.repos.alerts.evaluateAndApplyTier2(body.host_id, body, workerNow);
 
 		// Merge slow-drift inventory fields into hosts table (2-state wire semantics)
 		// Hosts-domain SQL — migrates in C10 with the rest of hosts write paths.

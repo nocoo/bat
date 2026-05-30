@@ -2,7 +2,6 @@
 import type { MetricsPayload } from "@bat/shared";
 import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
-import { evaluateAlerts } from "../services/alerts.js";
 import { buildInsertMetricsRawStatement } from "../services/metrics.js";
 import type { AppEnv } from "../types.js";
 
@@ -180,9 +179,9 @@ ON CONFLICT(host_id) DO UPDATE SET last_seen = excluded.last_seen`,
 
 		if (inMaintenance) {
 			// Purge duration rule timers to prevent stale first_seen accumulation
-			await db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(body.host_id).run();
+			await c.var.repos.alerts.clearPendingForHost(body.host_id);
 		} else {
-			await evaluateAlerts(db, body.host_id, body, workerNow);
+			await c.var.repos.alerts.evaluateAndApply(body.host_id, body, workerNow);
 		}
 	}
 
