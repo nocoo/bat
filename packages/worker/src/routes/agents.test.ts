@@ -1,5 +1,6 @@
 // Tests for Agent CRUD routes
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import {
 	agentsCreateRoute,
@@ -28,6 +29,7 @@ function makeCtx(
 				: "";
 	return {
 		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+		var: { repos: createD1Repositories(db) },
 		req: {
 			param: (key: string) => opts.params?.[key],
 			text: async () => rawText,

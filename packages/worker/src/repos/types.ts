@@ -11,12 +11,18 @@
 // interfaces.
 
 import type {
+	AgentHeartbeatEntry,
+	AgentHeartbeatResponse,
+	AgentItem,
+	AgentRow,
 	AllowedPort,
 	AssetItem,
 	AssetMapResponse,
 	AssetRow,
 	AssetsOverview,
 	BindingItem,
+	CliTokenRow,
+	CliTokenScope,
 	HostTag,
 	RetentionDays,
 	Tier2Payload,
@@ -208,8 +214,76 @@ export interface MaintenanceWindow {
 	end: string;
 	reason: string | null;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface AgentsRepository {}
+/**
+ * Agent CRUD + agent_tags edges + heartbeat. Atomic upsert via
+ * INSERT ... ON CONFLICT(source_key, match_key) preserves race-safe
+ * behaviour from the previous services/agents.ts. Host FK existence
+ * is exposed so routes never inline a hosts SELECT.
+ */
+export interface AgentsRepository {
+	/** All agents with hostname join + tags, ordered by created_at desc. */
+	list(): Promise<AgentItem[]>;
+	/** Single agent with hostname + tags, or null. */
+	getById(id: string): Promise<AgentItem | null>;
+	/** Hard delete. */
+	delete(id: string): Promise<boolean>;
+	/** Partial update; returns updated row or null. */
+	update(
+		id: string,
+		fields: {
+			host_id?: string | null | undefined;
+			nickname?: string | null | undefined;
+			role?: string | null | undefined;
+			runtime_app?: string | null | undefined;
+			runtime_version?: string | null | undefined;
+			status?: string | undefined;
+			metadata?: string | undefined;
+		},
+	): Promise<AgentRow | null>;
+	/**
+	 * Race-safe upsert keyed on `(source_key, match_key)`. Returns the
+	 * agent id and a `created` flag (true when this call inserted the row).
+	 */
+	upsertBy(
+		createParams: {
+			source_key: string;
+			match_key: string;
+			host_id?: string | null;
+			nickname?: string | null;
+			role?: string | null;
+			runtime_app?: string | null;
+			runtime_version?: string | null;
+			status?: string;
+			metadata?: string;
+		},
+		updateFields: {
+			host_id?: string | null | undefined;
+			nickname?: string | null | undefined;
+			role?: string | null | undefined;
+			runtime_app?: string | null | undefined;
+			runtime_version?: string | null | undefined;
+			status?: string | undefined;
+			metadata?: string | undefined;
+		},
+	): Promise<{ id: string; created: boolean }>;
+	/** Replace agent_tags edges; missing returns the missing list. */
+	replaceTags(
+		agentId: string,
+		tagIds: number[],
+	): Promise<{ ok: true } | { ok: "tags_not_found"; missing: number[] }>;
+	/** FK helper. */
+	hostExists(hostId: string): Promise<boolean>;
+	/**
+	 * Apply a CLI heartbeat report keyed by `source_key`. Atomic batch:
+	 * updates reported agents, ON-CONFLICT-creates new ones, marks
+	 * unreported existing agents as `missing`.
+	 */
+	processHeartbeat(
+		sourceKey: string,
+		agents: AgentHeartbeatEntry[],
+		nowSeconds: number,
+	): Promise<AgentHeartbeatResponse>;
+}
 /**
  * Asset CRUD + asset_tags edges. Host FK existence is exposed as a
  * dedicated method so routes never inline a hosts SELECT.
@@ -297,8 +371,21 @@ export interface Tier2Repository {
 	/** Latest snapshot for a host, or null. */
 	getLatestForHost(hostId: string): Promise<Tier2Snapshot | null>;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface CliTokensRepository {}
+/**
+ * CLI token CRUD + token verification. Tokens are stored as SHA-256
+ * hashes; pure helpers for plaintext generation and hashing live in
+ * `domain/cli-token.ts`.
+ */
+export interface CliTokensRepository {
+	create(tokenHash: string, label: string, scope: CliTokenScope): Promise<CliTokenRow>;
+	list(): Promise<CliTokenRow[]>;
+	delete(id: number): Promise<boolean>;
+	/**
+	 * Look up a token by hash. On hit, also bumps `last_used_at` to the
+	 * current unixepoch. Returns null on miss.
+	 */
+	findByHashAndTouch(tokenHash: string): Promise<CliTokenRow | null>;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface AggregationRepository {}
 

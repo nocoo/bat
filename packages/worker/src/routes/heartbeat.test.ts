@@ -1,8 +1,21 @@
 // Tests for POST /api/agents/heartbeat route + service
+import type { AgentHeartbeatEntry, AgentHeartbeatResponse } from "@bat/shared";
 import { beforeEach, describe, expect, test } from "vitest";
-import { processHeartbeat } from "../services/heartbeat.js";
+import { D1AgentsRepository } from "../adapters/d1/agents.js";
+import { createD1Repositories } from "../adapters/d1/factory.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import { agentsHeartbeatRoute } from "./heartbeat.js";
+
+/** Adapter shim — preserves the legacy `processHeartbeat(db, ...)` call shape
+ *  while delegating to `D1AgentsRepository.processHeartbeat`. */
+function processHeartbeat(
+	db: D1Database,
+	sourceKey: string,
+	agents: AgentHeartbeatEntry[],
+	now: number,
+): Promise<AgentHeartbeatResponse> {
+	return new D1AgentsRepository(db).processHeartbeat(sourceKey, agents, now);
+}
 
 // --- Helpers ---
 
@@ -21,6 +34,7 @@ function makeCtx(
 				: "";
 	return {
 		env: { DB: db, BAT_WRITE_KEY: "write-key", BAT_READ_KEY: "read-key" },
+		var: { repos: createD1Repositories(db) },
 		req: {
 			text: async () => rawText,
 		},

@@ -17,7 +17,6 @@ import type { AgentHeartbeatBody, AgentHeartbeatEntry, AgentStatus } from "@bat/
  */
 const HEARTBEAT_ALLOWED_STATUSES: readonly AgentStatus[] = ["running", "stopped"] as const;
 import type { Context } from "hono";
-import { processHeartbeat } from "../services/heartbeat.js";
 import type { AppEnv } from "../types.js";
 
 export async function agentsHeartbeatRoute(c: Context<AppEnv>) {
@@ -148,8 +147,7 @@ export async function agentsHeartbeatRoute(c: Context<AppEnv>) {
 	};
 
 	const now = Math.floor(Date.now() / 1000);
-	const result = await processHeartbeat(
-		c.env.DB,
+	const result = await c.var.repos.agents.processHeartbeat(
 		validatedBody.source_key,
 		validatedBody.agents,
 		now,

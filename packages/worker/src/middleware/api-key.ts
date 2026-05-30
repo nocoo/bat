@@ -6,6 +6,7 @@
 // Access-authenticated routes: browser endpoint with valid Access JWT → no API key required
 
 import type { Context, Next } from "hono";
+import { hashToken } from "../domain/cli-token.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
@@ -195,10 +196,9 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	}
 
 	// CLI token validation path — only reached for asset scope routes
-	// Hash the token and look it up in D1
-	const { hashToken, findCliTokenByHash } = await import("../services/cli-tokens.js");
+	// Hash the token and look it up via the repos bundle (also bumps last_used_at).
 	const tokenHash = await hashToken(token);
-	const cliToken = await findCliTokenByHash(c.env.DB, tokenHash);
+	const cliToken = await c.var.repos.cliTokens.findByHashAndTouch(tokenHash);
 
 	if (!cliToken) {
 		return c.json({ error: "Invalid API key" }, 403);
