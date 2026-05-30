@@ -78,6 +78,65 @@ export interface HostsRepository {
 
 	/** 24h hourly sparkline rows for the hosts list. */
 	listSparklineRowsSince(hostIds: string[], sinceSeconds: number): Promise<HostSparklineRow[]>;
+
+	/** Read `(is_active, maintenance_start, maintenance_end)` for the ingest
+	 *  hot path: a single SELECT covering retired check + maintenance window
+	 *  + host existence. Returns null for unknown hosts. */
+	getActiveAndMaintenance(hostId: string): Promise<{
+		is_active: number;
+		maintenance_start: string | null;
+		maintenance_end: string | null;
+	} | null>;
+	/** Upsert host identity (hostname/os/kernel/arch/cpu_model/boot_time +
+	 *  last_seen + identity_updated_at + probe_version) used by `/api/identity`.
+	 *  ON CONFLICT(host_id) refreshes all listed columns. */
+	upsertIdentity(params: {
+		hostId: string;
+		hostname: string;
+		os: string;
+		kernel: string;
+		arch: string;
+		cpuModel: string;
+		bootTime: number;
+		probeVersion: string | null;
+		nowSeconds: number;
+	}): Promise<void>;
+	/** Partial update of inventory columns. Caller passes only fields that
+	 *  were present on the wire. Empty `fields` is a no-op. */
+	updateInventory(hostId: string, fields: HostInventoryUpdate): Promise<void>;
+	/** Partial update of tier-2 slow-drift inventory (timezone / dns_*).
+	 *  Empty `fields` is a no-op. */
+	updateTier2Inventory(hostId: string, fields: HostTier2Inventory): Promise<void>;
+	/** Update the host's free-form description (or clear it with null). */
+	updateDescription(hostId: string, description: string | null): Promise<void>;
+	/** Ensure a host row exists for FK targets (no last_seen bump if it
+	 *  already does). Used by `/api/tier2` before its alert/inventory
+	 *  writes. `nowSeconds` is only consumed on the first-seen path. */
+	ensureExists(hostId: string, hostname: string, nowSeconds: number): Promise<void>;
+	/** Refresh `last_seen` for an existing host. Used by `/api/tier2`
+	 *  after a fresh snapshot is inserted. */
+	touchLastSeen(hostId: string, nowSeconds: number): Promise<void>;
+}
+
+/** Optional fields touched by `POST /api/identity` inventory merge. Each
+ *  field corresponds to a wire-payload key; absence means "leave unchanged". */
+export interface HostInventoryUpdate {
+	cpu_logical?: number | null;
+	cpu_physical?: number | null;
+	mem_total_bytes?: number | null;
+	swap_total_bytes?: number | null;
+	virtualization?: string | null;
+	net_interfaces?: unknown;
+	disks?: unknown;
+	boot_mode?: string | null;
+	public_ip?: string | null;
+}
+
+/** Optional fields touched by `POST /api/tier2` slow-drift inventory merge. */
+export interface HostTier2Inventory {
+	timezone?: string | null;
+	dns_resolvers?: unknown;
+	dns_search?: unknown;
 }
 
 /** Subset of `hosts` columns required by the `/api/hosts` overview list. */
@@ -157,8 +216,44 @@ export interface HostSparklineRow {
 	mem: number | null;
 	net: number | null;
 }
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface MetricsRepository {}
+
+/**
+ * Metrics raw + hourly read/write. Powers `/api/hosts/:id/metrics` reads
+ * (raw vs hourly auto-resolution) and `/api/ingest` writes (raw insert
+ * batched with host upsert). Hourly aggregation writes belong to the
+ * cron path and stay with C11.
+ */
+export interface MetricsRepository {
+	/** Read raw metrics rows (full column projection) for the metrics query
+	 *  route. Caller still owns ext_json unpacking and DTO shaping. */
+	queryRaw(hostId: string, from: number, to: number): Promise<MetricsRawRow[]>;
+	/** Read hourly aggregate rows for the metrics query route. */
+	queryHourly(hostId: string, from: number, to: number): Promise<MetricsHourlyRow[]>;
+	/** Atomic batch: host upsert + metrics_raw INSERT OR IGNORE.
+	 *  Returns whether the metrics row was newly inserted (false on duplicate).
+	 *  `mode = "first-seen"` issues an INSERT … ON CONFLICT … last_seen update
+	 *  for the host; `mode = "existing"` issues a plain UPDATE. */
+	insertRawWithHostUpsert(
+		hostId: string,
+		hostname: string,
+		payload: MetricsPayload,
+		nowSeconds: number,
+		mode: "first-seen" | "existing",
+	): Promise<{ inserted: boolean }>;
+}
+
+/** Raw metrics row as projected by the /api/hosts/:id/metrics raw query.
+ *  ext_json is built server-side from the underlying scalar columns and
+ *  unpacked by the route. */
+export interface MetricsRawRow extends Record<string, unknown> {
+	ext_json: string | null;
+}
+
+/** Hourly metrics row as projected by the same query when range > the
+ *  AUTO_RESOLUTION threshold. */
+export interface MetricsHourlyRow extends Record<string, unknown> {
+	ext_json: string | null;
+}
 /**
  * Alert state read + reconciliation. Pure rule evaluators live in
  * `domain/alerts/{evaluate,tier2}.ts`; this repo only owns the D1 persistence

@@ -307,4 +307,225 @@ describe("D1HostsRepository", () => {
 			expect(rows.find((r) => hashHostId(r.host_id) === hid)?.host_id).toBe("web-01.example.com");
 		});
 	});
+
+	describe("getActiveAndMaintenance (ingest hot path)", () => {
+		test("returns is_active + maintenance window in one read", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+			expect(await repo.getActiveAndMaintenance("h1")).toEqual({
+				is_active: 1,
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+		});
+		test("null for missing host", async () => {
+			expect(await repo.getActiveAndMaintenance("missing")).toBeNull();
+		});
+		test("returns is_active=0 for retired host", async () => {
+			await seedHost(db, "h1", "h1.example.com", { isActive: 0 });
+			const row = await repo.getActiveAndMaintenance("h1");
+			expect(row?.is_active).toBe(0);
+		});
+	});
+
+	describe("upsertIdentity", () => {
+		test("creates a host row on first call", async () => {
+			await repo.upsertIdentity({
+				hostId: "h1",
+				hostname: "h1.example.com",
+				os: "Ubuntu",
+				kernel: "6.5.0",
+				arch: "x86_64",
+				cpuModel: "Intel",
+				bootTime: NOW - 100,
+				probeVersion: "0.6.0",
+				nowSeconds: NOW,
+			});
+			const row = await db
+				.prepare(
+					"SELECT host_id, hostname, os, last_seen, identity_updated_at, probe_version FROM hosts WHERE host_id = ?",
+				)
+				.bind("h1")
+				.first<{
+					host_id: string;
+					hostname: string;
+					os: string;
+					last_seen: number;
+					identity_updated_at: number;
+					probe_version: string;
+				}>();
+			expect(row).toEqual({
+				host_id: "h1",
+				hostname: "h1.example.com",
+				os: "Ubuntu",
+				last_seen: NOW,
+				identity_updated_at: NOW,
+				probe_version: "0.6.0",
+			});
+		});
+		test("updates all listed columns on conflict (incl. probe_version)", async () => {
+			await repo.upsertIdentity({
+				hostId: "h1",
+				hostname: "old",
+				os: "Ubuntu",
+				kernel: "6.5.0",
+				arch: "x86_64",
+				cpuModel: "Intel",
+				bootTime: NOW - 100,
+				probeVersion: "0.5.0",
+				nowSeconds: NOW,
+			});
+			await repo.upsertIdentity({
+				hostId: "h1",
+				hostname: "new",
+				os: "Debian",
+				kernel: "6.6.0",
+				arch: "x86_64",
+				cpuModel: "AMD",
+				bootTime: NOW - 50,
+				probeVersion: "0.6.0",
+				nowSeconds: NOW + 100,
+			});
+			const row = await db
+				.prepare(
+					"SELECT hostname, os, kernel, probe_version, last_seen FROM hosts WHERE host_id = ?",
+				)
+				.bind("h1")
+				.first<{
+					hostname: string;
+					os: string;
+					kernel: string;
+					probe_version: string;
+					last_seen: number;
+				}>();
+			expect(row).toEqual({
+				hostname: "new",
+				os: "Debian",
+				kernel: "6.6.0",
+				probe_version: "0.6.0",
+				last_seen: NOW + 100,
+			});
+		});
+	});
+
+	describe("updateInventory", () => {
+		test("partial update sets only listed columns; absent keys untouched", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				cpu_logical: 8,
+				virtualization: "kvm",
+			});
+			await repo.updateInventory("h1", { cpu_logical: 16 });
+			const row = await db
+				.prepare("SELECT cpu_logical, virtualization FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ cpu_logical: number; virtualization: string }>();
+			expect(row).toEqual({ cpu_logical: 16, virtualization: "kvm" });
+		});
+		test("net_interfaces / disks JSON-serialised on the way down", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", { net_interfaces: [{ name: "eth0" }] });
+			const row = await db
+				.prepare("SELECT net_interfaces FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ net_interfaces: string }>();
+			expect(row?.net_interfaces).toBe('[{"name":"eth0"}]');
+		});
+		test("null public_ip preserved (key-present ≠ value-non-null)", async () => {
+			await seedHost(db, "h1", "h1.example.com", { public_ip: "1.2.3.4" });
+			await repo.updateInventory("h1", { public_ip: null });
+			const row = await db
+				.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string | null }>();
+			expect(row?.public_ip).toBeNull();
+		});
+		test("empty fields → no-op", async () => {
+			await seedHost(db, "h1", "h1.example.com", { cpu_logical: 4 });
+			await repo.updateInventory("h1", {});
+			const row = await db
+				.prepare("SELECT cpu_logical FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ cpu_logical: number }>();
+			expect(row?.cpu_logical).toBe(4);
+		});
+	});
+
+	describe("updateTier2Inventory", () => {
+		test("sets timezone and JSON-stringifies dns_resolvers/dns_search", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateTier2Inventory("h1", {
+				timezone: "UTC",
+				dns_resolvers: ["1.1.1.1"],
+				dns_search: ["example.com"],
+			});
+			const row = await db
+				.prepare("SELECT timezone, dns_resolvers, dns_search FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ timezone: string; dns_resolvers: string; dns_search: string }>();
+			expect(row).toEqual({
+				timezone: "UTC",
+				dns_resolvers: '["1.1.1.1"]',
+				dns_search: '["example.com"]',
+			});
+		});
+		test("empty fields → no-op", async () => {
+			await seedHost(db, "h1", "h1.example.com", { timezone: "UTC" });
+			await repo.updateTier2Inventory("h1", {});
+			const row = await db
+				.prepare("SELECT timezone FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ timezone: string }>();
+			expect(row?.timezone).toBe("UTC");
+		});
+	});
+
+	describe("updateDescription", () => {
+		test("sets description (string)", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateDescription("h1", "primary db");
+			const row = await db
+				.prepare("SELECT description FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ description: string | null }>();
+			expect(row?.description).toBe("primary db");
+		});
+		test("clears description (null)", async () => {
+			await seedHost(db, "h1", "h1.example.com", { description: "old" });
+			await repo.updateDescription("h1", null);
+			const row = await db
+				.prepare("SELECT description FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ description: string | null }>();
+			expect(row?.description).toBeNull();
+		});
+	});
+
+	describe("ensureExists / touchLastSeen", () => {
+		test("ensureExists creates row when missing; no-ops when present", async () => {
+			await repo.ensureExists("h1", "h1.example.com", NOW);
+			let row = await db
+				.prepare("SELECT host_id, hostname, last_seen FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ host_id: string; hostname: string; last_seen: number }>();
+			expect(row).toEqual({ host_id: "h1", hostname: "h1.example.com", last_seen: NOW });
+			// ensureExists on existing host does NOT update last_seen
+			await repo.ensureExists("h1", "different-name", NOW + 100);
+			row = await db
+				.prepare("SELECT hostname, last_seen FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ hostname: string; last_seen: number }>();
+			expect(row).toEqual({ hostname: "h1.example.com", last_seen: NOW });
+		});
+		test("touchLastSeen updates last_seen", async () => {
+			await seedHost(db, "h1", "h1.example.com", { lastSeen: NOW });
+			await repo.touchLastSeen("h1", NOW + 200);
+			const row = await db
+				.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ last_seen: number }>();
+			expect(row?.last_seen).toBe(NOW + 200);
+		});
+	});
 });

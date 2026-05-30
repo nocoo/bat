@@ -2,7 +2,6 @@
 import type { MetricsPayload } from "@bat/shared";
 import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
-import { buildInsertMetricsRawStatement } from "../services/metrics.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -125,47 +124,28 @@ export async function ingestRoute(c: Context<AppEnv>) {
 		);
 	}
 
-	const db = c.env.DB;
+	const repos = c.var.repos;
 
 	// Single SELECT covers retired check, maintenance window, and host existence.
-	const existing = await db
-		.prepare("SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?")
-		.bind(body.host_id)
-		.first<{
-			is_active: number;
-			maintenance_start: string | null;
-			maintenance_end: string | null;
-		}>();
+	const existing = await repos.hosts.getActiveAndMaintenance(body.host_id);
 
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Build the metrics insert and host upsert/update as a single batch.
-	// - First-seen host: INSERT OR IGNORE creates the row + UPDATE sets last_seen.
-	// - Existing host: INSERT is a no-op, UPDATE refreshes last_seen.
-	// We don't have D1 atomic-RETURNING for INSERT OR IGNORE here, so to learn
-	// whether the metrics row was new (and we should evaluate alerts) we issue
-	// the metrics insert in the batch and inspect changes on its result.
-	const metricsStmt = buildInsertMetricsRawStatement(db, body.host_id, body);
-	const hostUpsertStmt =
-		existing == null
-			? db
-					.prepare(
-						`INSERT INTO hosts (host_id, hostname, last_seen)
-VALUES (?, ?, ?)
-ON CONFLICT(host_id) DO UPDATE SET last_seen = excluded.last_seen`,
-					)
-					.bind(body.host_id, body.host_id, workerNow)
-			: db
-					.prepare("UPDATE hosts SET last_seen = ? WHERE host_id = ?")
-					.bind(workerNow, body.host_id);
-
-	// Order matters: host row must exist before metrics insert (FK).
-	// For existing hosts the host row is already there so order is irrelevant,
-	// but we keep host-first for the first-seen path.
-	const batchResults = await db.batch([hostUpsertStmt, metricsStmt]);
-	const inserted = (batchResults[1]?.meta?.changes ?? 0) > 0;
+	// Atomic batch: host upsert + metrics_raw INSERT OR IGNORE.
+	// - First-seen host: INSERT … ON CONFLICT … bumps last_seen.
+	// - Existing host:   plain UPDATE last_seen.
+	// We rely on the metrics insert's `meta.changes` to learn whether the
+	// row was newly inserted (and we should evaluate alerts) vs. a duplicate
+	// retried payload.
+	const { inserted } = await repos.metrics.insertRawWithHostUpsert(
+		body.host_id,
+		body.host_id,
+		body,
+		workerNow,
+		existing == null ? "first-seen" : "existing",
+	);
 
 	// Only evaluate alerts for genuinely new data — retried payloads with
 	// identical timestamps are no-ops from here.
@@ -179,9 +159,9 @@ ON CONFLICT(host_id) DO UPDATE SET last_seen = excluded.last_seen`,
 
 		if (inMaintenance) {
 			// Purge duration rule timers to prevent stale first_seen accumulation
-			await c.var.repos.alerts.clearPendingForHost(body.host_id);
+			await repos.alerts.clearPendingForHost(body.host_id);
 		} else {
-			await c.var.repos.alerts.evaluateAndApply(body.host_id, body, workerNow);
+			await repos.alerts.evaluateAndApply(body.host_id, body, workerNow);
 		}
 	}
 

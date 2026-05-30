@@ -1,7 +1,7 @@
 // POST /api/tier2 — receive and store Tier 2 data from probes
 import type { Tier2Payload } from "@bat/shared";
 import type { Context } from "hono";
-import { ensureHostExists, updateHostLastSeen } from "../services/metrics.js";
+import type { HostTier2Inventory } from "../repos/types.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -54,55 +54,38 @@ export async function tier2IngestRoute(c: Context<AppEnv>) {
 		);
 	}
 
-	const db = c.env.DB;
+	const repos = c.var.repos;
 
 	// Check if host is retired
-	// Hosts-domain SQL — migrates in C9/C10 alongside the rest of hosts/metrics.
-	const existing = await db
-		.prepare("SELECT is_active FROM hosts WHERE host_id = ?")
-		.bind(body.host_id)
-		.first<{ is_active: number }>();
-
+	const existing = await repos.hosts.getActiveFlag(body.host_id);
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);
 	}
 
-	// Ensure host record exists (FK target). Hosts/metrics SQL — C10.
-	await ensureHostExists(db, body.host_id, body.host_id, workerNow);
+	// Ensure host record exists (FK target).
+	await repos.hosts.ensureExists(body.host_id, body.host_id, workerNow);
 
 	// Insert tier2 snapshot — returns false if duplicate (same host_id + ts)
-	const inserted = await c.var.repos.tier2.insertSnapshot(body.host_id, body);
+	const inserted = await repos.tier2.insertSnapshot(body.host_id, body);
 
 	// Only update last_seen and evaluate alerts for genuinely new data
 	if (inserted) {
-		await updateHostLastSeen(db, body.host_id, workerNow);
-		await c.var.repos.alerts.evaluateAndApplyTier2(body.host_id, body, workerNow);
+		await repos.hosts.touchLastSeen(body.host_id, workerNow);
+		await repos.alerts.evaluateAndApplyTier2(body.host_id, body, workerNow);
 
 		// Merge slow-drift inventory fields into hosts table (2-state wire semantics)
-		// Hosts-domain SQL — migrates in C10 with the rest of hosts write paths.
 		const raw = body as unknown as Record<string, unknown>;
-		const clauses: string[] = [];
-		const values: unknown[] = [];
-
+		const inventory: HostTier2Inventory = {};
 		if ("timezone" in raw) {
-			clauses.push("timezone = ?");
-			values.push(raw.timezone);
+			inventory.timezone = raw.timezone as string | null;
 		}
 		if ("dns_resolvers" in raw) {
-			clauses.push("dns_resolvers = ?");
-			values.push(JSON.stringify(raw.dns_resolvers));
+			inventory.dns_resolvers = raw.dns_resolvers;
 		}
 		if ("dns_search" in raw) {
-			clauses.push("dns_search = ?");
-			values.push(JSON.stringify(raw.dns_search));
+			inventory.dns_search = raw.dns_search;
 		}
-
-		if (clauses.length > 0) {
-			await db
-				.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
-				.bind(...values, body.host_id)
-				.run();
-		}
+		await repos.hosts.updateTier2Inventory(body.host_id, inventory);
 	}
 
 	return c.body(null, 204);

@@ -3,10 +3,10 @@ import { resolveHostRecord } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
 export async function hostDescriptionPatchRoute(c: Context<AppEnv, "/api/hosts/:id/description">) {
-	const db = c.env.DB;
 	const idParam = c.req.param("id");
+	const repos = c.var.repos;
 
-	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
+	const host = await resolveHostRecord(repos.hosts, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -27,10 +27,7 @@ export async function hostDescriptionPatchRoute(c: Context<AppEnv, "/api/hosts/:
 		return c.json({ error: "description must be 200 characters or fewer" }, 400);
 	}
 
-	await db
-		.prepare("UPDATE hosts SET description = ? WHERE host_id = ?")
-		.bind(description, host.host_id)
-		.run();
+	await repos.hosts.updateDescription(host.host_id, description);
 
 	return c.body(null, 204);
 }
