@@ -51,42 +51,29 @@ export function validateMaintenanceBody(body: unknown): MaintenanceBodyResult {
 
 /** GET /api/hosts/:id/maintenance */
 export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(db, idParam);
+	const host = await resolveHostRecord(c.env.DB, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	const row = await db
-		.prepare(
-			"SELECT maintenance_start, maintenance_end, maintenance_reason FROM hosts WHERE host_id = ?",
-		)
-		.bind(host.host_id)
-		.first<{
-			maintenance_start: string | null;
-			maintenance_end: string | null;
-			maintenance_reason: string | null;
-		}>();
-
-	if (!(row?.maintenance_start && row?.maintenance_end)) {
+	const window = await c.var.repos.maintenance.getForHost(host.host_id);
+	if (!window) {
 		return c.json(null);
 	}
-
 	return c.json({
-		start: row.maintenance_start,
-		end: row.maintenance_end,
-		reason: row.maintenance_reason ?? "",
+		start: window.start,
+		end: window.end,
+		reason: window.reason ?? "",
 	});
 }
 
 /** PUT /api/hosts/:id/maintenance */
 export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(db, idParam);
+	const host = await resolveHostRecord(c.env.DB, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -105,24 +92,17 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 	if (!result.ok) {
 		return c.json({ error: result.error }, 400);
 	}
-	const { start, end, reason } = result.value;
 
-	await db
-		.prepare(
-			"UPDATE hosts SET maintenance_start = ?, maintenance_end = ?, maintenance_reason = ? WHERE host_id = ?",
-		)
-		.bind(start, end, reason, host.host_id)
-		.run();
+	await c.var.repos.maintenance.setForHost(host.host_id, result.value);
 
 	return new Response(null, { status: 204 });
 }
 
 /** DELETE /api/hosts/:id/maintenance */
 export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const db = c.env.DB;
 	const idParam = c.req.param("id");
 
-	const host = await resolveHostRecord(db, idParam);
+	const host = await resolveHostRecord(c.env.DB, idParam);
 	if (!host) {
 		return c.json({ error: "Host not found" }, 404);
 	}
@@ -130,12 +110,7 @@ export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/
 		return c.json({ error: "Host is retired" }, 403);
 	}
 
-	await db
-		.prepare(
-			"UPDATE hosts SET maintenance_start = NULL, maintenance_end = NULL, maintenance_reason = NULL WHERE host_id = ?",
-		)
-		.bind(host.host_id)
-		.run();
+	await c.var.repos.maintenance.clearForHost(host.host_id);
 
 	return new Response(null, { status: 204 });
 }

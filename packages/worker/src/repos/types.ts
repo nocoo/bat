@@ -10,7 +10,7 @@
 // outside `adapters/d1/**`. Routes/middleware/cron consume only these
 // interfaces.
 
-import type { RetentionDays, WebhookConfigRow } from "@bat/shared";
+import type { AllowedPort, RetentionDays, WebhookConfigRow } from "@bat/shared";
 
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface HostsRepository {}
@@ -49,8 +49,45 @@ export interface WebhooksRepository {
 	regenerateToken(configId: number, nowSeconds: number): Promise<string | null>;
 }
 
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface PortAllowlistRepository {}
+/**
+ * Port allowlist CRUD. Host existence is enforced inside the adapter so
+ * routes never run cross-domain SQL. Per-host routes accept raw `host_id`
+ * (not the 8-char `hid` hash) by design — see `routes/allowed-ports.ts`.
+ */
+export interface PortAllowlistRepository {
+	/** All ports across all hosts, grouped by host_id, ordered by host_id then port. */
+	listAllByHost(): Promise<Record<string, number[]>>;
+
+	/**
+	 * List ports for a single host.
+	 * - `{ ok: true, rows }` on success.
+	 * - `{ ok: "host_not_found" }` if the host id doesn't exist.
+	 */
+	listForHost(
+		hostId: string,
+	): Promise<{ ok: true; rows: AllowedPort[] } | { ok: "host_not_found" }>;
+
+	/**
+	 * Add a port to a host's allowlist. Idempotent.
+	 * - `{ ok: true, row, created }` on success; `created` distinguishes
+	 *   "freshly inserted" from "already present".
+	 * - `{ ok: "host_not_found" }` if the host id doesn't exist.
+	 * - `{ ok: "limit_exceeded", max }` when the host already has the
+	 *   maximum number of ports and the request is for a new port.
+	 */
+	addToHost(
+		hostId: string,
+		port: number,
+		reason: string,
+	): Promise<
+		| { ok: true; row: AllowedPort; created: boolean }
+		| { ok: "host_not_found" }
+		| { ok: "limit_exceeded"; max: number }
+	>;
+
+	/** Remove a port from a host's allowlist. Returns true on hit, false on miss. */
+	removeFromHost(hostId: string, port: number): Promise<boolean>;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface TagsRepository {}
 
@@ -62,8 +99,25 @@ export interface SettingsRepository {
 	setRetentionDays(value: RetentionDays): Promise<void>;
 }
 
-// biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
-export interface MaintenanceRepository {}
+/**
+ * Maintenance window read/write for a host's `maintenance_*` columns.
+ * Callers pass an already-resolved raw `host_id`; hid resolution still
+ * lives in `lib/resolve-host.ts` until C9 folds it into HostsRepository.
+ */
+export interface MaintenanceRepository {
+	/** Returns the window for `hostId`, or null when no window is set. */
+	getForHost(hostId: string): Promise<MaintenanceWindow | null>;
+	/** Upsert the window for `hostId`. */
+	setForHost(hostId: string, window: MaintenanceWindow): Promise<void>;
+	/** Clear the window (sets all three columns to NULL). */
+	clearForHost(hostId: string): Promise<void>;
+}
+
+export interface MaintenanceWindow {
+	start: string;
+	end: string;
+	reason: string | null;
+}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits
 export interface AgentsRepository {}
 // biome-ignore lint/suspicious/noEmptyInterface: methods land in their own atomic commits

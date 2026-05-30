@@ -7,7 +7,7 @@
 // Note: host-scoped routes accept raw host_id only (not 8-char hid).
 // Dashboard always sends raw host_id for tag/port operations.
 
-import { type AllowedPort, MAX_ALLOWED_PORTS_PER_HOST } from "@bat/shared";
+import { MAX_ALLOWED_PORTS_PER_HOST } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
@@ -40,28 +40,14 @@ export function validateAllowedPortBody(body: unknown): AllowedPortBody {
 	return { ok: true, port: payload.port, reason };
 }
 
-/** Verify host exists. Returns true if found. */
-async function hostExists(db: D1Database, hostId: string): Promise<boolean> {
-	const row = await db
-		.prepare("SELECT host_id FROM hosts WHERE host_id = ? LIMIT 1")
-		.bind(hostId)
-		.first<{ host_id: string }>();
-	return row !== null;
-}
-
 // ---------------------------------------------------------------------------
 // Bulk lookup
 // ---------------------------------------------------------------------------
 
 /** GET /api/allowed-ports — all ports grouped by host_id */
 export async function allowedPortsAllRoute(c: Context<AppEnv>) {
-	const db = c.env.DB;
-
-	const result = await db
-		.prepare("SELECT host_id, port FROM port_allowlist ORDER BY host_id, port")
-		.all<{ host_id: string; port: number }>();
-
-	return c.json(groupPortsByHost(result.results));
+	const grouped = await c.var.repos.ports.listAllByHost();
+	return c.json(grouped);
 }
 
 /**
@@ -105,27 +91,16 @@ export function groupPortsByHost(
 export async function hostAllowedPortsListRoute(
 	c: Context<AppEnv, "/api/hosts/:id/allowed-ports">,
 ) {
-	const db = c.env.DB;
 	const hostId = c.req.param("id");
-
-	// Verify host exists — return 404 instead of empty array for unknown hosts
-	if (!(await hostExists(db, hostId))) {
+	const result = await c.var.repos.ports.listForHost(hostId);
+	if (result.ok === "host_not_found") {
 		return c.json({ error: "Host not found" }, 404);
 	}
-
-	const result = await db
-		.prepare(
-			"SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? ORDER BY port ASC",
-		)
-		.bind(hostId)
-		.all<AllowedPort>();
-
-	return c.json(result.results);
+	return c.json(result.rows);
 }
 
 /** POST /api/hosts/:id/allowed-ports */
 export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:id/allowed-ports">) {
-	const db = c.env.DB;
 	const hostId = c.req.param("id");
 
 	let body: unknown;
@@ -139,51 +114,21 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 	if (!validated.ok) {
 		return c.json({ error: validated.error }, 400);
 	}
-	const { port, reason } = validated;
 
-	// Verify host exists
-	if (!(await hostExists(db, hostId))) {
+	const result = await c.var.repos.ports.addToHost(hostId, validated.port, validated.reason);
+	if (result.ok === "host_not_found") {
 		return c.json({ error: "Host not found" }, 404);
 	}
-
-	// Idempotent: if this port is already allowed, return it directly
-	const existing = await db
-		.prepare("SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? AND port = ?")
-		.bind(hostId, port)
-		.first<AllowedPort>();
-	if (existing) {
-		return c.json(existing, 201);
-	}
-
-	// Check entry limit (only for genuinely new ports)
-	const countRow = await db
-		.prepare("SELECT COUNT(*) as cnt FROM port_allowlist WHERE host_id = ?")
-		.bind(hostId)
-		.first<{ cnt: number }>();
-	if ((countRow?.cnt ?? 0) >= MAX_ALLOWED_PORTS_PER_HOST) {
+	if (result.ok === "limit_exceeded") {
 		return c.json({ error: `Maximum ${MAX_ALLOWED_PORTS_PER_HOST} allowed ports per host` }, 422);
 	}
-
-	// INSERT OR IGNORE (idempotent if port already allowed)
-	await db
-		.prepare("INSERT OR IGNORE INTO port_allowlist (host_id, port, reason) VALUES (?, ?, ?)")
-		.bind(hostId, port, reason)
-		.run();
-
-	// Return the inserted row
-	const row = await db
-		.prepare("SELECT port, reason, created_at FROM port_allowlist WHERE host_id = ? AND port = ?")
-		.bind(hostId, port)
-		.first<AllowedPort>();
-
-	return c.json(row, 201);
+	return c.json(result.row, 201);
 }
 
 /** DELETE /api/hosts/:id/allowed-ports/:port */
 export async function hostAllowedPortsRemoveRoute(
 	c: Context<AppEnv, "/api/hosts/:id/allowed-ports/:port">,
 ) {
-	const db = c.env.DB;
 	const hostId = c.req.param("id");
 	const port = parsePortParam(c.req.param("port"));
 
@@ -191,14 +136,9 @@ export async function hostAllowedPortsRemoveRoute(
 		return c.json({ error: "Invalid port number" }, 400);
 	}
 
-	const result = await db
-		.prepare("DELETE FROM port_allowlist WHERE host_id = ? AND port = ?")
-		.bind(hostId, port)
-		.run();
-
-	if (result.meta.changes === 0) {
+	const removed = await c.var.repos.ports.removeFromHost(hostId, port);
+	if (!removed) {
 		return c.json({ error: "Port not found in allowlist" }, 404);
 	}
-
 	return c.body(null, 204);
 }

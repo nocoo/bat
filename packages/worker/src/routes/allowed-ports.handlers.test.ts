@@ -2,6 +2,7 @@ import { Hono } from "hono";
 // Handler-level tests for allowed-ports (list + add), complementing the
 // existing wire-semantics tests for DELETE.
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
 import {
@@ -17,6 +18,7 @@ function mount(db: D1Database): Hono<AppEnv> {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
 		c.env = { DB: db, BAT_WRITE_KEY: "w", BAT_READ_KEY: "r" };
+		c.set("repos", createD1Repositories(db));
 		return next();
 	});
 	app.get("/api/allowed-ports", allowedPortsAllRoute);
