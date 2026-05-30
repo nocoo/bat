@@ -1,11 +1,18 @@
 # 20 — Phase 1: D1 Repository Refactor (v5)
 
-> Status: Draft v5 (v4 + 5 reviewer execution-edge fixes) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
+> Status: Draft v6 (v5 + 2 reviewer execution-edge fixes) · Owner: @MBP-SDE-A · Reviewer: @MBP-Reviewer-A · For: @zheng-li
 > Phase 1 = D1-only. **No KV** in this design. v1–v3 KV designs remain in git history (`00ec0a8`, `3b74fda`, `975ff57`) for if/when engine swap is revisited.
 
 ## 0. Changelog
 
-### v4 → v5 (this revision)
+### v5 → v6 (this revision)
+
+| # | v5 issue (reviewer) | v6 fix |
+|---|---|---|
+| Q1 | "SQL only in adapters/d1" conflicted with "one-shot `db.prepare` may stay in route/domain" | §3.5 rewritten: **zero D1/SQL access outside `adapters/d1/`**. Thin SQL becomes a small adapter method or an adapter-private helper — never inline in routes/middleware/domain/lib. §8 grep gate covers `packages/worker/src/**` minus `adapters/d1/`, tests, test-helpers. |
+| Q2 | Missing DB callsites and wrong endpoint paths | §3.1 adds `lib/resolve-host.ts` (→ folded into `HostsRepository.resolveByIdOrHid`); `routes/live.ts:SELECT 1 AS probe` (→ `HostsRepository.pingDatabase()`, no exception); `routes/monitoring.ts` direct SQL (→ assigned to C9 alongside the rest of host reads). §6.5 fixes endpoint paths (`/api/fleet/status`, `/api/hosts/:id/maintenance`) and adds the 4 `/api/monitoring/*` reads. |
+
+### v4 → v5
 
 | # | v4 issue (reviewer) | v5 fix |
 |---|---|---|
@@ -48,6 +55,9 @@
 | `services/tier2-alerts.ts` | Pure tier-2 evaluation rules | `domain/alerts/tier2.ts` |
 | `services/tier2-metrics.ts` | Tier2 snapshot upsert/read | `adapters/d1/tier2.ts` |
 | `services/status.ts` | Pure host-status derivation from alerts | `domain/status.ts` (pure; no DB) |
+| `lib/resolve-host.ts` | `resolveHostIdByHash(db, id)` — D1 lookup of opaque `hid` → real `host_id`; reused by `host-detail`/`metrics`/`tier2-read`/`monitoring` | DB part → `HostsRepository.resolveByIdOrHid(idOrHid)`; pure `isOpaqueHid` stays in `lib/` (or `domain/`) since it carries no I/O |
+| `routes/live.ts` | inline `SELECT 1 AS probe` health check | → `HostsRepository.pingDatabase()` (no inline-SQL exception kept) |
+| `routes/monitoring.ts` | direct D1 SQL across 4 monitoring endpoints | adapter calls land in `adapters/d1/hosts.ts` + reuse of existing repos; pure rule logic moves to `domain/monitoring.ts`. Scheduled in **C9** alongside the rest of host reads. |
 
 Two files **keep their name and path** because they have neither SQL nor non-trivial business logic: none, after classification. So after v5 lands, the `services/` directory is empty and can be removed.
 
@@ -74,25 +84,34 @@ Today's pure logic that ends up in `domain/`:
 After C11:
 
 ```bash
-# These should all return 0
-grep -rn "c\.env\.DB" packages/worker/src/routes packages/worker/src/middleware
-grep -rn "db\.prepare\|D1Database" packages/worker/src/routes packages/worker/src/middleware packages/worker/src/domain
+# Must return 0 hits across src/**, excluding adapters/d1, tests, and test-helpers
+grep -rn "c\.env\.DB\|D1Database\|db\.prepare\|db\.batch" packages/worker/src \
+  | grep -v "/adapters/d1/" \
+  | grep -v "\.test\.ts" \
+  | grep -v "/test-helpers/"
 ```
 
 And the `gate:routes`/`gate:pages` coverage gates plus the 95% unit-coverage gate stay green at every commit boundary.
 
-### 3.5 Repo inclusion rule (P5)
+### 3.5 SQL placement rule (Q1)
 
-A `Repository` method exists **only if** it carries SQL **and** at least one of:
+**Zero D1/SQL access outside `adapters/d1/`.** Concretely:
+
+- No `c.env.DB`, no `D1Database` typed param, no `db.prepare` / `db.batch` anywhere in `routes/**`, `middleware/**`, `domain/**`, `lib/**`, `index.ts`. The grep gate in §8 enforces this across `packages/worker/src/**` minus `adapters/d1/`, tests, and test-helpers.
+- A one-statement select is **not** an excuse to inline SQL. It either becomes a small method on the matching domain repo, or an **adapter-private helper** inside `adapters/d1/<domain>.ts`. The repo inclusion rule below decides which.
+
+**Repo *method* inclusion rule** (what becomes a public repo method vs. an adapter-private helper):
+
+A public `Repository` method exists when SQL plus at least one of:
 
 - a JOIN or FK-aware read that is hard to inline,
 - a uniqueness / invariant (`ON CONFLICT`, derived-id generation, ordered side-effects),
-- reuse across ≥ 2 routes or by cron / middleware,
+- reuse across ≥ 2 callers (routes / cron / middleware / other repos),
 - non-trivial behaviour worth its own contract test.
 
-A one-shot `db.prepare("SELECT 1 FROM settings WHERE key = ?")` does **not** become a repo method unless it meets the rule. The route or a `domain/` helper holds it. We are not auto-generating thin wrappers.
+Otherwise the SQL becomes a **private** function inside the adapter file (`adapters/d1/<domain>.ts`), called by the public methods of that adapter. It is never exposed on the repo interface and never imported from `routes/**`.
 
-This is the rule reviewers should hold us to in C2-C9.
+This way "no thin SQL wrapper on the public interface" and "zero SQL in routes/middleware/domain/lib" both hold — there is no conflict.
 
 ## 4. `c.var.repos` wiring (concrete)
 
@@ -230,8 +249,8 @@ The C0 snapshot covers:
 - `GET /api/hosts/:id`
 - `GET /api/hosts/:id/metrics?window=24h`
 - `GET /api/hosts/:id/metrics?window=7d`
+- `GET /api/hosts/:id/maintenance`
 - `GET /api/alerts`
-- `GET /api/maintenance`
 - `GET /api/webhooks`
 - `GET /api/allowed-ports`
 - `GET /api/agents`
@@ -239,8 +258,12 @@ The C0 snapshot covers:
 - `GET /api/bindings`
 - `GET /api/tags`
 - `GET /api/settings`
-- `GET /api/fleet-status`
-- `GET /api/live` (limit 10)
+- `GET /api/fleet/status`
+- `GET /api/live?limit=10`
+- `GET /api/monitoring/hosts`
+- `GET /api/monitoring/hosts/:id`
+- `GET /api/monitoring/groups`
+- `GET /api/monitoring/alerts`
 
 Write endpoints aren't snapshotted directly (volatile by design); instead the snapshot test does `PATCH /api/hosts/:id/description`, then re-fetches `GET /api/hosts/:id`, then asserts the description changed and the rest of the JSON did not. Similar pattern for `POST /api/identity`, `POST /api/metrics`, `POST /api/events`, `POST /api/maintenance`, the agents/assets/bindings CRUD, and the cron `aggregateHour` invocation.
 
@@ -261,7 +284,7 @@ Each commit ships green for `lint` + `typecheck` + `test` + `gate:routes` + `gat
 | C6 | `AgentsRepository` + `CliTokensRepository`. `upsertBy` keeps today's `ON CONFLICT(source_key, match_key)`. Middleware `api-key` switches to `c.var.repos.cliTokens` (drops dynamic import). | 2 domains |
 | C7 | `AlertsRepository` (state + pending CRUD only). Move alert evaluation pure logic to `domain/alerts/{evaluate,tier2}.ts` in the same commit (no behaviour change; same inputs, same outputs). | 1 domain + 1 domain helper extraction |
 | C8 | `EventsRepository`. | 1 domain |
-| C9 | `HostsRepository` — read paths (`list`, `getById`) + status helper extraction to `domain/status.ts`. Dashboard list logic stays in route; only the data access moves. | 1 domain (read) |
+| C9 | `HostsRepository` — read paths (`list`, `getById`, `resolveByIdOrHid`, `pingDatabase`) + status helper extraction to `domain/status.ts` + `routes/monitoring.ts` (4 endpoints) and `routes/live.ts` and `routes/fleet-status.ts` rewired through the repo; pure monitoring rule logic moves to `domain/monitoring.ts`. | hosts read surface + monitoring |
 | C10 | `MetricsRepository` (`appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour`) + remaining write paths on `HostsRepository` (`upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`/`unretire`). Largest single move (`metrics_raw` insert). | 1 large domain + finish hosts |
 | C11 | `AggregationRepository` (`aggregateHour`, `purgeRaw`, `purgeHourly`). Pure roll-up math lives in `domain/aggregation.ts`. Cron handler uses the factory. Final cleanup: remove `services/` if empty, delete `RUN_DIFF.md`, re-run C0 snapshot test. | cron + cleanup |
 
@@ -271,12 +294,11 @@ Total: **11 commits + 1 baseline (C0)**. Reviewer-friendly per-commit scope, no 
 
 After C11, the following invariants hold and are enforced by grep tests in CI:
 
-1. `grep -rn "c\.env\.DB" packages/worker/src/{routes,middleware,domain}` → **0 hits**.
-2. `grep -rn "db\.prepare\|D1Database" packages/worker/src/{routes,middleware,domain}` → **0 hits**.
-3. `services/` directory is empty or deleted.
-4. Total `packages/worker/src` LOC: **delta ≤ +5%** vs pre-refactor (we move > add).
-5. Route file LOC delta: **≤ -10%** on average (SQL strings move out).
-6. Existing test count grows (contract + baseline) but **per-test setup LOC shrinks** in route tests — measured as average lines between `describe(` and the first `test(` block.
+1. `grep -rn "c\.env\.DB\|D1Database\|db\.prepare\|db\.batch" packages/worker/src` excluding `packages/worker/src/adapters/d1/**`, `**/*.test.ts`, and `test-helpers/**` → **0 hits**.
+2. `services/` directory is empty or deleted (consequence of §3.1 classification, not a goal).
+3. Total `packages/worker/src` LOC: **delta ≤ +5%** vs pre-refactor (we move > add).
+4. Route file LOC delta: **≤ -10%** on average (SQL strings move out).
+5. Existing test count grows (contract + baseline) but **per-test setup LOC shrinks** in route tests — measured as average lines between `describe(` and the first `test(` block.
 
 ## 9. Behaviour preservation guards (re-emphasized)
 
