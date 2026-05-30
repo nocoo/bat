@@ -12,13 +12,13 @@ import type {
 	CliTokensRepository,
 	EventsRepository,
 	HostsRepository,
-	MaintenanceRepository,
 	MetricsRepository,
-	PortAllowlistRepository,
 	Repositories,
 	TagsRepository,
 	Tier2Repository,
 } from "../../repos/types.js";
+import { D1PortAllowlistRepository } from "./allowed-ports.js";
+import { D1MaintenanceRepository } from "./maintenance.js";
 import { D1SettingsRepository } from "./settings.js";
 import { D1WebhooksRepository } from "./webhooks.js";
 
@@ -26,9 +26,7 @@ const EMPTY_HOSTS: HostsRepository = Object.freeze({});
 const EMPTY_METRICS: MetricsRepository = Object.freeze({});
 const EMPTY_ALERTS: AlertsRepository = Object.freeze({});
 const EMPTY_EVENTS: EventsRepository = Object.freeze({});
-const EMPTY_PORTS: PortAllowlistRepository = Object.freeze({});
 const EMPTY_TAGS: TagsRepository = Object.freeze({});
-const EMPTY_MAINTENANCE: MaintenanceRepository = Object.freeze({});
 const EMPTY_AGENTS: AgentsRepository = Object.freeze({});
 const EMPTY_ASSETS: AssetsRepository = Object.freeze({});
 const EMPTY_BINDINGS: BindingsRepository = Object.freeze({});
@@ -48,10 +46,10 @@ export function createD1Repositories(db: D1Database): Repositories {
 		alerts: EMPTY_ALERTS,
 		events: EMPTY_EVENTS,
 		webhooks: new D1WebhooksRepository(db),
-		ports: EMPTY_PORTS,
+		ports: new D1PortAllowlistRepository(db),
 		tags: EMPTY_TAGS,
 		settings: new D1SettingsRepository(db),
-		maintenance: EMPTY_MAINTENANCE,
+		maintenance: new D1MaintenanceRepository(db),
 		agents: EMPTY_AGENTS,
 		assets: EMPTY_ASSETS,
 		bindings: EMPTY_BINDINGS,

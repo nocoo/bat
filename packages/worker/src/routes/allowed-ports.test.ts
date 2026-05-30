@@ -2,12 +2,14 @@
 // Specifically pins the wire contract for :port validation so future
 // refactors don't silently narrow the accepted range.
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 import { hostAllowedPortsRemoveRoute } from "./allowed-ports.js";
 
 function makeContext(db: D1Database, hostId: string, portParam: string) {
 	return {
 		env: { DB: db },
+		var: { repos: createD1Repositories(db) },
 		req: {
 			param: (key: string) => {
 				if (key === "id") {

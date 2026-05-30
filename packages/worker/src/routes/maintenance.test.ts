@@ -1,5 +1,6 @@
 // Maintenance CRUD route tests
 import { beforeEach, describe, expect, test } from "vitest";
+import { createD1Repositories } from "../adapters/d1/factory.js";
 import { createMockD1 } from "../test-helpers/mock-d1.js";
 
 import { maintenanceDeleteRoute, maintenanceGetRoute, maintenanceSetRoute } from "./maintenance.js";
@@ -7,6 +8,7 @@ import { maintenanceDeleteRoute, maintenanceGetRoute, maintenanceSetRoute } from
 function makeContext(db: D1Database, method: string, idParam: string, body?: unknown) {
 	return {
 		env: { DB: db },
+		var: { repos: createD1Repositories(db) },
 		req: {
 			param: (key: string) => (key === "id" ? idParam : ""),
 			method,
@@ -332,6 +334,7 @@ describe("maintenance CRUD routes", () => {
 		test("invalid JSON body → 400", async () => {
 			const c = {
 				env: { DB: db },
+				var: { repos: createD1Repositories(db) },
 				req: {
 					param: (key: string) => (key === "id" ? HOST_ID : ""),
 					method: "PUT",
