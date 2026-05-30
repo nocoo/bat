@@ -1,20 +1,9 @@
 // Settings CRUD routes
 // GET  /api/settings  — read current settings (read key)
 // PUT  /api/settings  — update settings (write key)
-import { type RetentionDays, parseRetentionDays } from "@bat/shared";
+import { parseRetentionDays } from "@bat/shared";
 import type { Context } from "hono";
-import { D1SettingsRepository } from "../adapters/d1/settings.js";
 import type { AppEnv } from "../types.js";
-
-/**
- * Read retention_days. Legacy free-function entry point kept while the
- * cron `services/aggregation.ts` consumer still takes a raw D1 binding;
- * delegates to the same `D1SettingsRepository` the routes use through
- * `c.var.repos.settings`. Removed in C11 when aggregation migrates.
- */
-export async function getRetentionDays(db: D1Database): Promise<RetentionDays> {
-	return new D1SettingsRepository(db).getRetentionDays();
-}
 
 /** GET /api/settings — returns current settings */
 export async function settingsGetRoute(c: Context<AppEnv>) {

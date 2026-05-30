@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, test } from "vitest";
 import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
-import { getRetentionDays, settingsGetRoute, settingsPutRoute } from "./settings";
+import { settingsGetRoute, settingsPutRoute } from "./settings";
 
 function mount(db: D1Database): Hono<AppEnv> {
 	const app = new Hono<AppEnv>();
@@ -155,27 +155,6 @@ describe("settings routes", () => {
 			});
 			expect(res.status).toBe(200);
 			expect(await res.json()).toEqual({ retention_days: 1 });
-		});
-	});
-
-	describe("getRetentionDays helper", () => {
-		test("returns 7 from seeded DB", async () => {
-			expect(await getRetentionDays(db)).toBe(7);
-		});
-
-		test("returns updated value after PUT", async () => {
-			await db.prepare("UPDATE settings SET value = '30' WHERE key = 'retention_days'").run();
-			expect(await getRetentionDays(db)).toBe(30);
-		});
-
-		test("returns 7 for bad stored value", async () => {
-			await db.prepare("UPDATE settings SET value = 'garbage' WHERE key = 'retention_days'").run();
-			expect(await getRetentionDays(db)).toBe(7);
-		});
-
-		test("returns 7 for missing row", async () => {
-			await db.prepare("DELETE FROM settings WHERE key = 'retention_days'").run();
-			expect(await getRetentionDays(db)).toBe(7);
 		});
 	});
 });
