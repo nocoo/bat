@@ -72,4 +72,42 @@ describe("L2: hosts detail + alerts", () => {
 		const res = await fetch(`${BASE}/api/hosts/nonexistent-host-xyz`, { headers: readHeaders() });
 		expect(res.status).toBe(404);
 	});
+
+	test("PATCH /api/hosts/:id/description → updates description", async () => {
+		const hid = hashHostId(HID);
+		const setRes = await fetch(`${BASE}/api/hosts/${hid}/description`, {
+			method: "PATCH",
+			headers: writeHeaders(),
+			body: JSON.stringify({ description: "primary api node" }),
+		});
+		expect(setRes.status).toBe(204);
+
+		const detailRes = await fetch(`${BASE}/api/hosts/${hid}`, { headers: readHeaders() });
+		const detail = (await detailRes.json()) as HostDetailItem;
+		expect(detail.description).toBe("primary api node");
+
+		const clearRes = await fetch(`${BASE}/api/hosts/${hid}/description`, {
+			method: "PATCH",
+			headers: writeHeaders(),
+			body: JSON.stringify({ description: null }),
+		});
+		expect(clearRes.status).toBe(204);
+	});
+
+	test("PATCH /api/hosts/:id/description → 400 on missing field, 404 on unknown host", async () => {
+		const hid = hashHostId(HID);
+		const missing = await fetch(`${BASE}/api/hosts/${hid}/description`, {
+			method: "PATCH",
+			headers: writeHeaders(),
+			body: JSON.stringify({}),
+		});
+		expect(missing.status).toBe(400);
+
+		const unknown = await fetch(`${BASE}/api/hosts/nonexistent-host-xyz/description`, {
+			method: "PATCH",
+			headers: writeHeaders(),
+			body: JSON.stringify({ description: "x" }),
+		});
+		expect(unknown.status).toBe(404);
+	});
 });
