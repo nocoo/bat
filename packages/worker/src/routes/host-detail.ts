@@ -2,6 +2,7 @@
 import type { HostDetailItem } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { freshestLastSeen, loadLastSeen } from "../lib/host-lastseen-cache.js";
 import { extractNetRates, extractRootDiskPct, safeParse } from "../lib/json-helpers.js";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import { deriveHostStatus } from "../services/status.js";
@@ -24,16 +25,18 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 
 	const now = Math.floor(Date.now() / 1000);
 
-	const [latestRows, alerts, allowedByHost] = await Promise.all([
+	const [latestRows, alerts, allowedByHost, observedSnap] = await Promise.all([
 		repos.hosts.getLatestMetricsBatch([hostId]),
 		repos.alerts.listForHosts([hostId]),
 		repos.ports.listForHosts([hostId]),
+		loadLastSeen(c.env.BAT_KV, hostId),
 	]);
 	const metrics = latestRows[0] ?? null;
 	const allowedPorts = allowedByHost.get(hostId);
 
 	const maintenance = getMaintenanceWindow(host);
-	const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
+	const lastSeen = freshestLastSeen(host.last_seen, observedSnap?.last_observed_at);
+	const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts, maintenance);
 	const inMaintenance =
 		maintenance !== null &&
 		isInMaintenanceWindow(toUtcHHMM(now), maintenance.start, maintenance.end);
@@ -53,7 +56,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		cpu_usage_pct: metrics?.cpu_usage_pct ?? null,
 		mem_used_pct: metrics?.mem_used_pct ?? null,
 		uptime_seconds: metrics?.uptime_seconds ?? null,
-		last_seen: host.last_seen,
+		last_seen: lastSeen,
 		alert_count: inMaintenance ? 0 : alerts.length,
 		cpu_logical: host.cpu_logical,
 		cpu_physical: host.cpu_physical,

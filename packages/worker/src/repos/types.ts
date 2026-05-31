@@ -245,13 +245,16 @@ export interface MetricsRepository {
 	/** Atomic batch: host upsert + metrics_raw INSERT OR IGNORE.
 	 *  Returns whether the metrics row was newly inserted (false on duplicate).
 	 *  `mode = "first-seen"` issues an INSERT … ON CONFLICT … last_seen update
-	 *  for the host; `mode = "existing"` issues a plain UPDATE. */
+	 *  for the host; `mode = "existing"` issues a plain UPDATE;
+	 *  `mode = "skip-host-touch"` only INSERTs metrics_raw (caller has
+	 *  guaranteed the host row exists and a recent `last_seen` flush is
+	 *  cached in KV — used by the 5min throttle in `/api/ingest`). */
 	insertRawWithHostUpsert(
 		hostId: string,
 		hostname: string,
 		payload: MetricsPayload,
 		nowSeconds: number,
-		mode: "first-seen" | "existing",
+		mode: "first-seen" | "existing" | "skip-host-touch",
 	): Promise<{ inserted: boolean }>;
 }
 

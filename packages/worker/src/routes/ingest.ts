@@ -2,6 +2,7 @@
 import type { MetricsPayload } from "@bat/shared";
 import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { loadLastSeen, recordSnapshot, shouldFlushLastSeen } from "../lib/host-lastseen-cache.js";
 import type { AppEnv } from "../types.js";
 
 const CLOCK_SKEW_MAX_SECONDS = 300;
@@ -137,17 +138,40 @@ export async function ingestRoute(c: Context<AppEnv>) {
 
 	// Atomic batch: host upsert + metrics_raw INSERT OR IGNORE.
 	// - First-seen host: INSERT … ON CONFLICT … bumps last_seen.
-	// - Existing host:   plain UPDATE last_seen.
+	// - Existing host:   plain UPDATE last_seen, UNLESS a recent KV snapshot
+	//   says we flushed within the 5min throttle window — then skip the
+	//   host UPDATE and only insert metrics_raw.
 	// We rely on the metrics insert's `meta.changes` to learn whether the
 	// row was newly inserted (and we should evaluate alerts) vs. a duplicate
 	// retried payload.
+	let mode: "first-seen" | "existing" | "skip-host-touch";
+	let priorFlushAt: number | null = null;
+	if (existing == null) {
+		mode = "first-seen";
+	} else {
+		const snapshot = await loadLastSeen(c.env.BAT_KV, body.host_id);
+		priorFlushAt = snapshot?.last_flush_at ?? null;
+		mode = shouldFlushLastSeen({ now: workerNow, snapshot }) ? "existing" : "skip-host-touch";
+	}
+
 	const { inserted } = await repos.metrics.insertRawWithHostUpsert(
 		body.host_id,
 		body.host_id,
 		body,
 		workerNow,
-		existing == null ? "first-seen" : "existing",
+		mode,
 	);
+
+	// Record an updated KV snapshot AFTER the D1 batch succeeds. `last_observed_at`
+	// always advances to `now` so the dashboard read overlay sees an actively
+	// reporting host. `last_flush_at` advances only when we actually wrote
+	// `hosts.last_seen` — otherwise we keep the previous flush time (or `now`
+	// if a flush was issued in any of the modes that touch the column).
+	const flushedNow = mode !== "skip-host-touch";
+	await recordSnapshot(c.env.BAT_KV, body.host_id, {
+		last_observed_at: workerNow,
+		last_flush_at: flushedNow ? workerNow : (priorFlushAt ?? workerNow),
+	});
 
 	// Only evaluate alerts for genuinely new data — retried payloads with
 	// identical timestamps are no-ops from here.
