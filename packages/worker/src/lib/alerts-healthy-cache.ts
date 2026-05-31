@@ -1,10 +1,10 @@
 // Ingest alert healthy sentinel.
 //
 // `evaluateAlerts` reads alert_states + alert_pending for a host on every
-// metrics ingest. When a host has been healthy for a while the rule evaluator
-// returns an empty `results` array and both tables are also empty — that's 2
-// D1 reads / ingest with no writes / 90 calls per 15min for 6 hosts = 180
-// stmts that contribute nothing.
+// metrics ingest. When a host has been healthy for a while every rule's
+// `fired` flag is false (i.e. `results.every(r => !r.fired)`) and both
+// tables are also empty — that's 2 D1 reads / ingest with no writes / 90
+// calls per 15min for 6 hosts = 180 stmts that contribute nothing.
 //
 // Optimisation: keep a short-lived KV sentinel `bat:host:alerts:empty:{host}`.
 // When the worker has just observed (active=0, pending=0) AND the new payload

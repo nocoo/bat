@@ -42,6 +42,15 @@ binding = "DB"
 database_name = "bat-db"
 database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 
+# Optional KV namespace for D1 query reduction (T1 token cache + revoke
+# sentinel, T2 heartbeat snapshot, T3 healthy alert sentinel, T4 dashboard
+# JSON cache). Leave commented out until @zheng-li provides the production
+# namespace id; while absent, every KV-backed path falls back to D1 and
+# behaves identically to pre-T1 code.
+# [[env.production.kv_namespaces]]
+# binding = "BAT_KV"
+# id = "<TODO: production namespace id>"
+
 [env.production.vars]
 ENVIRONMENT = "production"
 
