@@ -107,8 +107,12 @@ function DescriptionEditor({
 				value={draft}
 				onChange={(e) => setDraft(e.target.value)}
 				onKeyDown={(e) => {
-					if (e.key === "Enter") save();
-					if (e.key === "Escape") cancel();
+					if (e.key === "Enter") {
+						save();
+					}
+					if (e.key === "Escape") {
+						cancel();
+					}
 				}}
 				onBlur={save}
 				className="w-full rounded border border-border bg-secondary px-2 py-0.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"

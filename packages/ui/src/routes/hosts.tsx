@@ -33,6 +33,8 @@ function sortHosts(hosts: HostOverviewItem[], key: SortKey): HostOverviewItem[] 
 				return (b.mem_used_pct ?? -1) - (a.mem_used_pct ?? -1);
 			case "disk":
 				return (b.disk_root_used_pct ?? -1) - (a.disk_root_used_pct ?? -1);
+			default:
+				return 0;
 		}
 	});
 }
