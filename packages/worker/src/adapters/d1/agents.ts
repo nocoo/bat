@@ -3,6 +3,12 @@
 
 import { generateId } from "@bat/shared";
 import type { AgentHeartbeatEntry, AgentHeartbeatResponse, AgentItem, AgentRow } from "@bat/shared";
+import {
+	HEARTBEAT_THROTTLE_SECONDS,
+	loadSnapshot,
+	shouldFlush,
+	writeSnapshot,
+} from "../../lib/heartbeat-cache.js";
 import type { AgentsRepository } from "../../repos/types.js";
 
 interface TagRef {
@@ -240,7 +246,11 @@ export class D1AgentsRepository implements AgentsRepository {
 		sourceKey: string,
 		agents: AgentHeartbeatEntry[],
 		nowSeconds: number,
+		opts?: { kv?: KVNamespace | undefined; throttleSeconds?: number },
 	): Promise<AgentHeartbeatResponse> {
+		const kv = opts?.kv;
+		const throttleSeconds = opts?.throttleSeconds ?? HEARTBEAT_THROTTLE_SECONDS;
+
 		const existingRows = await this.db
 			.prepare("SELECT id, match_key, status FROM agents WHERE source_key = ?")
 			.bind(sourceKey)
@@ -252,6 +262,7 @@ export class D1AgentsRepository implements AgentsRepository {
 		}
 
 		const statements: D1PreparedStatement[] = [];
+		const snapshotsToWrite: { matchKey: string; entry: AgentHeartbeatEntry }[] = [];
 		let updated = 0;
 		let created = 0;
 		let missing = 0;
@@ -261,22 +272,44 @@ export class D1AgentsRepository implements AgentsRepository {
 			reportedMatchKeys.add(entry.match_key);
 			const existing = existingByMatchKey.get(entry.match_key);
 			if (existing) {
-				const setClauses: string[] = ["status = ?", "last_seen_at = ?"];
-				const bindings: unknown[] = [entry.status, nowSeconds];
-				if ("runtime_app" in entry) {
-					setClauses.push("runtime_app = ?");
-					bindings.push(entry.runtime_app ?? null);
+				// Throttle decision: when status + runtime fields are unchanged and the
+				// last D1 flush was <throttle ago, skip the UPDATE statement.
+				const snapshot = await loadSnapshot(kv, sourceKey, entry.match_key);
+				const flush = shouldFlush({
+					now: nowSeconds,
+					existingStatus: existing.status as AgentHeartbeatEntry["status"],
+					entryStatus: entry.status,
+					entryRuntimeAppProvided: "runtime_app" in entry,
+					entryRuntimeApp: entry.runtime_app,
+					entryRuntimeVersionProvided: "runtime_version" in entry,
+					entryRuntimeVersion: entry.runtime_version,
+					snapshot,
+					throttleSeconds,
+				});
+
+				if (flush) {
+					const setClauses: string[] = ["status = ?", "last_seen_at = ?"];
+					const bindings: unknown[] = [entry.status, nowSeconds];
+					if ("runtime_app" in entry) {
+						setClauses.push("runtime_app = ?");
+						bindings.push(entry.runtime_app ?? null);
+					}
+					if ("runtime_version" in entry) {
+						setClauses.push("runtime_version = ?");
+						bindings.push(entry.runtime_version ?? null);
+					}
+					bindings.push(existing.id);
+					statements.push(
+						this.db
+							.prepare(`UPDATE agents SET ${setClauses.join(", ")} WHERE id = ?`)
+							.bind(...bindings),
+					);
+					snapshotsToWrite.push({ matchKey: entry.match_key, entry });
 				}
-				if ("runtime_version" in entry) {
-					setClauses.push("runtime_version = ?");
-					bindings.push(entry.runtime_version ?? null);
-				}
-				bindings.push(existing.id);
-				statements.push(
-					this.db
-						.prepare(`UPDATE agents SET ${setClauses.join(", ")} WHERE id = ?`)
-						.bind(...bindings),
-				);
+
+				// `updated` always reflects the count of reported existing entries —
+				// not the count of D1 UPDATEs actually emitted. Throttling is an
+				// implementation detail, not part of the response contract.
 				updated++;
 			} else {
 				const id = generateId("agt_");
@@ -307,6 +340,7 @@ export class D1AgentsRepository implements AgentsRepository {
 							nowSeconds,
 						),
 				);
+				snapshotsToWrite.push({ matchKey: entry.match_key, entry });
 				created++;
 			}
 		}
@@ -322,6 +356,21 @@ export class D1AgentsRepository implements AgentsRepository {
 
 		if (statements.length > 0) {
 			await this.db.batch(statements);
+		}
+
+		// Refresh KV snapshots only after the D1 batch succeeded — a snapshot
+		// must never claim a flush time that did not actually land in D1.
+		if (kv && snapshotsToWrite.length > 0) {
+			await Promise.all(
+				snapshotsToWrite.map(({ matchKey, entry }) =>
+					writeSnapshot(kv, sourceKey, matchKey, {
+						status: entry.status,
+						runtime_app: "runtime_app" in entry ? (entry.runtime_app ?? null) : null,
+						runtime_version: "runtime_version" in entry ? (entry.runtime_version ?? null) : null,
+						last_flush_at: nowSeconds,
+					}),
+				),
+			);
 		}
 
 		return { updated, created, missing };

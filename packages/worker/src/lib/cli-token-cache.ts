@@ -1,8 +1,8 @@
 // CLI token KV cache + revoke sentinel.
 //
 // Goal: cut the per-request D1 SELECT + UPDATE that `cliTokens.findByHashAndTouch`
-// runs on every authenticated CLI call. With heartbeat at 60s and 6 hosts that
-// is ~720 D1 statements / 15min on the auth path alone.
+// runs on every authenticated CLI call. With CLI heartbeats at 60s and 6 hosts
+// that is ~180 D1 statements / 15min on the auth path alone (2 stmts × 90 calls).
 //
 // Validation order MUST be:
 //   1. revoked sentinel  (`bat:clitoken:revoked:{hash}`)

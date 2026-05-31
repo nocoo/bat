@@ -630,3 +630,77 @@ describe("processHeartbeat ON CONFLICT (race path)", () => {
 		expect(row2?.runtime_version).toBeNull();
 	});
 });
+
+describe("agentsHeartbeatRoute KV throttle wiring (Task #15 T2)", () => {
+	test("forwards BAT_KV binding to repos.agents.processHeartbeat", async () => {
+		let captured: { kv?: unknown; throttleSeconds?: number } | undefined;
+		const fakeRepos = {
+			agents: {
+				processHeartbeat: async (
+					_src: string,
+					_agents: AgentHeartbeatEntry[],
+					_now: number,
+					opts?: { kv?: KVNamespace; throttleSeconds?: number },
+				) => {
+					captured = opts;
+					return { updated: 0, created: 0, missing: 0 };
+				},
+			},
+		};
+		const fakeKv = { __kv: true } as unknown as KVNamespace;
+		const ctx = {
+			env: { DB: {} as D1Database, BAT_WRITE_KEY: "w", BAT_READ_KEY: "r", BAT_KV: fakeKv },
+			var: { repos: fakeRepos },
+			req: {
+				text: async () =>
+					JSON.stringify({
+						source_key: "sk",
+						agents: [{ match_key: "mk", status: "running" }],
+					}),
+			},
+			json: (data: unknown, status?: number) =>
+				new Response(JSON.stringify(data), { status: status ?? 200 }),
+			body: (_d: unknown, status?: number) => new Response(null, { status: status ?? 200 }),
+			// biome-ignore lint/suspicious/noExplicitAny: test helper
+		} as any;
+
+		const res = await agentsHeartbeatRoute(ctx);
+		expect(res.status).toBe(200);
+		expect(captured?.kv).toBe(fakeKv);
+	});
+
+	test("forwards undefined when BAT_KV is absent", async () => {
+		let captured: { kv?: unknown } | undefined;
+		const fakeRepos = {
+			agents: {
+				processHeartbeat: async (
+					_src: string,
+					_agents: AgentHeartbeatEntry[],
+					_now: number,
+					opts?: { kv?: KVNamespace },
+				) => {
+					captured = opts;
+					return { updated: 0, created: 0, missing: 0 };
+				},
+			},
+		};
+		const ctx = {
+			env: { DB: {} as D1Database, BAT_WRITE_KEY: "w", BAT_READ_KEY: "r" },
+			var: { repos: fakeRepos },
+			req: {
+				text: async () =>
+					JSON.stringify({
+						source_key: "sk",
+						agents: [{ match_key: "mk", status: "running" }],
+					}),
+			},
+			json: (data: unknown, status?: number) =>
+				new Response(JSON.stringify(data), { status: status ?? 200 }),
+			body: (_d: unknown, status?: number) => new Response(null, { status: status ?? 200 }),
+			// biome-ignore lint/suspicious/noExplicitAny: test helper
+		} as any;
+
+		await agentsHeartbeatRoute(ctx);
+		expect(captured?.kv).toBeUndefined();
+	});
+});
