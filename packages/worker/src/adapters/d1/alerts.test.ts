@@ -228,6 +228,29 @@ describe("D1AlertsRepository", () => {
 		test("no-op when host has no pending rows", async () => {
 			await expect(repo.clearPendingForHost(HOST_A)).resolves.toBeUndefined();
 		});
+
+		test("invalidates the healthy sentinel when KV is provided (Task #16 T3)", async () => {
+			const store = new Map<string, { value: string; ttl?: number }>();
+			const kv = {
+				get: async (key: string) => store.get(key)?.value ?? null,
+				put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+					store.set(key, { value, ttl: opts?.expirationTtl });
+				},
+				delete: async (key: string) => {
+					store.delete(key);
+				},
+				list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+				getWithMetadata: async () => ({ value: null, metadata: null }),
+			} as unknown as KVNamespace;
+			store.set(`bat:host:alerts:empty:${HOST_A}`, { value: "1" });
+
+			await repo.clearPendingForHost(HOST_A, { kv });
+			expect(store.has(`bat:host:alerts:empty:${HOST_A}`)).toBe(false);
+		});
+
+		test("works without KV (no-op invalidate)", async () => {
+			await expect(repo.clearPendingForHost(HOST_A, {})).resolves.toBeUndefined();
+		});
 	});
 
 	describe("listForHosts + countByHost (read-model for hosts list/detail/fleet/monitoring)", () => {

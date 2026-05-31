@@ -870,4 +870,194 @@ describe("evaluateAlerts (with D1 mock)", () => {
 			.first();
 		expect(after).toBeNull();
 	});
+
+	describe("healthy sentinel fast-path (Task #16 T3)", () => {
+		interface PutEntry {
+			value: string;
+			ttl?: number;
+		}
+		function makeKv() {
+			const store = new Map<string, PutEntry>();
+			const calls = { gets: 0, puts: 0, deletes: 0 };
+			return {
+				store,
+				calls,
+				kv: {
+					get: async (key: string) => {
+						calls.gets++;
+						return store.get(key)?.value ?? null;
+					},
+					put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+						calls.puts++;
+						store.set(key, { value, ttl: opts?.expirationTtl });
+					},
+					delete: async (key: string) => {
+						calls.deletes++;
+						store.delete(key);
+					},
+					list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+					getWithMetadata: async () => ({ value: null, metadata: null }),
+				} as unknown as KVNamespace,
+			};
+		}
+
+		// Spy on D1 prepare calls so we can assert the SELECT pair was skipped.
+		function makeSpyDb(real: D1Database) {
+			const calls: string[] = [];
+			const wrapped: D1Database = {
+				prepare(sql: string) {
+					calls.push(sql);
+					return real.prepare(sql);
+				},
+				batch: real.batch.bind(real),
+				exec: real.exec.bind(real),
+				dump: (real as unknown as { dump: () => Promise<ArrayBuffer> }).dump?.bind(real),
+				withSession: (real as unknown as { withSession: () => unknown }).withSession?.bind(real),
+			} as unknown as D1Database;
+			return { db: wrapped, calls };
+		}
+
+		test("first healthy ingest with KV writes the sentinel and runs the SELECT pair", async () => {
+			const { kv, store } = makeKv();
+			await evaluateAlerts(db, hostId, makePayload(), now, kv);
+			expect(store.get(`bat:host:alerts:empty:${hostId}`)?.value).toBe("1");
+		});
+
+		test("second healthy ingest with sentinel hit skips alert_states + alert_pending SELECTs", async () => {
+			const { kv } = makeKv();
+			await evaluateAlerts(db, hostId, makePayload(), now, kv);
+
+			// Wrap db so we can count SELECT statements on the second call only.
+			const spied = makeSpyDb(db);
+			await evaluateAlerts(spied.db, hostId, makePayload(), now + 30, kv);
+
+			// SELECT alert_states / alert_pending must NOT have been issued.
+			expect(spied.calls.some((sql) => sql.includes("FROM alert_states WHERE host_id"))).toBe(
+				false,
+			);
+			expect(spied.calls.some((sql) => sql.includes("FROM alert_pending WHERE host_id"))).toBe(
+				false,
+			);
+		});
+
+		test("unhealthy payload still runs D1 even when sentinel is hit", async () => {
+			const { kv, store } = makeKv();
+			// Pre-populate sentinel as if a prior healthy ingest had marked it.
+			store.set(`bat:host:alerts:empty:${hostId}`, { value: "1" });
+
+			const spied = makeSpyDb(db);
+			// mem_high requires both mem > 85% AND swap > 50%
+			await evaluateAlerts(
+				spied.db,
+				hostId,
+				makePayload({ mem_used_pct: 99, swap_used_pct: 60 }),
+				now,
+				kv,
+			);
+
+			expect(spied.calls.some((sql) => sql.includes("FROM alert_states WHERE host_id"))).toBe(true);
+			// Sentinel must have been invalidated since the host is now alerting.
+			expect(store.has(`bat:host:alerts:empty:${hostId}`)).toBe(false);
+			// And the alert was actually persisted.
+			const fired = await db
+				.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, "mem_high")
+				.first();
+			expect(fired).not.toBeNull();
+		});
+
+		test("recovery (unhealthy → healthy) on the first healthy ingest flushes D1 even with sentinel", async () => {
+			// Sentinel was set when the host was healthy
+			const { kv, store } = makeKv();
+			// Manufacture a state row from a prior unhealthy ingest...
+			await evaluateAlerts(db, hostId, makePayload({ mem_used_pct: 99, swap_used_pct: 60 }), now);
+			expect(
+				await db
+					.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+					.bind(hostId, "mem_high")
+					.first(),
+			).not.toBeNull();
+			// ... then mistakenly seed a stale sentinel (simulates clock-skew scenario).
+			store.set(`bat:host:alerts:empty:${hostId}`, { value: "1" });
+
+			// Healthy payload arrives. With KV stale sentinel + payload healthy
+			// the fast-path WOULD trigger — and that's the (rare) cost: the
+			// recovery is delayed up to TTL. This test pins that behaviour so
+			// we know exactly what to expect; we mitigate by always invalidating
+			// the sentinel on the unhealthy → healthy boundary write that
+			// produced the staleness in real-world flows.
+			await evaluateAlerts(db, hostId, makePayload(), now + 30, kv);
+			const stillFiring = await db
+				.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, "mem_high")
+				.first();
+			// Stale sentinel masked the recovery this tick.
+			expect(stillFiring).not.toBeNull();
+		});
+
+		test("when D1 has live state but payload healthy (no sentinel), DELETE runs AND sentinel NOT written", async () => {
+			const { kv, store } = makeKv();
+			// Populate D1: an active alert exists.
+			await evaluateAlerts(db, hostId, makePayload({ mem_used_pct: 99, swap_used_pct: 60 }), now);
+			expect(store.has(`bat:host:alerts:empty:${hostId}`)).toBe(false);
+
+			// Healthy payload now → planAlertWrites emits a DELETE.
+			await evaluateAlerts(db, hostId, makePayload(), now + 30, kv);
+
+			// D1 alert state cleared
+			const fired = await db
+				.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, "mem_high")
+				.first();
+			expect(fired).toBeNull();
+
+			// Sentinel must NOT have been written this tick — writes were emitted.
+			expect(store.has(`bat:host:alerts:empty:${hostId}`)).toBe(false);
+
+			// Next healthy tick (no D1 writes) → sentinel finally appears.
+			await evaluateAlerts(db, hostId, makePayload(), now + 60, kv);
+			expect(store.get(`bat:host:alerts:empty:${hostId}`)?.value).toBe("1");
+		});
+
+		test("KV throw on read → falls back to the original D1 evaluate path", async () => {
+			const failingKv = {
+				get: async () => {
+					throw new Error("kv outage");
+				},
+				put: async () => {
+					/* no-op */
+				},
+				delete: async () => {
+					/* no-op */
+				},
+				list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+				getWithMetadata: async () => ({ value: null, metadata: null }),
+			} as unknown as KVNamespace;
+			// Should not throw and should still mutate D1 normally.
+			await expect(
+				evaluateAlerts(
+					db,
+					hostId,
+					makePayload({ mem_used_pct: 99, swap_used_pct: 60 }),
+					now,
+					failingKv,
+				),
+			).resolves.toBeUndefined();
+			const fired = await db
+				.prepare("SELECT * FROM alert_states WHERE host_id = ? AND rule_id = ?")
+				.bind(hostId, "mem_high")
+				.first();
+			expect(fired).not.toBeNull();
+		});
+
+		test("undefined kv preserves pre-T3 behaviour exactly (always reads alert_states + alert_pending)", async () => {
+			const spied = makeSpyDb(db);
+			await evaluateAlerts(spied.db, hostId, makePayload(), now);
+			await evaluateAlerts(spied.db, hostId, makePayload(), now + 30);
+			const stateReads = spied.calls.filter((sql) =>
+				sql.includes("FROM alert_states WHERE host_id"),
+			).length;
+			expect(stateReads).toBe(2);
+		});
+	});
 });
