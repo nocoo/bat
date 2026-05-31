@@ -60,4 +60,15 @@ describe("D1CliTokensRepository", () => {
 			expect(after?.last_used_at).not.toBeNull();
 		});
 	});
+
+	describe("findHashById", () => {
+		test("returns hash on hit", async () => {
+			const row = await repo.create(HASH, "x", "assets");
+			expect(await repo.findHashById(row.id)).toBe(HASH);
+		});
+
+		test("returns null on miss", async () => {
+			expect(await repo.findHashById(99999)).toBeNull();
+		});
+	});
 });

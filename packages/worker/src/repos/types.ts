@@ -697,6 +697,10 @@ export interface CliTokensRepository {
 	create(tokenHash: string, label: string, scope: CliTokenScope): Promise<CliTokenRow>;
 	list(): Promise<CliTokenRow[]>;
 	delete(id: number): Promise<boolean>;
+	/** Look up the SHA-256 hash for a token by its numeric id, or null if no
+	 *  such token exists. Used to populate the KV revoke sentinel before
+	 *  deleting the row. */
+	findHashById(id: number): Promise<string | null>;
 	/**
 	 * Look up a token by hash. On hit, also bumps `last_used_at` to the
 	 * current unixepoch. Returns null on miss.
