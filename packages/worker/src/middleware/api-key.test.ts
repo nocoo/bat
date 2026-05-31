@@ -1,5 +1,7 @@
+import type { CliTokenRow } from "@bat/shared";
 import { Hono } from "hono";
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { rememberToken, tokenCacheKey, tokenRevokedKey } from "../lib/cli-token-cache";
 import type { AppEnv } from "../types";
 import { apiKeyAuth } from "./api-key";
 
@@ -342,5 +344,225 @@ describe("apiKeyAuth middleware", () => {
 			);
 			expect(res.status).toBe(200);
 		});
+	});
+});
+
+// CLI token + KV cache integration tests for Task #14 (T1).
+//
+// Covers:
+//   - cache miss → D1 lookup → cache populate
+//   - cache hit  → 0 D1 calls
+//   - revoked sentinel → 403 even if cache or D1 still has the row
+//   - KV throw on read → fallback to D1 (auth still works)
+//   - no BAT_KV binding → behaviour identical to before this task
+
+interface PutEntry {
+	value: string;
+	expirationTtl?: number;
+}
+
+function makeKv() {
+	const store = new Map<string, PutEntry>();
+	const calls = { gets: 0, puts: 0, deletes: 0 };
+	return {
+		store,
+		calls,
+		kv: {
+			get: vi.fn(async (key: string, type?: "json" | "text") => {
+				calls.gets++;
+				const entry = store.get(key);
+				if (!entry) {
+					return null;
+				}
+				if (type === "json") {
+					return JSON.parse(entry.value);
+				}
+				return entry.value;
+			}),
+			put: vi.fn(async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+				calls.puts++;
+				store.set(key, { value, expirationTtl: opts?.expirationTtl });
+			}),
+			delete: vi.fn(async (key: string) => {
+				calls.deletes++;
+				store.delete(key);
+			}),
+			list: vi.fn(),
+			getWithMetadata: vi.fn(),
+		} as unknown as KVNamespace,
+	};
+}
+
+function makeCliTokenRow(hash = "hash-abc"): CliTokenRow {
+	return {
+		id: 7,
+		token_hash: hash,
+		label: "ci",
+		scope: "assets",
+		created_at: 1_700_000_000,
+		last_used_at: null,
+	};
+}
+
+function buildAssetApp(opts: {
+	kv?: KVNamespace;
+	storedRow: CliTokenRow | null;
+	throwOnFind?: boolean;
+}) {
+	const findByHashAndTouch = vi.fn(async (_hash: string) => {
+		if (opts.throwOnFind) {
+			throw new Error("d1 outage");
+		}
+		return opts.storedRow;
+	});
+
+	const app = new Hono<AppEnv>();
+	app.use("*", async (c, next) => {
+		c.env = {
+			DB: {} as D1Database,
+			BAT_WRITE_KEY: WRITE_KEY,
+			BAT_READ_KEY: READ_KEY,
+			BAT_KV: opts.kv,
+		};
+		c.set("repos", {
+			cliTokens: {
+				findByHashAndTouch,
+			},
+		} as unknown as AppEnv["Variables"]["repos"]);
+		return next();
+	});
+	app.use("/api/*", apiKeyAuth);
+	app.get("/api/agents", (c) => c.json([]));
+	return { app, findByHashAndTouch };
+}
+
+describe("apiKeyAuth CLI token KV cache (Task #14 T1)", () => {
+	test("cache miss → D1 lookup → cache populate", async () => {
+		const { kv, store } = makeKv();
+		const row = makeCliTokenRow();
+		const { app, findByHashAndTouch } = buildAssetApp({ kv, storedRow: row });
+
+		const plaintext = "raw-cli-token";
+		const { hashToken } = await import("../domain/cli-token");
+		const hash = await hashToken(plaintext);
+		// Override stored hash so it actually matches the lookup
+		row.token_hash = hash;
+
+		const res = await app.request(
+			new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+				method: "GET",
+				headers: { Authorization: `Bearer ${plaintext}`, host: "bat-ingest.worker.hexly.ai" },
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		expect(findByHashAndTouch).toHaveBeenCalledTimes(1);
+		expect(store.has(tokenCacheKey(hash))).toBe(true);
+	});
+
+	test("cache hit → no D1 lookup", async () => {
+		const { kv } = makeKv();
+		const row = makeCliTokenRow();
+		const plaintext = "raw-cli-token-2";
+		const { hashToken } = await import("../domain/cli-token");
+		const hash = await hashToken(plaintext);
+		row.token_hash = hash;
+		await rememberToken(kv, row);
+
+		const { app, findByHashAndTouch } = buildAssetApp({ kv, storedRow: row });
+
+		const res = await app.request(
+			new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+				method: "GET",
+				headers: { Authorization: `Bearer ${plaintext}`, host: "bat-ingest.worker.hexly.ai" },
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		expect(findByHashAndTouch).not.toHaveBeenCalled();
+	});
+
+	test("revoked sentinel rejects auth with 403 even when cache + D1 still hold the token", async () => {
+		const { kv, store } = makeKv();
+		const row = makeCliTokenRow();
+		const plaintext = "raw-cli-token-3";
+		const { hashToken } = await import("../domain/cli-token");
+		const hash = await hashToken(plaintext);
+		row.token_hash = hash;
+		await rememberToken(kv, row);
+		// Mark revoked without removing the cache entry to simulate a stale cache
+		store.set(tokenRevokedKey(hash), { value: "1" });
+
+		const { app, findByHashAndTouch } = buildAssetApp({ kv, storedRow: row });
+
+		const res = await app.request(
+			new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+				method: "GET",
+				headers: { Authorization: `Bearer ${plaintext}`, host: "bat-ingest.worker.hexly.ai" },
+			}),
+		);
+
+		expect(res.status).toBe(403);
+		expect(findByHashAndTouch).not.toHaveBeenCalled();
+	});
+
+	test("KV throw on read → fallback to D1 lookup", async () => {
+		const { kv } = makeKv();
+		(kv.get as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("kv outage"));
+
+		const row = makeCliTokenRow();
+		const plaintext = "raw-cli-token-4";
+		const { hashToken } = await import("../domain/cli-token");
+		const hash = await hashToken(plaintext);
+		row.token_hash = hash;
+
+		const { app, findByHashAndTouch } = buildAssetApp({ kv, storedRow: row });
+
+		const res = await app.request(
+			new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+				method: "GET",
+				headers: { Authorization: `Bearer ${plaintext}`, host: "bat-ingest.worker.hexly.ai" },
+			}),
+		);
+
+		expect(res.status).toBe(200);
+		expect(findByHashAndTouch).toHaveBeenCalledTimes(1);
+	});
+
+	test("no BAT_KV binding → behaviour identical to pre-T1 (D1 every request)", async () => {
+		const row = makeCliTokenRow();
+		const plaintext = "raw-cli-token-5";
+		const { hashToken } = await import("../domain/cli-token");
+		const hash = await hashToken(plaintext);
+		row.token_hash = hash;
+
+		const { app, findByHashAndTouch } = buildAssetApp({ storedRow: row });
+
+		for (let i = 0; i < 3; i++) {
+			const res = await app.request(
+				new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+					method: "GET",
+					headers: { Authorization: `Bearer ${plaintext}`, host: "bat-ingest.worker.hexly.ai" },
+				}),
+			);
+			expect(res.status).toBe(200);
+		}
+		expect(findByHashAndTouch).toHaveBeenCalledTimes(3);
+	});
+
+	test("invalid token still returns 403 and does NOT populate cache", async () => {
+		const { kv, store } = makeKv();
+		const { app, findByHashAndTouch } = buildAssetApp({ kv, storedRow: null });
+
+		const res = await app.request(
+			new Request("http://bat-ingest.worker.hexly.ai/api/agents", {
+				method: "GET",
+				headers: { Authorization: "Bearer not-a-token", host: "bat-ingest.worker.hexly.ai" },
+			}),
+		);
+
+		expect(res.status).toBe(403);
+		expect(findByHashAndTouch).toHaveBeenCalledTimes(1);
+		expect(store.size).toBe(0);
 	});
 });

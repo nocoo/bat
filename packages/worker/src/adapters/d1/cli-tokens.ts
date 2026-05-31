@@ -35,6 +35,14 @@ export class D1CliTokensRepository implements CliTokensRepository {
 		return (result.meta?.changes ?? 0) > 0;
 	}
 
+	async findHashById(id: number): Promise<string | null> {
+		const row = await this.db
+			.prepare("SELECT token_hash FROM cli_tokens WHERE id = ?")
+			.bind(id)
+			.first<{ token_hash: string }>();
+		return row?.token_hash ?? null;
+	}
+
 	async findByHashAndTouch(tokenHash: string): Promise<CliTokenRow | null> {
 		const row = await this.db
 			.prepare("SELECT * FROM cli_tokens WHERE token_hash = ?")

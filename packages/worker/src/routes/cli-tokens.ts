@@ -6,6 +6,7 @@
 
 import type { CliTokenItem } from "@bat/shared";
 import type { Context } from "hono";
+import { markRevoked } from "../lib/cli-token-cache.js";
 import type { AppEnv } from "../types.js";
 
 export async function cliTokensListRoute(c: Context<AppEnv>) {
@@ -27,9 +28,17 @@ export async function cliTokensDeleteRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid token ID" }, 400);
 	}
 
+	// Capture token_hash before deletion so the KV revoke sentinel can be
+	// written without a second post-delete lookup.
+	const tokenHash = await c.var.repos.cliTokens.findHashById(id);
+
 	const deleted = await c.var.repos.cliTokens.delete(id);
 	if (!deleted) {
 		return c.json({ error: "Token not found" }, 404);
+	}
+
+	if (tokenHash) {
+		await markRevoked(c.env.BAT_KV, tokenHash);
 	}
 
 	return c.body(null, 204);

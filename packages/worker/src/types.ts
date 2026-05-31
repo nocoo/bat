@@ -8,6 +8,9 @@ export type Bindings = {
 	// Cloudflare Access configuration (optional, for browser endpoint)
 	CF_ACCESS_TEAM_DOMAIN?: string; // e.g., "hexly.cloudflareaccess.com"
 	CF_ACCESS_AUD?: string; // Access Application audience
+	// Optional KV namespace for D1 query reduction (cache + sentinels).
+	// Absent → all KV-backed paths transparently fall back to D1.
+	BAT_KV?: KVNamespace;
 };
 
 // Variables set by middleware, passed through Hono context

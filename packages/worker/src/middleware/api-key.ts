@@ -7,6 +7,7 @@
 
 import type { Context, Next } from "hono";
 import { hashToken } from "../domain/cli-token.js";
+import { lookupToken, rememberToken } from "../lib/cli-token-cache.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
@@ -195,13 +196,21 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 		}
 	}
 
-	// CLI token validation path — only reached for asset scope routes
-	// Hash the token and look it up via the repos bundle (also bumps last_used_at).
+	// CLI token validation path — only reached for asset scope routes.
+	// Order: revoked sentinel → KV cache → D1 (with cache populate). KV failure
+	// is treated as miss so auth never fails when KV is degraded.
 	const tokenHash = await hashToken(token);
-	const cliToken = await c.var.repos.cliTokens.findByHashAndTouch(tokenHash);
+	const cacheLookup = await lookupToken(c.env.BAT_KV, tokenHash);
 
-	if (!cliToken) {
+	if (cacheLookup.revoked) {
 		return c.json({ error: "Invalid API key" }, 403);
+	}
+	if (!("hit" in cacheLookup)) {
+		const row = await c.var.repos.cliTokens.findByHashAndTouch(tokenHash);
+		if (!row) {
+			return c.json({ error: "Invalid API key" }, 403);
+		}
+		await rememberToken(c.env.BAT_KV, row);
 	}
 
 	// Scope enforcement: assets scope only allows /api/agents, /api/assets, /api/bindings
