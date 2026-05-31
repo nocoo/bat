@@ -2,10 +2,13 @@
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
+import { tryReadCache, writeCache } from "../lib/dashboard-cache.js";
 import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
+
+const HOSTS_CACHE_TTL_SECONDS = 30;
 
 /**
  * Pure helper: group sparkline rows into per-host CPU/mem/net arrays,
@@ -64,13 +67,29 @@ export interface SparklineRow {
 }
 
 export async function hostsListRoute(c: Context<AppEnv>) {
+	// Short-TTL KV cache — stale tolerated up to TTL. Disabled outside
+	// production so dev / e2e snapshots see fresh state. Cache API is not
+	// usable behind Cloudflare Access, so this is KV-backed.
+	const cacheEnabled = c.env.ENVIRONMENT === "production";
+	const cacheOpts = { route: "hosts", ttlSeconds: HOSTS_CACHE_TTL_SECONDS };
+	if (cacheEnabled) {
+		const cached = await tryReadCache(c.env.BAT_KV, c.req.raw, cacheOpts);
+		if (cached) {
+			return cached;
+		}
+	}
+
 	const repos = c.var.repos;
 	const now = Math.floor(Date.now() / 1000);
 
 	const hosts = await repos.hosts.listOverviewRows();
 
 	if (hosts.length === 0) {
-		return c.json([]);
+		const empty = c.json([]);
+		if (cacheEnabled) {
+			await writeCache(c.env.BAT_KV, c.req.raw, empty, cacheOpts);
+		}
+		return empty;
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
@@ -139,5 +158,9 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 		};
 	});
 
-	return c.json(items);
+	const response = c.json(items);
+	if (cacheEnabled) {
+		await writeCache(c.env.BAT_KV, c.req.raw, response, cacheOpts);
+	}
+	return response;
 }

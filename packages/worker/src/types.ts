@@ -11,6 +11,10 @@ export type Bindings = {
 	// Optional KV namespace for D1 query reduction (cache + sentinels).
 	// Absent → all KV-backed paths transparently fall back to D1.
 	BAT_KV?: KVNamespace;
+	// "development" / "production" — wrangler.toml sets this. Used to skip
+	// the dashboard short-TTL cache in dev/e2e where snapshots assume each
+	// request hits the handler.
+	ENVIRONMENT?: string;
 };
 
 // Variables set by middleware, passed through Hono context

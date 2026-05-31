@@ -410,3 +410,104 @@ describe("GET /api/hosts", () => {
 		expect(host?.net_sparkline?.[0]?.v).toBe(0);
 	});
 });
+
+describe("GET /api/hosts cache wiring (Task #17 T4)", () => {
+	function makeKv() {
+		const store = new Map<string, { value: string; ttl?: number }>();
+		const calls = { gets: 0, puts: 0 };
+		const kv = {
+			get: async (key: string) => {
+				calls.gets++;
+				return store.get(key)?.value ?? null;
+			},
+			put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+				calls.puts++;
+				store.set(key, { value, ttl: opts?.expirationTtl });
+			},
+			delete: async () => {
+				/* unused in this test */
+			},
+			list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+			getWithMetadata: async () => ({ value: null, metadata: null }),
+		} as unknown as KVNamespace;
+		return { store, calls, kv };
+	}
+
+	function createProdApp(db: D1Database, kv: KVNamespace) {
+		const app = new Hono<AppEnv>();
+		app.use("*", async (c, next) => {
+			c.env = {
+				DB: db,
+				BAT_WRITE_KEY: "wk",
+				BAT_READ_KEY: READ_KEY,
+				ENVIRONMENT: "production",
+				BAT_KV: kv,
+			};
+			c.set("repos", createD1Repositories(db));
+			return next();
+		});
+		app.get("/api/hosts", hostsListRoute);
+		return app;
+	}
+
+	test("first call writes the JSON body into KV; second call serves from KV", async () => {
+		const { kv, calls, store } = makeKv();
+		const db = createMockD1();
+		const app = createProdApp(db, kv);
+
+		const r1 = await get(app);
+		expect(r1.status).toBe(200);
+		expect(calls.puts).toBe(1);
+		expect(calls.gets).toBe(1);
+		expect(store.size).toBe(1);
+
+		const r2 = await get(app);
+		expect(r2.status).toBe(200);
+		expect(r2.headers.get("X-Bat-Cache")).toBe("hit");
+		// gets increments; puts does NOT (cache hit means handler skipped)
+		expect(calls.gets).toBe(2);
+		expect(calls.puts).toBe(1);
+	});
+
+	test("cache is bypassed when ENVIRONMENT is not production (default test app)", async () => {
+		const { kv, calls } = makeKv();
+		const db = createMockD1();
+		const app = new Hono<AppEnv>();
+		app.use("*", async (c, next) => {
+			c.env = {
+				DB: db,
+				BAT_WRITE_KEY: "wk",
+				BAT_READ_KEY: READ_KEY,
+				BAT_KV: kv,
+			};
+			c.set("repos", createD1Repositories(db));
+			return next();
+		});
+		app.get("/api/hosts", hostsListRoute);
+
+		const r = await get(app);
+		expect(r.status).toBe(200);
+		expect(calls.gets).toBe(0);
+		expect(calls.puts).toBe(0);
+	});
+
+	test("production without BAT_KV binding falls back to handler (no throw, no cache)", async () => {
+		const db = createMockD1();
+		const app = new Hono<AppEnv>();
+		app.use("*", async (c, next) => {
+			c.env = {
+				DB: db,
+				BAT_WRITE_KEY: "wk",
+				BAT_READ_KEY: READ_KEY,
+				ENVIRONMENT: "production",
+				// BAT_KV intentionally absent
+			};
+			c.set("repos", createD1Repositories(db));
+			return next();
+		});
+		app.get("/api/hosts", hostsListRoute);
+
+		const r = await get(app);
+		expect(r.status).toBe(200);
+	});
+});
