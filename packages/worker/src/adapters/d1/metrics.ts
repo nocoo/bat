@@ -307,9 +307,19 @@ export class D1MetricsRepository implements MetricsRepository {
 		hostname: string,
 		payload: MetricsPayload,
 		nowSeconds: number,
-		mode: "first-seen" | "existing",
+		mode: "first-seen" | "existing" | "skip-host-touch",
 	): Promise<{ inserted: boolean }> {
 		const metricsStmt = buildInsertMetricsRawStatement(this.db, hostId, payload);
+
+		// "skip-host-touch": existing host whose last_seen was flushed recently
+		// (KV decision in the route). The host row is guaranteed to exist, so
+		// no FK risk and no host stmt is needed — only the metrics insert.
+		if (mode === "skip-host-touch") {
+			const result = await metricsStmt.run();
+			const inserted = (result.meta?.changes ?? 0) > 0;
+			return { inserted };
+		}
+
 		const hostStmt =
 			mode === "first-seen"
 				? this.db.prepare(HOST_UPSERT_FIRST_SEEN_SQL).bind(hostId, hostname, nowSeconds)

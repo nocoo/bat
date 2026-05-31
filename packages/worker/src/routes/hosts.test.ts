@@ -511,3 +511,74 @@ describe("GET /api/hosts cache wiring (Task #17 T4)", () => {
 		expect(r.status).toBe(200);
 	});
 });
+
+describe("GET /api/hosts last_seen overlay (Task #19 T6)", () => {
+	test("KV last_observed_at overrides stale D1 last_seen so a throttled host does not flip to offline", async () => {
+		const db = createMockD1();
+		const now = Math.floor(Date.now() / 1000);
+
+		// D1 last_seen is 200s old → would be `offline` (>120s threshold)
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, os, kernel, arch, last_seen, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			)
+			.bind("h-throttled", "h-throttled", "Ubuntu", "6.8", "x86_64", now - 200, 1)
+			.run();
+
+		// KV says we observed 5s ago — well within the 120s offline window
+		const store = new Map<string, { value: string; ttl?: number }>();
+		store.set("bat:host:lastseen:h-throttled", {
+			value: JSON.stringify({ last_observed_at: now - 5, last_flush_at: now - 200 }),
+		});
+		const kv = {
+			get: async (key: string, type?: "json" | "text") => {
+				const e = store.get(key);
+				if (!e) {
+					return null;
+				}
+				return type === "json" ? JSON.parse(e.value) : e.value;
+			},
+			put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+				store.set(key, { value, ttl: opts?.expirationTtl });
+			},
+			delete: async (key: string) => {
+				store.delete(key);
+			},
+			list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+			getWithMetadata: async () => ({ value: null, metadata: null }),
+		} as unknown as KVNamespace;
+
+		const app = new Hono<AppEnv>();
+		app.use("*", async (c, next) => {
+			c.env = { DB: db, BAT_WRITE_KEY: "wk", BAT_READ_KEY: READ_KEY, BAT_KV: kv };
+			c.set("repos", createD1Repositories(db));
+			return next();
+		});
+		app.get("/api/hosts", hostsListRoute);
+
+		const r = await get(app);
+		const items = (await r.json()) as HostOverviewItem[];
+		const item = items.find((h) => h.host_id === "h-throttled");
+		expect(item).toBeDefined();
+		// Without overlay this would be "offline"; with overlay it is healthy.
+		expect(item?.status).not.toBe("offline");
+		// last_seen reported is the freshest of D1 vs KV overlay
+		expect(item?.last_seen).toBe(now - 5);
+	});
+
+	test("without KV overlay, stale D1 last_seen still flips to offline (pre-T6 behaviour preserved)", async () => {
+		const db = createMockD1();
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, os, kernel, arch, last_seen, is_active) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			)
+			.bind("h-stale", "h-stale", "Ubuntu", "6.8", "x86_64", now - 200, 1)
+			.run();
+
+		const app = createApp(db); // no BAT_KV
+		const r = await get(app);
+		const items = (await r.json()) as HostOverviewItem[];
+		expect(items.find((h) => h.host_id === "h-stale")?.status).toBe("offline");
+	});
+});

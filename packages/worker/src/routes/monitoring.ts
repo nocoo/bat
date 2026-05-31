@@ -3,6 +3,11 @@
 import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { HostStatus } from "@bat/shared";
 import type { Context } from "hono";
+import {
+	freshestLastSeen,
+	loadLastSeen,
+	loadObservedSeenBatch,
+} from "../lib/host-lastseen-cache.js";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import type { AlertReadRow } from "../repos/types.js";
 import { deriveHostStatus } from "../services/status.js";
@@ -92,9 +97,10 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const [alerts, allowedByHost] = await Promise.all([
+	const [alerts, allowedByHost, observedMap] = await Promise.all([
 		repos.alerts.listForHosts(hostIds),
 		repos.ports.listForHosts(hostIds),
+		loadObservedSeenBatch(c.env.BAT_KV, hostIds),
 	]);
 
 	const alertsByHost = buildAlertsByHost(alerts);
@@ -122,7 +128,8 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 		const hostAlerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
 		const mw = getMaintenanceWindow(host);
-		const tier = deriveHostStatus(host.last_seen, now, hostAlerts, allowedPorts, mw);
+		const lastSeen = freshestLastSeen(host.last_seen, observedMap.get(host.host_id));
+		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
 		const inMaintenance = tier === "maintenance";
 
 		// Tag filtering (AND logic)
@@ -144,7 +151,7 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 			host_id: host.host_id,
 			hostname: host.hostname,
 			tier,
-			last_seen: host.last_seen,
+			last_seen: lastSeen,
 			alert_count: inMaintenance ? 0 : hostAlerts.length,
 			alerts: inMaintenance ? [] : formatAlerts(hostAlerts),
 		});
@@ -179,16 +186,18 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 		return c.json({ error: "Host not found" }, 404);
 	}
 
-	const [hostAlerts, allowedByHost, tagsByHost, uptime] = await Promise.all([
+	const [hostAlerts, allowedByHost, tagsByHost, uptime, observedSnap] = await Promise.all([
 		repos.alerts.listForHosts([hostId]),
 		repos.ports.listForHosts([hostId]),
 		repos.tags.listNamesForHosts([hostId]),
 		repos.hosts.getLatestUptime(hostId),
+		loadLastSeen(c.env.BAT_KV, hostId),
 	]);
 
 	const allowedPorts = allowedByHost.get(hostId);
 	const mw = getMaintenanceWindow(host);
-	const tier = deriveHostStatus(host.last_seen, now, hostAlerts, allowedPorts, mw);
+	const lastSeen = freshestLastSeen(host.last_seen, observedSnap?.last_observed_at);
+	const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
 	const inMaintenance = tier === "maintenance";
 	const tags = (tagsByHost.get(hostId) ?? []).slice().sort();
 
@@ -198,7 +207,7 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 			host_id: host.host_id,
 			hostname: host.hostname,
 			tier,
-			last_seen: host.last_seen,
+			last_seen: lastSeen,
 			uptime_seconds: uptime,
 			alert_count: inMaintenance ? 0 : hostAlerts.length,
 			alerts: inMaintenance ? [] : formatAlerts(hostAlerts),
@@ -220,10 +229,11 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const [alerts, allowedByHost, tagsByHost] = await Promise.all([
+	const [alerts, allowedByHost, tagsByHost, observedMap] = await Promise.all([
 		repos.alerts.listForHosts(hostIds),
 		repos.ports.listForHosts(hostIds),
 		repos.tags.listNamesForHosts(hostIds),
+		loadObservedSeenBatch(c.env.BAT_KV, hostIds),
 	]);
 
 	const alertsByHost = buildAlertsByHost(alerts);
@@ -235,7 +245,8 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 		const hostAlerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
 		const mw = getMaintenanceWindow(host);
-		const tier = deriveHostStatus(host.last_seen, now, hostAlerts, allowedPorts, mw);
+		const lastSeen = freshestLastSeen(host.last_seen, observedMap.get(host.host_id));
+		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
 		hostTiers.set(host.host_id, tier);
 		hostAlertCounts.set(host.host_id, tier === "maintenance" ? 0 : hostAlerts.length);
 	}

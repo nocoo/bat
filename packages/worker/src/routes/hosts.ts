@@ -3,6 +3,7 @@ import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { tryReadCache, writeCache } from "../lib/dashboard-cache.js";
+import { freshestLastSeen, loadObservedSeenBatch } from "../lib/host-lastseen-cache.js";
 import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -94,13 +95,15 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 
 	const hostIds = hosts.map((h) => h.host_id);
 
-	const [metricsRows, alertCountMap, alertRows, allowedByHost, sparklineRows] = await Promise.all([
-		repos.hosts.getLatestMetricsBatch(hostIds),
-		repos.alerts.countByHost(hostIds),
-		repos.alerts.listForHosts(hostIds),
-		repos.ports.listForHosts(hostIds),
-		repos.hosts.listSparklineRowsSince(hostIds, now - 86400),
-	]);
+	const [metricsRows, alertCountMap, alertRows, allowedByHost, sparklineRows, observedMap] =
+		await Promise.all([
+			repos.hosts.getLatestMetricsBatch(hostIds),
+			repos.alerts.countByHost(hostIds),
+			repos.alerts.listForHosts(hostIds),
+			repos.ports.listForHosts(hostIds),
+			repos.hosts.listSparklineRowsSince(hostIds, now - 86400),
+			loadObservedSeenBatch(c.env.BAT_KV, hostIds),
+		]);
 
 	const metricsMap = new Map(metricsRows.map((row) => [row.host_id, row]));
 	const alertsByHost = buildAlertsByHost(alertRows);
@@ -113,7 +116,8 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
 		const maintenance = getMaintenanceWindow(host);
-		const status = deriveHostStatus(host.last_seen, now, alerts, allowedPorts, maintenance);
+		const lastSeen = freshestLastSeen(host.last_seen, observedMap.get(host.host_id));
+		const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts, maintenance);
 		const inMaintenance =
 			maintenance !== null && isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
@@ -136,7 +140,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			cpu_usage_pct: metrics?.cpu_usage_pct ?? null,
 			mem_used_pct: metrics?.mem_used_pct ?? null,
 			uptime_seconds: metrics?.uptime_seconds ?? null,
-			last_seen: host.last_seen,
+			last_seen: lastSeen,
 			alert_count: inMaintenance ? 0 : (alertCountMap.get(host.host_id) ?? 0),
 			cpu_logical: host.cpu_logical,
 			cpu_physical: host.cpu_physical,
