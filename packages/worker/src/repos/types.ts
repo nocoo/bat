@@ -594,11 +594,20 @@ export interface AgentsRepository {
 	 * Apply a CLI heartbeat report keyed by `source_key`. Atomic batch:
 	 * updates reported agents, ON-CONFLICT-creates new ones, marks
 	 * unreported existing agents as `missing`.
+	 *
+	 * `opts.kv` enables a 5min D1 write throttle: when an entry's status and
+	 * runtime fields are unchanged AND the last D1 flush was <5min ago, the
+	 * UPDATE is omitted from the batch. KV failure is treated as "no
+	 * snapshot" → flush always happens. The response counter `updated`
+	 * still reflects the count of reported existing entries (not the
+	 * count of D1 UPDATEs actually emitted) so the route's contract is
+	 * stable across throttle decisions.
 	 */
 	processHeartbeat(
 		sourceKey: string,
 		agents: AgentHeartbeatEntry[],
 		nowSeconds: number,
+		opts?: { kv?: KVNamespace | undefined; throttleSeconds?: number },
 	): Promise<AgentHeartbeatResponse>;
 }
 /**

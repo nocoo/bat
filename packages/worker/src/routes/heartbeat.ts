@@ -151,6 +151,7 @@ export async function agentsHeartbeatRoute(c: Context<AppEnv>) {
 		validatedBody.source_key,
 		validatedBody.agents,
 		now,
+		{ kv: c.env.BAT_KV },
 	);
 	return c.json(result);
 }
