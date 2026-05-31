@@ -3,6 +3,7 @@
 // `lib/resolve-host.ts`. Pure status / sparkline derivation stays in
 // the routes (which still own the wire-DTO shape) or in `services/`.
 
+import { type HostMetaProjection, loadHostMeta, storeHostMeta } from "../../lib/host-meta-cache.js";
 import type {
 	HostDetailRow,
 	HostInventoryUpdate,
@@ -50,11 +51,34 @@ export class D1HostsRepository implements HostsRepository {
 		return result.results;
 	}
 
-	async getActiveFlag(hostId: string): Promise<{ host_id: string; is_active: number } | null> {
-		return this.db
-			.prepare("SELECT host_id, is_active FROM hosts WHERE host_id = ?")
+	async getActiveFlag(
+		hostId: string,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<{ host_id: string; is_active: number } | null> {
+		const cached = await loadHostMeta(opts?.kv, hostId);
+		if (cached) {
+			return { host_id: hostId, is_active: cached.is_active };
+		}
+		const row = await this.db
+			.prepare(
+				"SELECT host_id, is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?",
+			)
 			.bind(hostId)
-			.first<{ host_id: string; is_active: number }>();
+			.first<{
+				host_id: string;
+				is_active: number;
+				maintenance_start: string | null;
+				maintenance_end: string | null;
+			}>();
+		if (row) {
+			await storeHostMeta(opts?.kv, hostId, {
+				is_active: row.is_active,
+				maintenance_start: row.maintenance_start,
+				maintenance_end: row.maintenance_end,
+			});
+			return { host_id: row.host_id, is_active: row.is_active };
+		}
+		return null;
 	}
 
 	async listOverviewRows(): Promise<HostOverviewRow[]> {
@@ -139,19 +163,26 @@ ORDER BY host_id, hour_ts ASC`,
 		return result.results;
 	}
 
-	async getActiveAndMaintenance(hostId: string): Promise<{
+	async getActiveAndMaintenance(
+		hostId: string,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<{
 		is_active: number;
 		maintenance_start: string | null;
 		maintenance_end: string | null;
 	} | null> {
-		return this.db
+		const cached = await loadHostMeta(opts?.kv, hostId);
+		if (cached) {
+			return cached;
+		}
+		const row = await this.db
 			.prepare("SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?")
 			.bind(hostId)
-			.first<{
-				is_active: number;
-				maintenance_start: string | null;
-				maintenance_end: string | null;
-			}>();
+			.first<HostMetaProjection>();
+		// Do NOT cache null — first-seen hosts should be visible to the very
+		// next ingest after upsert, not masked for the TTL window.
+		await storeHostMeta(opts?.kv, hostId, row);
+		return row;
 	}
 
 	async upsertIdentity(params: {

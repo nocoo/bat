@@ -54,8 +54,15 @@ export interface HostsRepository {
 	 *  routes that need to 403 a known-but-retired host. */
 	listAllHostIdsWithActive(): Promise<{ host_id: string; is_active: number }[]>;
 
-	/** Look up a single host's `(host_id, is_active)` by raw host_id. */
-	getActiveFlag(hostId: string): Promise<{ host_id: string; is_active: number } | null>;
+	/** Look up a single host's `(host_id, is_active)` by raw host_id.
+	 *  `opts.kv` enables a short-TTL projection cache. KV miss/throw falls
+	 *  back to D1; the projection only carries `is_active`, plus the
+	 *  maintenance window for callers that want both — so a future
+	 *  `getActiveAndMaintenance` call inside the TTL is also served by KV. */
+	getActiveFlag(
+		hostId: string,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<{ host_id: string; is_active: number } | null>;
 
 	/** Active-host inventory used by `/api/hosts` list. */
 	listOverviewRows(): Promise<HostOverviewRow[]>;
@@ -83,8 +90,12 @@ export interface HostsRepository {
 
 	/** Read `(is_active, maintenance_start, maintenance_end)` for the ingest
 	 *  hot path: a single SELECT covering retired check + maintenance window
-	 *  + host existence. Returns null for unknown hosts. */
-	getActiveAndMaintenance(hostId: string): Promise<{
+	 *  + host existence. Returns null for unknown hosts. `opts.kv` enables
+	 *  the same short-TTL projection cache as `getActiveFlag`. */
+	getActiveAndMaintenance(
+		hostId: string,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<{
 		is_active: number;
 		maintenance_start: string | null;
 		maintenance_end: string | null;
@@ -528,10 +539,17 @@ export interface SettingsRepository {
 export interface MaintenanceRepository {
 	/** Returns the window for `hostId`, or null when no window is set. */
 	getForHost(hostId: string): Promise<MaintenanceWindow | null>;
-	/** Upsert the window for `hostId`. */
-	setForHost(hostId: string, window: MaintenanceWindow): Promise<void>;
-	/** Clear the window (sets all three columns to NULL). */
-	clearForHost(hostId: string): Promise<void>;
+	/** Upsert the window for `hostId`. `opts.kv` invalidates the host meta
+	 *  projection so the next ingest sees the new window without waiting
+	 *  for TTL. */
+	setForHost(
+		hostId: string,
+		window: MaintenanceWindow,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<void>;
+	/** Clear the window (sets all three columns to NULL). `opts.kv` same
+	 *  invalidation contract as `setForHost`. */
+	clearForHost(hostId: string, opts?: { kv?: KVNamespace | undefined }): Promise<void>;
 }
 
 export interface MaintenanceWindow {

@@ -93,7 +93,7 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 		return c.json({ error: result.error }, 400);
 	}
 
-	await c.var.repos.maintenance.setForHost(host.host_id, result.value);
+	await c.var.repos.maintenance.setForHost(host.host_id, result.value, { kv: c.env.BAT_KV });
 
 	return new Response(null, { status: 204 });
 }
@@ -110,7 +110,7 @@ export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/
 		return c.json({ error: "Host is retired" }, 403);
 	}
 
-	await c.var.repos.maintenance.clearForHost(host.host_id);
+	await c.var.repos.maintenance.clearForHost(host.host_id, { kv: c.env.BAT_KV });
 
 	return new Response(null, { status: 204 });
 }

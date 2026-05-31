@@ -83,4 +83,48 @@ describe("D1MaintenanceRepository", () => {
 			await expect(repo.clearForHost(HOST_A)).resolves.toBeUndefined();
 		});
 	});
+
+	describe("invalidates host meta projection on writes (Task #18 T5)", () => {
+		function makeKv() {
+			const store = new Map<string, { value: string; ttl?: number }>();
+			const calls = { deletes: 0 };
+			const kv = {
+				get: async (key: string) => store.get(key)?.value ?? null,
+				put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+					store.set(key, { value, ttl: opts?.expirationTtl });
+				},
+				delete: async (key: string) => {
+					calls.deletes++;
+					store.delete(key);
+				},
+				list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+				getWithMetadata: async () => ({ value: null, metadata: null }),
+			} as unknown as KVNamespace;
+			return { store, calls, kv };
+		}
+
+		test("setForHost deletes bat:host:meta:{id} when KV given", async () => {
+			const { kv, store } = makeKv();
+			store.set(`bat:host:meta:${HOST_A}`, { value: '{"is_active":1}' });
+			await repo.setForHost(HOST_A, { start: "01:00", end: "02:00", reason: "x" }, { kv });
+			expect(store.has(`bat:host:meta:${HOST_A}`)).toBe(false);
+		});
+
+		test("clearForHost deletes bat:host:meta:{id} when KV given", async () => {
+			const { kv, store } = makeKv();
+			store.set(`bat:host:meta:${HOST_A}`, { value: '{"is_active":1}' });
+			await repo.clearForHost(HOST_A, { kv });
+			expect(store.has(`bat:host:meta:${HOST_A}`)).toBe(false);
+		});
+
+		test("setForHost works without KV (no-op invalidate)", async () => {
+			await expect(
+				repo.setForHost(HOST_A, { start: "01:00", end: "02:00", reason: "x" }),
+			).resolves.toBeUndefined();
+		});
+
+		test("clearForHost works without KV (no-op invalidate)", async () => {
+			await expect(repo.clearForHost(HOST_A)).resolves.toBeUndefined();
+		});
+	});
 });
