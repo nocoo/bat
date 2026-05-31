@@ -8,6 +8,7 @@
 // pure wall-clock comparison and doesn't belong in the persistence layer.
 
 import type { MetricsPayload, Tier2Payload } from "@bat/shared";
+import { invalidateHealthy } from "../../lib/alerts-healthy-cache.js";
 import type { AlertActiveJoinedRow, AlertReadRow, AlertsRepository } from "../../repos/types.js";
 import { evaluateAlerts } from "./_alerts-tier1.js";
 import { evaluateTier2Alerts } from "./_alerts-tier2.js";
@@ -33,15 +34,26 @@ ORDER BY a.triggered_at DESC`,
 		return result.results;
 	}
 
-	evaluateAndApply(hostId: string, payload: MetricsPayload, now: number): Promise<void> {
-		return evaluateAlerts(this.db, hostId, payload, now);
+	evaluateAndApply(
+		hostId: string,
+		payload: MetricsPayload,
+		now: number,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<void> {
+		return evaluateAlerts(this.db, hostId, payload, now, opts?.kv);
 	}
 
 	evaluateAndApplyTier2(hostId: string, payload: Tier2Payload, now: number): Promise<void> {
 		return evaluateTier2Alerts(this.db, hostId, payload, now);
 	}
 
-	async clearPendingForHost(hostId: string): Promise<void> {
+	async clearPendingForHost(
+		hostId: string,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<void> {
+		// Drop the healthy-sentinel BEFORE the DELETE so a concurrent ingest
+		// cannot read a stale "empty" sentinel and skip the post-DELETE state.
+		await invalidateHealthy(opts?.kv, hostId);
 		await this.db.prepare("DELETE FROM alert_pending WHERE host_id = ?").bind(hostId).run();
 	}
 

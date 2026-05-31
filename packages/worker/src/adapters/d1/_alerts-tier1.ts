@@ -7,6 +7,7 @@
 import type { MetricsPayload } from "@bat/shared";
 import { evaluateRules } from "../../domain/alerts/evaluate.js";
 import type { AlertEvalResult, AlertSeverity } from "../../domain/alerts/types.js";
+import { invalidateHealthy, isMarkedHealthy, markHealthy } from "../../lib/alerts-healthy-cache.js";
 
 export { evaluateRules };
 export type { AlertEvalResult };
@@ -141,14 +142,34 @@ VALUES (?, ?, ?, ?)`,
  * Reads current alert state once, computes a diff against the new evaluation
  * results, and writes only the rules whose state actually changed. Healthy
  * hosts produce zero writes (down from ~23 per ingest before).
+ *
+ * `kv` (optional) enables the healthy sentinel fast-path: when the rule
+ * evaluator says the new payload is healthy AND a recent observation marked
+ * the host as having no active/pending alert rows, skip both D1 reads. The
+ * sentinel is invalidated on any state-mutating path so a recovery never
+ * gets delayed beyond the immediate ingest that detects it.
  */
 export async function evaluateAlerts(
 	db: D1Database,
 	hostId: string,
 	payload: MetricsPayload,
 	now: number,
+	kv?: KVNamespace,
 ): Promise<void> {
 	const results = evaluateRules(payload);
+	// `results` carries one entry per rule with a `fired` flag — it is NOT a
+	// list of firing rules. The payload is healthy iff every rule's `fired`
+	// is false (no instant rule triggered AND no duration rule's condition is
+	// currently true).
+	const payloadIsHealthy = results.every((r) => !r.fired);
+
+	// Fast-path: rule evaluator says healthy AND we have a fresh "empty" KV
+	// sentinel → safe to skip the alert_states + alert_pending SELECT pair.
+	// We do NOT skip when the payload is unhealthy: an alert might need to
+	// fire on this very ingest, and the sentinel only attests to past state.
+	if (payloadIsHealthy && (await isMarkedHealthy(kv, hostId))) {
+		return;
+	}
 
 	const [statesRes, pendingRes] = await Promise.all([
 		db
@@ -168,7 +189,20 @@ export async function evaluateAlerts(
 
 	const writes = planAlertWrites(hostId, results, currentStates, currentPending, now, db);
 	if (writes.length === 0) {
+		// Truly empty state observed AND no writes needed. Mark the host as
+		// healthy so future healthy ingests can skip the SELECT pair. We only
+		// write the sentinel when both D1 reads came back empty AND the
+		// payload itself was healthy — partial-empty (e.g. pending exists but
+		// duration not met) does NOT qualify.
+		if (payloadIsHealthy && currentStates.size === 0 && currentPending.size === 0) {
+			await markHealthy(kv, hostId);
+		}
 		return;
 	}
+
+	// State is changing. Invalidate the sentinel BEFORE the batch so a
+	// concurrent healthy ingest that races us cannot resurrect a stale
+	// sentinel after our write commits.
+	await invalidateHealthy(kv, hostId);
 	await db.batch(writes);
 }

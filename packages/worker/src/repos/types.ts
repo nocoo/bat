@@ -269,8 +269,15 @@ export interface AlertsRepository {
 	listActiveJoinedHosts(): Promise<AlertActiveJoinedRow[]>;
 	/** Evaluate tier-1 / signal-expansion / tier-3 rules and reconcile
 	 *  alert_states + alert_pending in a single batch. No-op when nothing
-	 *  changed. */
-	evaluateAndApply(hostId: string, payload: MetricsPayload, now: number): Promise<void>;
+	 *  changed. `opts.kv` enables the healthy-sentinel fast-path: a recent
+	 *  observation of empty-state plus a rule-healthy payload skips both
+	 *  reads. KV failure on read is treated as miss; on write is best-effort. */
+	evaluateAndApply(
+		hostId: string,
+		payload: MetricsPayload,
+		now: number,
+		opts?: { kv?: KVNamespace | undefined },
+	): Promise<void>;
 	/** Evaluate tier-2 rules (uses the host's per-host port allowlist) and
 	 *  reconcile alert_states + alert_pending in a single batch. */
 	evaluateAndApplyTier2(hostId: string, payload: Tier2Payload, now: number): Promise<void>;
@@ -280,9 +287,10 @@ export interface AlertsRepository {
 	 * still need to drop accumulated `alert_pending.first_seen` so the
 	 * post-maintenance baseline is clean. Does not touch `alert_states`
 	 * (already-fired alerts persist; the maintenance filter on the list route
-	 * hides them).
+	 * hides them). `opts.kv` (when provided) also invalidates the host's
+	 * healthy-sentinel so the next ingest re-derives state.
 	 */
-	clearPendingForHost(hostId: string): Promise<void>;
+	clearPendingForHost(hostId: string, opts?: { kv?: KVNamespace | undefined }): Promise<void>;
 	/** Read-model: alerts for the given hosts, used by hosts list, host
 	 *  detail, fleet-status, and the monitoring routes. Empty input → empty
 	 *  output without a DB call. */

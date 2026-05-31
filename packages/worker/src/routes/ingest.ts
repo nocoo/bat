@@ -159,9 +159,11 @@ export async function ingestRoute(c: Context<AppEnv>) {
 
 		if (inMaintenance) {
 			// Purge duration rule timers to prevent stale first_seen accumulation
-			await repos.alerts.clearPendingForHost(body.host_id);
+			await repos.alerts.clearPendingForHost(body.host_id, { kv: c.env.BAT_KV });
 		} else {
-			await repos.alerts.evaluateAndApply(body.host_id, body, workerNow);
+			await repos.alerts.evaluateAndApply(body.host_id, body, workerNow, {
+				kv: c.env.BAT_KV,
+			});
 		}
 	}
 
