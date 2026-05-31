@@ -77,7 +77,7 @@ export async function identityRoute(c: Context<AppEnv>) {
 	const repos = c.var.repos;
 
 	// Check if host is retired
-	const existing = await repos.hosts.getActiveFlag(body.host_id);
+	const existing = await repos.hosts.getActiveFlag(body.host_id, { kv: c.env.BAT_KV });
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);
 	}

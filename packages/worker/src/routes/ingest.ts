@@ -127,7 +127,9 @@ export async function ingestRoute(c: Context<AppEnv>) {
 	const repos = c.var.repos;
 
 	// Single SELECT covers retired check, maintenance window, and host existence.
-	const existing = await repos.hosts.getActiveAndMaintenance(body.host_id);
+	const existing = await repos.hosts.getActiveAndMaintenance(body.host_id, {
+		kv: c.env.BAT_KV,
+	});
 
 	if (existing && existing.is_active === 0) {
 		return c.json({ error: "host is retired" }, 403);

@@ -330,6 +330,152 @@ describe("D1HostsRepository", () => {
 		});
 	});
 
+	describe("host meta KV projection (Task #18 T5)", () => {
+		interface PutEntry {
+			value: string;
+			ttl?: number;
+		}
+		function makeKv() {
+			const store = new Map<string, PutEntry>();
+			const calls = { gets: 0, puts: 0, deletes: 0 };
+			const kv = {
+				get: async (key: string, type?: "json" | "text") => {
+					calls.gets++;
+					const entry = store.get(key);
+					if (!entry) {
+						return null;
+					}
+					return type === "json" ? JSON.parse(entry.value) : entry.value;
+				},
+				put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+					calls.puts++;
+					store.set(key, { value, ttl: opts?.expirationTtl });
+				},
+				delete: async (key: string) => {
+					calls.deletes++;
+					store.delete(key);
+				},
+				list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+				getWithMetadata: async () => ({ value: null, metadata: null }),
+			} as unknown as KVNamespace;
+			return { store, calls, kv };
+		}
+
+		// Wrap the live D1 so we can count SELECT prepares.
+		function spyDb(real: D1Database) {
+			const sqls: string[] = [];
+			const wrapped: D1Database = {
+				prepare(sql: string) {
+					sqls.push(sql);
+					return real.prepare(sql);
+				},
+				batch: real.batch.bind(real),
+				exec: real.exec.bind(real),
+				dump: (real as unknown as { dump: () => Promise<ArrayBuffer> }).dump?.bind(real),
+				withSession: (real as unknown as { withSession: () => unknown }).withSession?.bind(real),
+			} as unknown as D1Database;
+			return { db: wrapped, sqls };
+		}
+
+		test("getActiveAndMaintenance: KV miss populates the projection AND returns D1 row", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+			const { kv, store } = makeKv();
+			const row = await repo.getActiveAndMaintenance("h1", { kv });
+			expect(row).toEqual({
+				is_active: 1,
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+			expect(store.has("bat:host:meta:h1")).toBe(true);
+		});
+
+		test("getActiveAndMaintenance: KV hit skips D1 prepare entirely", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+			const { kv } = makeKv();
+			// First call: populates
+			await repo.getActiveAndMaintenance("h1", { kv });
+
+			// Second call: must NOT touch D1
+			const spied = spyDb(db);
+			const spiedRepo = new D1HostsRepository(spied.db);
+			const cached = await spiedRepo.getActiveAndMaintenance("h1", { kv });
+			expect(cached?.is_active).toBe(1);
+			expect(spied.sqls.some((s) => s.includes("FROM hosts WHERE host_id"))).toBe(false);
+		});
+
+		test("getActiveAndMaintenance: D1 returns null is NOT cached (first-seen)", async () => {
+			const { kv, store } = makeKv();
+			const row = await repo.getActiveAndMaintenance("missing", { kv });
+			expect(row).toBeNull();
+			expect(store.size).toBe(0);
+		});
+
+		test("getActiveAndMaintenance: KV throw on read falls back to D1", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			const failingKv = {
+				get: async () => {
+					throw new Error("kv outage");
+				},
+				put: async () => {
+					/* no-op */
+				},
+				delete: async () => {
+					/* no-op */
+				},
+				list: async () => ({ keys: [], list_complete: true, cursor: "" }),
+				getWithMetadata: async () => ({ value: null, metadata: null }),
+			} as unknown as KVNamespace;
+			const row = await repo.getActiveAndMaintenance("h1", { kv: failingKv });
+			expect(row?.is_active).toBe(1);
+		});
+
+		test("getActiveAndMaintenance: retired host (is_active=0) is cached + returned", async () => {
+			await seedHost(db, "h1", "h1.example.com", { isActive: 0 });
+			const { kv, store } = makeKv();
+			const row = await repo.getActiveAndMaintenance("h1", { kv });
+			expect(row?.is_active).toBe(0);
+			const cached = JSON.parse(store.get("bat:host:meta:h1")?.value ?? "{}");
+			expect(cached.is_active).toBe(0);
+		});
+
+		test("getActiveAndMaintenance: undefined kv → behaviour identical to pre-T5", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			// No `opts` at all → must still resolve, no KV access
+			const row = await repo.getActiveAndMaintenance("h1");
+			expect(row?.is_active).toBe(1);
+		});
+
+		test("getActiveFlag: KV miss populates and KV hit serves both methods", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				maintenance_start: "01:00",
+				maintenance_end: "02:00",
+			});
+			const { kv, store } = makeKv();
+			const flag = await repo.getActiveFlag("h1", { kv });
+			expect(flag).toEqual({ host_id: "h1", is_active: 1 });
+			expect(store.has("bat:host:meta:h1")).toBe(true);
+
+			// Cross-method: getActiveAndMaintenance now finds full projection
+			const spied = spyDb(db);
+			const spiedRepo = new D1HostsRepository(spied.db);
+			const meta = await spiedRepo.getActiveAndMaintenance("h1", { kv });
+			expect(meta?.maintenance_start).toBe("01:00");
+			expect(spied.sqls.some((s) => s.includes("FROM hosts WHERE host_id"))).toBe(false);
+		});
+
+		test("getActiveFlag: D1 null is not cached", async () => {
+			const { kv, store } = makeKv();
+			expect(await repo.getActiveFlag("missing", { kv })).toBeNull();
+			expect(store.size).toBe(0);
+		});
+	});
+
 	describe("upsertIdentity", () => {
 		test("creates a host row on first call", async () => {
 			await repo.upsertIdentity({
