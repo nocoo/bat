@@ -137,22 +137,32 @@ pub fn parse_size_string(s: &str) -> Option<u64> {
 }
 
 /// Collect disk deep scan information from the system.
+///
+/// Commands run sequentially to avoid flooding the I/O queue:
+/// du (heaviest) → journalctl (fast) → find (heavy).
+/// Heavy commands use low I/O priority (ionice -c3 nice -n 19).
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub async fn collect_disk_deep_scan() -> DiskDeepScanInfo {
-    // Run all three commands concurrently
-    let (du_result, journal_result, find_result) = tokio::join!(
-        // Top directories
-        command::run_command_default("du", &["-xb", "--max-depth=1", "/"],),
-        // Journal usage
-        command::run_command_default("journalctl", &["--disk-usage"],),
-        // Large files
-        command::run_command_default(
-            "find",
-            &[
-                "/", "-xdev", "-type", "f", "-size", "+100M", "-printf", "%s\t%p\n"
-            ],
-        ),
-    );
+    use std::time::Duration;
+
+    const DISK_TIMEOUT: Duration = Duration::from_secs(120);
+
+    // Phase 1: du (heaviest I/O — sequential, low priority)
+    let du_result =
+        command::run_command_low_priority("du", &["-xb", "--max-depth=1", "/"], DISK_TIMEOUT).await;
+
+    // Phase 2: journalctl (fast, normal priority is fine)
+    let journal_result = command::run_command_default("journalctl", &["--disk-usage"]).await;
+
+    // Phase 3: find (heavy I/O — sequential, low priority)
+    let find_result = command::run_command_low_priority(
+        "find",
+        &[
+            "/", "-xdev", "-type", "f", "-size", "+100M", "-printf", "%s\t%p\n",
+        ],
+        DISK_TIMEOUT,
+    )
+    .await;
 
     let mut top_dirs = match du_result {
         Ok(output) => {
