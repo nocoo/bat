@@ -123,33 +123,33 @@ async fn main() {
     let mut identity_timer = tokio::time::Instant::now();
     let identity_interval = Duration::from_hours(6);
 
-    // Tier 2 collection: light (30min) runs systemd/security/docker/ports/software,
-    // heavy (6h) runs disk_deep. Separate timers prevent disk scans from running
-    // every 30 minutes when 6h is sufficient.
-    let mut tier2_light_timer = tokio::time::Instant::now();
-    let tier2_light_interval = Duration::from_mins(30);
-    let mut tier2_heavy_timer = tokio::time::Instant::now();
+    // Tier 2 collection: runs every 30 minutes as a single payload.
+    // disk_deep (heavy) only runs on startup + every 6h within the collection.
+    let mut tier2_timer = tokio::time::Instant::now();
+    let tier2_interval = Duration::from_mins(30);
     let tier2_heavy_interval = Duration::from_hours(6);
 
     // Inflight guard: prevents overlapping tier2 collections (which caused
     // the iowait storm on jp2.nocoo.cloud 2026-06-03).
-    let tier2_light_running = Arc::new(AtomicBool::new(false));
-    let tier2_heavy_running = Arc::new(AtomicBool::new(false));
+    let tier2_running = Arc::new(AtomicBool::new(false));
+
+    // Track when disk_deep last ran (shared with spawned task via Arc<Mutex>).
+    // Initialized to epoch so the first cycle always includes disk_deep.
+    let last_disk_deep = Arc::new(Mutex::new(
+        tokio::time::Instant::now() - tier2_heavy_interval,
+    ));
 
     // Public IP echo fetch: every 1 hour
     let mut echo_timer = tokio::time::Instant::now();
     let echo_interval = Duration::from_hours(1);
 
-    // Send initial tier2 (both light and heavy) in background
-    spawn_tier2_light_task(
+    // Send initial tier2 (includes disk_deep on first run) in background
+    spawn_tier2_task(
         sender.clone(),
         Arc::clone(&host_id),
-        Arc::clone(&tier2_light_running),
-    );
-    spawn_tier2_heavy_task(
-        sender.clone(),
-        Arc::clone(&host_id),
-        Arc::clone(&tier2_heavy_running),
+        Arc::clone(&tier2_running),
+        Arc::clone(&last_disk_deep),
+        tier2_heavy_interval,
     );
 
     loop {
@@ -212,32 +212,20 @@ async fn main() {
                     identity_timer = tokio::time::Instant::now();
                 }
 
-                // Periodic tier2 light (30min): systemd/security/docker/ports/software
-                if tier2_light_timer.elapsed() >= tier2_light_interval {
-                    if tier2_light_running.load(Ordering::Relaxed) {
-                        tracing::warn!("tier2 light still running, skipping this cycle");
+                // Periodic tier2 (30min): all collectors, disk_deep only if 6h elapsed
+                if tier2_timer.elapsed() >= tier2_interval {
+                    if tier2_running.load(Ordering::Relaxed) {
+                        tracing::warn!("tier2 still running, skipping this cycle");
                     } else {
-                        spawn_tier2_light_task(
+                        spawn_tier2_task(
                             sender.clone(),
                             Arc::clone(&host_id),
-                            Arc::clone(&tier2_light_running),
+                            Arc::clone(&tier2_running),
+                            Arc::clone(&last_disk_deep),
+                            tier2_heavy_interval,
                         );
                     }
-                    tier2_light_timer = tokio::time::Instant::now();
-                }
-
-                // Periodic tier2 heavy (6h): disk_deep only
-                if tier2_heavy_timer.elapsed() >= tier2_heavy_interval {
-                    if tier2_heavy_running.load(Ordering::Relaxed) {
-                        tracing::warn!("tier2 heavy (disk_deep) still running, skipping this cycle");
-                    } else {
-                        spawn_tier2_heavy_task(
-                            sender.clone(),
-                            Arc::clone(&host_id),
-                            Arc::clone(&tier2_heavy_running),
-                        );
-                    }
-                    tier2_heavy_timer = tokio::time::Instant::now();
+                    tier2_timer = tokio::time::Instant::now();
                 }
 
                 // Periodic public IP refresh via echo service (1h)
@@ -263,27 +251,28 @@ async fn main() {
     }
 }
 
-/// Spawn a background task for tier2 light collectors (fast: systemd, security, docker, ports, software).
+/// Spawn a background task that collects tier2 data and sends it.
+///
+/// `disk_deep` is included only if `heavy_interval` has elapsed since
+/// `last_disk_deep`. This keeps a single complete payload per POST (avoiding
+/// the snapshot overwrite problem) while throttling heavy I/O commands.
 #[cfg_attr(coverage_nightly, coverage(off))]
-fn spawn_tier2_light_task(sender: Sender, host_id: Arc<str>, running: Arc<AtomicBool>) {
+fn spawn_tier2_task(
+    sender: Sender,
+    host_id: Arc<str>,
+    running: Arc<AtomicBool>,
+    last_disk_deep: Arc<Mutex<tokio::time::Instant>>,
+    heavy_interval: Duration,
+) {
     running.store(true, Ordering::Relaxed);
     tokio::spawn(async move {
-        let t2_payload = collect_tier2_light(&host_id).await;
+        let include_disk_deep = last_disk_deep.lock().await.elapsed() >= heavy_interval;
+        let t2_payload = collect_tier2(&host_id, include_disk_deep).await;
         if let Err(e) = sender.post("/api/tier2", &t2_payload).await {
-            tracing::error!(error = %e, "failed to send tier2 light");
+            tracing::error!(error = %e, "failed to send tier2");
         }
-        running.store(false, Ordering::Relaxed);
-    });
-}
-
-/// Spawn a background task for tier2 heavy collectors (slow: `disk_deep` only).
-#[cfg_attr(coverage_nightly, coverage(off))]
-fn spawn_tier2_heavy_task(sender: Sender, host_id: Arc<str>, running: Arc<AtomicBool>) {
-    running.store(true, Ordering::Relaxed);
-    tokio::spawn(async move {
-        let t2_payload = collect_tier2_heavy(&host_id).await;
-        if let Err(e) = sender.post("/api/tier2", &t2_payload).await {
-            tracing::error!(error = %e, "failed to send tier2 heavy");
+        if include_disk_deep {
+            *last_disk_deep.lock().await = tokio::time::Instant::now();
         }
         running.store(false, Ordering::Relaxed);
     });
@@ -534,7 +523,7 @@ async fn build_identity_payload(
 }
 
 #[cfg_attr(coverage_nightly, coverage(off))]
-async fn collect_tier2_light(host_id: &str) -> payload::Tier2Payload {
+async fn collect_tier2(host_id: &str, include_disk_deep: bool) -> payload::Tier2Payload {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
@@ -546,14 +535,25 @@ async fn collect_tier2_light(host_id: &str) -> payload::Tier2Payload {
         .await
         .unwrap_or_default();
 
-    // Light collectors: systemd + security can run in parallel (both are fast),
-    // then docker runs after (medium weight).
+    // Phase A (light): systemd + security in parallel (both fast)
     let (systemd, security) = tokio::join!(
         collectors::tier2::systemd::collect_failed_services(),
         collectors::tier2::security::collect_security_posture(),
     );
 
+    // Phase B (medium): docker sequentially after light
     let docker = collectors::tier2::docker::collect_docker_status().await;
+
+    // Phase C (heavy): disk_deep only when 6h interval has elapsed.
+    // Runs sequentially (inside collect_disk_deep_scan) with low I/O priority.
+    let disk_deep = if include_disk_deep {
+        tracing::info!("tier2: including disk_deep scan");
+        Some(orchestrate::convert_disk_deep(
+            collectors::tier2::disk_deep::collect_disk_deep_scan().await,
+        ))
+    } else {
+        None
+    };
 
     // Software discovery — reuses raw ports data
     let mut software =
@@ -598,39 +598,12 @@ async fn collect_tier2_light(host_id: &str) -> payload::Tier2Payload {
         systemd.map(orchestrate::convert_systemd),
         Some(orchestrate::convert_security(security)),
         docker.map(orchestrate::convert_docker),
-        None, // disk_deep not included in light collection
+        disk_deep,
         Some(orchestrate::convert_software(software)),
         websites.map(orchestrate::convert_websites),
         timezone,
         dns_resolvers,
         dns_search,
-    )
-}
-
-#[cfg_attr(coverage_nightly, coverage(off))]
-async fn collect_tier2_heavy(host_id: &str) -> payload::Tier2Payload {
-    let timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-
-    // Heavy: disk_deep runs alone with low I/O priority (handled inside the collector)
-    let disk_deep = collectors::tier2::disk_deep::collect_disk_deep_scan().await;
-
-    orchestrate::build_tier2_payload(
-        PROBE_VERSION,
-        host_id,
-        timestamp,
-        None,
-        None,
-        None,
-        None,
-        Some(orchestrate::convert_disk_deep(disk_deep)),
-        None,
-        None,
-        None,
-        None,
-        None,
     )
 }
 
