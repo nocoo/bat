@@ -38,8 +38,9 @@ impl fmt::Display for CommandError {
 
 /// Run an external command with a timeout, returning stdout as a String.
 ///
-/// On timeout, the child process is explicitly killed to prevent zombie
-/// accumulation (D-state processes from orphaned I/O-heavy commands).
+/// Stdout/stderr are drained concurrently with child execution to avoid pipe
+/// buffer deadlocks. On timeout, the child is killed with a bounded 5s wait
+/// to handle D-state (uninterruptible I/O) processes gracefully.
 pub async fn run_command(
     program: &str,
     args: &[&str],
@@ -58,28 +59,52 @@ pub async fn run_command(
             }
         })?;
 
-    let stdout_handle = child.stdout.take();
-    let stderr_handle = child.stderr.take();
+    // Take pipe handles and spawn concurrent reader tasks to avoid deadlock
+    // when output exceeds the OS pipe buffer (~64KB on Linux).
+    let stdout_pipe = child.stdout.take();
+    let stderr_pipe = child.stderr.take();
+
+    let stdout_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stdout_pipe {
+            tokio::io::AsyncReadExt::read_to_end(&mut pipe, &mut buf)
+                .await
+                .ok();
+        }
+        buf
+    });
+    let stderr_task = tokio::spawn(async move {
+        let mut buf = Vec::new();
+        if let Some(mut pipe) = stderr_pipe {
+            tokio::io::AsyncReadExt::read_to_end(&mut pipe, &mut buf)
+                .await
+                .ok();
+        }
+        buf
+    });
 
     match tokio::time::timeout(timeout, child.wait()).await {
         Err(_) => {
-            child.kill().await.ok();
+            // Timeout: kill with a bounded 5s wait. If the process is in
+            // uninterruptible sleep (D-state), kill() itself may hang, so we
+            // bound it to avoid blocking the tier2 inflight guard indefinitely.
+            let _ = tokio::time::timeout(Duration::from_secs(5), async {
+                child.kill().await.ok();
+            })
+            .await;
+            // Abort reader tasks — we don't need the output on timeout
+            stdout_task.abort();
+            stderr_task.abort();
             Err(CommandError::Timeout)
         }
-        Ok(Err(e)) => Err(CommandError::Io(e)),
+        Ok(Err(e)) => {
+            stdout_task.abort();
+            stderr_task.abort();
+            Err(CommandError::Io(e))
+        }
         Ok(Ok(status)) => {
-            let mut stdout_bytes = Vec::new();
-            let mut stderr_bytes = Vec::new();
-            if let Some(mut out) = stdout_handle {
-                tokio::io::AsyncReadExt::read_to_end(&mut out, &mut stdout_bytes)
-                    .await
-                    .ok();
-            }
-            if let Some(mut err) = stderr_handle {
-                tokio::io::AsyncReadExt::read_to_end(&mut err, &mut stderr_bytes)
-                    .await
-                    .ok();
-            }
+            let stdout_bytes = stdout_task.await.unwrap_or_default();
+            let stderr_bytes = stderr_task.await.unwrap_or_default();
 
             if status.success() {
                 String::from_utf8(stdout_bytes).map_err(|e| {
@@ -256,5 +281,21 @@ mod tests {
         assert!(matches!(result, Err(CommandError::Timeout)));
         // Should return almost immediately after the timeout, not wait for the child
         assert!(elapsed < Duration::from_secs(2));
+    }
+
+    #[tokio::test]
+    async fn large_output_does_not_deadlock() {
+        // Generate output larger than the OS pipe buffer (~64KB on Linux, ~65536 bytes).
+        // Before the concurrent reader fix, this would deadlock: the child fills
+        // the pipe buffer, blocks on write, and never exits — hanging until timeout.
+        let result = run_command(
+            "dd",
+            &["if=/dev/zero", "bs=1024", "count=128", "status=none"],
+            Duration::from_secs(5),
+        )
+        .await;
+        assert!(result.is_ok());
+        // 128KB of null bytes
+        assert_eq!(result.unwrap().len(), 128 * 1024);
     }
 }
