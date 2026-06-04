@@ -76,11 +76,20 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 	}
 
 	async getLatestForHost(hostId: string): Promise<Tier2Snapshot | null> {
+		// disk_deep_json uses latest-non-null semantics: the probe only sends
+		// disk_deep every 6h, but light collections run every 30min with
+		// disk_deep=null. Without COALESCE, the latest row's null would hide
+		// the 6h-old scan result.
 		const row = await this.db
 			.prepare(
 				`SELECT t.host_id, t.ts, t.ports_json, t.systemd_json,
-       t.security_json, t.docker_json, t.disk_deep_json, t.software_json,
-       t.websites_json,
+       t.security_json, t.docker_json,
+       COALESCE(t.disk_deep_json, (
+         SELECT t2.disk_deep_json FROM tier2_snapshots t2
+         WHERE t2.host_id = t.host_id AND t2.disk_deep_json IS NOT NULL
+         ORDER BY t2.ts DESC LIMIT 1
+       )) AS disk_deep_json,
+       t.software_json, t.websites_json,
        h.timezone, h.dns_resolvers AS dns_resolvers_json, h.dns_search AS dns_search_json
 FROM tier2_snapshots t
 JOIN hosts h ON h.host_id = t.host_id

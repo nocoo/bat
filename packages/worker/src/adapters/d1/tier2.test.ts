@@ -99,5 +99,33 @@ describe("D1Tier2Repository", () => {
 		test("returns null for an unknown host", async () => {
 			expect(await repo.getLatestForHost("ghost")).toBeNull();
 		});
+
+		test("disk_deep uses latest-non-null semantics across rows", async () => {
+			// Simulate heavy cycle at T=0: includes disk_deep
+			const diskDeep = {
+				top_dirs: [{ path: "/usr", size_bytes: 1_000_000_000 }],
+				journal_bytes: 256_000_000,
+				large_files: [],
+			};
+			await repo.insertSnapshot(HOST_A, makePayload(NOW, { disk_deep: diskDeep }));
+
+			// Simulate light cycle at T+30min: disk_deep is null (not collected)
+			await repo.insertSnapshot(
+				HOST_A,
+				makePayload(NOW + 1800, {
+					ports: { listening: [{ port: 80, bind: "0.0.0.0", protocol: "tcp" }] },
+				}),
+			);
+
+			const snap = await repo.getLatestForHost(HOST_A);
+			expect(snap).not.toBeNull();
+			// Latest row's timestamp
+			expect(snap?.ts).toBe(NOW + 1800);
+			// ports from the latest row
+			expect(snap?.ports?.listening).toHaveLength(1);
+			// disk_deep should COALESCE to the earlier non-null row
+			expect(snap?.disk_deep).not.toBeNull();
+			expect(snap?.disk_deep?.top_dirs?.[0]?.path).toBe("/usr");
+		});
 	});
 });
