@@ -1,5 +1,24 @@
 # Changelog
 
+## v2.0.3
+
+### Added
+- Host last_seen 5min flush in ingest (T6)
+- Host active/maintenance projection KV cache (T5)
+- Dashboard short-TTL KV cache (T4)
+- Ingest alert healthy sentinel (T3)
+- Heartbeat 5min D1 write throttle, conservative (T2)
+- CLI token KV cache + revoke sentinel (T1)
+
+### Changed
+- Wire BAT_KV production binding (id 57d8209e)
+
+### Fixed
+- Unify tier2 payload to prevent snapshot overwrite
+- Concurrent pipe drain + bounded kill in run_command
+- Prevent iowait storm from disk-scan cycle stacking
+- Satisfy biome useBlockStatements + useDefaultSwitchClause
+
 ## v2.0.2
 
 ### Added
