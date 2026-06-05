@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.4
+
+### Changed
+- Bump @biomejs/biome 1.9 → 2.4 and adapt config + sources
+- Bump vite 6 → 8, @vitejs/plugin-react 4 → 6
+- Bump toml 0.8 → 1.1
+- Bump nix 0.30 → 0.31
+- Bump safe patch/minor across all workspaces
+
 ## v2.0.3
 
 ### Added
