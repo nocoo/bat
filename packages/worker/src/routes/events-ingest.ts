@@ -3,8 +3,8 @@
 // IP validation: CF-Connecting-IP must match host's public_ip
 import {
 	EVENT_BODY_MAX_BYTES,
-	EVENT_TAGS_MAX_COUNT,
 	EVENT_TAG_MAX_LENGTH,
+	EVENT_TAGS_MAX_COUNT,
 	EVENT_TITLE_MAX_LENGTH,
 } from "@bat/shared";
 import type { Context } from "hono";

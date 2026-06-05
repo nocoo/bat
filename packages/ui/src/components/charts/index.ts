@@ -1,10 +1,10 @@
+export { ChartTooltip } from "./chart-tooltip";
 export { CpuChart } from "./cpu-chart";
+export { DashboardResponsiveContainer } from "./dashboard-responsive-container";
+export { DiskBars } from "./disk-bars";
+export { DiskIoChart } from "./disk-io-chart";
 export { MemoryChart } from "./memory-chart";
 export { NetworkChart } from "./network-chart";
-export { DiskBars } from "./disk-bars";
 export { PsiChart } from "./psi-chart";
-export { DiskIoChart } from "./disk-io-chart";
 export { TcpChart } from "./tcp-chart";
 export { TopProcessesTable } from "./top-processes-table";
-export { ChartTooltip } from "./chart-tooltip";
-export { DashboardResponsiveContainer } from "./dashboard-responsive-container";

@@ -1,3 +1,6 @@
+import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
+import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
+import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
 import { AppShell } from "@/components/layout";
 import { TagChip } from "@/components/tag-chip";
@@ -8,9 +11,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks";
 import { getSwatchColor } from "@/lib/palette";
 import { validateTagName } from "@/lib/webhooks-format";
-import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
-import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
-import { useCallback, useState } from "react";
 
 export function TagsPage() {
 	const { data: tags, error, isLoading, mutate } = useTags();

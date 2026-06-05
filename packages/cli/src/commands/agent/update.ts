@@ -5,8 +5,8 @@
 
 import type { AgentItem, AgentStatus, AgentUpdateBody } from "@bat/shared";
 import { VALID_AGENT_STATUSES } from "@bat/shared";
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, validateConfig } from "../../lib/config.js";
 import { ApiError, AuthError, HttpClient, NetworkError } from "../../lib/http.js";

@@ -1,7 +1,7 @@
-import { formatBytes, transformDiskData } from "@/lib/transforms";
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
+import { formatBytes, transformDiskData } from "@/lib/transforms";
 
 export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	const disks = useMemo(() => transformDiskData(data), [data]);

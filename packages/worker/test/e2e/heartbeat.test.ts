@@ -3,7 +3,7 @@
 
 import type { AgentHeartbeatResponse, AgentItem } from "@bat/shared";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { BASE, assertStatus, writeHeaders } from "./helpers";
+import { assertStatus, BASE, writeHeaders } from "./helpers";
 
 const SUFFIX = Date.now().toString(36);
 const SOURCE_KEY = `e2e_hb_src_${SUFFIX}`;

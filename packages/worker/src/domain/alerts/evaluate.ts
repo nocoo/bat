@@ -5,13 +5,13 @@
 // Source of truth: docs/03-data-structures.md § Alert Rules
 // Source of truth: docs/05-worker.md § Alert Evaluation
 
+import type { DiskIoMetric, DiskMetric, MetricsPayload } from "@bat/shared";
 import {
 	ALERT_THRESHOLDS,
 	SIGNAL_EXPANSION_THRESHOLDS,
 	TIER2_THRESHOLDS,
 	TIER3_THRESHOLDS,
 } from "@bat/shared";
-import type { DiskIoMetric, DiskMetric, MetricsPayload } from "@bat/shared";
 import type { AlertEvalResult } from "./types.js";
 
 export type { AlertEvalResult, AlertSeverity } from "./types.js";

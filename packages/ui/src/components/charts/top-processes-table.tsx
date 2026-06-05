@@ -1,10 +1,13 @@
+import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
+import { Activity } from "lucide-react";
+import { useMemo, useState } from "react";
 import {
-	type SortDir,
-	type SortKey,
 	cpuColor,
 	filterProcesses,
 	memPctColor,
 	nextSortState,
+	type SortDir,
+	type SortKey,
 	sortProcesses,
 	stateColor,
 	threadColor,
@@ -15,9 +18,6 @@ import {
 	formatUptime,
 	transformTopProcessesData,
 } from "@/lib/transforms";
-import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
-import { Activity } from "lucide-react";
-import { useMemo, useState } from "react";
 
 /** Sortable column header with keyboard support */
 function SortTh({
@@ -53,7 +53,10 @@ function SortTh({
 export function TopProcessesTable({
 	data,
 	resolution,
-}: { data: MetricsDataPoint[]; resolution?: MetricsResolution }) {
+}: {
+	data: MetricsDataPoint[];
+	resolution?: MetricsResolution;
+}) {
 	const processes = useMemo(() => transformTopProcessesData(data), [data]);
 	const [sortKey, setSortKey] = useState<SortKey>("cpu_pct");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");

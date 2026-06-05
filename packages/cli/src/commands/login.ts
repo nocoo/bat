@@ -2,8 +2,8 @@
 // Opens browser → CF Access authenticates → Worker mints CLI token → redirect back.
 
 import { hostname } from "node:os";
-import { defineCommand, openBrowser, performLogin } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand, openBrowser, performLogin } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../lib/config.js";
 import { createConfigManager, generateSourceKey } from "../lib/config.js";
 import { error, info, success, warn } from "../lib/output.js";

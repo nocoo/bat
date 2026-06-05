@@ -3,7 +3,7 @@
 
 import type { AssetItem, AssetMapResponse, AssetsOverview, BindingItem } from "@bat/shared";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { BASE, assertStatus, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
+import { assertStatus, BASE, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
 // Use unique suffix per test run to avoid collisions on shared dev D1
 const SUFFIX = Date.now().toString(36);

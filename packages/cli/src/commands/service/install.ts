@@ -4,8 +4,8 @@
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, getHeartbeatInterval, validateConfig } from "../../lib/config.js";
 import { error, info, success, warn } from "../../lib/output.js";

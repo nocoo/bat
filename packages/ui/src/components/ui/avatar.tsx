@@ -36,4 +36,4 @@ function AvatarFallback({ className, ...props }: ComponentProps<typeof Fallback>
 	);
 }
 
-export { Avatar, AvatarImage, AvatarFallback };
+export { Avatar, AvatarFallback, AvatarImage };

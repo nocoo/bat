@@ -2,11 +2,11 @@
 import { describe, expect, test } from "vitest";
 import {
 	ALL_ALERT_RULES,
+	getAlertRule,
 	SIGNAL_EXPANSION_ALERT_RULES,
 	TIER1_ALERT_RULES,
 	TIER2_ALERT_RULES,
 	TIER3_ALERT_RULES,
-	getAlertRule,
 } from "../alerts";
 
 describe("TIER2_ALERT_RULES", () => {

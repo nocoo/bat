@@ -129,9 +129,9 @@ describe("getMaintenanceWindow", () => {
 });
 
 import {
-	type MonitoringAlertRow,
 	buildMonitoringAlertsResult,
 	filterNonMaintenanceAlerts,
+	type MonitoringAlertRow,
 } from "./monitoring";
 
 const mAlert = (over: Partial<MonitoringAlertRow>): MonitoringAlertRow => ({

@@ -2,6 +2,7 @@
 // Accepts a CLI heartbeat report and updates agent statuses.
 // Uses source_key as the installation boundary for mark-missing logic.
 
+import type { AgentHeartbeatBody, AgentHeartbeatEntry, AgentStatus } from "@bat/shared";
 import {
 	AGENT_MATCH_KEY_MAX_LENGTH,
 	AGENT_RUNTIME_APP_MAX_LENGTH,
@@ -9,13 +10,13 @@ import {
 	AGENT_SOURCE_KEY_MAX_LENGTH,
 	MAX_HEARTBEAT_AGENTS,
 } from "@bat/shared";
-import type { AgentHeartbeatBody, AgentHeartbeatEntry, AgentStatus } from "@bat/shared";
 
 /**
  * Heartbeat-specific allowed statuses. Clients may only report "running" or "stopped".
  * "missing" is exclusively set by server-side diff logic; "unknown" is initial state only.
  */
 const HEARTBEAT_ALLOWED_STATUSES: readonly AgentStatus[] = ["running", "stopped"] as const;
+
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 

@@ -1,12 +1,12 @@
+import { type HostTag, MAX_TAGS_PER_HOST, type TagItem } from "@bat/shared";
+import { Plus, Tags } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useSWRConfig } from "swr";
 import { deleteAPI, postAPI } from "@/api";
 import { TagChip } from "@/components/tag-chip";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHostTagsFor, useTags } from "@/hooks";
 import { createTagAffordance, suggestTags } from "@/lib/host-tags";
-import { type HostTag, MAX_TAGS_PER_HOST, type TagItem } from "@bat/shared";
-import { Plus, Tags } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { useSWRConfig } from "swr";
 
 interface HostTagsPanelProps {
 	hostId: string;

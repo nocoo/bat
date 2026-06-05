@@ -11,7 +11,7 @@
  * Run: `bun run scripts/check-page-coverage.ts`
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");

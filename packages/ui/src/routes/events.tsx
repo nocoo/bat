@@ -1,3 +1,7 @@
+import { type EventItem, hashHostId } from "@bat/shared";
+import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router";
 import { AppShell } from "@/components/layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,10 +16,6 @@ import {
 } from "@/components/ui/table";
 import { EVENTS_PAGE_SIZE, useEvents, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
-import { type EventItem, hashHostId } from "@bat/shared";
-import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
 
 function EventTable({ events }: { events: EventItem[] }) {
 	const { data: hosts } = useHosts();

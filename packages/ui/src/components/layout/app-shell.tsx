@@ -1,3 +1,6 @@
+import { Github, Menu } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation } from "react-router";
 import {
 	Sheet,
 	SheetContent,
@@ -6,9 +9,6 @@ import {
 	SheetTitle,
 } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Github, Menu } from "lucide-react";
-import { useEffect } from "react";
-import { useLocation } from "react-router";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";

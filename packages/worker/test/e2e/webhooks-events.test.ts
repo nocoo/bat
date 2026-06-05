@@ -3,7 +3,7 @@
 
 import type { EventsListResponse, WebhookConfig } from "@bat/shared";
 import { beforeAll, describe, expect, test } from "vitest";
-import { BASE, assertStatus, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
+import { assertStatus, BASE, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
 const HID = "e2e-wh-host";
 const PUBLIC_IP = "203.0.113.42";

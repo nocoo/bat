@@ -1,7 +1,8 @@
 // GET /api/monitoring/* — monitoring endpoints for Uptime Kuma integration
 // Design doc: docs/16-monitoring-api.md
-import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
+
 import type { HostStatus } from "@bat/shared";
+import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import {
 	freshestLastSeen,

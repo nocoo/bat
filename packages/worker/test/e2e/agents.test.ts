@@ -4,7 +4,7 @@
 
 import type { AgentItem } from "@bat/shared";
 import { beforeAll, describe, expect, test } from "vitest";
-import { BASE, assertStatus, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
+import { assertStatus, BASE, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
 const HOST_ID = "e2e-agents-host";
 let agentId = "";

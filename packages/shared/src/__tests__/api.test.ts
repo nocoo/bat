@@ -2,11 +2,11 @@
 import { describe, expect, test } from "vitest";
 import {
 	API_ROUTES,
+	hashHostId,
 	MAX_ALLOWED_PORTS_PER_HOST,
 	MAX_TAGS_PER_HOST,
 	TAG_COLOR_COUNT,
 	TAG_MAX_LENGTH,
-	hashHostId,
 } from "../api.js";
 
 describe("hashHostId", () => {

@@ -1,14 +1,14 @@
+import type { HostOverviewItem } from "@bat/shared";
+import { AlertTriangle, Server } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { HostCard } from "@/components/host-card";
 import { AppShell } from "@/components/layout";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostTags, useHosts, useTags } from "@/hooks";
+import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
-import type { HostOverviewItem } from "@bat/shared";
-import { AlertTriangle, Server } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
-import { Link } from "react-router";
 
 type SortKey = "name-asc" | "name-desc" | "cpu" | "mem" | "disk";
 

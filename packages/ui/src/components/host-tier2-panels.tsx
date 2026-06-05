@@ -1,3 +1,5 @@
+import type { Tier2Snapshot } from "@bat/shared";
+import { Globe, Lock, Package, Unlock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	dedupeAndSortWebsites,
@@ -5,8 +7,6 @@ import {
 	softwareCategoryLabel,
 	websiteUrl,
 } from "@/lib/tier2-format";
-import type { Tier2Snapshot } from "@bat/shared";
-import { Globe, Lock, Package, Unlock } from "lucide-react";
 
 interface Tier2PanelsProps {
 	tier2: Tier2Snapshot | undefined;

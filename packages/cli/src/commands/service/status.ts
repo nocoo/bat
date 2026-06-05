@@ -1,7 +1,7 @@
 // bat-cli service status — Check if the heartbeat service is running.
 
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager } from "../../lib/config.js";
 import { error, info, success } from "../../lib/output.js";

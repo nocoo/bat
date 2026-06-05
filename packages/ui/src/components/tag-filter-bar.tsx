@@ -1,5 +1,5 @@
-import { TagChip } from "@/components/tag-chip";
 import type { TagItem } from "@bat/shared";
+import { TagChip } from "@/components/tag-chip";
 
 interface TagFilterBarProps {
 	tags: TagItem[];

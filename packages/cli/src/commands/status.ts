@@ -1,8 +1,8 @@
 // bat-cli status — Display connection status and config summary.
 // Reads local config, verifies token by calling the Worker API.
 
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../lib/config.js";
 import { createConfigManager, getHeartbeatInterval, validateConfig } from "../lib/config.js";
 import { AuthError, HttpClient, NetworkError } from "../lib/http.js";

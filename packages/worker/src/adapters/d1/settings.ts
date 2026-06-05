@@ -1,7 +1,7 @@
 // D1-backed SettingsRepository. SQL lifted verbatim from the previous
 // `routes/settings.ts` callsite and `services/aggregation.ts` consumer.
 
-import { DEFAULT_RETENTION_DAYS, type RetentionDays, parseRetentionDays } from "@bat/shared";
+import { DEFAULT_RETENTION_DAYS, parseRetentionDays, type RetentionDays } from "@bat/shared";
 import type { SettingsRepository } from "../../repos/types.js";
 
 export class D1SettingsRepository implements SettingsRepository {

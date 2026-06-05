@@ -1,8 +1,8 @@
 // D1-backed AgentsRepository. SQL lifted verbatim from
 // `services/agents.ts` and `services/heartbeat.ts` (both now removed).
 
-import { generateId } from "@bat/shared";
 import type { AgentHeartbeatEntry, AgentHeartbeatResponse, AgentItem, AgentRow } from "@bat/shared";
+import { generateId } from "@bat/shared";
 import {
 	HEARTBEAT_THROTTLE_SECONDS,
 	loadSnapshot,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type SparklineRow, buildSparklinesByHost, normalizeNetSparkline } from "./hosts";
+import { buildSparklinesByHost, normalizeNetSparkline, type SparklineRow } from "./hosts";
 
 describe("normalizeNetSparkline", () => {
 	test("returns null for an empty input", () => {

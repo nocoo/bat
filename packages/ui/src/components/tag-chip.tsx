@@ -1,5 +1,5 @@
-import { getBadgeStyleByIndex } from "@/lib/palette";
 import { X } from "lucide-react";
+import { getBadgeStyleByIndex } from "@/lib/palette";
 
 interface TagChipProps {
 	name: string;
@@ -13,6 +13,7 @@ export function TagChip({ name, color, onRemove, onClick, size = "sm" }: TagChip
 	const style = getBadgeStyleByIndex(color);
 
 	return (
+		// biome-ignore lint/a11y/noStaticElementInteractions: span has role=button + tabIndex + keyboard handler when interactive
 		<span
 			className={`inline-flex items-center gap-1 rounded-full font-medium ${
 				size === "sm" ? "text-xs px-2 py-0.5" : "text-xs px-2.5 py-0.5"

@@ -19,7 +19,7 @@
 import { hashHostId } from "@bat/shared";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { normalize } from "./baseline/normalize";
-import { BASE, assertStatus, makeMetricsPayload, readHeaders, writeHeaders } from "./helpers";
+import { assertStatus, BASE, makeMetricsPayload, readHeaders, writeHeaders } from "./helpers";
 
 // /api/ingest enforces a 5-minute clock-skew bound, so metric timestamps must
 // be relative to NOW. T0 is reserved for boot_time anchors. All volatile
@@ -757,7 +757,6 @@ async function snap(
 	}
 	const norm = normalize(filtered);
 	const path = `./baseline/__snapshots__/${name}.json`;
-	// biome-ignore lint/suspicious/noMisplacedAssertion: helper invoked from inside a test()
 	await expect(`${JSON.stringify(norm, null, 2)}\n`).toMatchFileSnapshot(path);
 }
 
@@ -887,6 +886,5 @@ function expectShallowEqualExcept(
 		delete av[k];
 		delete bv[k];
 	}
-	// biome-ignore lint/suspicious/noMisplacedAssertion: helper invoked from inside a test()
 	expect(av).toEqual(bv);
 }

@@ -9,8 +9,8 @@ import type { Tier2Payload } from "@bat/shared";
 import { evaluateTier2Rules } from "../../domain/alerts/tier2.js";
 import type { AlertEvalResult } from "../../domain/alerts/types.js";
 
-export { evaluateTier2Rules };
 export type { AlertEvalResult };
+export { evaluateTier2Rules };
 
 interface AlertStateRow {
 	rule_id: string;
@@ -240,4 +240,4 @@ VALUES (?, ?, ?, ?)`,
 }
 
 // Legacy single-rule helpers retained for unit tests.
-export { handleInstantRule, handleDurationRule };
+export { handleDurationRule, handleInstantRule };
