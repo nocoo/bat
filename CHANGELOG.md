@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.0.5
+
+### Changed
+- Redact VPS fleet details, point to nmem instead
+
+### Fixed
+- Use Duration::from_mins for clippy::duration_suboptimal_units
+- Add setup-bun to probe-release job
+
 ## v2.0.4
 
 ### Changed
