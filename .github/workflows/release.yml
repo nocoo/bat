@@ -269,6 +269,11 @@ jobs:
           path: probe/out/
           retention-days: 7
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.11"
+
       - name: Setup Wrangler for R2 upload
         uses: cloudflare/wrangler-action@v3
         with:
