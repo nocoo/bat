@@ -145,7 +145,7 @@ pub fn parse_size_string(s: &str) -> Option<u64> {
 pub async fn collect_disk_deep_scan() -> DiskDeepScanInfo {
     use std::time::Duration;
 
-    const DISK_TIMEOUT: Duration = Duration::from_secs(120);
+    const DISK_TIMEOUT: Duration = Duration::from_mins(2);
 
     // Phase 1: du (heaviest I/O — sequential, low priority)
     let du_result =
