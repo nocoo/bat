@@ -1,7 +1,6 @@
 // D1-backed BindingsRepository. SQL lifted verbatim from
 // `services/bindings.ts` (now removed).
 
-import { hashHostId } from "@bat/shared";
 import type {
 	AssetMapAgent,
 	AssetMapAsset,
@@ -12,6 +11,7 @@ import type {
 	BindingItem,
 	BindingRow,
 } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import type { BindingsRepository } from "../../repos/types.js";
 
 export class D1BindingsRepository implements BindingsRepository {

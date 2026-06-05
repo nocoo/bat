@@ -1,9 +1,9 @@
+import { AlertTriangle, ChevronRight, Copy, Terminal } from "lucide-react";
+import { useCallback, useState } from "react";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSetup } from "@/hooks";
-import { AlertTriangle, ChevronRight, Copy, Terminal } from "lucide-react";
-import { useCallback, useState } from "react";
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
 	const [copied, setCopied] = useState(false);

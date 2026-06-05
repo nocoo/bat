@@ -1,8 +1,8 @@
 // bat-cli agent list — List all registered agents.
 
 import type { AgentItem } from "@bat/shared";
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, validateConfig } from "../../lib/config.js";
 import { AuthError, HttpClient, NetworkError } from "../../lib/http.js";

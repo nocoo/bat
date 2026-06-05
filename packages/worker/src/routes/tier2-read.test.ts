@@ -1,5 +1,5 @@
-import { hashHostId } from "@bat/shared";
 import type { Tier2Snapshot } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import { Hono } from "hono";
 import { beforeEach, describe, expect, test } from "vitest";
 import { createD1Repositories } from "../adapters/d1/factory";

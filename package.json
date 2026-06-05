@@ -3,7 +3,9 @@
 	"version": "2.0.3",
 	"private": true,
 	"packageManager": "bun@1.3.11",
-	"workspaces": ["packages/*"],
+	"workspaces": [
+		"packages/*"
+	],
 	"scripts": {
 		"dev": "turbo run dev --parallel --filter=!@bat/cli",
 		"release": "bun scripts/release.ts",
@@ -20,9 +22,14 @@
 		"gate:security": "bun run scripts/run-security.ts",
 		"prepare": "husky"
 	},
-	"trustedDependencies": ["@biomejs/biome", "better-sqlite3", "esbuild", "workerd"],
+	"trustedDependencies": [
+		"@biomejs/biome",
+		"better-sqlite3",
+		"esbuild",
+		"workerd"
+	],
 	"devDependencies": {
-		"@biomejs/biome": "^1.9.4",
+		"@biomejs/biome": "^2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@vitest/coverage-v8": "^4.1.8",
 		"better-sqlite3": "^12.10.0",
@@ -34,7 +41,9 @@
 		"vitest": "^4.1.8"
 	},
 	"lint-staged": {
-		"*.{ts,tsx,js,jsx,json,css}": ["biome check --error-on-warnings --no-errors-on-unmatched"]
+		"*.{ts,tsx,js,jsx,json,css}": [
+			"biome check --error-on-warnings --no-errors-on-unmatched"
+		]
 	},
 	"dependencies": {
 		"postcss": "^8.5.15"

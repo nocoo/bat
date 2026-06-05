@@ -446,8 +446,8 @@ describe("validateMaintenanceBody", () => {
 
 import {
 	EVENT_BODY_MAX_BYTES,
-	EVENT_TAGS_MAX_COUNT,
 	EVENT_TAG_MAX_LENGTH,
+	EVENT_TAGS_MAX_COUNT,
 	EVENT_TITLE_MAX_LENGTH,
 } from "@bat/shared";
 import { validateEventPayload } from "./events-ingest";

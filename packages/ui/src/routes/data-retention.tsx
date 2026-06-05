@@ -1,11 +1,11 @@
+import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
+import { AlertTriangle, Check, Database } from "lucide-react";
+import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings } from "@/hooks";
-import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
-import { AlertTriangle, Check, Database } from "lucide-react";
-import { useCallback, useState } from "react";
 
 function retentionLabel(days: RetentionDays): string {
 	if (days === 1) {

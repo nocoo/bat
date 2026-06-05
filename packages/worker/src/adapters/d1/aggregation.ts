@@ -5,7 +5,6 @@
 
 import type { RetentionDays } from "@bat/shared";
 import {
-	type RawRow,
 	aggregateDiskIo,
 	aggregateNetwork,
 	avg,
@@ -14,6 +13,7 @@ import {
 	max,
 	maxNullable,
 	min,
+	type RawRow,
 	sumNullable,
 } from "../../domain/aggregation.js";
 import type { AggregationRepository } from "../../repos/types.js";

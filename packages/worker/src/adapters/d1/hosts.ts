@@ -11,8 +11,8 @@ import type {
 	HostOverviewRow,
 	HostSparklineRow,
 	HostStatusRow,
-	HostTier2Inventory,
 	HostsRepository,
+	HostTier2Inventory,
 } from "../../repos/types.js";
 
 const HOST_OVERVIEW_COLUMNS =

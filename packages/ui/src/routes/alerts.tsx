@@ -1,3 +1,6 @@
+import { type AlertItem, hashHostId } from "@bat/shared";
+import { AlertTriangle, Bell } from "lucide-react";
+import { Link } from "react-router";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,9 +14,6 @@ import {
 } from "@/components/ui/table";
 import { useAlerts, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
-import { type AlertItem, hashHostId } from "@bat/shared";
-import { AlertTriangle, Bell } from "lucide-react";
-import { Link } from "react-router";
 
 function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 	const { data: hosts } = useHosts();

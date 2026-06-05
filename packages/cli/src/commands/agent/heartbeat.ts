@@ -3,8 +3,8 @@
 // Only "running" and "stopped" are valid heartbeat statuses.
 
 import type { AgentHeartbeatBody, AgentHeartbeatResponse } from "@bat/shared";
-import { defineCommand } from "@nocoo/cli-base";
 import type { ConfigManager } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/cli-base";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, validateConfig } from "../../lib/config.js";
 import { AuthError, HttpClient, NetworkError } from "../../lib/http.js";

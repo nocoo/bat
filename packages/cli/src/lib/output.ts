@@ -46,18 +46,15 @@ export function table(headers: string[], rows: string[][]): void {
 
 	// Header line
 	const headerLine = headers.map((h, i) => h.padEnd(widths[i] ?? 0)).join("  ");
-	// biome-ignore lint/suspicious/noConsoleLog: CLI output is intentional
 	console.log(pc.bold(headerLine));
 
 	// Separator
 	const sepLine = widths.map((w) => "─".repeat(w)).join("──");
-	// biome-ignore lint/suspicious/noConsoleLog: CLI output is intentional
 	console.log(pc.dim(sepLine));
 
 	// Data rows
 	for (const row of rows) {
 		const line = row.map((cell, i) => cell.padEnd(widths[i] ?? 0)).join("  ");
-		// biome-ignore lint/suspicious/noConsoleLog: CLI output is intentional
 		console.log(line);
 	}
 }

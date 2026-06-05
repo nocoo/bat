@@ -1,3 +1,7 @@
+import type { HostOverviewItem, HostTag, SparklinePoint } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
+import { Unlock } from "lucide-react";
+import { Link } from "react-router";
 import { StatusBadge } from "@/components/status-badge";
 import { TagChip } from "@/components/tag-chip";
 import { Card } from "@/components/ui/card";
@@ -12,10 +16,6 @@ import {
 	statusDotColor,
 	toPolyline,
 } from "@/lib/host-card-format";
-import type { HostOverviewItem, HostTag, SparklinePoint } from "@bat/shared";
-import { hashHostId } from "@bat/shared";
-import { Unlock } from "lucide-react";
-import { Link } from "react-router";
 
 // ---------------------------------------------------------------------------
 // Inline sub-components

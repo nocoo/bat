@@ -12,7 +12,7 @@
  * Run: `bun run scripts/check-route-coverage.ts`
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -36,7 +36,7 @@ function discoverDeclaredRoutes(): Route[] {
 	for (const m of src.matchAll(re)) {
 		const method = m[1];
 		const path = m[2];
-		if (method && path && path.startsWith("/api/")) {
+		if (method && path?.startsWith("/api/")) {
 			routes.push({ method: method.toUpperCase() as RouteMethod, path });
 		}
 	}

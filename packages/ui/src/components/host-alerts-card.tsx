@@ -1,7 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatRelativeTime, severityColorClass, sortAlertsBySeverity } from "@/lib/alerts-format";
 import type { AlertItem } from "@bat/shared";
 import { Bell } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatRelativeTime, severityColorClass, sortAlertsBySeverity } from "@/lib/alerts-format";
 
 interface HostAlertsCardProps {
 	alerts: AlertItem[];

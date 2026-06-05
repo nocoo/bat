@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_RETENTION_DAYS, RETENTION_OPTIONS, parseRetentionDays } from "../settings.js";
+import { DEFAULT_RETENTION_DAYS, parseRetentionDays, RETENTION_OPTIONS } from "../settings.js";
 
 describe("settings", () => {
 	describe("RETENTION_OPTIONS", () => {

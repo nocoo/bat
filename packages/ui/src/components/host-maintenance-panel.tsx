@@ -1,3 +1,6 @@
+import { Wrench } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { useSWRConfig } from "swr";
 import { deleteAPI, putAPI } from "@/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHostMaintenance } from "@/hooks";
@@ -8,9 +11,6 @@ import {
 	utcHHMMToLocal,
 	validateWindow,
 } from "@/lib/maintenance";
-import { Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { useSWRConfig } from "swr";
 
 interface MaintenancePanelProps {
 	hostId: string;

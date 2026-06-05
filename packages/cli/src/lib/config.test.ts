@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import type { BatCliConfig } from "./config.js";
 import {
 	createConfigManager,
 	generateSourceKey,
@@ -11,7 +12,6 @@ import {
 	getHeartbeatInterval,
 	validateConfig,
 } from "./config.js";
-import type { BatCliConfig } from "./config.js";
 
 let tempDir: string;
 

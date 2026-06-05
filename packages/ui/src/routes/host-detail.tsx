@@ -1,3 +1,7 @@
+import { hashHostId } from "@bat/shared";
+import { AlertTriangle, Info } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { useParams } from "react-router";
 import { patchAPI } from "@/api";
 import {
 	CpuChart,
@@ -18,13 +22,9 @@ import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAlerts, useHostDetail, useHostMetrics, useHostTier2, useHosts } from "@/hooks";
+import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
 import { formatMemory, formatUptime } from "@/lib/host-card-format";
 import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
-import { hashHostId } from "@bat/shared";
-import { AlertTriangle, Info } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
-import { useParams } from "react-router";
 
 const TIME_RANGES = [
 	{ label: "1h", seconds: 3600 },
@@ -38,7 +38,10 @@ const TIME_RANGES = [
 function TimeRangePicker({
 	selected,
 	onSelect,
-}: { selected: number; onSelect: (seconds: number) => void }) {
+}: {
+	selected: number;
+	onSelect: (seconds: number) => void;
+}) {
 	return (
 		<div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
 			{TIME_RANGES.map((range) => (
@@ -74,7 +77,11 @@ function DescriptionEditor({
 	hid,
 	value,
 	onSaved,
-}: { hid: string; value: string | null; onSaved: (v: string | null) => void }) {
+}: {
+	hid: string;
+	value: string | null;
+	onSaved: (v: string | null) => void;
+}) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState(value ?? "");
 	const inputRef = useRef<HTMLInputElement>(null);

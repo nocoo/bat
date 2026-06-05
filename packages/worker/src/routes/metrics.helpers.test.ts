@@ -2,11 +2,11 @@
 import { describe, expect, test } from "vitest";
 import {
 	EXT_KEY_MAP,
-	type HourlyRow,
-	type RawRow,
 	expandHourlyRow,
 	expandRawRow,
+	type HourlyRow,
 	parseMetricsRange,
+	type RawRow,
 } from "./metrics.js";
 
 describe("expandRawRow", () => {

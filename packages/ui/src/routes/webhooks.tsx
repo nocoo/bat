@@ -1,3 +1,6 @@
+import type { WebhookConfig } from "@bat/shared";
+import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
+import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,9 +11,6 @@ import {
 	displayWebhookHostname,
 	filterAvailableHosts,
 } from "@/lib/webhooks-format";
-import type { WebhookConfig } from "@bat/shared";
-import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
-import { useCallback, useState } from "react";
 
 export function WebhooksPage() {
 	const { data: webhooks, error, isLoading, mutate } = useWebhooks();

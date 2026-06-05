@@ -2,7 +2,7 @@
 
 import type { HostTag, TagItem } from "@bat/shared";
 import { beforeAll, describe, expect, test } from "vitest";
-import { BASE, assertStatus, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
+import { assertStatus, BASE, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
 const HID = "e2e-tags-host";
 

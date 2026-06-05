@@ -1,9 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
 import {
+	freshestLastSeen,
 	HOST_LAST_SEEN_FLUSH_SECONDS,
 	HOST_LAST_SEEN_TTL_SECONDS,
 	type HostLastSeenSnapshot,
-	freshestLastSeen,
 	hostLastSeenKey,
 	loadLastSeen,
 	loadObservedSeenBatch,

@@ -1,10 +1,3 @@
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useMe } from "@/hooks";
-import { getAvatarColor, getDisplayName } from "@/lib/avatar-color";
-import { cn } from "@/lib/utils";
-import { APP_VERSION } from "@/lib/version";
 import {
 	Bell,
 	ChevronUp,
@@ -18,6 +11,13 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMe } from "@/hooks";
+import { getAvatarColor, getDisplayName } from "@/lib/avatar-color";
+import { cn } from "@/lib/utils";
+import { APP_VERSION } from "@/lib/version";
 import { useSidebar } from "./sidebar-context";
 
 // ── Types ──
@@ -67,7 +67,11 @@ function NavGroupSection({
 	group,
 	pathname,
 	onNavigate,
-}: { group: NavGroup; pathname: string; onNavigate: () => void }) {
+}: {
+	group: NavGroup;
+	pathname: string;
+	onNavigate: () => void;
+}) {
 	const [open, setOpen] = useState(group.defaultOpen ?? true);
 
 	return (
@@ -269,6 +273,6 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 	);
 }
 
+export type { NavGroup, NavItem };
 // Export for testing
 export { NAV_GROUPS, NAV_ITEMS };
-export type { NavItem, NavGroup };

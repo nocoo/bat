@@ -2,9 +2,9 @@ import { describe, expect, test } from "vitest";
 import {
 	ALL_ALERT_RULES,
 	type AlertSeverity,
-	TIER1_ALERT_RULES,
 	getAlertRule,
 	getAlertRuleLabel,
+	TIER1_ALERT_RULES,
 } from "../alerts";
 import { ALERT_THRESHOLDS } from "../constants";
 

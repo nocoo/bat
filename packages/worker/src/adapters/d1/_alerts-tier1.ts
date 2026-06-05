@@ -9,8 +9,8 @@ import { evaluateRules } from "../../domain/alerts/evaluate.js";
 import type { AlertEvalResult, AlertSeverity } from "../../domain/alerts/types.js";
 import { invalidateHealthy, isMarkedHealthy, markHealthy } from "../../lib/alerts-healthy-cache.js";
 
-export { evaluateRules };
 export type { AlertEvalResult };
+export { evaluateRules };
 
 interface AlertStateRow {
 	rule_id: string;
