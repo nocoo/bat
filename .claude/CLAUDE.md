@@ -140,25 +140,30 @@ file probe/out/bat-probe-linux-aarch64   # expect: ELF 64-bit ARM aarch64, stati
 
 ### Release checklist
 
-**Worker + UI 部署已自动化**（P0，2026-04）：
+**Worker + UI + Probe 部署已自动化**（2026-06 更新）：
 - **Tag 触发**：`v*.*.*` tag push 触发部署（严格版本校验）
 - **CI 绿灯触发**：main 分支 CI 通过后自动部署（连续部署）
 - 流程：build → D1 migrate → wrangler deploy → verify `/api/live`
-- Probe 二进制 / R2 / VPS 仍手动（待 P1/P2）
+- Probe 二进制：CI 内 docker 交叉编译 x86_64+aarch64，上传 R2 versioned + latest
+- VPS 升级仍手动（见下文）
 
-GitHub Secrets 依赖：`CLOUDFLARE_API_TOKEN`（Workers Edit + D1 Edit）、`CLOUDFLARE_ACCOUNT_ID`。
+GitHub Secrets 依赖：`CLOUDFLARE_API_TOKEN`（Workers Edit + D1 Edit + R2 Edit）、`CLOUDFLARE_ACCOUNT_ID`。
 
-1. **发版（自动）**：`bun run release` — 同步版本号、CHANGELOG、commit、push、tag、GitHub Release。tag push 后 CI 自动部署 Worker+UI。
-2. **Probe 二进制（手动）**：本地 docker 交叉编译（见上），上传 R2：
+1. **发版（自动）**：`bun run release` — 同步版本号、CHANGELOG、commit、push、tag、GitHub Release。tag push 后 CI 自动部署 Worker + UI + R2 probe binaries。
+2. **CI 失败 fallback（手动 R2 上传）**：如 `probe-release` job 失败，从 artifact 下载二进制再手动上传：
    ```bash
+   gh run download <RUN_ID> -n probe-binaries -D probe/out
    VERSION=$(jq -r .version package.json)
-   wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
-   wrangler r2 object put "zhe/apps/bat/${VERSION}/bat-probe-linux-aarch64" --file probe/out/bat-probe-linux-aarch64 --remote
-   wrangler r2 object put "zhe/apps/bat/latest/bat-probe-linux-x86_64" --file probe/out/bat-probe-linux-x86_64 --remote
-   wrangler r2 object put "zhe/apps/bat/latest/bat-probe-linux-aarch64" --file probe/out/bat-probe-linux-aarch64 --remote
+   for tier in "$VERSION" latest; do
+     for f in bat-probe-linux-x86_64 bat-probe-linux-aarch64 \
+              bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256; do
+       (cd packages/worker && bunx wrangler r2 object put \
+         "zhe/apps/bat/$tier/$f" --file "../../probe/out/$f" --remote)
+     done
+   done
    ```
    - Public URL prefix: `https://s.zhe.to/apps/bat/`
-   - `install.sh` fetches from `latest/` by default — no script changes needed per release
+   - `install.sh` fetches from `latest/` by default
 3. **VPS 升级（手动）**：见下文 upgrade 命令
 4. **验证**：
    - GH Actions Run 通过（Worker verify 已在 workflow 内做了一次 `/api/live` 校验）
@@ -192,19 +197,22 @@ GitHub Secrets 依赖：`CLOUDFLARE_API_TOKEN`（Workers Edit + D1 Edit）、`CL
 
 ### Test hosts
 
-Probes are deployed on personal VPS fleet. SSH access uses `~/.ssh/id_rsa` key.
+Probes 部署在私人 VPS 舰队上。**舰队详情（hostname、SSH 端口、密钥、用户）不写入版本控制**，查询：
 
-| Host | User | Arch | Probe path | Config |
-|------|------|------|-----------|--------|
-| jp.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
-| us.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
-| us2.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
-| tongji.nocoo.cloud | nocoo | x86_64 | `/usr/local/bin/bat-probe` | `/etc/bat/config.toml` |
-
-Upgrade probe on a host:
 ```bash
-ssh -i ~/.ssh/id_rsa nocoo@<host> "sudo systemctl stop bat-probe && sudo curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64 && sudo chmod +x /usr/local/bin/bat-probe && sudo systemctl start bat-probe"
+nmem --json m search "VPS 舰队" -l vps -n 1
 ```
+
+通用约定（可写入版本控制）：
+
+- Probe 安装路径：`/usr/local/bin/bat-probe`
+- 配置文件：`/etc/bat/config.toml`
+- systemd unit：`bat-probe.service`
+- 二进制下载：`https://s.zhe.to/apps/bat/latest/bat-probe-linux-{x86_64,aarch64}`
+- 单机升级模板（替换 `<host>` 与 SSH 参数为 nmem 中的实际值）：
+  ```bash
+  ssh <host> "sudo systemctl stop bat-probe && sudo curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64 && sudo chmod +x /usr/local/bin/bat-probe && sudo systemctl start bat-probe && sudo systemctl is-active bat-probe"
+  ```
 
 ### Deployment history in memory
 
@@ -254,3 +262,4 @@ Requires `socket.io-client` (`bun add -d socket.io-client`). When curl times out
 - **glibc version mismatch from `rust:1-slim`**: The `rust:1-slim` Docker image tracks Debian unstable/testing, so its glibc version drifts upward silently. Binaries compiled against it fail with `GLIBC_2.39 not found` on Debian 12 (glibc 2.36) and older. Fix: use `rust:1-alpine` + musl for fully static binaries with zero host libc dependency. Always verify with `file <binary>` — expect `static-pie linked`.
 - **D1 migration must be applied before deploying Worker code that references new columns**: Deploying Worker code that queries new columns (e.g. `maintenance_start`) without first applying the migration causes 500 on ALL routes that touch the `hosts` table — including `/api/ingest`, silently dropping all probe data fleet-wide. Always run `npx wrangler d1 migrations apply bat-db --remote --env production` BEFORE `npx wrangler deploy`.
 - **Edge Dashboard 迁移 (2026-04)**：Next.js Dashboard 已迁移到 Cloudflare Workers 边缘部署。packages/dashboard 已废弃（保留在 git 历史），packages/ui 是新的 SPA。Railway 部署不再需要。
+- **Release baseline snapshot 必须 amend 进 release commit**：`bun run release` 完成 commit 后，`packages/worker/test/e2e/baseline/__snapshots__/{live,fleet.status}.json` 仍包含旧版本号，pre-push 的 L2 E2E 会因 snapshot mismatch 拦住 push。修复：`cd packages/worker && bun run test:e2e -- --update`，然后 `git commit --amend --no-edit` 把 snapshot 并入 release commit，保持单原子提交。
