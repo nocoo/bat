@@ -34,7 +34,7 @@
 		"@vitest/coverage-v8": "^4.1.8",
 		"better-sqlite3": "^12.10.0",
 		"husky": "^9.1.0",
-		"lint-staged": "^16.4.0",
+		"lint-staged": "^17.0.7",
 		"picomatch": "^4.0.4",
 		"turbo": "^2.9.16",
 		"typescript": "^5.8.2",
