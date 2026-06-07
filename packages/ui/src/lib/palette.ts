@@ -6,6 +6,8 @@
  * themed via index.css.
  */
 
+import type { CSSProperties } from "react";
+
 const v = (token: string) => `hsl(var(--${token}))`;
 
 /** Named chart colors, used by recharts series. */
@@ -56,7 +58,7 @@ function hashText(str: string): number {
 	return Math.abs(hash);
 }
 
-interface BadgeStyle {
+interface BadgeStyle extends CSSProperties {
 	backgroundColor: string;
 	color: string;
 }
