@@ -1,5 +1,18 @@
 # Changelog
 
+## v2.0.6
+
+### Changed
+- Bump recharts 2.15 → 3.8.1
+- Bump lucide-react 0.511 → 1.17.0
+- Bump @types/node 22 → 25 in packages/cli
+- Patch sweep across all workspaces
+- Bump typescript 5.9 → 6.0.3
+- Bump lint-staged 16.4 → 17.0.7
+
+### Fixed
+- Use bunx wrangler from packages/worker for R2 probe upload
+
 ## v2.0.5
 
 ### Changed
