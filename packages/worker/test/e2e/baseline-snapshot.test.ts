@@ -112,7 +112,12 @@ describe("C0 baseline: normalized API snapshot (permanent regression guard)", ()
 	test("GET /api/hosts/:id/maintenance (window present)", async () => {
 		await snap("hosts.maintenance.h1", () => fetchJson(`/api/hosts/${HIDS[H1]}/maintenance`), {
 			sanity: (json) => {
-				expect(json).toMatchObject({ start: "01:00", end: "02:00", reason: "bl-baseline" });
+				// start/end are wall-clock derived (NOW+2h, NOW+2h+1m); only
+				// the reason and shape are deterministic.
+				const obj = json as { start: string; end: string; reason: string };
+				expect(obj.reason).toBe("bl-baseline");
+				expect(obj.start).toMatch(/^\d{2}:\d{2}$/);
+				expect(obj.end).toMatch(/^\d{2}:\d{2}$/);
 			},
 		});
 	});
@@ -498,11 +503,21 @@ async function seedBaselineDataset(): Promise<void> {
 	});
 	assertStatus(descRes.status, 204, "seed description");
 
-	// Maintenance window on H1
+	// Maintenance window on H1. Compute a 1-minute window starting 2 hours
+	// after NOW so it never overlaps wall-clock during the test run, no
+	// matter what hour the suite executes. Without this, a window like
+	// "01:00-02:00" would put H1 into `maintenance` tier whenever the
+	// suite runs in that UTC range and break the `critical` snapshot.
+	// The volatile start/end strings are scrubbed by normalize() to `<HHMM>`
+	// so the snapshot stays stable.
+	const winStart = new Date((NOW + 7200) * 1000);
+	const winEnd = new Date((NOW + 7260) * 1000);
+	const fmt = (d: Date): string =>
+		`${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
 	const mwRes = await fetch(`${BASE}/api/hosts/${HIDS[H1]}/maintenance`, {
 		method: "PUT",
 		headers: writeHeaders(),
-		body: JSON.stringify({ start: "01:00", end: "02:00", reason: "bl-baseline" }),
+		body: JSON.stringify({ start: fmt(winStart), end: fmt(winEnd), reason: "bl-baseline" }),
 	});
 	assertStatus(mwRes.status, 204, "seed maintenance");
 
