@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.0.7
+
+### Changed
+- Bump wrangler 4.98.0 → 4.99.0
+- Bump swr 2.3.3 → 2.4.1
+- Bump hono 4.12.23 → 4.12.25
+- Bump @types/react-dom 19.1.3 → 19.2.3
+- Bump @cloudflare/workers-types 4.20260607.1 → 4.20260610.1
+- Bump turbo 2.9.16 → 2.9.17
+
+### Fixed
+- Make L2 baseline-snapshot maintenance fixture wall-clock independent
+- Add `environment: production` to probe-release job
+
 ## v2.0.6
 
 ### Changed
