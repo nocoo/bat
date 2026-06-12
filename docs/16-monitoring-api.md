@@ -17,7 +17,7 @@ A monitoring API enables:
 
 1. **Uptime Kuma keyword monitors** that check bat host health → a single monitor covers 28 internal alert rules instead of duplicating checks.
 2. **Group-level endpoints** that Uptime Kuma can monitor as aggregate health (e.g. "all VPS hosts healthy").
-3. **Automatic monitor management** — the `uptime-kuma` skill can read this API to discover new hosts and create/update monitors programmatically.
+3. **Automatic monitor management** — an Uptime Kuma client can read this API to discover new hosts and create/update monitors programmatically.
 
 ## Design Principles
 
@@ -227,9 +227,9 @@ However, this design introduces **Worker read access to `tags` and `host_tags`**
 
 ---
 
-## Integration with Uptime Kuma Skill
+## Integration with Uptime Kuma
 
-The `uptime-kuma` skill (`.agents/skills/uptime-kuma/`) can automate monitor lifecycle:
+An Uptime Kuma client (Socket.IO) can automate monitor lifecycle:
 
 ### Auto-onboarding flow
 
@@ -290,7 +290,7 @@ Implemented in `packages/worker/src/routes/monitoring.test.ts` — 36 tests, 100
 
 ### Phase 4: ~~Uptime Kuma sync script~~ — Skipped
 
-Decided not to implement automatic sync. Monitor creation/update in Uptime Kuma will be done manually via the `uptime-kuma` skill as needed. The monitoring API endpoints provide the data; humans decide which monitors to create.
+Decided not to implement automatic sync. Monitor creation/update in Uptime Kuma will be done manually as needed. The monitoring API endpoints provide the data; humans decide which monitors to create.
 
 ### No new migrations needed
 

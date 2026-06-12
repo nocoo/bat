@@ -222,35 +222,6 @@ nmem --json m search "bat release 部署" -l deployment -l bat -n 3
 ```
 This returns past release records including worker version IDs, R2 paths, VPS upgrade status, and verification results. Always check memory before deploying to confirm the current fleet and any host-specific notes.
 
-## Uptime Kuma Monitoring
-
-Bat services are monitored via the `uptime-kuma` skill. Config lives at `.claude/skills/uptime-kuma/config.json` (gitignored).
-
-### Usage
-
-**Read-only (Prometheus metrics via curl):**
-```bash
-CONFIG="$(cat .claude/skills/uptime-kuma/config.json)"
-BASE_URL=$(echo "$CONFIG" | jq -r '.base_url')
-API_KEY=$(echo "$CONFIG" | jq -r '.api_key')
-curl -sf -u ":$API_KEY" "$BASE_URL/metrics" | grep "^monitor_status{"
-```
-
-**Write operations (Socket.IO via bun):**
-```bash
-cp .claude/skills/uptime-kuma/scripts/socketio-client.mjs /tmp/uk-task.mjs
-sd 'skills/uptime-kuma/config.json' "$(pwd)/.claude/skills/uptime-kuma/config.json" /tmp/uk-task.mjs
-# Edit /tmp/uk-task.mjs, then: bun run /tmp/uk-task.mjs
-```
-
-Requires `socket.io-client` (`bun add -d socket.io-client`). When curl times out, prefer Socket.IO (WebSocket transport works through Cloudflare).
-
-### When to use
-
-- **Post-deploy verification**: confirm bat worker and VPS monitors are UP after release
-- **Adding monitors**: new bat services should get keyword monitors targeting `/api/live`
-- **Incident triage**: check DOWN monitors to correlate with bat alerts
-
 ## Retrospective
 
 - **bun is the sole package manager**: pnpm was removed. Only `bun.lock` exists. Husky hooks use `bun turbo` / `bunx`. Docker builds use `oven/bun:1` + `bun install --frozen-lockfile`. Do not introduce pnpm references.

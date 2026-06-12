@@ -248,7 +248,7 @@ Pre-commit hook blocks the commit. Zero diagnostics required.
 | Tool | What | Scope |
 |------|------|-------|
 | osv-scanner | Known CVEs in dependencies | `bun.lock` (JS) + `probe/Cargo.lock` (Rust) |
-| gitleaks | Secrets/credentials in staged commits | `.gitleaks.toml` (allowlist for false positives) |
+| gitleaks | Secrets/credentials in staged commits | scans entire git history |
 
 ### Run
 
