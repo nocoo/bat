@@ -54,6 +54,14 @@ const MIGRATION_HOST_DESCRIPTION_PATH = resolve(
 	__dirname,
 	"../../migrations/0025_host_description.sql",
 );
+const MIGRATION_TOP_PROCESSES_TO_HOSTS_PATH = resolve(
+	__dirname,
+	"../../migrations/0026_top_processes_to_hosts.sql",
+);
+const MIGRATION_DROP_TOP_PROCESSES_FROM_RAW_PATH = resolve(
+	__dirname,
+	"../../migrations/0027_drop_top_processes_from_raw.sql",
+);
 
 /**
  * D1PreparedStatement mock wrapping bun:sqlite Statement.
@@ -361,6 +369,27 @@ export function createMockD1(): D1Database {
 		.filter(Boolean)) {
 		db.exec(`${stmt};`);
 	}
+
+	// Apply top_processes_to_hosts migration
+	const topProcessesToHostsSchema = readFileSync(MIGRATION_TOP_PROCESSES_TO_HOSTS_PATH, "utf-8");
+	for (const stmt of topProcessesToHostsSchema
+		.split(";")
+		.map((s) => s.trim())
+		.filter(Boolean)) {
+		db.exec(`${stmt};`);
+	}
+
+	// Apply drop_top_processes_from_raw migration.
+	// This migration is hand-rolled CREATE/INSERT/DROP/RENAME, so it
+	// contains comments and a multi-stmt body where ";" inside string
+	// literals would confuse the naive .split(";") loop used above. Run
+	// the entire file in one exec — better-sqlite3 handles multi-stmt
+	// scripts natively.
+	const dropTopProcessesFromRawSchema = readFileSync(
+		MIGRATION_DROP_TOP_PROCESSES_FROM_RAW_PATH,
+		"utf-8",
+	);
+	db.exec(dropTopProcessesFromRawSchema);
 
 	return {
 		prepare(sql: string): D1PreparedStatement {

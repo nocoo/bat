@@ -14,6 +14,11 @@ import type { MetricsHourlyRow, MetricsRawRow, MetricsRepository } from "../../r
  * adapter's `insertRawWithHostUpsert` and (indirectly) by tests that need
  * to inspect the prepared statement. Kept private — callers go through
  * the repository surface.
+ *
+ * `top_processes_json` is intentionally not in this INSERT — the latest
+ * snapshot is mirrored onto `hosts.top_processes_json` by the host
+ * upsert/touch SQL below. That column will be physically dropped by
+ * migration 0027.
  */
 function buildInsertMetricsRawStatement(
 	db: D1Database,
@@ -50,9 +55,8 @@ function buildInsertMetricsRawStatement(
    netstat_tcp_fast_retrans_delta, netstat_tcp_ofo_queue_delta,
    netstat_tcp_abort_on_memory_delta, netstat_syncookies_sent_delta,
    softnet_processed_delta, softnet_dropped_delta, softnet_time_squeeze_delta,
-   conntrack_count, conntrack_max,
-   top_processes_json)
-VALUES (${new Array(98).fill("?").join(", ")})`,
+   conntrack_count, conntrack_max)
+VALUES (${new Array(97).fill("?").join(", ")})`,
 		)
 		.bind(
 			hostId,
@@ -152,7 +156,6 @@ VALUES (${new Array(98).fill("?").join(", ")})`,
 			payload.softnet?.time_squeeze_delta ?? null,
 			payload.conntrack?.count ?? null,
 			payload.conntrack?.max ?? null,
-			payload.top_processes ? JSON.stringify(payload.top_processes) : null,
 		);
 }
 
@@ -225,8 +228,7 @@ const RAW_SELECT_SQL = `SELECT ts, cpu_usage_pct, cpu_iowait, cpu_steal, cpu_loa
          'softnet_time_squeeze_delta', softnet_time_squeeze_delta,
          'conntrack_count', conntrack_count,
          'conntrack_max', conntrack_max
-       ) as ext_json,
-       top_processes_json
+       ) as ext_json
      FROM metrics_raw
      WHERE host_id = ? AND ts >= ? AND ts <= ?
      ORDER BY ts ASC`;
@@ -267,17 +269,23 @@ const HOURLY_SELECT_SQL = `SELECT hour_ts as ts, cpu_usage_avg as cpu_usage_pct,
          oom_kills_sum as oom_kills,
          fd_allocated_avg as fd_allocated,
          fd_max,
-         ext_json,
-         NULL as top_processes_json
+         ext_json
        FROM metrics_hourly
        WHERE host_id = ? AND hour_ts >= ? AND hour_ts <= ?
        ORDER BY hour_ts ASC`;
 
-const HOST_UPSERT_FIRST_SEEN_SQL = `INSERT INTO hosts (host_id, hostname, last_seen)
-VALUES (?, ?, ?)
-ON CONFLICT(host_id) DO UPDATE SET last_seen = excluded.last_seen`;
+const HOST_UPSERT_FIRST_SEEN_SQL = `INSERT INTO hosts (host_id, hostname, last_seen, top_processes_json, top_processes_ts)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(host_id) DO UPDATE SET
+  last_seen = excluded.last_seen,
+  top_processes_json = COALESCE(excluded.top_processes_json, hosts.top_processes_json),
+  top_processes_ts = COALESCE(excluded.top_processes_ts, hosts.top_processes_ts)`;
 
-const HOST_TOUCH_LAST_SEEN_SQL = "UPDATE hosts SET last_seen = ? WHERE host_id = ?";
+const HOST_TOUCH_LAST_SEEN_SQL = `UPDATE hosts
+SET last_seen = ?,
+    top_processes_json = COALESCE(?, top_processes_json),
+    top_processes_ts = COALESCE(?, top_processes_ts)
+WHERE host_id = ?`;
 
 export class D1MetricsRepository implements MetricsRepository {
 	private readonly db: D1Database;
@@ -310,10 +318,15 @@ export class D1MetricsRepository implements MetricsRepository {
 		mode: "first-seen" | "existing" | "skip-host-touch",
 	): Promise<{ inserted: boolean }> {
 		const metricsStmt = buildInsertMetricsRawStatement(this.db, hostId, payload);
+		const topProcessesJson = payload.top_processes ? JSON.stringify(payload.top_processes) : null;
+		const topProcessesTs = topProcessesJson != null ? payload.timestamp : null;
 
 		// "skip-host-touch": existing host whose last_seen was flushed recently
 		// (KV decision in the route). The host row is guaranteed to exist, so
 		// no FK risk and no host stmt is needed — only the metrics insert.
+		// `top_processes_json` refresh is intentionally skipped on this path: a
+		// 5min staleness window for the latest process list is invisible to
+		// users and lets the throttle keep its zero-write semantics.
 		if (mode === "skip-host-touch") {
 			const result = await metricsStmt.run();
 			const inserted = (result.meta?.changes ?? 0) > 0;
@@ -322,8 +335,12 @@ export class D1MetricsRepository implements MetricsRepository {
 
 		const hostStmt =
 			mode === "first-seen"
-				? this.db.prepare(HOST_UPSERT_FIRST_SEEN_SQL).bind(hostId, hostname, nowSeconds)
-				: this.db.prepare(HOST_TOUCH_LAST_SEEN_SQL).bind(nowSeconds, hostId);
+				? this.db
+						.prepare(HOST_UPSERT_FIRST_SEEN_SQL)
+						.bind(hostId, hostname, nowSeconds, topProcessesJson, topProcessesTs)
+				: this.db
+						.prepare(HOST_TOUCH_LAST_SEEN_SQL)
+						.bind(nowSeconds, topProcessesJson, topProcessesTs, hostId);
 
 		// Order matters on the first-seen path: host row must exist before
 		// metrics insert (FK). For existing hosts the host row is already

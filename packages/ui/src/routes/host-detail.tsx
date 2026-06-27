@@ -228,7 +228,7 @@ export function HostDetailPage() {
 								resolution={metricsResponse.resolution}
 							/>
 							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<TopProcessesTable data={metricsResponse.data} />
+							<TopProcessesTable topProcessesJson={detail?.top_processes_json ?? null} />
 						</div>
 
 						{/* Right column — system info + disks */}

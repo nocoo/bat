@@ -52,6 +52,8 @@
   "swap_total_bytes": 2000000000,
   "swap_used_pct": 5,
   "timezone": null,
+  "top_processes_json": null,
+  "top_processes_ts": null,
   "uptime_seconds": "<DURATION>",
   "virtualization": "kvm"
 }

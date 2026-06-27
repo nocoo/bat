@@ -21,7 +21,7 @@ const HOST_OVERVIEW_COLUMNS =
 const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen, maintenance_start, maintenance_end";
 
 const HOST_DETAIL_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, description, maintenance_start, maintenance_end, maintenance_reason";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, description, maintenance_start, maintenance_end, maintenance_reason, top_processes_json, top_processes_ts";
 
 const LATEST_METRICS_COLUMNS =
 	"cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json";

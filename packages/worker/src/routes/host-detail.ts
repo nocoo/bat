@@ -80,6 +80,8 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		dns_search: safeParse(host.dns_search),
 		net_interfaces: safeParse(host.net_interfaces),
 		disks: safeParse(host.disks),
+		top_processes_json: host.top_processes_json,
+		top_processes_ts: host.top_processes_ts,
 		maintenance_start: host.maintenance_start,
 		maintenance_end: host.maintenance_end,
 		maintenance_reason: host.maintenance_reason,

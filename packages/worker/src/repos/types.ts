@@ -209,6 +209,8 @@ export interface HostDetailRow {
 	maintenance_start: string | null;
 	maintenance_end: string | null;
 	maintenance_reason: string | null;
+	top_processes_json: string | null;
+	top_processes_ts: number | null;
 }
 
 export interface HostLatestMetricsRow {

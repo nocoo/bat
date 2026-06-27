@@ -1,4 +1,4 @@
-import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
+import type { MetricsResolution } from "@bat/shared";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -51,13 +51,13 @@ function SortTh({
 }
 
 export function TopProcessesTable({
-	data,
+	topProcessesJson,
 	resolution,
 }: {
-	data: MetricsDataPoint[];
+	topProcessesJson: string | null;
 	resolution?: MetricsResolution;
 }) {
-	const processes = useMemo(() => transformTopProcessesData(data), [data]);
+	const processes = useMemo(() => transformTopProcessesData(topProcessesJson), [topProcessesJson]);
 	const [sortKey, setSortKey] = useState<SortKey>("cpu_pct");
 	const [sortDir, setSortDir] = useState<SortDir>("desc");
 	const [search, setSearch] = useState("");

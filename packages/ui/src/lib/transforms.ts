@@ -321,45 +321,37 @@ export interface TopProcessEntry {
 }
 
 /**
- * Extract top processes from the latest data point's top_processes_json.
- * Returns empty array if no data or hourly resolution (not applicable).
+ * Parse a serialized top-processes snapshot (the latest one stored on
+ * `hosts.top_processes_json`). Returns [] for null, empty string, or
+ * malformed JSON.
  */
-export function transformTopProcessesData(data: MetricsDataPoint[]): TopProcessEntry[] {
-	if (data.length === 0) {
+export function transformTopProcessesData(json: string | null | undefined): TopProcessEntry[] {
+	if (!json) {
 		return [];
 	}
-
-	// Find last data point that has top_processes_json
-	for (let i = data.length - 1; i >= 0; i--) {
-		const point = data[i];
-		if (point?.top_processes_json) {
-			try {
-				const raw = JSON.parse(point.top_processes_json) as TopProcessEntry[];
-				return raw.map((p) => ({
-					pid: p.pid,
-					name: p.name ?? "",
-					cmd: p.cmd ?? "",
-					state: p.state ?? "?",
-					ppid: p.ppid ?? 0,
-					user: p.user ?? "",
-					cpu_pct: p.cpu_pct ?? null,
-					mem_rss: p.mem_rss ?? 0,
-					mem_pct: p.mem_pct ?? 0,
-					mem_virt: p.mem_virt ?? 0,
-					num_threads: p.num_threads ?? 0,
-					uptime: p.uptime ?? 0,
-					majflt_rate: p.majflt_rate ?? null,
-					io_read_rate: p.io_read_rate ?? null,
-					io_write_rate: p.io_write_rate ?? null,
-					processor: p.processor ?? -1,
-				}));
-			} catch {
-				return [];
-			}
-		}
+	try {
+		const raw = JSON.parse(json) as TopProcessEntry[];
+		return raw.map((p) => ({
+			pid: p.pid,
+			name: p.name ?? "",
+			cmd: p.cmd ?? "",
+			state: p.state ?? "?",
+			ppid: p.ppid ?? 0,
+			user: p.user ?? "",
+			cpu_pct: p.cpu_pct ?? null,
+			mem_rss: p.mem_rss ?? 0,
+			mem_pct: p.mem_pct ?? 0,
+			mem_virt: p.mem_virt ?? 0,
+			num_threads: p.num_threads ?? 0,
+			uptime: p.uptime ?? 0,
+			majflt_rate: p.majflt_rate ?? null,
+			io_read_rate: p.io_read_rate ?? null,
+			io_write_rate: p.io_write_rate ?? null,
+			processor: p.processor ?? -1,
+		}));
+	} catch {
+		return [];
 	}
-
-	return [];
 }
 
 /** Format seconds into human-readable uptime (e.g. "2d 3h", "15m", "30s") */

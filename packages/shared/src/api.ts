@@ -99,6 +99,13 @@ export interface HostDetailItem extends HostOverviewItem {
 	dns_search: string[] | null;
 	net_interfaces: NetInterfaceDTO[] | null;
 	disks: BlockDeviceDTO[] | null;
+	/** Latest top-processes snapshot the probe reported. Null until the
+	 *  first ingest. Refreshed at most every 5min in step with the
+	 *  hosts.last_seen flush throttle — sufficient for the "processes"
+	 *  panel which only renders the most recent point. */
+	top_processes_json: string | null;
+	/** Probe timestamp (unix seconds) when the snapshot was taken. */
+	top_processes_ts: number | null;
 }
 
 export type MetricsResolution = "raw" | "hourly";
@@ -219,7 +226,6 @@ export interface MetricsDataPoint {
 	softnet_time_squeeze_delta: number | null;
 	conntrack_count: number | null;
 	conntrack_max: number | null;
-	top_processes_json: string | null;
 }
 
 /** GET /api/alerts → AlertItem[] */

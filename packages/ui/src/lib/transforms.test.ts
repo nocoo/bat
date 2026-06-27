@@ -187,13 +187,17 @@ describe("transformTcpData", () => {
 });
 
 describe("transformTopProcessesData", () => {
-	test("returns [] when no point has top_processes_json", () => {
-		expect(transformTopProcessesData([dp({ ts: 1 })])).toEqual([]);
+	test("returns [] for null", () => {
+		expect(transformTopProcessesData(null)).toEqual([]);
 	});
 
-	test("uses last point that has top_processes_json", () => {
+	test("returns [] for empty string", () => {
+		expect(transformTopProcessesData("")).toEqual([]);
+	});
+
+	test("parses a valid snapshot", () => {
 		const json = JSON.stringify([{ pid: 1, name: "init", cpu_pct: 0.5, mem_rss: 100, mem_pct: 1 }]);
-		const out = transformTopProcessesData([dp({ ts: 1, top_processes_json: json }), dp({ ts: 2 })]);
+		const out = transformTopProcessesData(json);
 		expect(out).toHaveLength(1);
 		expect(out[0]?.pid).toBe(1);
 		expect(out[0]?.cpu_pct).toBe(0.5);
@@ -201,7 +205,7 @@ describe("transformTopProcessesData", () => {
 	});
 
 	test("invalid JSON returns []", () => {
-		expect(transformTopProcessesData([dp({ ts: 1, top_processes_json: "}" })])).toEqual([]);
+		expect(transformTopProcessesData("}")).toEqual([]);
 	});
 });
 
