@@ -1,5 +1,65 @@
 # Changelog
 
+## v2.1.0
+
+### Changed
+- Lift top_processes_json off metrics_raw onto hosts
+- Bump wrangler from 4.104.0 to 4.105.0 in packages/worker
+- Bump @cloudflare/workers-types from 4.20260624.1 to 4.20260625.1 in packages/worker
+- Bump turbo from 2.9.17 to 2.10.0
+- Bump @types/node from 26.0.0 to 26.0.1 in packages/cli
+- Bump @cloudflare/workers-types from 4.20260623.1 to 4.20260624.1 in packages/worker
+- Bump wrangler from 4.103.0 to 4.104.0 in packages/worker
+- Bump recharts from 3.8.1 to 3.9.0 in packages/ui
+- Bump hono from 4.12.26 to 4.12.27 in packages/worker
+- Bump @playwright/test from 1.61.0 to 1.61.1 in packages/ui
+- Bump @cloudflare/workers-types from 4.20260621.1 to 4.20260623.1 in packages/worker
+- Bump @biomejs/biome from 2.5.0 to 2.5.1
+- Bump swr from 2.4.1 to 2.4.2 in packages/ui
+- Bump quinn-proto from 0.11.14 to 0.11.15
+- Bump @cloudflare/workers-types from 4.20260620.1 to 4.20260621.1
+- Bump lint-staged from 17.0.7 to 17.0.8
+- Bump @cloudflare/workers-types from 4.20260619.1 to 4.20260620.1
+- Bump wrangler from 4.101.0 to 4.103.0
+- Bump @types/node from 25.9.2 to 26.0.0
+- Bump @cloudflare/workers-types from 4.20260617.1 to 4.20260619.1
+- Bump react-router from 8.0.0 to 8.0.1
+- Bump lucide-react from 1.20.0 to 1.21.0
+- Bump hono from 4.12.25 to 4.12.26
+- Bump undici to clear OSV gate
+- Pin base-ci reusable workflow to v2026.5 SHA
+- Bump react-router from 7.18.0 to 8.0.0
+- Bump @cloudflare/workers-types from 4.20260616.1 to 4.20260617.1
+- Bump happy-dom from 20.10.5 to 20.10.6
+- Bump wrangler from 4.100.0 to 4.101.0
+- Bump react-router from 7.17.0 to 7.18.0
+- Bump lucide-react from 1.18.0 to 1.20.0
+- Bump happy-dom from 20.10.4 to 20.10.5
+- Bump @cloudflare/workers-types from 4.20260615.1 to 4.20260616.1
+- Bump @cloudflare/workers-types 4.20260613.1 → 4.20260615.1
+- Bump @bat/ui deps
+- Bump better-sqlite3 12.10.1 → 12.11.1
+- Bump vitest + @vitest/coverage-v8 4.1.8 → 4.1.9
+- Bump @cloudflare/workers-types 4.20260612.1 → 4.20260613.1
+- Bump better-sqlite3 12.10.0 → 12.10.1
+- Upgrade base-ci to v2026.4
+- Bump esbuild 0.25.12 → 0.28.1 (security)
+- Bump tailwindcss 4.3.0 → 4.3.1
+- Bump lucide-react 1.17.0 → 1.18.0
+- Bump happy-dom 20.10.2 → 20.10.3
+- Bump @tailwindcss/vite 4.3.0 → 4.3.1
+- Bump @cloudflare/workers-types 4.20260611.1 → 4.20260612.1
+- Bump @biomejs/biome 2.4.16 → 2.5.0
+- Bump wrangler 4.99.0 → 4.100.0
+- Bump @cloudflare/workers-types 4.20260610.1 → 4.20260611.1
+- Untrack uptime-kuma/config.json, add .gitignore
+
+### Fixed
+- Bump ws override 8.20.1 → 8.21.0 (GHSA-96hv-2xvq-fx4p)
+
+### Removed
+- Remove uptime-kuma skill from bat
+
 ## v2.0.7
 
 ### Changed
