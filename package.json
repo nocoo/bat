@@ -46,7 +46,7 @@
 		]
 	},
 	"dependencies": {
-		"postcss": "^8.5.15"
+		"postcss": "^8.5.16"
 	},
 	"overrides": {
 		"esbuild": "0.28.1",
