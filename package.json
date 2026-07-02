@@ -29,7 +29,7 @@
 		"workerd"
 	],
 	"devDependencies": {
-		"@biomejs/biome": "^2.5.1",
+		"@biomejs/biome": "^2.5.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@vitest/coverage-v8": "^4.1.9",
 		"better-sqlite3": "^12.11.1",
