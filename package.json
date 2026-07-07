@@ -31,7 +31,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.5.2",
 		"@types/better-sqlite3": "^7.6.13",
-		"@vitest/coverage-v8": "^4.1.9",
+		"@vitest/coverage-v8": "4.1.10",
 		"better-sqlite3": "^12.11.1",
 		"husky": "^9.1.0",
 		"lint-staged": "^17.0.8",
