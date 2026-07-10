@@ -466,13 +466,9 @@ pub fn collect_top_processes(
         let io = read_proc_io(stat.pid);
         let uid = get_proc_uid(stat.pid).unwrap_or(u32::MAX);
 
-        let prev = prev_states.get(&stat.pid).and_then(|p| {
-            if p.starttime == stat.starttime {
-                Some(p)
-            } else {
-                None
-            }
-        });
+        let prev = prev_states
+            .get(&stat.pid)
+            .filter(|p| p.starttime == stat.starttime);
 
         let snapshot = build_snapshot(
             stat,
