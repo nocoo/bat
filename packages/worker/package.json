@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"hono": "4.12.29",
+		"hono": "4.12.30",
 		"jose": "^6.2.3"
 	},
 	"devDependencies": {
