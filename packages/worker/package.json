@@ -16,11 +16,11 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"hono": "4.12.29",
+		"hono": "4.12.30",
 		"jose": "^6.2.3"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "5.20260711.1",
+		"@cloudflare/workers-types": "5.20260712.1",
 		"@types/bun": "^1.3.14",
 		"typescript": "^7.0.2",
 		"wrangler": "4.110.0"
