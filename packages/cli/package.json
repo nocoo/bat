@@ -17,7 +17,7 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"@nocoo/cli-base": "^0.2.4"
+		"@nocoo/base-cli": "^0.3.0"
 	},
 	"devDependencies": {
 		"@types/node": "^26.1.1",

@@ -1,7 +1,7 @@
 // bat-cli binding delete — Delete a binding between an agent and an asset.
 
-import type { ConfigManager } from "@nocoo/cli-base";
-import { defineCommand } from "@nocoo/cli-base";
+import type { ConfigManager } from "@nocoo/base-cli";
+import { defineCommand } from "@nocoo/base-cli";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, validateConfig } from "../../lib/config.js";
 import { ApiError, AuthError, HttpClient, NetworkError } from "../../lib/http.js";

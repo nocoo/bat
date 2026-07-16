@@ -3,8 +3,8 @@
 
 import type { AssetItem } from "@bat/shared";
 import { MAX_TAGS_PER_ASSET } from "@bat/shared";
-import type { ConfigManager } from "@nocoo/cli-base";
-import { defineCommand } from "@nocoo/cli-base";
+import type { ConfigManager } from "@nocoo/base-cli";
+import { defineCommand } from "@nocoo/base-cli";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, validateConfig } from "../../lib/config.js";
 import { ApiError, AuthError, HttpClient, NetworkError } from "../../lib/http.js";

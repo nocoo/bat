@@ -3,7 +3,7 @@
 // Usage: bat-cli <command> [options]
 
 import { BAT_VERSION } from "@bat/shared";
-import { defineCommand, runMain } from "@nocoo/cli-base";
+import { defineCommand, runMain } from "@nocoo/base-cli";
 import agent from "../commands/agent/index.js";
 import asset from "../commands/asset/index.js";
 import binding from "../commands/binding/index.js";

@@ -8,9 +8,9 @@ import type { BatCliConfig } from "../lib/config.js";
 import { createConfigManager } from "../lib/config.js";
 import { runLogin } from "./login.js";
 
-// Mock @nocoo/cli-base login flow
-vi.mock("@nocoo/cli-base", async (importOriginal) => {
-	const original = await importOriginal<typeof import("@nocoo/cli-base")>();
+// Mock @nocoo/base-cli login flow
+vi.mock("@nocoo/base-cli", async (importOriginal) => {
+	const original = await importOriginal<typeof import("@nocoo/base-cli")>();
 	return {
 		...original,
 		performLogin: vi.fn(),
@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe("runLogin", () => {
 	test("saves config on successful login", async () => {
-		const { performLogin } = await import("@nocoo/cli-base");
+		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
 
 		mockPerformLogin.mockImplementation(async (deps) => {
@@ -70,7 +70,7 @@ describe("runLogin", () => {
 	});
 
 	test("preserves existing source_key on re-login", async () => {
-		const { performLogin } = await import("@nocoo/cli-base");
+		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
 
 		// Pre-create config with an existing source_key
@@ -98,7 +98,7 @@ describe("runLogin", () => {
 	});
 
 	test("returns 1 when login fails", async () => {
-		const { performLogin } = await import("@nocoo/cli-base");
+		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
 
 		mockPerformLogin.mockResolvedValue({
@@ -114,7 +114,7 @@ describe("runLogin", () => {
 	});
 
 	test("returns 1 when no worker_url in response", async () => {
-		const { performLogin } = await import("@nocoo/cli-base");
+		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
 
 		mockPerformLogin.mockImplementation(async (deps) => {
@@ -129,7 +129,7 @@ describe("runLogin", () => {
 	});
 
 	test("passes correct login parameters to performLogin", async () => {
-		const { performLogin } = await import("@nocoo/cli-base");
+		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
 
 		mockPerformLogin.mockImplementation(async (deps) => {

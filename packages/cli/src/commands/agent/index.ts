@@ -1,7 +1,7 @@
 // bat-cli agent — Agent management commands.
 // Subcommands: list, create, update, delete, heartbeat, tags
 
-import { defineCommand } from "@nocoo/cli-base";
+import { defineCommand } from "@nocoo/base-cli";
 import agentCreate from "./create.js";
 import agentDelete from "./delete.js";
 import agentHeartbeat from "./heartbeat.js";

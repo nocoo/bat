@@ -1,10 +1,10 @@
-// CLI configuration management — wraps @nocoo/cli-base ConfigManager.
+// CLI configuration management — wraps @nocoo/base-cli ConfigManager.
 // Config stored at ~/.config/bat/ with 0600 permissions.
 
 import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { ConfigManager } from "@nocoo/cli-base";
+import { ConfigManager } from "@nocoo/base-cli";
 
 /** CLI config shape stored on disk */
 export interface BatCliConfig {

@@ -1,7 +1,7 @@
 // Output formatting helpers for CLI display.
-// Uses @nocoo/cli-base consola + picocolors for consistent styling.
+// Uses @nocoo/base-cli consola + picocolors for consistent styling.
 
-import { consola, pc } from "@nocoo/cli-base";
+import { consola, pc } from "@nocoo/base-cli";
 
 /** Print a success message (green checkmark) */
 export function success(msg: string): void {

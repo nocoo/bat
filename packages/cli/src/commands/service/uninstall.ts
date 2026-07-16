@@ -3,8 +3,8 @@
 
 import { spawnSync } from "node:child_process";
 import { existsSync, unlinkSync } from "node:fs";
-import type { ConfigManager } from "@nocoo/cli-base";
-import { defineCommand } from "@nocoo/cli-base";
+import type { ConfigManager } from "@nocoo/base-cli";
+import { defineCommand } from "@nocoo/base-cli";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager } from "../../lib/config.js";
 import { error, info, success, warn } from "../../lib/output.js";
