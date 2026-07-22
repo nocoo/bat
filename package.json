@@ -29,7 +29,7 @@
 		"workerd"
 	],
 	"devDependencies": {
-		"@biomejs/biome": "2.5.4",
+		"@biomejs/biome": "2.5.5",
 		"@types/better-sqlite3": "^7.6.13",
 		"@vitest/coverage-v8": "4.1.10",
 		"better-sqlite3": "^12.11.1",
@@ -46,7 +46,7 @@
 		]
 	},
 	"dependencies": {
-		"postcss": "^8.5.20"
+		"postcss": "^8.5.21"
 	},
 	"overrides": {
 		"esbuild": "0.28.1",
