@@ -66,18 +66,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
 
-      # --ignore-scripts blocks all install scripts including for trustedDependencies.
-      # Re-run install scripts only for native deps we explicitly trust.
-      - name: Build trusted native bindings
-        run: |
-          for pkg in better-sqlite3; do
-            if [ -d "node_modules/$pkg" ]; then
-              echo "::group::Rebuild $pkg"
-              (cd "node_modules/$pkg" && bun run install)
-              echo "::endgroup::"
-            fi
-          done
-
       - name: Build shared
         run: bun run build
 
@@ -104,18 +92,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile --ignore-scripts
-
-      # --ignore-scripts blocks all install scripts including for trustedDependencies.
-      # Re-run install scripts only for native deps we explicitly trust.
-      - name: Build trusted native bindings
-        run: |
-          for pkg in better-sqlite3; do
-            if [ -d "node_modules/$pkg" ]; then
-              echo "::group::Rebuild $pkg"
-              (cd "node_modules/$pkg" && bun run install)
-              echo "::endgroup::"
-            fi
-          done
 
       - name: Build shared + UI
         run: bun run build

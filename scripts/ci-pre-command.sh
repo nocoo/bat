@@ -9,8 +9,4 @@ fi
 
 rustup toolchain install nightly --profile minimal --component llvm-tools-preview
 
-cd node_modules/better-sqlite3
-npx --yes node-gyp rebuild
-cd ../..
-
 bun run build
