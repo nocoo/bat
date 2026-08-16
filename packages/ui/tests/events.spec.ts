@@ -33,7 +33,7 @@ test.describe("Events page", () => {
 		await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible({
 			timeout: 15_000,
 		});
-		await expect(page.getByText("Deploy v2.1.0")).toBeVisible();
+		await expect(page.getByText("Deploy v1.2.3")).toBeVisible();
 		await expect(page.getByText("Config reload")).toBeVisible();
 	});
 

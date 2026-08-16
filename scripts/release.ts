@@ -53,6 +53,13 @@ const VERSION_TARGETS: VersionTarget[] = [
 	{ path: "packages/shared/src/version.ts", pattern: "const-version" },
 	// Rust probe
 	{ path: "probe/Cargo.toml", pattern: "cargo-version" },
+	// L2 baseline snapshots embed the worker version; bump them here so
+	// pre-push E2E does not fail the release commit on snapshot mismatch.
+	{ path: "packages/worker/test/e2e/baseline/__snapshots__/live.json", pattern: "json-version" },
+	{
+		path: "packages/worker/test/e2e/baseline/__snapshots__/fleet.status.json",
+		pattern: "json-version",
+	},
 ];
 
 const BUMP_TYPES = ["patch", "minor", "major"] as const;
@@ -474,6 +481,8 @@ async function main(): Promise<void> {
 		"!scripts/release.ts",
 		"--glob",
 		"!**/__tests__/**",
+		"--glob",
+		"!**/tests/**",
 	]);
 
 	if (rgResult.code === 0 && rgResult.stdout.trim()) {

@@ -39,5 +39,5 @@ VALUES (1, 'pw-host-alpha', 'pw-test-token-abc123', 10, 1);
 -- Events
 INSERT OR REPLACE INTO events (id, host_id, webhook_config_id, title, body, tags, source_ip, created_at)
 VALUES
-  (1, 'pw-host-alpha', 1, 'Deploy v2.1.0', '{"version":"2.1.0","commit":"abc1234"}', '["deploy","release"]', '203.0.113.10', strftime('%s','now') - 3600),
+  (1, 'pw-host-alpha', 1, 'Deploy v1.2.3', '{"version":"1.2.3","commit":"abc1234"}', '["deploy","release"]', '203.0.113.10', strftime('%s','now') - 3600),
   (2, 'pw-host-alpha', 1, 'Config reload', '{"service":"nginx"}', '["config"]', '203.0.113.10', strftime('%s','now') - 1800);
