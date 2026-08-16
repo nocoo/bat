@@ -72,6 +72,7 @@ export const useWebhooks = () =>
 interface UserInfo {
 	email: string | null;
 	name: string | null;
+	avatar: string | null;
 	authenticated: boolean;
 }
 export const useMe = () => useSWR<UserInfo>("me", () => getAPI<UserInfo>("/api/me"), STATIC);

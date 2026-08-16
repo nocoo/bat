@@ -42,6 +42,7 @@ describe("getDisplayName", () => {
 			name: "Alice",
 			initial: "A",
 			email: "alice@example.com",
+			avatar: null,
 		});
 	});
 
@@ -50,16 +51,36 @@ describe("getDisplayName", () => {
 			name: "bob",
 			initial: "B",
 			email: "bob@example.com",
+			avatar: null,
 		});
 	});
 
 	test("falls back to 'User' when neither name nor email", () => {
-		expect(getDisplayName({})).toEqual({ name: "User", initial: "U", email: null });
+		expect(getDisplayName({})).toEqual({ name: "User", initial: "U", email: null, avatar: null });
 	});
 
 	test("handles null user", () => {
-		expect(getDisplayName(null)).toEqual({ name: "User", initial: "U", email: null });
-		expect(getDisplayName(undefined)).toEqual({ name: "User", initial: "U", email: null });
+		expect(getDisplayName(null)).toEqual({ name: "User", initial: "U", email: null, avatar: null });
+		expect(getDisplayName(undefined)).toEqual({
+			name: "User",
+			initial: "U",
+			email: null,
+			avatar: null,
+		});
+	});
+
+	test("passes through a profile avatar URL", () => {
+		expect(
+			getDisplayName({
+				name: "Zheng Li",
+				email: "architie@gmail.com",
+				avatar: "https://cdn.example/avatar-80.jpg",
+			}).avatar,
+		).toBe("https://cdn.example/avatar-80.jpg");
+	});
+
+	test("treats empty avatar as null", () => {
+		expect(getDisplayName({ name: "A", avatar: "" }).avatar).toBeNull();
 	});
 
 	test("uppercases first letter of initial", () => {

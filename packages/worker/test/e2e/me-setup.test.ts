@@ -9,9 +9,14 @@ describe("L2: me + setup", () => {
 		// return authenticated:false rather than 4xx.
 		const res = await fetch(`${BASE}/api/me`);
 		expect(res.status).toBe(200);
-		const body = (await res.json()) as { email: null | string; authenticated: boolean };
+		const body = (await res.json()) as {
+			email: null | string;
+			avatar: null | string;
+			authenticated: boolean;
+		};
 		expect(body.authenticated).toBe(false);
 		expect(body.email).toBeNull();
+		expect(body.avatar).toBeNull();
 	});
 
 	test("GET /api/me with malformed JWT → anonymous (decode failure tolerated)", async () => {

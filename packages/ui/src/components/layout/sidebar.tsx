@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMe } from "@/hooks";
@@ -140,7 +140,12 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 
 	const handleNavigate = () => setMobileOpen(false);
 
-	const { name: userName, initial: userInitial, email: userEmail } = getDisplayName(user);
+	const {
+		name: userName,
+		initial: userInitial,
+		email: userEmail,
+		avatar: userAvatar,
+	} = getDisplayName(user);
 
 	return (
 		<TooltipProvider delayDuration={0}>
@@ -254,6 +259,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 						<div className="px-4 py-3 border-t">
 							<div className="flex items-center gap-3">
 								<Avatar className="h-9 w-9 shrink-0">
+									{userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
 									<AvatarFallback className={cn("text-xs text-white", getAvatarColor(userEmail))}>
 										{userInitial}
 									</AvatarFallback>

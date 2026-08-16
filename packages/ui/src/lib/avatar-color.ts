@@ -39,13 +39,14 @@ export function getAvatarColor(email: string | null | undefined): string {
 
 /** Display name + first-letter initial derived from user record. */
 export function getDisplayName(
-	user: { name?: string | null; email?: string | null } | null | undefined,
-): { name: string; initial: string; email: string | null } {
+	user: { name?: string | null; email?: string | null; avatar?: string | null } | null | undefined,
+): { name: string; initial: string; email: string | null; avatar: string | null } {
 	const email = user?.email ?? null;
 	const rawName = user?.name;
 	const name = rawName && rawName.length > 0 ? rawName : (email?.split("@")[0] ?? "User");
 	const initial = (name.charAt(0) || "U").toUpperCase();
-	return { name, initial, email };
+	const avatar = user?.avatar && user.avatar.length > 0 ? user.avatar : null;
+	return { name, initial, email, avatar };
 }
 
 export { AVATAR_COLORS, FALLBACK_COLOR };
