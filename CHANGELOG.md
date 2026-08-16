@@ -1,5 +1,124 @@
 # Changelog
 
+## v2.1.1
+
+### Added
+- Load sidebar identity from author api
+
+### Changed
+- Bump wrangler 4.122.0 → 4.123.0 (STU-3526)
+- Bump hono 4.13.1 → 4.13.2 (STU-3524)
+- Bump @cloudflare/workers-types 5.20260813.1 → 5.20260814.1 (STU-3523)
+- Pin nanoid ≥3.3.18 via root overrides (STU-3525) (#333)
+- Bump @cloudflare/workers-types 5.20260812.1 → 5.20260813.1 (STU-3388)
+- Bump swr 2.5.0 → 2.5.1 (STU-3387)
+- Bump wrangler 4.121.0 → 4.122.0 (STU-3386)
+- Bump wrangler 4.120.1 → 4.121.0 (STU-3299)
+- Bump @cloudflare/workers-types to 5.20260812.1 (STU-3298)
+- Bump @biomejs/biome 2.5.7 to 2.5.8 (STU-3297)
+- Bump wrangler 4.120.1 and workers-types 5.20260811.1 (STU-3257)
+- Bump workers-types to 5.20260810.1 (STU-3114)
+- Bump lucide-react 1.30.0 to 1.31.0 (STU-3115)
+- Bump workers-types to 5.20260809.1 (STU-3081)
+- Bump hono 4.13.0 to 4.13.1 (STU-2910)
+- Bump workers-types to 5.20260808.1 (STU-2913)
+- Bump happy-dom to 20.11.2 (STU-2911)
+- Bump @types/node 26.1.2 to 26.2.0 (STU-2912)
+- Bump wrangler 4.119.0 to 4.120.0 (STU-2907)
+- Bump lucide-react 1.29.0 to 1.30.0 (STU-2909)
+- Bump turbo 2.10.8 to 2.10.9 (STU-2908)
+- Bump postcss 8.5.25 to 8.5.26 (STU-2849)
+- Bump lucide-react 1.28.0 to 1.29.0 (STU-2850)
+- Bump better-sqlite3 13.0.2 to 13.0.3 (STU-2706)
+- Bump wrangler to 4.119.0 (STU-2705)
+- Align config schema with 2.5.7 (STU-2542)
+- Bump swr 2.4.2 to 2.5.0 (STU-2544)
+- Bump biome 2.5.6 to 2.5.7 (STU-2542)
+- Bump workers types to 5.20260804.1 (STU-2541)
+- Bump hono 4.12.34 to 4.13.0 (STU-2540)
+- Bump jose 6.2.7 to 6.2.8 (STU-2539)
+- Bump @types/better-sqlite3 7.6.13 → 9.6.0 (STU-2309, GH #260) (#276)
+- Bump @types/react from 19.2.17 to 19.2.18
+- Bump turbo 2.10.7 → 2.10.8 (STU-2306)
+- Bump @cloudflare/workers-types to 5.20260801.1 (STU-2308)
+- Bump @playwright/test 1.62.0 → 1.62.1 (GH #248)
+- Pin jose lockfile to 6.2.7
+- Bump jose from ^6.2.5 to ^6.2.7
+- Bump wrangler 4.115.0 → 4.118.0 (STU-2307)
+- Bump lint-staged 17.2.0 → 17.3.0 (GH #256)
+- Bump lucide-react 1.27.0 → 1.28.0 (STU-2303)
+- Bump @types/react-dom 19.2.3 → 19.2.4 (STU-2302) (#267)
+- Bump hono 4.12.34, undici override 7.29.0 (STU-2468) (#262)
+- Bump 15 upgrades (STU-2246)
+- Pin postcss ≥8.5.18 via root overrides (GHSA-r28c-9q8g-f849)
+- Bump 8 upgrades (STU-2141)
+- Pin sharp ≥0.35.3 via root overrides (GHSA-f88m-g3jw-g9cj)
+- Bump better-sqlite3 12.11.1 → 13.0.1
+- Bump 7 patch upgrades (biome, postcss, react, jose, workers-types, wrangler)
+- Bump recharts 3.9.2 → 3.10.0 (#209)
+- Bump radix-ui 1.6.3 → 1.6.4 (#208)
+- Bump 4 patch upgrades (radix-ui, react-avatar, postcss, workers-types)
+- Bump lint-staged 17.0.8 → 17.1.0
+- Bump hono 4.12.30 → 4.12.31
+- Bump happy-dom 20.10.6 → 20.11.0
+- Bump @cloudflare/workers-types 5.20260717.1 → 5.20260718.1
+- Bump wrangler 4.111.0 → 4.112.0
+- Bump lucide-react 1.24.0 → 1.25.0
+- Bump @cloudflare/workers-types 5.20260716.1 → 5.20260717.1
+- Bump tailwindcss 4.3.2 → 4.3.3
+- Bump @tailwindcss/vite 4.3.2 → 4.3.3
+- Bump @cloudflare/workers-types 5.20260715.1 → 5.20260716.1
+- Migrate @nocoo/cli-base → @nocoo/base-cli ^0.3.0
+- Bump wrangler 4.110.0 → 4.111.0
+- Bump @cloudflare/workers-types 5.20260713.1 → 5.20260715.1
+- Bump @biomejs/biome 2.5.3 → 2.5.4
+- Bump @cloudflare/workers-types 5.20260712.1 → 5.20260713.1
+- Bump postcss 8.5.18 → 8.5.19
+- Bump turbo 2.10.4 → 2.10.5
+- Bump postcss 8.5.17 → 8.5.18
+- Bump hono 4.12.29 → 4.12.30
+- Bump @cloudflare/workers-types 5.20260711.1 → 5.20260712.1
+- Bump postcss 8.5.16 → 8.5.17, @cloudflare/workers-types 5.20260710.1 → 5.20260711.1
+- Bump hono 4.12.28 → 4.12.29, @cloudflare/workers-types 5.20260708.1 → 5.20260710.1
+- Bump wrangler 4.107.1 → 4.110.0, lucide-react 1.23.0 → 1.24.0 (#170)
+- Bump typescript 6.0.3 → 7.0.2
+- Bump @types/node 26.1.0 → 26.1.1
+- Bump react-router 8.1.0 → 8.2.0
+- Bump @cloudflare/workers-types 5.20260706.1 → 5.20260708.1
+- Bump wrangler 4.107.0 → 4.107.1
+- Bump @biomejs/biome 2.5.2 → 2.5.3
+- Bump vitest 4.1.9 → 4.1.10
+- Bump @vitest/coverage-v8 4.1.9 → 4.1.10
+- Bump turbo 2.10.3 → 2.10.4
+- Bump hono 4.12.27 → 4.12.28
+- Bump radix-ui 1.6.1 → 1.6.2
+- Bump @radix-ui/react-avatar 1.2.1 → 1.2.2
+- Bump @cloudflare/workers-types 5.20260705.1 → 5.20260706.1
+- Bump @cloudflare/workers-types from 5.20260704.1 to 5.20260705.1 in packages/worker
+- Upgrade dependencies (batch 2026-07-05)
+- Bump @cloudflare/workers-types from 4.20260702.1 to 5.20260703.1 in packages/worker
+- Bump turbo from 2.10.2 to 2.10.3
+- Upgrade dependencies (batch 2026-07-03)
+- Add root .npmrc for supply chain security baseline
+- Upgrade dependencies (batch 2026-07-02)
+- Bump wrangler from 4.105.0 to 4.106.0 in packages/worker
+- Bump turbo from 2.10.1 to 2.10.2
+- Bump recharts from 3.9.0 to 3.9.1 in packages/ui
+- Bump radix-ui from 1.6.0 to 1.6.1 in packages/ui
+- Bump @radix-ui/react-avatar from 1.2.0 to 1.2.1 in packages/ui
+- Bump @cloudflare/workers-types from 4.20260629.1 to 4.20260630.1 in packages/worker
+- Upgrade dependencies (batch 2026-06-30)
+- Bump postcss from 8.5.15 to 8.5.16
+- Bump lucide-react from 1.21.0 to 1.22.0 in packages/ui
+- Bump @cloudflare/workers-types from 4.20260626.1 to 4.20260628.1 in packages/worker
+- Bump @cloudflare/workers-types from 4.20260625.1 to 4.20260626.1 in packages/worker
+
+### Fixed
+- Keep release bump off fixture versions
+- Stabilize Playwright runtime and report (STU-2695)
+- Pin @playwright/test to exact 1.62.0 (STU-2246)
+- Drop manual better-sqlite3 rebuild — v13 ships prebuilds
+
 ## v2.1.0
 
 ### Changed
