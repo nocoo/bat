@@ -31,14 +31,14 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.9",
 		"@types/better-sqlite3": "^9.6.0",
-		"@vitest/coverage-v8": "4.1.10",
+		"@vitest/coverage-v8": "4.1.11",
 		"better-sqlite3": "13.0.3",
 		"husky": "^9.1.0",
 		"lint-staged": "^17.3.0",
 		"picomatch": "^4.0.5",
 		"turbo": "2.10.10",
 		"typescript": "^7.0.2",
-		"vitest": "4.1.10"
+		"vitest": "4.1.11"
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json,css}": [
