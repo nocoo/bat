@@ -41,15 +41,14 @@ export default defineConfig({
 	],
 
 	webServer: {
-		// Start local Wrangler serving Worker + static assets on port 27025
-		// First apply migrations, then start wrangler
-		// Uses a separate persist dir to avoid conflicts with L2 tests
-		command:
-			"cd ../worker && bash ../../scripts/l3-setup.sh && bunx wrangler dev --port 27025 --local --persist-to .wrangler/e2e-pw",
+		// Seed D1 + start wrangler on :27025 (separate persist dir from L2).
+		// I/O goes to a file via l3-webserver.sh — do not pipe wrangler through
+		// Playwright (workerd EPIPE crash: cloudflare/workers-sdk#15202).
+		command: "bash ../../scripts/l3-webserver.sh",
 		url: "http://localhost:27025/api/live",
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
-		stdout: "pipe",
-		stderr: "pipe",
+		stdout: "ignore",
+		stderr: "ignore",
 	},
 });
