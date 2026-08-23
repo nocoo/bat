@@ -113,7 +113,7 @@ bat/
 
 ```bash
 bun install
-bun --filter @bat/worker dev       # Worker: localhost:8787
+bun --filter @bat/worker dev       # Worker: localhost:37025
 bun --filter @bat/dashboard dev    # Dashboard: localhost:7025
 cd probe && cargo build --release   # Probe
 ```

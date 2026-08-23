@@ -88,7 +88,7 @@ Pre-commit hook blocks the commit. Developer must fix before retrying.
 
 | Purpose | Port |
 |---------|------|
-| Worker dev | 8787 |
+| Worker dev | 37025 |
 | L2 E2E tests | 18787 |
 | L3 Playwright | 27787 |
 | UI Vite dev | 7025 |

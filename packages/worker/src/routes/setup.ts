@@ -13,7 +13,7 @@ export function setupRoute(c: Context<AppEnv>): Response {
 	// Determine worker URL from request
 	// In production: use bat-ingest.worker.hexly.ai (machine endpoint)
 	// In dev: use current origin
-	const host = c.req.header("host") || "localhost:8787";
+	const host = c.req.header("host") || "localhost:37025";
 	const protocol = host.startsWith("localhost") ? "http" : "https";
 
 	// For browser endpoint (bat.hexly.ai), point to machine endpoint

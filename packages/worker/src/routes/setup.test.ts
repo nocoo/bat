@@ -19,13 +19,13 @@ describe("setupRoute", () => {
 	test("defaults to localhost when host header missing", async () => {
 		const res = setupRoute(makeCtx(undefined));
 		const body = (await res.json()) as { worker_url: string };
-		expect(body.worker_url).toBe("http://localhost:8787");
+		expect(body.worker_url).toBe("http://localhost:37025");
 	});
 
 	test("localhost uses http", async () => {
-		const res = setupRoute(makeCtx("localhost:8787"));
+		const res = setupRoute(makeCtx("localhost:37025"));
 		const body = (await res.json()) as { worker_url: string };
-		expect(body.worker_url).toBe("http://localhost:8787");
+		expect(body.worker_url).toBe("http://localhost:37025");
 	});
 
 	test("bat.hexly.ai browser endpoint points to machine endpoint", async () => {

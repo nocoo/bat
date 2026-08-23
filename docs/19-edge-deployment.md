@@ -274,7 +274,7 @@ bat.dev.hexly.ai (Caddy) → localhost:7025 (Vite dev)
 ### Mode 2: Full local stack
 
 ```
-localhost:7025 (Vite dev) → localhost:8787 (Wrangler dev)
+localhost:7025 (Vite dev) → localhost:37025 (Wrangler dev)
 ```
 
 - Both Vite and Wrangler run locally
@@ -284,7 +284,7 @@ localhost:7025 (Vite dev) → localhost:8787 (Wrangler dev)
 ### Mode 3: Production-like test
 
 ```
-localhost:8787 (Wrangler dev, serving static from packages/worker/static/)
+localhost:37025 (Wrangler dev, serving static from packages/worker/static/)
 ```
 
 - Build UI first, then run Wrangler which serves the built assets

@@ -5,7 +5,7 @@ import { defineConfig, devices } from "@playwright/test";
  *
  * Port convention:
  *   - 7025: UI vite dev server
- *   - 8787: worker wrangler dev (default)
+ *   - 37025: worker wrangler dev
  *   - 17025: L2 Worker E2E tests
  *   - 27025: L3 Playwright tests (this config)
  *

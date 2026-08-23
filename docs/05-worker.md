@@ -328,7 +328,7 @@ Test every Worker route against local Wrangler dev server:
 | Write key on read route | `GET /api/hosts` (write key) | 403, scope mismatch |
 | Read key on write route | `POST /api/ingest` (read key) | 403, scope mismatch |
 
-**Server convention**: Worker dev on port 8787, API E2E on port 18787.
+**Server convention**: Worker dev on port 37025, API E2E on port 18787.
 
 ### L4
 

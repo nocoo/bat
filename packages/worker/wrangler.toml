@@ -2,6 +2,11 @@ name = "bat"
 main = "src/index.ts"
 compatibility_date = "2025-03-14"
 
+# Sidecar worker: main UI 7025 + 30000. Do not use wrangler default 8787.
+[dev]
+port = 37025
+ip = "127.0.0.1"
+
 # Cron trigger: hourly aggregation and data purge
 [triggers]
 crons = ["0 * * * *"]
