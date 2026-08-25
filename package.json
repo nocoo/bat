@@ -35,7 +35,7 @@
 		"better-sqlite3": "13.0.3",
 		"husky": "^9.1.0",
 		"lint-staged": "^17.3.0",
-		"picomatch": "^4.0.5",
+		"picomatch": "^4.0.7",
 		"turbo": "2.10.11",
 		"typescript": "^7.0.2",
 		"vitest": "4.1.11"
