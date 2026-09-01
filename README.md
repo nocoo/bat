@@ -36,7 +36,7 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 
 - **系统指标采集** — CPU usage/iowait/steal、内存、磁盘、网络流量，30 秒间隔
 - **极低资源占用** — Rust 编写，~2MB RSS；当前发布的 x86_64 静态二进制约 3.4MB
-- **一键安装** — `curl | bash` 安装脚本，自动配置 systemd 服务
+- **手动安装** — R2 二进制 + 仓库内 `probe/dist/bat-probe.service`。CD **不**上传 `install.sh`；Setup 页的 `latest/install.sh` 目前 404
 
 ### Worker（数据引擎）
 
@@ -48,7 +48,7 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 
 - **实时可视化** — Recharts 图表，CPU/内存/磁盘/网络趋势
 - **Cloudflare Access** — 浏览器走 `bat.hexly.ai`；机器流量走 ingest 域名
-- **Probe 分发** — 内置安装脚本和二进制分发，Setup 页面一键部署
+- **Probe 分发** — R2 `latest/bat-probe-linux-{x86_64,aarch64}`（及 `.sha256`）。没有已发布的一键脚本
 
 ## 安装
 
@@ -61,7 +61,7 @@ curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-prob
 chmod +x /usr/local/bin/bat-probe
 ```
 
-aarch64 把文件名换成 `bat-probe-linux-aarch64`。配置与 systemd 见 `probe/install.sh` / [docs/04-probe.md](docs/04-probe.md)。
+aarch64 把文件名换成 `bat-probe-linux-aarch64`。systemd unit 以仓库 `probe/dist/bat-probe.service` 为准（含 `User=bat` 与 `AmbientCapabilities=CAP_DAC_READ_SEARCH`）。不要用缺能力的 docs/04 片段，也不要跑未注入 `DASHBOARD_URL` 的 `probe/install.sh`。
 
 ### Worker 部署
 
