@@ -126,7 +126,7 @@ cd probe && cargo build --release   # Probe
 
 | 层 | 内容 | 触发时机 |
 |----|------|----------|
-| L1 | TS line ≥90%（`check-coverage.sh 90 95`）；Rust ≥95%（probe 暂存时） | pre-commit + CI |
+| L1 | TS line ≥90%（shared/worker/ui，`check-coverage.sh 90 95`）；Rust llvm-cov ≥95%（每次 pre-commit） | pre-commit；CI 的 probe job 是 `cargo test` 不是 llvm-cov |
 | G1 | tsc + Biome；probe clippy/fmt | pre-commit + CI |
 | L2 | wrangler `--local` :17025；`gate:routes` 静态 method/path | pre-push + CI |
 | L3 | Playwright Chromium :27025 | CI only |
