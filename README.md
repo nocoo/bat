@@ -54,9 +54,14 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 
 ### Probe 安装（在目标 VPS 上）
 
+CD 只把 probe 二进制和 checksum 传到 R2（`latest/` + 版本目录），**不上传** `install.sh`。`probe/install.sh` 需要注入 `DASHBOARD_URL`，未注入会退出。本机安装二进制：
+
 ```bash
-curl -fsSL https://s.zhe.to/apps/bat/latest/install.sh | bash -s -- --url <ingest_url> --key <write_key>
+curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64
+chmod +x /usr/local/bin/bat-probe
 ```
+
+aarch64 把文件名换成 `bat-probe-linux-aarch64`。配置与 systemd 见 `probe/install.sh` / [docs/04-probe.md](docs/04-probe.md)。
 
 ### Worker 部署
 
@@ -124,7 +129,7 @@ cd probe && cargo build --release   # Probe
 | G1 | tsc + Biome；probe clippy/fmt | pre-commit + CI |
 | L2 | wrangler `--local` :17025；`gate:routes` 静态 method/path | pre-push + CI |
 | L3 | Playwright Chromium :27025 | CI only |
-| G2 | gitleaks pre-commit+CI；osv `bun.lock` pre-push+CI；osv `probe/Cargo.lock` 仅 pre-push | |
+| G2 | gitleaks pre-commit+pre-push+CI；osv `bun.lock` pre-push+CI；osv `probe/Cargo.lock` 仅 pre-push | |
 
 覆盖率以 `scripts/check-coverage.sh` 为准，不要沿用旧的 225 / `@bat/dashboard` 计数。
 
