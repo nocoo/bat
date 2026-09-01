@@ -160,19 +160,13 @@ Browser never needs to know any API key. Cloudflare Access handles authenticatio
 
 ### CF Worker + D1
 
-```bash
-# Apply D1 migrations (MUST run before deploy if new columns are referenced)
-cd packages/worker && npx wrangler d1 migrations apply bat-db --remote --env production
+Do not `wrangler deploy` or apply production D1 from a laptop. Version with `bun run release`. CD is `.github/workflows/release.yml` (tag `v*.*.*` and CI-green `main`). Migrations must land on production D1 **before** Worker code that references new columns — that order is the CD job’s job.
 
-# Deploy Worker (includes UI static assets)
-cd packages/worker && npx wrangler deploy --env production
-```
-
-Worker secrets: `BAT_WRITE_KEY`, `BAT_READ_KEY`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`
+Worker secrets (one-time, not every release): `BAT_WRITE_KEY`, `BAT_READ_KEY`, `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`
 
 ### Probe on VPS
 
-Installation via `probe/install.sh`. Binaries hosted on R2 (`https://s.zhe.to/apps/bat/latest/`). See CLAUDE.md § Probe Build & Release for cross-compile and deployment details.
+Binaries (not `install.sh`) are on R2: `https://s.zhe.to/apps/bat/latest/bat-probe-linux-{x86_64,aarch64}`. `probe/install.sh` is not uploaded by CD and exits unless `DASHBOARD_URL` was injected. Runbook: [docs/19-edge-deployment.md](docs/19-edge-deployment.md).
 
 ---
 
