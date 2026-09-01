@@ -54,14 +54,26 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 
 ### Probe 安装（在目标 VPS 上）
 
-CD 只把 probe 二进制和 checksum 传到 R2（`latest/` + 版本目录），**不上传** `install.sh`。`probe/install.sh` 需要注入 `DASHBOARD_URL`，未注入会退出。本机安装二进制：
+CD 只把 probe 二进制和 checksum 传到 R2，**不上传** `install.sh`。未注入 `DASHBOARD_URL` 的 `probe/install.sh` 会退出。Setup 页的 `latest/install.sh` 目前 404。新机器（root，x86_64）：
 
 ```bash
 curl -fsSL -o /usr/local/bin/bat-probe https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64
-chmod +x /usr/local/bin/bat-probe
+chmod 755 /usr/local/bin/bat-probe
+id -u bat >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin bat
+mkdir -p /etc/bat
+cat > /etc/bat/config.toml <<'EOF'
+worker_url = "https://bat-ingest.worker.hexly.ai"
+write_key = "<write_key>"
+EOF
+chown -R bat:bat /etc/bat
+chmod 600 /etc/bat/config.toml
+# copy probe/dist/bat-probe.service (User=bat, AmbientCapabilities=CAP_DAC_READ_SEARCH)
+install -m 644 probe/dist/bat-probe.service /etc/systemd/system/bat-probe.service
+systemctl daemon-reload
+systemctl enable --now bat-probe
 ```
 
-aarch64 把文件名换成 `bat-probe-linux-aarch64`。systemd unit 以仓库 `probe/dist/bat-probe.service` 为准（含 `User=bat` 与 `AmbientCapabilities=CAP_DAC_READ_SEARCH`）。不要用缺能力的 docs/04 片段，也不要跑未注入 `DASHBOARD_URL` 的 `probe/install.sh`。
+aarch64 把二进制文件名换成 `bat-probe-linux-aarch64`。unit 必须来自仓库 `probe/dist/bat-probe.service`，不要用缺能力的 docs/04 片段。
 
 ### Worker 部署
 
