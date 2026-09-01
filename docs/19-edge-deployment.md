@@ -264,12 +264,14 @@ Uptime Kuma also monitors `GET /api/live` (public, no auth) as a basic liveness 
 ```
 bat.dev.hexly.ai (Caddy) → localhost:7025 (Vite dev)
                                 │
-                                └── /api/* proxy → bat-ingest.worker.hexly.ai (production Worker)
+                                └── /api/* proxy → https://bat.hexly.ai
+                                    headers: CF-Access-Client-Id / CF-Access-Client-Secret
+                                    from packages/ui/.env.local
 ```
 
-- Vite dev server on port 7025, proxies `/api/*` to the production machine endpoint
-- Real production data, hot module replacement for UI changes
-- User info shows "anonymous" (no Access JWT from localhost)
+- Vite :7025 proxies `/api/*` to the **browser** host `bat.hexly.ai`, not ingest
+- Without those Access service-token headers prod returns the Access login HTML
+- Real production data, HMR for UI changes
 
 ### Mode 2: Full local stack
 
@@ -306,19 +308,9 @@ npx wrangler secret put CF_ACCESS_AUD --env production
 
 ### Deploy sequence
 
-**Order matters**: D1 migrations before Worker deploy. Deploying Worker code that references new columns without applying the migration causes 500 on all affected routes.
+Do not run this from a laptop. Entry: `bun run release`. CD: `.github/workflows/release.yml`.
 
-```bash
-# 1. Build UI into Worker static assets
-bun turbo build --filter=@bat/ui
-
-# 2. Apply D1 migrations (if any new ones)
-cd packages/worker
-npx wrangler d1 migrations apply bat-db --remote --env production
-
-# 3. Deploy Worker (code + static assets)
-npx wrangler deploy --env production
-```
+**Order matters**: production D1 migrations before Worker code that references new columns. Laptop `wrangler deploy` races CD and can 500 `/api/ingest` fleet-wide.
 
 ### Verify
 
