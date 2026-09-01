@@ -10,11 +10,11 @@ Routing: narrative stays here. A project-specific rule that will recur may becom
 - **Why:** only `bun.lock` exists; hooks call `bun turbo` / `bunx`.
 - **Follow-up:** do not introduce pnpm.
 
-## E2E migration list is manual
+## E2E migration list was manual
 
 - **What:** worker E2E 500s on routes that touch new columns; pre-push blocked.
-- **Why:** `packages/worker/test/e2e` applies a hardcoded migration list.
-- **Follow-up:** add every new migration to that list.
+- **Why:** e2e used to apply a hardcoded migration list.
+- **Follow-up:** `packages/worker/test/e2e/global-setup.ts` now auto-discovers numbered migrations. Do not revive a hardcoded list.
 
 ## Docker Hub TLS vs pull
 
