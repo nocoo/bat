@@ -67,13 +67,33 @@ write_key = "<write_key>"
 EOF
 chown -R bat:bat /etc/bat
 chmod 600 /etc/bat/config.toml
-# copy probe/dist/bat-probe.service (User=bat, AmbientCapabilities=CAP_DAC_READ_SEARCH)
-install -m 644 probe/dist/bat-probe.service /etc/systemd/system/bat-probe.service
+cat > /etc/systemd/system/bat-probe.service <<'EOF'
+[Unit]
+Description=bat VPS monitoring probe
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/bat-probe
+Restart=always
+RestartSec=5
+MemoryMax=15M
+User=bat
+Group=bat
+AmbientCapabilities=CAP_DAC_READ_SEARCH
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadOnlyPaths=/proc /sys /etc
+
+[Install]
+WantedBy=multi-user.target
+EOF
 systemctl daemon-reload
 systemctl enable --now bat-probe
 ```
 
-aarch64 把二进制文件名换成 `bat-probe-linux-aarch64`。unit 必须来自仓库 `probe/dist/bat-probe.service`，不要用缺能力的 docs/04 片段。
+aarch64 把二进制文件名换成 `bat-probe-linux-aarch64`。unit 内容必须与仓库 `probe/dist/bat-probe.service` 一致，不要用缺 `AmbientCapabilities` 的 docs/04 片段。
 
 ### Worker 部署
 
