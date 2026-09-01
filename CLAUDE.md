@@ -23,7 +23,7 @@ This file is the **contract**. Hooks, CI, and config are **enforcement**. If the
 - Browser: `bat.hexly.ai` (Cloudflare Access). Ingest: `bat-ingest.worker.hexly.ai` (no Access; `BAT_WRITE_KEY` / `BAT_READ_KEY`). One Worker serves API + SPA.
 - E2E is `--local --persist-to` only. Never `--remote` D1. L2 `.wrangler/e2e` :17025; L3 `.wrangler/e2e-pw` :27025. Dev wrangler :37025; Vite :7025. Do not use 8787.
 - UI is Vite SPA in `packages/ui`, not Next.js, not Railway.
-- `@bat/ui` has no L1 suite. TS L1 line ≥90% via `check-coverage.sh 90 95`; Rust ≥95% when `probe/` is staged. Worker vitest also gates 95/90/95/95.
+- TS L1 line ≥90% via `check-coverage.sh 90 95` (shared/worker/ui). Rust llvm-cov ≥95% on every pre-commit. Worker vitest also gates 95/90/95/95. Clippy/fmt only if `probe/` is staged.
 - `gate:routes` is a static `(method, path)` scan of `packages/worker/src/index.ts` vs e2e files — structural hit, not assertion quality.
 - `bun run deploy` races CD. Version with `bun run release`; Worker deploys via `.github/workflows/release.yml`.
 
@@ -66,7 +66,7 @@ Org gaps: index-snapshot pre-commit; stdin-range pre-push; `.skip`/`.only` (Play
 | Change | Proof | Status | Evidence |
 |---|---|---|---|
 | Logic TS | L1 line ≥90% (`check-coverage.sh 90 95`) | enforced | pre-commit → `check-coverage.sh`; CI `test:unit:coverage` |
-| Logic Rust | L1 ≥95% llvm-cov when probe staged; CI is `cargo test` not llvm-cov | enforced | pre-commit clippy/fmt + coverage script; CI `probe` job |
+| Logic Rust | L1 llvm-cov ≥95% every pre-commit; CI is `cargo test` not llvm-cov | enforced | pre-commit `check-coverage.sh`; CI `probe` job |
 | API L2 | real HTTP wrangler `--local`; structural 100% `/api` routes | enforced | pre-push → `turbo test:e2e --filter=@bat/worker`; CI `l2-e2e`; `gate:routes` |
 | UI L3 | Playwright Chromium | enforced | CI `l3-playwright` (`packages/ui` + `l3-webserver.sh`) |
 | Types / lint | tsc + Biome 0 warning; clippy | enforced | pre-commit typecheck + lint-staged; CI lint/typecheck/clippy |
