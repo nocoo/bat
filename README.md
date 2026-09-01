@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/platform-Linux-blue" alt="platform" />
   <img src="https://img.shields.io/badge/probe-Rust-orange" alt="probe" />
   <img src="https://img.shields.io/badge/worker-Cloudflare%20Workers-yellow" alt="worker" />
-  <img src="https://img.shields.io/badge/dashboard-Next.js%2016-black" alt="dashboard" />
+  <img src="https://img.shields.io/badge/dashboard-Vite-black" alt="dashboard" />
   <img src="https://img.shields.io/badge/tests-225-brightgreen" alt="tests" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license" />
 </p>
@@ -17,17 +17,17 @@
 
 ## 这是什么
 
-Bat 是一套专为小型 VPS 集群设计的基础设施监控方案，用于替代 Netdata（120–243MB RSS）等重量级方案。整个系统由三个组件构成：Rust 编写的 Probe 采集端（~2MB RSS），运行在 Cloudflare Workers 上的数据处理和告警引擎，以及部署在 Railway 上的 Next.js 可视化仪表盘。
+Bat 是一套专为小型 VPS 集群设计的基础设施监控方案，用于替代 Netdata（120–243MB RSS）等重量级方案。三个组件：Rust Probe（~2MB RSS）、Cloudflare Worker（Hono + D1，同时托管 API 与 SPA）、Vite 仪表盘。架构以 [docs/02-architecture.md](docs/02-architecture.md) 为准。
 
 ```
-VPS hosts              Cloudflare              Railway
-┌──────────┐          ┌──────────────┐         ┌──────────────┐
-│ bat-probe │──POST──>│     bat      │<──GET───│  dashboard   │
-│  (Rust)   │         │ (Hono + D1)  │         │ (Next.js 16) │
-└──────────┘          └──────────────┘         └──────────────┘
-  ~2MB RSS             CF Workers + D1          Bun standalone
-  30s interval         Hourly aggregation       Google OAuth
-  systemd unit         Alert evaluation         Recharts
+VPS hosts                         Cloudflare
+┌──────────┐          ┌──────────────────────────────────┐
+│ bat-probe │──POST──>│  bat-ingest.worker.hexly.ai      │
+│  (Rust)   │         │  (no Access, write/read keys)    │
+└──────────┘          │                                  │
+                      │  bat.hexly.ai  (Access)          │
+Browser ─────────────>│  Worker = API + Vite SPA assets  │
+                      └──────────────────────────────────┘
 ```
 
 ## 功能
@@ -47,7 +47,7 @@ VPS hosts              Cloudflare              Railway
 ### Dashboard（仪表盘）
 
 - **实时可视化** — Recharts 图表，CPU/内存/磁盘/网络趋势
-- **Google OAuth** — 基于邮箱白名单的访问控制
+- **Cloudflare Access** — 浏览器走 `bat.hexly.ai`；机器流量走 ingest 域名
 - **Probe 分发** — 内置安装脚本和二进制分发，Setup 页面一键部署
 
 ## 安装
@@ -68,28 +68,22 @@ wrangler d1 execute bat-db-prod --env production --file=migrations/0001_initial.
 wrangler deploy --env production
 ```
 
-### Dashboard 部署（Railway / Docker）
+### Dashboard
 
-```bash
-docker build -f packages/dashboard/Dockerfile .
-```
-
-环境变量：`BAT_API_URL`、`BAT_READ_KEY`、`BAT_WRITE_KEY`、`AUTH_SECRET`、`GOOGLE_CLIENT_ID`、`GOOGLE_CLIENT_SECRET`、`ALLOWED_EMAILS`。
+SPA 由 Worker `[assets]` 托管，不再走 Railway / Next.js。浏览器认证是 Cloudflare Access。详见 [docs/19-edge-deployment.md](docs/19-edge-deployment.md)。
 
 ## 项目结构
 
 ```
 bat/
 ├── packages/
-│   ├── dashboard/          # Next.js 16 仪表盘
-│   ├── worker/             # Cloudflare Workers 数据引擎
-│   └── shared/             # 共享类型定义
+│   ├── ui/                 # Vite SPA :7025
+│   ├── worker/             # Hono Worker + D1（wrangler :37025）
+│   ├── shared/             # 共享类型
+│   └── cli/
 ├── probe/                  # Rust 采集端
-│   ├── src/collectors/     # CPU/memory/disk/network 采集器
-│   ├── dist/               # systemd unit 文件
-│   └── install.sh          # 安装脚本
-├── docs/                   # 设计文档（10 篇）
-└── scripts/                # 版本同步、覆盖率检查、logo 生成
+├── docs/                   # 编号设计文档
+└── scripts/
 ```
 
 ## 技术栈
@@ -98,8 +92,8 @@ bat/
 |---|------|
 | Probe | [Rust](https://www.rust-lang.org/) · [tokio](https://tokio.rs/) · [reqwest](https://docs.rs/reqwest) |
 | Worker | [Hono](https://hono.dev/) · [Cloudflare Workers](https://workers.cloudflare.com/) · [D1](https://developers.cloudflare.com/d1/) |
-| Dashboard | [Next.js 16](https://nextjs.org/) · [React 19](https://react.dev/) · [SWR](https://swr.vercel.app/) · [Recharts](https://recharts.org/) |
-| 认证 | [NextAuth.js](https://next-auth.js.org/) · Google OAuth |
+| Dashboard | [Vite](https://vite.dev/) · React · Recharts |
+| 认证 | Cloudflare Access（浏览器）；ingest 用 write/read key |
 | 工具链 | [Bun](https://bun.sh/) · [Turbo](https://turbo.build/) · [Biome](https://biomejs.dev/) · [Husky](https://typicode.github.io/husky/) |
 
 ## 开发
@@ -113,8 +107,7 @@ bat/
 
 ```bash
 bun install
-bun --filter @bat/worker dev       # Worker: localhost:37025
-bun --filter @bat/dashboard dev    # Dashboard: localhost:7025
+bun run dev                         # Vite :7025 + wrangler :37025
 cd probe && cargo build --release   # Probe
 ```
 
@@ -133,10 +126,11 @@ cd probe && cargo build --release   # Probe
 
 | 层 | 内容 | 触发时机 |
 |----|------|----------|
-| L1 UT | 单元测试（225 个，覆盖率 90%+） | pre-commit |
-| L2 Lint | Biome + TypeScript 类型检查 | pre-commit |
-| L3 API E2E | Worker API 端到端测试 | pre-push |
-| L4 BDD E2E | Playwright 浏览器测试 | 按需 |
+| L1 | TS line ≥90%（`check-coverage.sh 90 95`）；Rust ≥95%（probe 暂存时） | pre-commit + CI |
+| G1 | tsc + Biome；probe clippy/fmt | pre-commit + CI |
+| L2 | wrangler `--local` :17025；`gate:routes` 静态 method/path | pre-push + CI |
+| L3 | Playwright Chromium :27025 | CI only |
+| G2 | gitleaks；osv `bun.lock` + `probe/Cargo.lock` | pre-commit（secrets）/ pre-push + CI |
 
 | 模块 | 测试数 | 覆盖率 |
 |------|--------|--------|
