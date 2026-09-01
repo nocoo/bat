@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/probe-Rust-orange" alt="probe" />
   <img src="https://img.shields.io/badge/worker-Cloudflare%20Workers-yellow" alt="worker" />
   <img src="https://img.shields.io/badge/dashboard-Vite-black" alt="dashboard" />
-  <img src="https://img.shields.io/badge/tests-225-brightgreen" alt="tests" />
+  <img src="https://img.shields.io/badge/coverage-90%2B-brightgreen" alt="coverage" />
   <img src="https://img.shields.io/badge/license-MIT-green" alt="license" />
 </p>
 
@@ -35,13 +35,13 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 ### Probe（采集端）
 
 - **系统指标采集** — CPU usage/iowait/steal、内存、磁盘、网络流量，30 秒间隔
-- **极低资源占用** — Rust 编写，~2MB RSS，静态编译 ~300KB ELF
+- **极低资源占用** — Rust 编写，~2MB RSS；当前发布的 x86_64 静态二进制约 3.4MB
 - **一键安装** — `curl | bash` 安装脚本，自动配置 systemd 服务
 
 ### Worker（数据引擎）
 
 - **数据接收与存储** — Hono 框架，D1 数据库，支持高频写入
-- **智能告警** — 6 条内置规则（内存、磁盘、iowait、steal、主机离线等）
+- **智能告警** — `ALL_ALERT_RULES`（当前 28 条）在 Worker 侧评估
 - **定时聚合** — Cron 触发的小时级数据聚合，自动清理过期数据
 
 ### Dashboard（仪表盘）
@@ -55,18 +55,12 @@ Browser ─────────────>│  Worker = API + Vite SPA ass
 ### Probe 安装（在目标 VPS 上）
 
 ```bash
-curl -fsSL https://<dashboard>/api/probe/install.sh | bash -s -- --url <worker_url> --key <write_key>
+curl -fsSL https://s.zhe.to/apps/bat/latest/install.sh | bash -s -- --url <ingest_url> --key <write_key>
 ```
 
-### Worker 部署（Cloudflare Workers）
+### Worker 部署
 
-```bash
-cd packages/worker
-wrangler secret put BAT_WRITE_KEY --env production
-wrangler secret put BAT_READ_KEY --env production
-wrangler d1 execute bat-db-prod --env production --file=migrations/0001_initial.sql
-wrangler deploy --env production
-```
+不要在本机 `wrangler deploy`，也不要使用不存在的 `bat-db-prod` 或只 apply `0001`。生产 D1 迁移必须先于引用新列的 Worker 代码。版本入口 `bun run release`；CD 见 `.github/workflows/release.yml` 与 [docs/19-edge-deployment.md](docs/19-edge-deployment.md)。
 
 ### Dashboard
 
@@ -100,7 +94,7 @@ bat/
 
 ### 环境要求
 
-- Bun 1.3+、Rust 1.80+
+- Bun 1.3+、Rust 1.85+（edition 2024）
 - Wrangler CLI（Worker 开发）
 
 ### 快速开始
@@ -119,26 +113,20 @@ cd probe && cargo build --release   # Probe
 | `bun turbo test` | 运行所有测试 |
 | `bun run lint` | Biome 代码检查 |
 | `bun run lint:fix` | 自动修复 lint 问题 |
-| `scripts/sync-version.sh` | 同步版本号到所有子包 |
+| `bun run release` | 同步全部子包（含 `packages/cli`）并打 tag |
 | `scripts/resize-logos.py` | 从 logo.png 生成所有派生图标 |
 
 ## 测试
 
 | 层 | 内容 | 触发时机 |
 |----|------|----------|
-| L1 | TS line ≥90%（shared/worker/ui，`check-coverage.sh 90 95`）；Rust llvm-cov ≥95%（每次 pre-commit） | pre-commit；CI 的 probe job 是 `cargo test` 不是 llvm-cov |
+| L1 | TS line ≥90% pre-commit（`check-coverage.sh 90 95`）；CI `test:unit:coverage` 默认 TS 95% / Rust llvm-cov 90%；另有 `cargo test` probe job | pre-commit + CI |
 | G1 | tsc + Biome；probe clippy/fmt | pre-commit + CI |
 | L2 | wrangler `--local` :17025；`gate:routes` 静态 method/path | pre-push + CI |
 | L3 | Playwright Chromium :27025 | CI only |
-| G2 | gitleaks；osv `bun.lock` + `probe/Cargo.lock` | pre-commit（secrets）/ pre-push + CI |
+| G2 | gitleaks pre-commit+CI；osv `bun.lock` pre-push+CI；osv `probe/Cargo.lock` 仅 pre-push | |
 
-| 模块 | 测试数 | 覆盖率 |
-|------|--------|--------|
-| @bat/shared | 26 | 100% |
-| @bat/worker | 85 | 90%+ |
-| @bat/dashboard | 47 | 90%+ |
-| probe (Rust) | 67 | — |
-| **合计** | **225** | |
+覆盖率以 `scripts/check-coverage.sh` 为准，不要沿用旧的 225 / `@bat/dashboard` 计数。
 
 ```bash
 bun turbo test          # TypeScript 测试
@@ -147,54 +135,18 @@ cd probe && cargo test  # Rust 测试
 
 ## 告警规则
 
-21 条告警规则，全部已实现。Probe 上报原始数据，Worker 服务端评估告警。
-
-### Tier 1（每次 ingest 评估）
-
-| 规则 | 条件 | 严重度 |
-|------|------|--------|
-| `mem_high` | mem > 85% AND swap > 50% | Critical |
-| `no_swap` | swap = 0 AND mem > 70% | Critical |
-| `disk_full` | 任一挂载点 > 85% | Critical |
-| `iowait_high` | iowait > 20% 持续 5min | Warning |
-| `steal_high` | steal > 10% 持续 5min | Warning |
-| `host_offline` | 超过 120s 未上报 | Critical |
-| `uptime_anomaly` | uptime < 300s | Info |
-
-### Tier 2（每次 tier2 上报评估）
-
-| 规则 | 条件 | 严重度 |
-|------|------|--------|
-| `ssh_password_auth` | SSH 密码认证开启 | Critical |
-| `ssh_root_login` | SSH root 登录=yes | Critical |
-| `no_firewall` | 防火墙未启用 | Critical |
-| `public_port` | 非白名单端口暴露在 0.0.0.0 | Warning |
-| `security_updates` | 安全更新待安装 > 7d | Warning |
-| `container_restart` | 容器重启次数 > 5 | Critical |
-| `systemd_failed` | 有 failed systemd 单元 | Warning |
-| `reboot_required` | 需要重启 > 7d | Info |
-
-### Tier 3（每次 ingest 评估，可选字段）
-
-| 规则 | 条件 | 严重度 |
-|------|------|--------|
-| `cpu_pressure` | PSI cpu avg60 > 25% 持续 5min | Warning |
-| `mem_pressure` | PSI mem avg60 > 10% 持续 5min | Warning |
-| `io_pressure` | PSI io avg60 > 20% 持续 5min | Warning |
-| `disk_io_saturated` | 任一设备利用率 > 80% 持续 5min | Warning |
-| `tcp_conn_leak` | TIME_WAIT > 500 持续 5min | Warning |
-| `oom_kill` | OOM kill 次数 > 0 | Critical |
+规则条数以 `packages/shared/src/alerts.ts` 的 `ALL_ALERT_RULES` 为准（当前 28 条）。Probe 上报原始数据，Worker 服务端评估。
 
 ## 文档
 
 | 文档 | 内容 |
 |------|------|
-| [01-metrics-catalogue](./docs/01-metrics-catalogue.md) | 信号目录：T1/T2/T3/Identity 全量信号、procfs 数据源、21 条告警规则 |
+| [01-metrics-catalogue](./docs/01-metrics-catalogue.md) | 信号目录（告警条数可能过期；以 `ALL_ALERT_RULES` 为准） |
 | [02-architecture](./docs/02-architecture.md) | 系统架构、关键决策、MVP 范围、部署方案 |
 | [03-data-structures](./docs/03-data-structures.md) | D1 Schema、Migration 策略、Payload 类型 |
 | [04-probe](./docs/04-probe.md) | Rust Probe：采集器、主循环、配置、systemd |
 | [05-worker](./docs/05-worker.md) | CF Worker：路由、数据接收、告警、聚合 Cron |
-| [06-dashboard](./docs/06-dashboard.md) | Next.js 仪表盘：OAuth、代理架构、图表 |
+| [06-ui](./docs/06-ui.md) | Vite SPA（旧 Next/代理描述可能过期） |
 | [07-testing](./docs/07-testing.md) | 四层测试策略、Husky hooks |
 | [08-commits](./docs/08-commits.md) | 原子化提交计划（Phase 0–5，46 commits） |
 | [09-tier3-signals](./docs/09-tier3-signals.md) | Tier 3 设计：PSI 压力、磁盘 I/O、TCP 状态、OOM kills |
