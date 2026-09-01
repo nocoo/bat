@@ -326,35 +326,7 @@ open https://bat.hexly.ai
 
 ## Wrangler Configuration
 
-### Production (`wrangler.toml`)
-
-```toml
-name = "bat"
-main = "src/index.ts"
-compatibility_date = "2025-04-01"
-
-# Dual custom domains
-routes = [
-  { pattern = "bat.hexly.ai", custom_domain = true },
-  { pattern = "bat-ingest.worker.hexly.ai", custom_domain = true }
-]
-
-# Static SPA assets
-[assets]
-directory = "./static"
-binding = "ASSETS"
-run_worker_first = ["/api/*"]
-not_found_handling = "single-page-application"
-
-# D1 database
-[[d1_databases]]
-binding = "DB"
-database_name = "bat-db"
-
-# Hourly aggregation cron
-[triggers]
-crons = ["0 * * * *"]
-```
+Do not copy a snippet from this file. Production config is `packages/worker/wrangler.toml` (`[env.production]`, D1 id, `BAT_KV`, `compatibility_date`).
 
 ### Test environment
 
