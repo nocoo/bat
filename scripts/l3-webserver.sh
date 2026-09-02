@@ -18,5 +18,7 @@ bash "$SCRIPT_DIR/l3-setup.sh"
 mkdir -p "$(dirname "$LOG_FILE")"
 : >"$LOG_FILE"
 
-exec bunx wrangler dev --port 27025 --local --persist-to .wrangler/e2e-pw \
+# Suppress per-request logs: workerd can terminate with EPIPE while emitting
+# high-volume access logs during Playwright. Keep error output for diagnostics.
+exec bunx wrangler dev --log-level error --port 27025 --local --persist-to .wrangler/e2e-pw \
 	>>"$LOG_FILE" 2>&1
