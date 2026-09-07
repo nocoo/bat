@@ -1,0 +1,51 @@
+{
+	"study": "bat/2026-09-07-01",
+	"finishing": "02",
+	"method": "generated",
+	"generationCalls": 1,
+	"nativeDimensions": [2048, 2048],
+	"sourceRevisionBefore": "c5a23ce1b183425e81e97fe1061ddaba16075bcd",
+	"previous": {
+		"kind": "original",
+		"original": "/logos/originals/bat.png",
+		"sourcePath": "logo.png",
+		"sourceUrl": "https://github.com/nocoo/bat/blob/99e48ef72afeaf178422c17875728128fe06615c/logo.png",
+		"modified": false,
+		"width": 2048,
+		"height": 2048,
+		"bytes": 2747994,
+		"sha256": "24b80b738e8425f05eac0e83a9a78ece9d22c7390fc56a33d50c7fdc0a05ee62",
+		"thumbnail": "/logos/display/bat-160.webp",
+		"display": "/logos/display/bat-1024.webp"
+	},
+	"masters": {
+		"logo.png": {
+			"sha256": "882034b5b3e7511560a999422199cb486c80ee3fc00eb586d6584326fa4f1e1d",
+			"width": 2048,
+			"height": 2048
+		},
+		"assets/brand/icon.png": {
+			"sha256": "e6e06e63ea35672a4507d89350d20f88aa4c8ba8f27feed94bac0d186e75f4c0",
+			"width": 2048,
+			"height": 2048
+		},
+		"assets/brand/icon-rounded.png": {
+			"sha256": "d5604572323b6f297e12e9c51170cb495a800f272c405f3d4edd0e3575998ce4",
+			"width": 2048,
+			"height": 2048
+		}
+	},
+	"roundedClearancePx": 145.5,
+	"acceptance": {
+		"decisionSource": "owner-delegated batch acceptance",
+		"ownerReviewedExactBytes": false,
+		"scope": "Named ten-project batch"
+	},
+	"review": "https://hexly.ai/logos/bat",
+	"archive": "https://github.com/nocoo/hexly.ai/tree/main/artwork/logo-family/bat/2026-09-07-01",
+	"model": "gpt-image-2",
+	"generation": {
+		"path": "raw/generated.png",
+		"sha256": "1935dbb8272ecb7e1d601042fc687f8b88f1ea72cdb8e6bb20f13182be08b3ce"
+	}
+}
