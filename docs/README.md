@@ -1,5 +1,9 @@
 # bat docs
 
+[中文项目说明](../README.md) · [English README](README.en.md)
+
+Current setup and operational boundaries are in [probe installation, development, and releases](21-development.md). Older design documents provide context; current source and this guide take precedence for commands, retention, and deployment.
+
 ## Index
 
 | # | Document | Description |
@@ -22,6 +26,9 @@
 | 16 | [monitoring-api](./16-monitoring-api.md) | Monitoring API for Uptime Kuma integration: host health tiers, group aggregation, alert endpoints, auto-onboarding flow |
 | 17 | [maintenance-window](./17-maintenance-window.md) | Per-host daily recurring maintenance window: alert suppression, `maintenance` status, chart grey overlay |
 | 18 | [quality-system-upgrade](./18-quality-system-upgrade.md) | Six-dimension quality system upgrade (L1/L2/L3 + G1/G2 + D1): Tier C → S roadmap, 12 atomic commits |
+| 19 | [edge-deployment](./19-edge-deployment.md) | Single-Worker and dual-domain deployment background |
+| 20 | [D1-to-KV migration](./20-d1-to-kv-migration.md) | Optional KV caches and D1 query reduction |
+| 21 | [development](./21-development.md) | Current probe installation, CLI, configuration, local tests, retention, and release behavior |
 
 ## Archive
 
