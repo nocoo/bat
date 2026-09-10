@@ -1,4 +1,21 @@
 import {
+	Avatar,
+	AvatarFallback,
+	AvatarImage,
+	Sidebar as BasaltSidebar,
+	Button,
+	Collapsible,
+	CollapsibleTrigger,
+	SidebarFooter,
+	SidebarHeader,
+	SidebarNav,
+	SidebarUser,
+	Tooltip,
+	TooltipContent,
+	TooltipProvider,
+	TooltipTrigger,
+} from "@nocoo/basalt";
+import {
 	Bell,
 	ChevronUp,
 	Database,
@@ -11,9 +28,6 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Collapsible, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useMe } from "@/hooks";
 import { getAvatarColor, getDisplayName } from "@/lib/avatar-color";
 import { cn } from "@/lib/utils";
@@ -149,32 +163,30 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 
 	return (
 		<TooltipProvider delayDuration={0}>
-			<aside
+			<BasaltSidebar
 				aria-label={mobile ? "Main navigation drawer" : "Main navigation"}
-				className={cn(
-					"sticky top-0 flex h-screen shrink-0 flex-col bg-background transition-all duration-300 ease-in-out overflow-hidden",
-					collapsed ? "w-[68px]" : "w-[260px]",
-				)}
+				collapsed={collapsed}
 			>
 				{collapsed ? (
 					/* ── Collapsed (icon-only) view ── */
-					<div className="flex h-screen w-[68px] flex-col items-center">
+					<>
 						{/* Logo */}
-						<div className="flex h-14 w-full items-center justify-start pl-6 pr-3">
+						<SidebarHeader className="justify-start pl-6 pr-3">
 							<img src="/logo-24.png" alt="bat" width={24} height={24} />
-						</div>
+						</SidebarHeader>
 
 						{/* Expand toggle */}
 						<Tooltip>
 							<TooltipTrigger asChild={true}>
-								<button
-									type="button"
+								<Button
+									variant="ghost"
+									size="icon"
 									onClick={toggle}
 									aria-label="Expand sidebar"
-									className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors mb-2"
+									className="mb-2 self-center text-muted-foreground hover:text-foreground"
 								>
 									<PanelLeft className="h-4 w-4" aria-hidden="true" strokeWidth={1.5} />
-								</button>
+								</Button>
 							</TooltipTrigger>
 							<TooltipContent side="right" sideOffset={8}>
 								Expand sidebar
@@ -182,7 +194,7 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 						</Tooltip>
 
 						{/* Navigation — flat icon list (no group headers when collapsed) */}
-						<nav className="flex-1 flex flex-col items-center gap-1 overflow-y-auto pt-1">
+						<SidebarNav className="items-center gap-1 pt-1">
 							{NAV_ITEMS.map((item) => {
 								const isActive = pathname.startsWith(item.href);
 
@@ -208,21 +220,21 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 									</Tooltip>
 								);
 							})}
-						</nav>
+						</SidebarNav>
 
 						{/* Version badge at bottom */}
-						<div className="py-3 flex justify-center w-full">
+						<SidebarFooter className="flex w-full justify-center px-0 py-3">
 							<span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
 								v{APP_VERSION}
 							</span>
-						</div>
-					</div>
+						</SidebarFooter>
+					</>
 				) : (
 					/* ── Expanded view ── */
-					<div className="flex h-screen w-[260px] flex-col">
+					<>
 						{/* Header: logo + collapse toggle */}
-						<div className="px-3 h-14 flex items-center">
-							<div className="flex w-full items-center justify-between px-3">
+						<SidebarHeader>
+							<div className="flex w-full items-center justify-between">
 								<div className="flex items-center gap-3">
 									<img src="/logo-24.png" alt="bat" width={24} height={24} />
 									<span className="text-lg font-bold tracking-tighter">bat</span>
@@ -230,19 +242,20 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 										v{APP_VERSION}
 									</span>
 								</div>
-								<button
-									type="button"
+								<Button
+									variant="ghost"
+									size="icon"
 									onClick={toggle}
 									aria-label="Collapse sidebar"
-									className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground transition-colors"
+									className="h-7 w-7 text-muted-foreground hover:text-foreground"
 								>
 									<PanelLeft className="h-4 w-4" aria-hidden="true" strokeWidth={1.5} />
-								</button>
+								</Button>
 							</div>
-						</div>
+						</SidebarHeader>
 
 						{/* Navigation — grouped */}
-						<nav className="flex-1 overflow-y-auto pt-1">
+						<SidebarNav className="pt-1">
 							<div className="flex flex-col gap-3 px-3">
 								{NAV_GROUPS.map((group) => (
 									<NavGroupSection
@@ -253,28 +266,26 @@ export function Sidebar({ mobile = false }: SidebarProps) {
 									/>
 								))}
 							</div>
-						</nav>
+						</SidebarNav>
 
 						{/* Footer — user info */}
-						<div className="px-4 py-3 border-t">
-							<div className="flex items-center gap-3">
-								<Avatar className="h-9 w-9 shrink-0">
-									{userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
-									<AvatarFallback className={cn("text-xs text-white", getAvatarColor(userEmail))}>
-										{userInitial}
-									</AvatarFallback>
-								</Avatar>
-								<div className="flex-1 min-w-0">
-									<p className="text-sm font-medium text-foreground truncate">{userName}</p>
-									{userEmail && (
-										<p className="text-xs text-muted-foreground truncate">{userEmail}</p>
-									)}
-								</div>
-							</div>
-						</div>
-					</div>
+						<SidebarFooter className="border-t border-border">
+							<SidebarUser
+								name={userName}
+								email={userEmail}
+								avatar={
+									<Avatar className="h-9 w-9 shrink-0">
+										{userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
+										<AvatarFallback className={cn("text-xs text-white", getAvatarColor(userEmail))}>
+											{userInitial}
+										</AvatarFallback>
+									</Avatar>
+								}
+							/>
+						</SidebarFooter>
+					</>
 				)}
-			</aside>
+			</BasaltSidebar>
 		</TooltipProvider>
 	);
 }
