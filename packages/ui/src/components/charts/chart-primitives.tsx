@@ -1,6 +1,7 @@
 // Tiny shared chart primitives — keep individual chart files focused on the
 // recharts geometry / series config and let these handle the boilerplate
 // shared across every chart card.
+import { LayerCard } from "@nocoo/basalt";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { useMemo } from "react";
@@ -35,7 +36,11 @@ export function useMaintenanceAreas(
 
 /** Card wrapper used by every chart (consistent padding + radius). */
 export function ChartCard({ children }: { children: ReactNode }) {
-	return <div className="rounded-card bg-secondary p-4 md:p-5">{children}</div>;
+	return (
+		<LayerCard className="p-4 md:p-5" padding="none">
+			{children}
+		</LayerCard>
+	);
 }
 
 /** "No X data" placeholder rendered inside a {@link ChartCard}. */

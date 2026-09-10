@@ -1,4 +1,5 @@
 import type { MetricsResolution } from "@bat/shared";
+import { LayerCard } from "@nocoo/basalt";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -78,7 +79,7 @@ export function TopProcessesTable({
 	if (processes.length === 0) {
 		const isHourly = resolution === "hourly";
 		return (
-			<div className="rounded-card bg-secondary p-4 md:p-5">
+			<LayerCard className="p-4 md:p-5" padding="none">
 				<div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-1">
 					<span>
 						{isHourly
@@ -87,14 +88,14 @@ export function TopProcessesTable({
 					</span>
 					{isHourly && <span className="text-xs">Switch to 1h or 6h to see live process data</span>}
 				</div>
-			</div>
+			</LayerCard>
 		);
 	}
 
 	const thBase = "px-2 py-1.5 text-right font-medium";
 
 	return (
-		<div className="rounded-card bg-secondary p-4 md:p-5">
+		<LayerCard className="p-4 md:p-5" padding="none">
 			<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
 				<div className="flex items-center gap-2 text-base font-semibold">
 					<Activity className="h-4 w-4" />
@@ -221,6 +222,6 @@ export function TopProcessesTable({
 					</tbody>
 				</table>
 			</div>
-		</div>
+		</LayerCard>
 	);
 }

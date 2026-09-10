@@ -1,4 +1,5 @@
 import type { MetricsDataPoint } from "@bat/shared";
+import { LayerCard } from "@nocoo/basalt";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
 import { formatBytes, transformDiskData } from "@/lib/transforms";
@@ -8,16 +9,16 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 
 	if (disks.length === 0) {
 		return (
-			<div className="rounded-card bg-secondary p-4 md:p-5">
+			<LayerCard className="p-4 md:p-5" padding="none">
 				<div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
 					No disk data
 				</div>
-			</div>
+			</LayerCard>
 		);
 	}
 
 	return (
-		<div className="rounded-card bg-secondary p-4 md:p-5">
+		<LayerCard className="p-4 md:p-5" padding="none">
 			<div className="mb-3 flex items-center gap-2 text-base font-semibold">
 				<HardDrive className="h-4 w-4" />
 				Disk Usage
@@ -48,6 +49,6 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 					</div>
 				))}
 			</div>
-		</div>
+		</LayerCard>
 	);
 }

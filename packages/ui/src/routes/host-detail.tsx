@@ -190,18 +190,15 @@ export function HostDetailPage() {
 					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
 						<div className="space-y-4">
 							{Array.from({ length: 4 }, (_, i) => (
-								<div
-									key={`chart-skeleton-${i.toString()}`}
-									className="rounded-card bg-secondary p-4 md:p-5"
-								>
+								<Card key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
 									<Skeleton className="h-64 w-full" />
-								</div>
+								</Card>
 							))}
 						</div>
 						<div className="space-y-4">
-							<div className="rounded-card bg-secondary p-4 md:p-5">
+							<Card className="p-4 md:p-5">
 								<Skeleton className="h-32 w-full" />
-							</div>
+							</Card>
 						</div>
 					</div>
 				) : metricsResponse ? (
