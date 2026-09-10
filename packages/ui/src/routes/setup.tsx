@@ -1,3 +1,4 @@
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, ChevronRight, Copy, Terminal } from "lucide-react";
 import { useCallback, useState } from "react";
 import { AppShell } from "@/components/layout";
@@ -68,12 +69,10 @@ export function SetupPage() {
 				</div>
 			) : (
 				<div className="space-y-6 max-w-3xl">
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight">Install Probe</h1>
-						<p className="mt-1 text-sm text-muted-foreground">
-							Deploy the monitoring probe on your Linux servers.
-						</p>
-					</div>
+					<PageHeader
+						title="Install Probe"
+						description="Deploy the monitoring probe on your Linux servers."
+					/>
 
 					{/* Prerequisites */}
 					<Card>

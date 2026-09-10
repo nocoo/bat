@@ -1,4 +1,5 @@
 import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Check, Database } from "lucide-react";
 import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
@@ -59,13 +60,10 @@ export function DataRetentionPage() {
 				</div>
 			) : (
 				<div className="space-y-4 max-w-4xl">
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight">Data Retention</h1>
-						<p className="mt-1 text-sm text-muted-foreground">
-							Configure how long monitoring data is stored. All metrics, snapshots, and events older
-							than the selected window are automatically purged every hour.
-						</p>
-					</div>
+					<PageHeader
+						title="Data Retention"
+						description="Configure how long monitoring data is stored. All metrics, snapshots, and events older than the selected window are automatically purged every hour."
+					/>
 
 					{/* Action error banner */}
 					{actionError && (

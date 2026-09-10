@@ -1,4 +1,5 @@
 import type { WebhookConfig } from "@bat/shared";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
@@ -85,12 +86,10 @@ export function WebhooksPage() {
 				</div>
 			) : (
 				<div className="space-y-4 max-w-4xl">
-					<div>
-						<h1 className="text-2xl font-semibold tracking-tight">Webhooks</h1>
-						<p className="mt-1 text-sm text-muted-foreground">
-							Configure webhook tokens for hosts to send events via POST /api/events.
-						</p>
-					</div>
+					<PageHeader
+						title="Webhooks"
+						description="Configure webhook tokens for hosts to send events via POST /api/events."
+					/>
 
 					{/* Action error banner */}
 					{actionError && (
