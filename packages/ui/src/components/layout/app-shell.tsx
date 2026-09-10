@@ -104,7 +104,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 						>
 							<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
 						</a>
-						<ThemeToggle />
+						<ThemeToggle aria-label="Toggle theme" />
 					</div>
 				</header>
 
