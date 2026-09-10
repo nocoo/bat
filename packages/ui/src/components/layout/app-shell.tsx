@@ -85,21 +85,24 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 			)}
 
 			<AppMain>
-				<header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
-					<div className="flex items-center gap-3">
+				<header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-6">
+					<div className="flex min-w-0 flex-1 items-center gap-3">
 						{showHamburger && (
 							<button
 								type="button"
 								onClick={() => setMobileOpen(true)}
 								aria-label="Open navigation menu"
-								className={`flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
+								className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
 							>
 								<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
 							</button>
 						)}
-						<Breadcrumbs items={[{ label: "Home", href: "/" }, ...breadcrumbs]} />
+						<Breadcrumbs
+							items={[{ label: "Home", href: "/" }, ...breadcrumbs]}
+							className="min-w-0"
+						/>
 					</div>
-					<div className="flex items-center gap-1">
+					<div className="flex shrink-0 items-center gap-1">
 						<a
 							href="https://github.com/nocoo/bat"
 							target="_blank"

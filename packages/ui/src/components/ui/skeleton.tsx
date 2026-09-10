@@ -7,7 +7,7 @@ function Skeleton({ className, style, ...props }: React.ComponentProps<"div">) {
 	return (
 		<SkeletonLine
 			className={cn("w-full h-full", className)}
-			style={{ width: "auto", ...style }}
+			style={{ width: undefined, ...style }}
 			{...props}
 		/>
 	);

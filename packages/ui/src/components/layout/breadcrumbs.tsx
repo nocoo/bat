@@ -5,7 +5,7 @@ import {
 
 export function Breadcrumbs({ items, className }: BasaltBreadcrumbsProps) {
 	return (
-		<nav aria-label="Breadcrumb navigation" className="inline-flex items-center">
+		<nav aria-label="Breadcrumb navigation" className="inline-flex min-w-0 items-center">
 			<BasaltBreadcrumbs items={items} className={className} />
 		</nav>
 	);
