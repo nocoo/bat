@@ -6,6 +6,7 @@
 		"rules": {
 			"preset": "recommended",
 			"correctness": {
+				"noInvalidPositionAtImportRule": "off",
 				"noUnusedImports": "error",
 				"noUnusedVariables": "error",
 				"noNodejsModules": "off",
