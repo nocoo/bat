@@ -1,4 +1,5 @@
 import type { WebhookConfig } from "@bat/shared";
+import { Button } from "@nocoo/basalt";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -121,13 +122,9 @@ export function WebhooksPage() {
 										</option>
 									))}
 								</select>
-								<button
-									type="submit"
-									disabled={creating || !selectedHostId}
-									className="h-8 px-3 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
-								>
+								<Button type="submit" size="sm" disabled={creating || !selectedHostId}>
 									{creating ? "Creating..." : "Generate"}
-								</button>
+								</Button>
 							</form>
 						</CardContent>
 					</Card>
