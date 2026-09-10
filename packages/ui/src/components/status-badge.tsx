@@ -20,7 +20,11 @@ export function StatusBadge({ status }: { status: HostStatus }) {
 	return (
 		<Badge
 			variant={config.variant}
-			className={status === "maintenance" ? "text-basalt-foreground font-semibold" : undefined}
+			className={
+				status === "maintenance"
+					? "!bg-purple !text-purple-foreground dark:!bg-purple dark:!text-purple-foreground font-medium"
+					: undefined
+			}
 			data-testid="status-badge"
 		>
 			{config.label}
