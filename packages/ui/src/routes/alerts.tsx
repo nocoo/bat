@@ -96,7 +96,7 @@ export function AlertsPage() {
 				</div>
 			) : (
 				<Card>
-					<CardContent className="py-2">
+					<CardContent className="py-2 overflow-x-auto">
 						<AlertTable alerts={alerts} />
 					</CardContent>
 				</Card>

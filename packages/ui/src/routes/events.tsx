@@ -92,7 +92,7 @@ export function EventsPage() {
 			) : (
 				<div className="space-y-4">
 					<Card>
-						<CardContent className="py-2">
+						<CardContent className="py-2 overflow-x-auto">
 							<EventTable events={events} />
 						</CardContent>
 					</Card>
