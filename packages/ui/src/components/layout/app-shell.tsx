@@ -6,7 +6,6 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@nocoo/basalt";
-import { AppHeader } from "@nocoo/basalt/components/app-header";
 import {
 	AppMain,
 	AppSkipLink,
@@ -17,6 +16,7 @@ import { useEffect } from "react";
 import { useLocation } from "react-router";
 import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Breadcrumbs } from "./breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { ThemeToggle } from "./theme-toggle";
@@ -85,10 +85,9 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 			)}
 
 			<AppMain>
-				<AppHeader
-					aria-label="Breadcrumb navigation"
-					leading={
-						showHamburger ? (
+				<header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
+					<div className="flex items-center gap-3">
+						{showHamburger && (
 							<button
 								type="button"
 								onClick={() => setMobileOpen(true)}
@@ -97,31 +96,22 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 							>
 								<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
 							</button>
-						) : null
-					}
-					actions={
-						<div className="flex items-center gap-1">
-							<a
-								href="https://github.com/nocoo/bat"
-								target="_blank"
-								rel="noopener noreferrer"
-								aria-label="GitHub repository"
-								className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-							>
-								<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
-							</a>
-							<ThemeToggle aria-label="Toggle theme" />
-						</div>
-					}
-					breadcrumbs={
-						breadcrumbs.length > 1
-							? [{ label: "Home", href: "/" }, ...breadcrumbs.slice(0, -1)]
-							: breadcrumbs[0]?.href
-								? [{ label: "Home", href: "/" }]
-								: [{ label: "Home", href: "/" }]
-					}
-					title={breadcrumbs.length > 0 ? (breadcrumbs[breadcrumbs.length - 1]?.label ?? "") : ""}
-				/>
+						)}
+						<Breadcrumbs items={[{ label: "Home", href: "/" }, ...breadcrumbs]} />
+					</div>
+					<div className="flex items-center gap-1">
+						<a
+							href="https://github.com/nocoo/bat"
+							target="_blank"
+							rel="noopener noreferrer"
+							aria-label="GitHub repository"
+							className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+						>
+							<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
+						</a>
+						<ThemeToggle aria-label="Toggle theme" />
+					</div>
+				</header>
 
 				{/* Floating island content area */}
 				<div className="flex min-h-0 flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
