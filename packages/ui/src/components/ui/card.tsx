@@ -1,15 +1,13 @@
+import { LayerCard } from "@nocoo/basalt";
 import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 function Card({ className, ...props }: React.ComponentProps<"div">) {
 	return (
-		<div
-			data-slot="card"
-			className={cn(
-				"bg-secondary text-card-foreground flex flex-col gap-4 rounded-card py-4",
-				className,
-			)}
+		<LayerCard
+			className={cn("text-card-foreground flex flex-col gap-4 py-4", className)}
+			padding="none"
 			{...props}
 		/>
 	);
