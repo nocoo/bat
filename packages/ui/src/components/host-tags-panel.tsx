@@ -106,7 +106,7 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	}, [suggestions, affordance, attachTag, createAndAttach]);
 
 	return (
-		<Card>
+		<Card className="overflow-visible">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-base">
 					<Tags className="h-4 w-4" />
