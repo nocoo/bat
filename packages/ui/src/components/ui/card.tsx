@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 function Card({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<LayerCard
-			className={cn("text-card-foreground flex flex-col gap-4 py-4", className)}
+			className={cn("text-card-foreground flex flex-col gap-4 py-4 overflow-visible", className)}
 			padding="none"
 			{...props}
 		/>
