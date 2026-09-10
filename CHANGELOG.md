@@ -1,5 +1,136 @@
 # Changelog
 
+## v2.2.0
+
+### Added
+- Add standardized PageHeader title and subtitle across all pages
+- Add ThemeProvider, AccentProvider, and LinkProvider to App
+- Adopt bat family identity
+
+### Changed
+- Add rich 32-host seed dataset and seed script for local development
+- Delegate Skeleton to @nocoo/basalt SkeletonLine
+- Use Basalt LayerCard in chart containers and host detail skeletons
+- Use Basalt Button in Webhooks page
+- Use Basalt Input in Tags page
+- Use PageHeader in Webhooks, Data Retention, and Setup pages
+- Wrap Card with @nocoo/basalt LayerCard
+- Migrate AppShell to @nocoo/basalt AppShell, AppMain, AppHeader, ContentIsland
+- Delegate Breadcrumbs to @nocoo/basalt
+- Migrate Sidebar to @nocoo/basalt components
+- Delegate ThemeToggle to @nocoo/basalt
+- Add @nocoo/basalt 2.1.2
+- Align workers types with wrangler
+- Bump wrangler to 4.130.0
+- Update @types/bun to 1.4.2
+- Refresh bilingual project documentation
+- Update @types/node to 26.5.0
+- Bump wrangler to 4.129.1
+- Bump hono 4.13.5 → 4.13.7 (STU-5058)
+- Bump workers-types to 5.20260907.1
+- Bump lucide-react to 1.42.0
+- Bump workers-types to 5.20260906.1
+- Upgrade lint-staged to 17.5.0
+- Bump jose 6.2.11 → 6.2.12 (STU-5207)
+- Bump @cloudflare/workers-types to 5.20260905.1
+- Bump @playwright/test to 1.63.0
+- Bump jose 6.2.10 → 6.2.11 (STU-5059)
+- Upgrade @types/bun to 1.4.1
+- Bump wrangler to 4.129.0
+- Upgrade postcss to 8.5.28
+- Upgrade lucide-react to 1.40.0
+- Upgrade happy-dom to 20.14.0
+- Upgrade Vitest coverage to 5.0.0
+- Bump @types/react-dom to 19.2.7
+- Bump workers types to 5.20260903.1
+- Bump biome to 2.5.12
+- Restore wrangler 4.128.0
+- Bump workers types to 5.20260901.1
+- Bump @types/node to 26.4.1
+- Bump happy-dom to 20.12.2
+- Bump lucide-react to 1.39.0
+- Bump wrangler to 4.128.0
+- Upgrade biome to 2.5.11
+- Bump lucide-react to 1.38.0
+- Bump @testing-library/react to 16.3.3
+- Bump workers types to 5.20260831.1
+- Embed probe unit in install steps
+- Add full probe install steps
+- Point wrangler config at real file
+- Wrangler 37025 is worker dev
+- Note e2e migrations auto-discover
+- Align edge runbook with vite and cd
+- Make architecture deploy cd-only
+- Install probe binary not missing script
+- Fix install deploy and stale counts
+- Pin current docs env and coverage
+- Import accidents from nested claude file
+- Align readme l1 coverage triggers
+- Correct ui and rust coverage facts
+- Replace stale next and railway readme
+- Add claude agent handbook
+- Add Retrospective.md for accident routing
+- Bump wrangler to 4.127.1
+- Upgrade lint-staged to 17.4.1
+- Bump react-router to 8.3.1
+- Bump workers types to 5.20260830.1
+- Bump hono 4.13.4 → 4.13.5 (STU-4507)
+- Bump turbo 2.10.11 → 2.10.12 (STU-4512)
+- Bump @types/node 26.3.0 → 26.4.0 (STU-4509)
+- Bump happy-dom to 20.12.0
+- Bump picomatch 4.0.5 → 4.0.7 (STU-4354)
+- Bump lucide-react 1.33.0 → 1.34.0 (STU-4355) (#390)
+- Bump @types/node 26.2.0 → 26.3.0 (STU-4357) (#389)
+- Bump hono 4.13.3 → 4.13.4 (STU-4356)
+- @types/react-dom 19.2.4 → 19.2.5
+- Pin local worker to port 37025
+- Record release coverage pitfalls
+- Bump @cloudflare/workers-types 5.20260822.1 → 5.20260823.1 (STU-4231)
+- Bump jose 6.2.9 → 6.2.10 (STU-4154) (#379)
+- Bump @biomejs/biome 2.5.9 → 2.5.10 (STU-4156) (#378)
+- Bump @cloudflare/workers-types 5.20260821.1 → 5.20260822.1 (STU-4155) (#377)
+- Bump @types/bun 1.3.14 → 1.4.0 (STU-4032)
+- Bump @cloudflare/workers-types 5.20260819.1 → 5.20260821.1 (STU-4033)
+- Bump wrangler 4.124.0 → 4.125.0 (STU-4031)
+- Bump happy-dom 20.11.2 → 20.11.6 (STU-3931)
+- Bump lucide-react 1.32.0 → 1.33.0 (STU-3930)
+- Bump @cloudflare/workers-types 5.20260818.1 → 5.20260819.1 (STU-3756) (#361)
+- Bump hono 4.13.2 → 4.13.3 (STU-3753)
+- Bump turbo 2.10.10 → 2.10.11 (STU-3751) (#359)
+- Bump wrangler 4.123.0 → 4.124.0 (STU-3749) (#358)
+- Bump lucide-react 1.31.0 → 1.32.0 (STU-3752)
+- STU-3750: bump vitest 4.1.10 → 4.1.11 (#356)
+- Bump @cloudflare/workers-types 5.20260817.1 → 5.20260818.1 (STU-3684)
+- Bump turbo 2.10.9 → 2.10.10 (STU-3590) (#346)
+- Bump jose 6.2.8 → 6.2.9 (STU-3642)
+- Bump @cloudflare/workers-types 5.20260814.1 → 5.20260817.1 (STU-3667) (#343)
+- Bump @biomejs/biome 2.5.8 → 2.5.9 (STU-3683)
+
+### Fixed
+- Use semantic purple token with WCAG contrast for maintenance status badge
+- Ensure readable contrast for maintenance status badge text
+- Preserve prod target and secure TLS verification default in vite proxy
+- Proxy to local worker dev or target with Access fallback
+- Preserve visible overflow on Card wrapper for overflowing content
+- Clear skeleton inline width, constrain breadcrumbs, and allow webhook select to shrink
+- Use asChild on sidebar CollapsibleTrigger and preserve overflow on AllowedPortsPanel
+- Preserve caller width styling in Skeleton wrapper over Basalt SkeletonLine
+- Add horizontal scrolling for migrated AlertTable and EventTable containers
+- Preserve visible overflow on HostTagsPanel card for suggestions dropdown
+- Keep breadcrumbs in AppShell header without generating duplicate h1 headings
+- Import @nocoo/basalt/styles/tailwind and register @source in index.css
+- Upgrade lucide-react to 1.43.0
+- Upgrade sharp to 0.35.4
+- Silence Wrangler access logs in L3
+- Revert wrangler to 4.127.1
+- Prevent L3 wrangler EPIPE under Playwright pipe
+- Restore jose caret range ^6.2.9 (STU-3642)
+
+### Removed
+- Migrate common controls (Badge, Button, Table) to @nocoo/basalt and remove local shims
+- Drop one-click install claims
+- Remove conflicting nested claude handbook
+
 ## v2.1.1
 
 ### Added
