@@ -1,4 +1,5 @@
 import { type AlertItem, hashHostId } from "@bat/shared";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import {
 	Table,
 	TableBody,
@@ -89,17 +90,29 @@ export function AlertsPage() {
 					<p className="mt-2 text-sm">{error.message}</p>
 				</div>
 			) : !alerts || alerts.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-					<Bell className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">No active alerts</h2>
-					<p className="mt-2 text-sm">All systems are running normally.</p>
+				<div className="space-y-4">
+					<PageHeader
+						title="Alerts"
+						description="Active alerts and incident notifications across your fleet."
+					/>
+					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+						<Bell className="h-12 w-12 mb-4" strokeWidth={1} />
+						<h2 className="text-lg font-semibold text-foreground">No active alerts</h2>
+						<p className="mt-2 text-sm">All systems are running normally.</p>
+					</div>
 				</div>
 			) : (
-				<Card>
-					<CardContent className="py-2 overflow-x-auto">
-						<AlertTable alerts={alerts} />
-					</CardContent>
-				</Card>
+				<div className="space-y-4">
+					<PageHeader
+						title="Alerts"
+						description="Active alerts and incident notifications across your fleet."
+					/>
+					<Card>
+						<CardContent className="py-2 overflow-x-auto">
+							<AlertTable alerts={alerts} />
+						</CardContent>
+					</Card>
+				</div>
 			)}
 		</AppShell>
 	);

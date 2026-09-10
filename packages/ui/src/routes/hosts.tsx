@@ -1,4 +1,5 @@
 import type { HostOverviewItem } from "@bat/shared";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -126,23 +127,29 @@ export function HostsPage() {
 			) : !hosts || hosts.length === 0 ? (
 				<HostsEmpty />
 			) : (
-				<div className="space-y-3">
-					<div className="flex items-center justify-between gap-3 flex-wrap">
-						{showFilterBar && (
-							<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
-						)}
-						<select
-							value={sortKey}
-							onChange={(e) => setSortKey(e.target.value as SortKey)}
-							className="ml-auto rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
-						>
-							{SORT_OPTIONS.map((opt) => (
-								<option key={opt.value} value={opt.value}>
-									{opt.label}
-								</option>
-							))}
-						</select>
-					</div>
+				<div className="space-y-6">
+					<PageHeader
+						title="Hosts"
+						description="Monitored servers and real-time infrastructure status."
+						actions={
+							<select
+								value={sortKey}
+								onChange={(e) => setSortKey(e.target.value as SortKey)}
+								className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
+							>
+								{SORT_OPTIONS.map((opt) => (
+									<option key={opt.value} value={opt.value}>
+										{opt.label}
+									</option>
+								))}
+							</select>
+						}
+						filters={
+							showFilterBar ? (
+								<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
+							) : null
+						}
+					/>
 					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 						{filteredHosts.map((host, index) => (
 							<div

@@ -1,5 +1,6 @@
 import { type EventItem, hashHostId } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import {
 	Table,
 	TableBody,
@@ -84,13 +85,25 @@ export function EventsPage() {
 					<p className="mt-2 text-sm">{error.message}</p>
 				</div>
 			) : !events || events.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-					<ScrollText className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">No events yet</h2>
-					<p className="mt-2 text-sm">Events will appear here when hosts send webhook payloads.</p>
+				<div className="space-y-4">
+					<PageHeader
+						title="Events"
+						description="Audit timeline of webhook triggers, deployments, and host events."
+					/>
+					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+						<ScrollText className="h-12 w-12 mb-4" strokeWidth={1} />
+						<h2 className="text-lg font-semibold text-foreground">No events yet</h2>
+						<p className="mt-2 text-sm">
+							Events will appear here when hosts send webhook payloads.
+						</p>
+					</div>
 				</div>
 			) : (
 				<div className="space-y-4">
+					<PageHeader
+						title="Events"
+						description="Audit timeline of webhook triggers, deployments, and host events."
+					/>
 					<Card>
 						<CardContent className="py-2 overflow-x-auto">
 							<EventTable events={events} />

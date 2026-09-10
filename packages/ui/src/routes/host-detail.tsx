@@ -1,4 +1,5 @@
 import { hashHostId } from "@bat/shared";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Info } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { useParams } from "react-router";
@@ -170,13 +171,22 @@ export function HostDetailPage() {
 		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
 			<div className="space-y-6">
 				{/* Header */}
-				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-					<div className="flex items-center gap-3">
-						<h1 className="text-2xl font-bold">{host?.hostname ?? hid}</h1>
-						{host && <StatusBadge status={host.status} />}
-					</div>
-					<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />
-				</div>
+				<PageHeader
+					title={host?.hostname ?? hid}
+					description={
+						host ? (
+							<span className="inline-flex items-center gap-2 mt-1">
+								<StatusBadge status={host.status} />
+								<span className="text-sm text-basalt-muted-foreground">
+									Real-time metrics, system specifications, and services.
+								</span>
+							</span>
+						) : (
+							"Real-time metrics, system specifications, and services."
+						)
+					}
+					actions={<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />}
+				/>
 				{detail && (
 					<DescriptionEditor
 						hid={hid}

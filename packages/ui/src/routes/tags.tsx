@@ -1,5 +1,6 @@
 import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
 import { Badge, Button, Input } from "@nocoo/basalt";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
@@ -95,6 +96,11 @@ export function TagsPage() {
 				</div>
 			) : (
 				<div className="space-y-4">
+					<PageHeader
+						title="Tags"
+						description="Labels and categorization rules for grouping monitored hosts."
+					/>
+
 					{/* Create new tag */}
 					<Card>
 						<CardContent className="py-3">
