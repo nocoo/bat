@@ -1,5 +1,5 @@
 import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
-import { Badge, Button } from "@nocoo/basalt";
+import { Badge, Button, Input } from "@nocoo/basalt";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
@@ -106,11 +106,12 @@ export function TagsPage() {
 								}}
 							>
 								<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-								<input
+								<Input
 									placeholder="New tag name…"
 									value={newName}
 									onChange={(e) => setNewName(e.target.value)}
-									className="h-8 text-sm flex-1 rounded-md border border-border bg-background px-3 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+									size="sm"
+									className="flex-1"
 									maxLength={32}
 								/>
 								<Button
@@ -202,10 +203,11 @@ function TagRow({
 							onRename();
 						}}
 					>
-						<input
+						<Input
 							value={editName}
 							onChange={(e) => onEditNameChange(e.target.value)}
-							className="h-7 text-sm w-40 rounded-md border border-border bg-background px-2 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							size="sm"
+							className="w-40"
 							maxLength={32}
 						/>
 						<Button type="submit" size="sm" variant="ghost" className="h-7 text-xs">
