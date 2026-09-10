@@ -1,16 +1,22 @@
-import { Menu } from "lucide-react";
-import { useEffect } from "react";
-import { useLocation } from "react-router";
-import { Github } from "@/components/icons/github";
 import {
+	ContentIsland,
 	Sheet,
 	SheetContent,
 	SheetDescription,
 	SheetHeader,
 	SheetTitle,
-} from "@/components/ui/sheet";
+} from "@nocoo/basalt";
+import { AppHeader } from "@nocoo/basalt/components/app-header";
+import {
+	AppMain,
+	AppSkipLink,
+	AppShell as BasaltAppShell,
+} from "@nocoo/basalt/components/app-shell";
+import { Menu } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation } from "react-router";
+import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Breadcrumbs } from "./breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { ThemeToggle } from "./theme-toggle";
@@ -54,7 +60,8 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 	const showHamburger = resolved ? isMobile : true;
 
 	return (
-		<div className="flex min-h-screen w-full bg-background">
+		<BasaltAppShell>
+			<AppSkipLink>Skip to main content</AppSkipLink>
 			{/* Desktop sidebar — CSS-hidden on mobile before JS resolves */}
 			{showDesktopSidebar && (
 				<div className={resolved ? undefined : "hidden md:contents"}>
@@ -66,8 +73,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 				<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
 					<SheetContent
 						side="left"
-						className="w-[260px] p-0 sm:max-w-[260px]"
-						showCloseButton={false}
+						className="w-[260px] max-w-[260px] border-0 bg-basalt-background p-0"
 					>
 						<SheetHeader className="sr-only">
 							<SheetTitle>Navigation Menu</SheetTitle>
@@ -78,11 +84,11 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 				</Sheet>
 			)}
 
-			<main className="flex flex-1 flex-col min-h-screen min-w-0">
-				{/* Header — no border, matching basalt */}
-				<header className="flex h-14 shrink-0 items-center justify-between px-4 md:px-6">
-					<div className="flex items-center gap-3">
-						{showHamburger && (
+			<AppMain>
+				<AppHeader
+					aria-label="Breadcrumb navigation"
+					leading={
+						showHamburger ? (
 							<button
 								type="button"
 								onClick={() => setMobileOpen(true)}
@@ -91,31 +97,38 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 							>
 								<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
 							</button>
-						)}
-						<Breadcrumbs items={[{ label: "Home", href: "/" }, ...breadcrumbs]} />
-					</div>
-					<div className="flex items-center gap-1">
-						<a
-							href="https://github.com/nocoo/bat"
-							target="_blank"
-							rel="noopener noreferrer"
-							aria-label="GitHub repository"
-							className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-						>
-							<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
-						</a>
-						<ThemeToggle aria-label="Toggle theme" />
-					</div>
-				</header>
+						) : null
+					}
+					actions={
+						<div className="flex items-center gap-1">
+							<a
+								href="https://github.com/nocoo/bat"
+								target="_blank"
+								rel="noopener noreferrer"
+								aria-label="GitHub repository"
+								className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+							>
+								<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
+							</a>
+							<ThemeToggle aria-label="Toggle theme" />
+						</div>
+					}
+					breadcrumbs={
+						breadcrumbs.length > 1
+							? [{ label: "Home", href: "/" }, ...breadcrumbs.slice(0, -1)]
+							: breadcrumbs[0]?.href
+								? [{ label: "Home", href: "/" }]
+								: [{ label: "Home", href: "/" }]
+					}
+					title={breadcrumbs.length > 0 ? (breadcrumbs[breadcrumbs.length - 1]?.label ?? "") : ""}
+				/>
 
 				{/* Floating island content area */}
-				<div className="flex-1 px-2 pb-2 md:px-3 md:pb-3">
-					<div className="h-full rounded-[16px] md:rounded-[20px] bg-card p-3 md:p-5 overflow-y-auto">
-						{children}
-					</div>
+				<div className="flex min-h-0 flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
+					<ContentIsland>{children}</ContentIsland>
 				</div>
-			</main>
-		</div>
+			</AppMain>
+		</BasaltAppShell>
 	);
 }
 
