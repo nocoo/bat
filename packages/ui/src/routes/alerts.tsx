@@ -1,9 +1,4 @@
 import { type AlertItem, hashHostId } from "@bat/shared";
-import { AlertTriangle, Bell } from "lucide-react";
-import { Link } from "react-router";
-import { AppShell } from "@/components/layout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
 	TableBody,
@@ -11,7 +6,12 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@nocoo/basalt/components/table";
+import { AlertTriangle, Bell } from "lucide-react";
+import { Link } from "react-router";
+import { AppShell } from "@/components/layout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
 

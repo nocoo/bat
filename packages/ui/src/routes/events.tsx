@@ -1,11 +1,5 @@
 import { type EventItem, hashHostId } from "@bat/shared";
-import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
-import { useState } from "react";
-import { Link } from "react-router";
-import { AppShell } from "@/components/layout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@nocoo/basalt";
 import {
 	Table,
 	TableBody,
@@ -13,7 +7,13 @@ import {
 	TableHead,
 	TableHeader,
 	TableRow,
-} from "@/components/ui/table";
+} from "@nocoo/basalt/components/table";
+import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { useState } from "react";
+import { Link } from "react-router";
+import { AppShell } from "@/components/layout";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EVENTS_PAGE_SIZE, useEvents, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
 

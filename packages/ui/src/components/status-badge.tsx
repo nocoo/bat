@@ -1,5 +1,5 @@
 import type { HostStatus } from "@bat/shared";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@nocoo/basalt";
 
 const STATUS_CONFIG: Record<
 	HostStatus,
