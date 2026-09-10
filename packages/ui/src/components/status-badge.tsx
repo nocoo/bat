@@ -18,7 +18,11 @@ const STATUS_CONFIG: Record<
 export function StatusBadge({ status }: { status: HostStatus }) {
 	const config = STATUS_CONFIG[status];
 	return (
-		<Badge variant={config.variant} data-testid="status-badge">
+		<Badge
+			variant={config.variant}
+			className={status === "maintenance" ? "text-basalt-foreground font-semibold" : undefined}
+			data-testid="status-badge"
+		>
 			{config.label}
 		</Badge>
 	);
