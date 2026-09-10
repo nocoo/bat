@@ -19,17 +19,17 @@ export default defineConfig(({ mode }) => {
 		server: {
 			port: 7025,
 			allowedHosts: ["bat.dev.hexly.ai"],
-			// Proxy /api/* to the prod browser entry so local dev sees real data.
-			// Cloudflare Access service-token headers come from .env.local;
-			// without them prod returns the Access login HTML.
+			// Proxy /api/* to local worker dev (or prod if target configured)
 			proxy: {
 				"/api": {
-					target: "https://bat.hexly.ai",
+					target: env.VITE_API_TARGET || "http://127.0.0.1:37025",
 					changeOrigin: true,
-					secure: true,
+					secure: false,
 					headers: {
-						"CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID ?? "",
-						"CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET ?? "",
+						...(env.CF_ACCESS_CLIENT_ID ? { "CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID } : {}),
+						...(env.CF_ACCESS_CLIENT_SECRET
+							? { "CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET }
+							: {}),
 					},
 				},
 			},
