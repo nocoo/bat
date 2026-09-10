@@ -125,7 +125,7 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 			: [];
 
 	return (
-		<Card>
+		<Card className="overflow-visible">
 			<CardHeader>
 				<CardTitle className="flex items-center gap-2 text-base">
 					<Shield className="h-4 w-4" />

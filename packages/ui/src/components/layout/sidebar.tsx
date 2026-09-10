@@ -91,17 +91,22 @@ function NavGroupSection({
 	return (
 		<Collapsible open={open} onOpenChange={setOpen}>
 			{/* Group header */}
-			<CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2.5">
-				<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
-					{group.label}
-				</span>
-				<ChevronUp
-					className={cn(
-						"h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
-						!open && "rotate-180",
-					)}
-					strokeWidth={1.5}
-				/>
+			<CollapsibleTrigger asChild>
+				<button
+					type="button"
+					className="flex w-full items-center justify-between px-3 py-2.5 cursor-pointer text-left"
+				>
+					<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
+						{group.label}
+					</span>
+					<ChevronUp
+						className={cn(
+							"h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
+							!open && "rotate-180",
+						)}
+						strokeWidth={1.5}
+					/>
+				</button>
 			</CollapsibleTrigger>
 
 			{/* Animated group content */}
