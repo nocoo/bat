@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { createD1Repositories } from "./adapters/d1/factory.js";
 import { isConnectPath, isVersionedPath } from "./domain/connect.js";
+import { errorCategory } from "./lib/error-category.js";
 import { accessAuth } from "./middleware/access-auth.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
 import {
@@ -135,6 +136,7 @@ app.use("/api/*", (c, next) =>
 );
 
 app.onError((error, c) => {
+	if (c.env?.ENVIRONMENT === "development") c.header("X-Bat-Diagnostic", errorCategory(error));
 	if (isConnectPath(c.req.path)) return connectError(c, error);
 	// Never log request bodies, authorization headers or exception SQL bindings.
 	return c.json({ error: "Internal server error" }, 500);

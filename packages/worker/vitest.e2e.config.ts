@@ -8,6 +8,7 @@ export default defineConfig({
 		hookTimeout: 120_000,
 		// Boot one wrangler dev for the whole run; per-route test files share it.
 		globalSetup: ["./test/e2e/global-setup.ts"],
+		setupFiles: ["./test/e2e/diagnostics.ts"],
 		// Run files sequentially so per-route D1 mutations don't race each other
 		// (single shared --persist-to dir). Each file uses file-prefixed host IDs
 		// so parallel-safety is not strictly required, but sequential is simpler
