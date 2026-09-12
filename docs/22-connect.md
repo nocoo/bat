@@ -148,6 +148,15 @@ Agent instructions: discover capabilities and the OpenAPI contract first; operat
 
 Cloudflare Access evaluates before the Worker. A valid Connect Bearer header alone cannot pass an interactive Access login application. The browser application must retain its existing Allow/Service Auth rules and JWT audience. Only the precise machine paths `bat.hexly.ai/api/v1` and `bat.hexly.ai/api/v1/*` receive an Access **Bypass** policy, so those requests reach the Worker's compulsory Connect authentication. The wildcard does not cover the exact parent. Do not bypass `/api/*`, `/connect`, `/api/connect/*`, `/api/auth/*` or the root hostname.
 
+The existing production controls were verified through an authenticated, read-only browser export on 2026-09-12. Preserve these when adding the two Connect paths:
+
+| Application | Existing path coverage | Policies |
+|---|---|---|
+| `bat-auth` (`1ee43cb7-95a4-4ab6-9fa3-f756824fb605`) | `bat.hexly.ai`, including `/connect` and `/api/connect/*` | `Allow Authorized Users`: Allow for the configured email, 168-hour session; `Service-Auth`: Service Auth (`non_identity`) for three specific service tokens |
+| `shared-bypass` (`2950f1fa-7c5d-4a77-a007-09cc57c3e576`) | `*.hexly.ai/api/live`, including the explicit `bat.hexly.ai/api/live` destination | `Bypass`: Everyone; this shared application also serves other projects, so preserve its other destinations |
+
+The browser audience is `f9289df18aed3f2a3f08ada1587c2a5fde199934b873c2026a94bf68863bdcd0`. These are legacy zone-scoped Access applications under zone `c64f1264b07d306e9ec8810cbec9f60f`; an empty account-scoped application listing does not mean the browser is unprotected. Verify access to the zone application/policy endpoints before attempting changes. Browser read access alone does not establish that an API credential can edit those policies.
+
 The independent machine domain `bat-ingest.worker.hexly.ai` also accepts `/api/v1` through the same Bearer validation; its whitelist rejects Connect management and SPA paths. Existing probe, event webhook and monitoring authentication stay separate. `GET /api/live` remains public. `run_worker_first=true` ensures the Worker verifies browser Access JWTs before serving SPA/assets, including the Connect UI.
 
 Production requires these existing secrets: `BAT_READ_KEY`, `BAT_WRITE_KEY`, `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`. New secret names are `CONNECT_TOKEN_KEYS` and `CONNECT_MANAGERS`. Variables are `ENVIRONMENT=production` and `CONNECT_DEPLOYMENT_ID=bat-production`. Bindings are `DB`, optional `BAT_KV`, `ASSETS`, `CONNECT_COORDINATOR` and `CONNECT_EDGE_LIMITER`. The first DO class migration is `connect-v1`; D1 migration `0028_connect.sql` adds credential/grant/audit/retry tables, host tag ownership and configuration revision triggers.
