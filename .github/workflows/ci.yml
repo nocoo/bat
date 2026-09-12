@@ -1,4 +1,3 @@
-# Bat CI — L1 + G1 + G2 via base-ci, L2 local wrangler E2E, L3 Playwright, Rust probe tests
 name: CI
 
 on:
@@ -9,120 +8,51 @@ on:
   workflow_dispatch:
 
 jobs:
-  # ─────────────────────────────────────────────────────
-  # L1 (Unit tests) + G1 (Typecheck + Lint) + G2 (Gitleaks + OSV)
-  # ─────────────────────────────────────────────────────
   quality:
-    uses: nocoo/base-ci/.github/workflows/bun-quality.yml@aec4adc1a817c56790d1698329ef9398a15a754a  # v2026.5
+    uses: nocoo/base-ci/.github/workflows/quality.yml@3d2e9e55fdd60aa756df454ded53ef6d06d6653f
     with:
-      bun-version: "1.3.11"
-      pre-command: "bash scripts/ci-pre-command.sh"
+      runtime-version: "1.3.11"
+      install-policy: "trusted"
+      prepare-command: "bash scripts/ci-pre-command.sh"
+      test-command: "bun run test:unit:coverage"
       osv-config: "osv-scanner.toml"
-      enable-l2: "false"
-      upload-coverage: "false"
     secrets: inherit
 
-  # ─────────────────────────────────────────────────────
-  # Coverage gates: structural route + page coverage
-  # Runs in PARALLEL — static analysis, no runtime needed.
-  # ─────────────────────────────────────────────────────
   coverage-gates:
     name: "Coverage Gates"
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@3d2e9e55fdd60aa756df454ded53ef6d06d6653f
+    with:
+      runtime-version: "1.3.11"
+      install-policy: "trusted"
+      timeout-minutes: 5
+      command: |
+        bun run gate:routes
+        bun run gate:pages
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - name: "G: Route coverage (L2)"
-        run: bun run gate:routes
-
-      - name: "G: Page coverage (L3)"
-        run: bun run gate:pages
-
-  # ─────────────────────────────────────────────────────
-  # L2: Worker E2E — local wrangler miniflare
-  # Runs in PARALLEL with quality for faster CI.
-  # No external secrets needed — uses local D1/miniflare.
-  # ─────────────────────────────────────────────────────
   l2-e2e:
     name: "L2 Worker E2E"
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@3d2e9e55fdd60aa756df454ded53ef6d06d6653f
+    with:
+      runtime-version: "1.3.11"
+      install-policy: "blocked"
+      timeout-minutes: 15
+      pre-command: "bun run build"
+      command: "bun turbo test:e2e --filter=@bat/worker"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Build shared
-        run: bun run build
-
-      - name: "L2: Worker E2E tests"
-        run: bun turbo test:e2e --filter=@bat/worker
-
-  # ─────────────────────────────────────────────────────
-  # L3: Playwright browser E2E
-  # Runs in PARALLEL with quality and L2 for faster CI.
-  # Tests UI flows against local Wrangler.
-  # ─────────────────────────────────────────────────────
   l3-playwright:
     name: "L3 Playwright E2E"
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    uses: nocoo/base-ci/.github/workflows/test-job.yml@3d2e9e55fdd60aa756df454ded53ef6d06d6653f
+    with:
+      runtime-version: "1.3.11"
+      install-policy: "blocked"
+      browser: "chromium"
+      browser-working-directory: "packages/ui"
+      timeout-minutes: 20
+      pre-command: "bun run build"
+      command: "bun run test:e2e:pw"
+      artifact-name: playwright-report
+      artifact-path: "packages/ui/playwright-report/"
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Build shared + UI
-        run: bun run build
-
-      - name: Install Playwright browsers
-        run: cd packages/ui && bunx playwright install chromium --with-deps
-
-      - name: "L3: Playwright E2E tests"
-        run: cd packages/ui && bunx playwright test
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: packages/ui/playwright-report/
-          retention-days: 7
-
-      - name: Upload wrangler L3 log
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: wrangler-l3-log
-          path: packages/worker/.wrangler/e2e-pw-wrangler.log
-          if-no-files-found: ignore
-          retention-days: 7
-
-  # ─────────────────────────────────────────────────────
-  # Rust Probe: cargo test + clippy
-  # Runs in PARALLEL with quality for faster CI.
-  # ─────────────────────────────────────────────────────
   probe:
     name: "Probe (Rust)"
     runs-on: ubuntu-latest
@@ -132,21 +62,18 @@ jobs:
         working-directory: probe
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: "probe -> target"
-
       - name: "L1: Probe unit tests"
         run: cargo test --all-features
-
       - name: "G1: Clippy lint"
         run: cargo clippy -- -D warnings
-
       - name: "G1: Format check"
         run: cargo fmt --check

@@ -1,9 +1,3 @@
-# Bat CD
-# - Tag push (v*.*.*) → deploy-tagged: strict version match (release.ts flow)
-# - CI green on main   → deploy-main:    continuous deploy of latest main
-# - workflow_dispatch  → deploy-tagged: manual redeploy of a specific tag
-# Probe binaries auto-built and uploaded to R2 on tag push.
-# VPS upgrade is still manual.
 name: Release
 
 on:
@@ -22,189 +16,42 @@ on:
         type: string
 
 jobs:
-  # ─────────────────────────────────────────────────────
-  # Tagged release: enforces tag == package.json version
-  # ─────────────────────────────────────────────────────
-  deploy-tagged:
-    name: Deploy Worker (tagged)
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
-    concurrency:
-      group: deploy-worker-production
-      cancel-in-progress: false
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag || github.ref }}
-
-      - name: Resolve version
-        id: ver
-        env:
-          INPUT_TAG: ${{ inputs.tag }}
-        run: |
-          TAG="${INPUT_TAG:-$GITHUB_REF_NAME}"
-          VERSION="${TAG#v}"
-          echo "tag=$TAG"          >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION"  >> "$GITHUB_OUTPUT"
-          PKG_VERSION=$(jq -r .version package.json)
-          if [ "$PKG_VERSION" != "$VERSION" ]; then
-            echo "❌ Tag $TAG does not match package.json version $PKG_VERSION" >&2
-            exit 1
-          fi
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Build shared + UI (into packages/worker/static)
-        run: bun run build
-
-      # D1 migration MUST run before wrangler deploy.
-      # CLAUDE.md retrospective: deploying Worker code that references new
-      # columns before migrating drops all probe ingest fleet-wide.
-      - name: Apply D1 migrations (production, remote)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/worker
-          command: d1 migrations apply bat-db --remote --env production
-
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/worker
-          command: deploy --env production
-
-      - name: Verify /api/live reports new version
-        run: |
-          set -e
-          EXPECTED="${{ steps.ver.outputs.version }}"
-          for i in 1 2 3 4 5 6; do
-            ACTUAL=$(curl -fsS https://bat-ingest.worker.hexly.ai/api/live | jq -r .version)
-            echo "attempt $i: live=$ACTUAL expected=$EXPECTED"
-            if [ "$ACTUAL" = "$EXPECTED" ]; then
-              echo "✅ Live version matches"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "❌ /api/live did not report $EXPECTED after 30s"
-          exit 1
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Bat Release ${{ steps.ver.outputs.tag }}"
-            echo ""
-            echo "- Trigger: tagged (\`${{ github.event_name }}\`)"
-            echo "- Worker: deployed to \`bat\` (production)"
-            echo "- D1: \`bat-db\` migrations applied"
-            echo "- Verify: https://bat-ingest.worker.hexly.ai/api/live"
-            echo "- Probe: binaries uploaded to R2 (see probe-release job)"
-            echo ""
-            echo "**VPS upgrade is still manual** — run the upgrade command in CLAUDE.md."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # ─────────────────────────────────────────────────────
-  # Continuous deploy: main push, gated by CI success
-  # ─────────────────────────────────────────────────────
-  deploy-main:
-    name: Deploy Worker (main)
+  deploy:
+    name: Deploy Worker
     if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.conclusion == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: production
-    concurrency:
-      group: deploy-worker-production
-      cancel-in-progress: false
-    steps:
-      - name: Checkout main HEAD that CI validated
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
+    uses: nocoo/base-ci/.github/workflows/deploy-worker.yml@3d2e9e55fdd60aa756df454ded53ef6d06d6653f
+    with:
+      expected-workflow-path: ".github/workflows/ci.yml"
+      expected-workflow-name: "CI"
+      source-run-id: ${{ github.event_name == 'workflow_run' && format('{0}', github.event.workflow_run.id) || '' }}
+      tag: ${{ github.event_name == 'push' && github.ref_name || inputs.tag || '' }}
+      package-version-match: ${{ github.event_name != 'workflow_run' }}
+      runtime-version: "1.3.11"
+      install-policy: "blocked"
+      build-command: "bun run build"
+      wrangler-version: "4.130.0"
+      wrangler-working-directory: "packages/worker"
+      d1-migrations: true
+      d1-command: "d1 migrations apply bat-db --remote --env production"
+      deploy-command: deploy --env production
+      environment: production
+      concurrency-group: deploy-worker-production
+      timeout-minutes: 15
+      verify-command: |
+        EXPECTED=$(jq -r .version package.json)
+        HTTP=$(curl -fsS -o /tmp/live.json -w "%{http_code}" https://bat-ingest.worker.hexly.ai/api/live || echo "000")
+        ACTUAL=$(jq -r .version /tmp/live.json 2>/dev/null || echo "?")
+        test "$HTTP" = "200" && test "$ACTUAL" = "$EXPECTED"
+      verify-retries: 6
+      verify-retry-seconds: 5
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Read package.json version
-        id: ver
-        run: |
-          VERSION=$(jq -r .version package.json)
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.11"
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile --ignore-scripts
-
-      - name: Build shared + UI (into packages/worker/static)
-        run: bun run build
-
-      # D1 migration MUST run before wrangler deploy.
-      - name: Apply D1 migrations (production, remote)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/worker
-          command: d1 migrations apply bat-db --remote --env production
-
-      - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: packages/worker
-          command: deploy --env production
-
-      - name: Verify /api/live reports new version
-        run: |
-          set -e
-          EXPECTED="${{ steps.ver.outputs.version }}"
-          for i in 1 2 3 4 5 6; do
-            HTTP=$(curl -fsS -o /tmp/live.json -w "%{http_code}" https://bat-ingest.worker.hexly.ai/api/live || echo "000")
-            ACTUAL=$(jq -r .version /tmp/live.json 2>/dev/null || echo "?")
-            echo "attempt $i: http=$HTTP version=$ACTUAL expected=$EXPECTED"
-            if [ "$ACTUAL" = "$EXPECTED" ]; then
-              echo "✅ Live version matches"
-              exit 0
-            fi
-            sleep 5
-          done
-          echo "❌ /api/live did not report $EXPECTED after 30s"
-          exit 1
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Bat Continuous Deploy"
-            echo ""
-            echo "- Trigger: main push (CI gated)"
-            echo "- SHA: \`${{ steps.ver.outputs.sha }}\`"
-            echo "- Version: \`${{ steps.ver.outputs.version }}\`"
-            echo "- D1: \`bat-db\` migrations applied"
-            echo "- Verify: https://bat-ingest.worker.hexly.ai/api/live"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-  # ─────────────────────────────────────────────────────
-  # Probe: build static musl binaries + upload to R2
-  # Runs on tag push only (same trigger as deploy-tagged).
-  # ─────────────────────────────────────────────────────
   probe-release:
     name: "Probe Release"
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -212,10 +59,21 @@ jobs:
     timeout-minutes: 30
     environment: production
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Resolve release source
+        id: source
+        uses: nocoo/base-ci/.github/actions/release-source@8cbdb970c3a38240289c1e152c40dd550ac62dba
         with:
-          ref: ${{ github.ref }}
+          github-token: ${{ github.token }}
+          expected-workflow-path: ".github/workflows/ci.yml"
+          expected-workflow-name: "CI"
+          tag: ${{ github.ref_name }}
+          package-version-match: true
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.source.outputs.target-sha }}
+          persist-credentials: false
 
       - name: Resolve version
         id: ver
@@ -264,48 +122,35 @@ jobs:
           file probe/out/bat-probe-linux-aarch64
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: probe-binaries
           path: probe/out/
           retention-days: 7
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Setup JS and frozen install
+        uses: nocoo/base-ci/.github/actions/setup-js@081cdf665b9c67f233abfcc9242ce0be76ce2bb4
         with:
-          bun-version: "1.3.11"
-
-      # Use the workspace's wrangler (packages/worker pins wrangler ^4) to upload
-      # via `bunx wrangler`. Avoids cloudflare/wrangler-action@v3, which probes
-      # `bun run wrangler` at repo root (no entrypoint there → fails).
-      - name: Install worker deps for wrangler CLI
-        working-directory: packages/worker
-        run: bun install --frozen-lockfile --ignore-scripts
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: "blocked"
 
       - name: Upload to R2 (versioned + latest)
-        working-directory: packages/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
+          WRANGLER="./node_modules/.bin/wrangler"
+          test -x "$WRANGLER"
+          reported=$("$WRANGLER" --version)
+          echo "$reported" | grep -q "4.130.0"
           for tier in "$VERSION" latest; do
             for f in bat-probe-linux-x86_64 bat-probe-linux-aarch64 \
                      bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256; do
               echo "→ zhe/apps/bat/$tier/$f"
-              bunx wrangler r2 object put "zhe/apps/bat/$tier/$f" \
-                --file "../../probe/out/$f" --remote
+              "$WRANGLER" r2 object put "zhe/apps/bat/$tier/$f" \
+                --file "probe/out/$f" --remote
             done
           done
-
-      - name: Summary
-        if: always()
-        run: |
-          {
-            echo "### Probe Release ${{ steps.ver.outputs.version }}"
-            echo ""
-            echo "- x86_64: \`bat-probe-linux-x86_64\` → R2"
-            echo "- aarch64: \`bat-probe-linux-aarch64\` → R2"
-            echo "- Checksums: SHA-256"
-            echo "- Install: \`curl -fsSL https://s.zhe.to/apps/bat/latest/bat-probe-linux-x86_64\`"
-          } >> "$GITHUB_STEP_SUMMARY"
