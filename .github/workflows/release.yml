@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Tag to deploy (e.g. v1.1.1)"
+        description: "Tag to deploy (e.g. v2.3.0), or connect-access-audit for a read-only production audit"
         required: true
         type: string
 
@@ -24,7 +24,7 @@ jobs:
     name: Deploy Worker
     if: >-
       github.event_name == 'push' ||
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && inputs.tag != 'connect-access-audit') ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success')
     uses: nocoo/base-ci/.github/workflows/deploy-worker.yml@ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f
@@ -55,6 +55,23 @@ jobs:
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  connect-access-audit:
+    name: Audit Connect Access
+    if: github.event_name == 'workflow_dispatch' && inputs.tag == 'connect-access-audit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+    steps:
+      - name: Checkout audit source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read Access and Worker metadata
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 scripts/connect-access-audit.py
 
   probe-release:
     name: "Probe Release"
