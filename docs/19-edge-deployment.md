@@ -6,6 +6,7 @@
 > - [02-architecture.md](./02-architecture.md) — System overview, monorepo structure
 > - [05-worker.md](./05-worker.md) — Worker routes and business logic
 > - [06-ui.md](./06-ui.md) — SPA build and UI architecture
+> - [22-connect.md](./22-connect.md) — Current Connect routing, full-asset Access verification, server grants, coordinator and deployment requirements. Its auth/asset rules supersede the original middleware and `run_worker_first` description below.
 
 ---
 

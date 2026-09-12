@@ -51,7 +51,7 @@ export function validateMaintenanceBody(body: unknown): MaintenanceBodyResult {
 
 /** GET /api/hosts/:id/maintenance */
 export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const idParam = c.req.param("id");
+	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
@@ -71,7 +71,7 @@ export async function maintenanceGetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 
 /** PUT /api/hosts/:id/maintenance */
 export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const idParam = c.req.param("id");
+	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {
@@ -100,7 +100,7 @@ export async function maintenanceSetRoute(c: Context<AppEnv, "/api/hosts/:id/mai
 
 /** DELETE /api/hosts/:id/maintenance */
 export async function maintenanceDeleteRoute(c: Context<AppEnv, "/api/hosts/:id/maintenance">) {
-	const idParam = c.req.param("id");
+	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	const host = await resolveHostRecord(c.var.repos.hosts, idParam);
 	if (!host) {

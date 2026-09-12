@@ -20,5 +20,5 @@ mkdir -p "$(dirname "$LOG_FILE")"
 
 # Suppress per-request logs: workerd can terminate with EPIPE while emitting
 # high-volume access logs during Playwright. Keep error output for diagnostics.
-exec bunx wrangler dev --log-level error --port 27025 --local --persist-to .wrangler/e2e-pw \
+exec bunx wrangler dev --log-level error --port 27025 --local --persist-to .wrangler/e2e-pw --env-file .wrangler/connect-e2e-pw.env \
 	>>"$LOG_FILE" 2>&1

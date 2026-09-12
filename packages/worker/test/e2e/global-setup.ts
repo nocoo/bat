@@ -25,7 +25,8 @@
 //      from leaking auth credentials into the loop.
 
 import { type ChildProcess, spawn } from "node:child_process";
-import { existsSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -33,7 +34,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKER_ROOT = join(__dirname, "../..");
 const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
-const DEV_VARS_PATH = join(WORKER_ROOT, ".dev.vars");
+const E2E_ENV_PATH = join(WORKER_ROOT, ".wrangler/connect-e2e.env");
 const MIGRATIONS_DIR = join(WORKER_ROOT, "migrations");
 const TEST_MARKER_SQL = join(__dirname, "fixtures/test_marker.sql");
 
@@ -43,7 +44,6 @@ const WRITE_KEY = "e2e-write-key";
 const READ_KEY = "e2e-read-key";
 
 let wranglerProc: ChildProcess | null = null;
-let devVarsExistedBefore = false;
 
 async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 	const deadline = Date.now() + timeoutMs;
@@ -109,8 +109,16 @@ function assertNoRemoteCloudflareEnv(): void {
 
 export async function setup(): Promise<void> {
 	assertNoRemoteCloudflareEnv();
-	devVarsExistedBefore = existsSync(DEV_VARS_PATH);
-	writeFileSync(DEV_VARS_PATH, `BAT_WRITE_KEY=${WRITE_KEY}\nBAT_READ_KEY=${READ_KEY}\n`);
+	mkdirSync(dirname(E2E_ENV_PATH), { recursive: true });
+	const keyring = JSON.stringify({
+		active: "test",
+		keys: { test: randomBytes(32).toString("base64url") },
+	});
+	writeFileSync(
+		E2E_ENV_PATH,
+		`BAT_WRITE_KEY=${WRITE_KEY}\nBAT_READ_KEY=${READ_KEY}\nCONNECT_TOKEN_KEYS='${keyring}'\n`,
+		{ mode: 0o600 },
+	);
 
 	if (existsSync(PERSIST_DIR)) {
 		rmSync(PERSIST_DIR, { recursive: true, force: true });
@@ -177,7 +185,19 @@ export async function setup(): Promise<void> {
 
 	wranglerProc = spawn(
 		"npx",
-		["wrangler", "dev", "--port", String(PORT), "--local", "--persist-to", ".wrangler/e2e"],
+		[
+			"wrangler",
+			"dev",
+			"--port",
+			String(PORT),
+			"--local",
+			"--persist-to",
+			".wrangler/e2e",
+			"--env-file",
+			E2E_ENV_PATH,
+			"--log-level",
+			"error",
+		],
 		{ cwd: WORKER_ROOT, stdio: "ignore" },
 	);
 
@@ -193,9 +213,7 @@ export async function teardown(): Promise<void> {
 		wranglerProc.kill();
 		wranglerProc = null;
 	}
-	if (!devVarsExistedBefore && existsSync(DEV_VARS_PATH)) {
-		rmSync(DEV_VARS_PATH);
-	}
+	rmSync(E2E_ENV_PATH, { force: true });
 	if (existsSync(PERSIST_DIR)) {
 		rmSync(PERSIST_DIR, { recursive: true, force: true });
 	}

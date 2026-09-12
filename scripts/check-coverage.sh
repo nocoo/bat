@@ -79,7 +79,12 @@ for pkg in shared worker ui; do
   pkg_dir="packages/${pkg}"
   filter="@bat/${pkg}"
 
-  output=$(cd "$pkg_dir" && npx vitest run --coverage 2>&1) || true
+  if ! output=$(cd "$pkg_dir" && npx vitest run --coverage 2>&1); then
+    echo "✘ ${filter}: unit tests or configured coverage thresholds failed"
+    echo "$output"
+    failed=1
+    continue
+  fi
   if ! check_ts_coverage "$filter" "$output"; then
     failed=1
   fi

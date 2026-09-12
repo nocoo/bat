@@ -8,7 +8,7 @@ import type { AppEnv } from "../types.js";
 const ALERTS_CACHE_TTL_SECONDS = 30;
 
 export async function alertsListRoute(c: Context<AppEnv>) {
-	const cacheEnabled = c.env.ENVIRONMENT === "production";
+	const cacheEnabled = c.env.ENVIRONMENT === "production" && !c.var.connectToken;
 	const cacheOpts = { route: "alerts", ttlSeconds: ALERTS_CACHE_TTL_SECONDS };
 	if (cacheEnabled) {
 		const cached = await tryReadCache(c.env.BAT_KV, c.req.raw, cacheOpts);

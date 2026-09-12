@@ -83,6 +83,7 @@
       "version": "2.2.0",
       "dependencies": {
         "@bat/shared": "workspace:*",
+        "@cfworker/json-schema": "4.1.1",
         "hono": "4.13.7",
         "jose": "^6.2.12",
       },
@@ -109,6 +110,7 @@
     "ws": "8.21.0",
   },
   "packages": {
+    "@cfworker/json-schema": ["@cfworker/json-schema@4.1.1", "", {}, "sha1-Sio5R+6fp7fCS+mBQigxuGdMO+Y="],
     "@babel/code-frame": ["@babel/code-frame@7.29.0", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.28.5", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-9NhCeYjq9+3uxgdtp20LSiJXJvN0FeCtNGpJxuMFZ1Kv3cWUNb6DOhJwUvcVCzKGR66cw4njwM6hrJLqgOwbcw=="],
 
     "@babel/helper-string-parser": ["@babel/helper-string-parser@7.29.7", "", {}, "sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw=="],

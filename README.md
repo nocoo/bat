@@ -21,6 +21,7 @@ Bat 面向需要照看多台 VPS 的个人或小团队。Rust 探针在 Linux �
 - 在主机列表与详情中查看历史趋势、告警、标签和事件，设置端口允许名单与每日 UTC 维护窗口。
 - 提供监控查询 API，可供 Uptime Kuma 等外部系统按主机或组读取健康状态；Webhook 接口接收外部脚本上报的事件。
 - 管理 agent、资产及两者的关联，记录 agent 心跳。CLI 提供对应的查询和管理命令。
+- 通过 Connect 为 Agent 创建绑定单台服务器的 read / write Bearer token，发现 `/api/v1` 能力与 OpenAPI 契约，安全查询或操作授权资源；支持重复查看、轮换、撤销与可选过期。
 - 每小时聚合并清理历史数据，保留期可选 1、7 或 30 天，默认 7 天；该设置同时作用于原始指标、小时聚合、扩展快照和事件。
 
 KV 是可选缓存，缺失或读取失败时回到 D1。告警由服务端规则评估；Webhook 是事件接收入口，仓库没有通用的告警消息推送渠道。
@@ -70,7 +71,7 @@ bun run dev
 
 ## 测试
 
-先在干净的独立 checkout 安装依赖并运行 `bun run build`，准备 Worker 的静态资源。API runner 会覆盖 `packages/worker/.dev.vars`，不会还原已有文件，因此不要直接在含个人开发配置的目录执行。
+先安装依赖并运行 `bun run build`，准备 Worker 的静态资源。API 与浏览器测试分别在 `.wrangler` 下生成独立测试 keyring，不会覆盖个人 `.dev.vars` 配置。
 
 ```bash
 bun run test
@@ -103,6 +104,7 @@ bun run test:e2e:pw
 - [探针安装、开发与发布](docs/21-development.md)
 - [架构与设计背景](docs/02-architecture.md)
 - [监控 API](docs/16-monitoring-api.md)
+- [Connect API、权限与安全部署](docs/22-connect.md)
 - [D1 / KV 调整](docs/20-d1-to-kv-migration.md)
 
 ## 许可证

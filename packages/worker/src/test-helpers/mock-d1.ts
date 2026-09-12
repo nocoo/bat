@@ -146,6 +146,26 @@ class MockD1PreparedStatement implements D1PreparedStatement {
 		}
 		return rows as T[];
 	}
+
+	executeBatch<T>(): D1Result<T> {
+		const stmt = this.#db.prepare(this.#sql);
+		const rows = stmt.reader ? (stmt.all(...this.#bindings) as T[]) : [];
+		const changes = stmt.reader ? 0 : stmt.run(...this.#bindings).changes;
+		return {
+			results: rows,
+			success: true,
+			meta: {
+				served_by: "mock-d1",
+				duration: 0,
+				changes,
+				last_row_id: 0,
+				changed_db: changes > 0,
+				size_after: 0,
+				rows_read: rows.length,
+				rows_written: changes,
+			},
+		};
+	}
 }
 
 /**
@@ -390,6 +410,7 @@ export function createMockD1(): D1Database {
 		"utf-8",
 	);
 	db.exec(dropTopProcessesFromRawSchema);
+	db.exec(readFileSync(resolve(__dirname, "../../migrations/0028_connect.sql"), "utf-8"));
 
 	return {
 		prepare(sql: string): D1PreparedStatement {
@@ -405,18 +426,9 @@ export function createMockD1(): D1Database {
 		},
 
 		async batch<T = unknown>(statements: D1PreparedStatement[]): Promise<D1Result<T>[]> {
-			const results: D1Result<T>[] = [];
-			for (const stmt of statements) {
-				// Use all() for SELECT queries, run() for mutations
-				const mockStmt = stmt as MockD1PreparedStatement;
-				const sql = mockStmt._sql;
-				if (sql.trim().toUpperCase().startsWith("SELECT")) {
-					results.push(await mockStmt.all<T>());
-				} else {
-					results.push(await mockStmt.run<T>());
-				}
-			}
-			return results;
+			return db.transaction(() =>
+				statements.map((statement) => (statement as MockD1PreparedStatement).executeBatch<T>()),
+			)();
 		},
 
 		async dump(): Promise<ArrayBuffer> {

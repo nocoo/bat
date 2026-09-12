@@ -29,6 +29,7 @@ Current setup and operational boundaries are in [probe installation, development
 | 19 | [edge-deployment](./19-edge-deployment.md) | Single-Worker and dual-domain deployment background |
 | 20 | [D1-to-KV migration](./20-d1-to-kv-migration.md) | Optional KV caches and D1 query reduction |
 | 21 | [development](./21-development.md) | Current probe installation, CLI, configuration, local tests, retention, and release behavior |
+| 22 | [connect](./22-connect.md) | Server-bound Bearer API, OpenAPI/discovery, encrypted recoverable tokens, Access routing, audit and rollback |
 
 ## Archive
 

@@ -10,6 +10,8 @@ import { D1PortAllowlistRepository } from "./allowed-ports.js";
 import { D1AssetsRepository } from "./assets.js";
 import { D1BindingsRepository } from "./bindings.js";
 import { D1CliTokensRepository } from "./cli-tokens.js";
+import { D1ConnectRepository } from "./connect.js";
+import { D1ConnectProductsRepository } from "./connect-products.js";
 import { D1EventsRepository } from "./events.js";
 import { D1HostsRepository } from "./hosts.js";
 import { D1MaintenanceRepository } from "./maintenance.js";
@@ -26,6 +28,8 @@ import { D1WebhooksRepository } from "./webhooks.js";
  */
 export function createD1Repositories(db: D1Database): Repositories {
 	return {
+		connect: new D1ConnectRepository(db),
+		connectProducts: new D1ConnectProductsRepository(db),
 		hosts: new D1HostsRepository(db),
 		metrics: new D1MetricsRepository(db),
 		alerts: new D1AlertsRepository(db),

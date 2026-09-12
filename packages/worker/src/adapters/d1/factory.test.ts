@@ -9,7 +9,7 @@ import type { AppEnv } from "../../types.js";
 import { createD1Repositories } from "./factory.js";
 
 describe("createD1Repositories", () => {
-	test("returns a bundle with all 15 repo slots", () => {
+	test("returns a bundle with all product and Connect repositories", () => {
 		const fakeDb = {} as D1Database;
 		const repos = createD1Repositories(fakeDb);
 		const expectedKeys = [
@@ -28,6 +28,8 @@ describe("createD1Repositories", () => {
 			"tier2",
 			"cliTokens",
 			"aggregation",
+			"connect",
+			"connectProducts",
 		];
 		for (const k of expectedKeys) {
 			expect(repos).toHaveProperty(k);
@@ -76,7 +78,7 @@ describe("reposMiddleware", () => {
 			hasHosts: true,
 			hasMetrics: true,
 			hasAggregation: true,
-			keyCount: 15,
+			keyCount: 17,
 		});
 	});
 

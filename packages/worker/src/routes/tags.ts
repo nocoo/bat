@@ -213,13 +213,13 @@ export async function tagsByHostsRoute(c: Context<AppEnv>) {
 
 /** GET /api/hosts/:id/tags */
 export async function hostTagsListRoute(c: Context<AppEnv, "/api/hosts/:id/tags">) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 	return c.json(await c.var.repos.tags.listForHost(hostId));
 }
 
 /** POST /api/hosts/:id/tags */
 export async function hostTagsAddRoute(c: Context<AppEnv, "/api/hosts/:id/tags">) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	let body: unknown;
 	try {
@@ -248,7 +248,7 @@ export async function hostTagsAddRoute(c: Context<AppEnv, "/api/hosts/:id/tags">
 
 /** PUT /api/hosts/:id/tags — replace all tags */
 export async function hostTagsReplaceRoute(c: Context<AppEnv, "/api/hosts/:id/tags">) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	let body: unknown;
 	try {
@@ -275,7 +275,7 @@ export async function hostTagsReplaceRoute(c: Context<AppEnv, "/api/hosts/:id/ta
 
 /** DELETE /api/hosts/:id/tags/:tagId */
 export async function hostTagsRemoveRoute(c: Context<AppEnv, "/api/hosts/:id/tags/:tagId">) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 	const tagId = parseTagId(c.req.param("tagId"));
 
 	if (tagId === null) {

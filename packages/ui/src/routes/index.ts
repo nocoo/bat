@@ -1,4 +1,5 @@
 export { AlertsPage } from "./alerts";
+export { ConnectPage } from "./connect";
 export { DataRetentionPage } from "./data-retention";
 export { EventsPage } from "./events";
 export { HostDetailPage } from "./host-detail";

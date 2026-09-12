@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import { createD1Repositories } from "./adapters/d1/factory.js";
+import { isConnectPath, isVersionedPath } from "./domain/connect.js";
 import { accessAuth } from "./middleware/access-auth.js";
 import { apiKeyAuth } from "./middleware/api-key.js";
+import {
+	connectBearer,
+	connectEnvelope,
+	connectError,
+	connectManager,
+} from "./middleware/connect.js";
 import { entryControl } from "./middleware/entry-control.js";
 import { reposMiddleware } from "./middleware/repos.js";
 import {
@@ -36,6 +43,18 @@ import {
 } from "./routes/bindings.js";
 import { cliAuthBridgeRoute, cliAuthRoute } from "./routes/cli-auth.js";
 import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js";
+import { registerConnectApi } from "./routes/connect-api.js";
+import {
+	connectAuditRoute,
+	connectServersRoute,
+	connectTokenChallengeRoute,
+	connectTokenRenameRoute,
+	connectTokenRevealRoute,
+	connectTokenRevokeRoute,
+	connectTokenRotateRoute,
+	connectTokensCreateRoute,
+	connectTokensListRoute,
+} from "./routes/connect-management.js";
 import { eventsIngestRoute } from "./routes/events-ingest.js";
 import { eventsListRoute } from "./routes/events-list.js";
 import { fleetStatusRoute } from "./routes/fleet-status.js";
@@ -90,12 +109,50 @@ const app = new Hono<AppEnv>();
 // 2. accessAuth: verify Access JWT for browser endpoint
 // 3. apiKeyAuth: verify API key (with Access JWT bypass for browser reads/writes)
 app.use("*", reposMiddleware);
+app.use("*", async (c, next) => {
+	await next();
+	if (!c.req.path.startsWith("/api/") && c.res.headers.get("Content-Type")?.includes("text/html")) {
+		c.header("Cache-Control", "no-store, private");
+		c.header(
+			"Content-Security-Policy",
+			"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+		);
+		c.header("Referrer-Policy", "no-referrer");
+		c.header("X-Frame-Options", "DENY");
+		c.header("X-Content-Type-Options", "nosniff");
+	}
+});
+app.use("/api/*", connectEnvelope);
 app.use("*", entryControl);
-app.use("/api/*", accessAuth);
+app.use("*", accessAuth);
 app.use("/api/*", apiKeyAuth);
+app.use("/api/*", (c, next) =>
+	isVersionedPath(c.req.path)
+		? connectBearer(c, next)
+		: isConnectPath(c.req.path)
+			? connectManager(c, next)
+			: next(),
+);
+
+app.onError((error, c) => {
+	if (isConnectPath(c.req.path)) return connectError(c, error);
+	// Never log request bodies, authorization headers or exception SQL bindings.
+	return c.json({ error: "Internal server error" }, 500);
+});
+
+app.get("/api/connect/servers", connectServersRoute);
+app.get("/api/connect/servers/:serverId/tokens", connectTokensListRoute);
+app.post("/api/connect/servers/:serverId/tokens", connectTokensCreateRoute);
+app.patch("/api/connect/servers/:serverId/tokens/:tokenId", connectTokenRenameRoute);
+app.post("/api/connect/servers/:serverId/tokens/:tokenId/challenge", connectTokenChallengeRoute);
+app.post("/api/connect/servers/:serverId/tokens/:tokenId/reveal", connectTokenRevealRoute);
+app.post("/api/connect/servers/:serverId/tokens/:tokenId/rotate", connectTokenRotateRoute);
+app.post("/api/connect/servers/:serverId/tokens/:tokenId/revoke", connectTokenRevokeRoute);
+app.get("/api/connect/servers/:serverId/audit", connectAuditRoute);
+registerConnectApi(app);
 
 // Root health check
-app.get("/", (c) => c.text("bat ok"));
+app.get("/", async (c) => (c.env.ASSETS ? c.env.ASSETS.fetch(c.req.raw) : c.text("bat ok")));
 
 // Public routes (no auth)
 app.get("/api/live", liveRoute);
@@ -179,9 +236,14 @@ app.get("/api/bindings", bindingsListRoute);
 app.post("/api/bindings", bindingsCreateRoute);
 app.delete("/api/bindings/:agentId/:assetId", bindingsDeleteRoute);
 
+app.get("*", async (c) => {
+	if (c.req.path.startsWith("/api/") || !c.env.ASSETS) return c.json({ error: "Not found" }, 404);
+	return c.env.ASSETS.fetch(c.req.raw);
+});
+
 export default {
 	fetch: app.fetch,
-	async scheduled(_event: ScheduledEvent, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
+	async scheduled(_event: ScheduledController, env: AppEnv["Bindings"], _ctx: ExecutionContext) {
 		// Composition root for the cron path: build the per-run repositories
 		// bundle and hand it to the aggregation entry point. Cron body never
 		// touches `env.DB` directly.
@@ -189,6 +251,7 @@ export default {
 		const hourTs = Math.floor(Date.now() / 3600000) * 3600 - 3600;
 		await repos.aggregation.aggregateHour(hourTs);
 		await repos.aggregation.runScheduledMaintenance(Math.floor(Date.now() / 1000));
+		await repos.connect.maintenance(Math.floor(Date.now() / 1000));
 	},
 };
 

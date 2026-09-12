@@ -21,6 +21,7 @@ One Hono Worker serves both API and SPA. D1 persists data, while the production 
 - Inspect host history, alerts, tags, and events; configure allowed ports and daily maintenance windows in UTC.
 - Expose monitoring APIs for tools such as Uptime Kuma to query host or group health. Webhook endpoints receive events from external scripts.
 - Manage agents, assets, their relationships, and agent heartbeats through the dashboard and CLI.
+- Create server-bound read/write Bearer tokens in Connect, discover `/api/v1` through OpenAPI, and access authorized resources with repeat Reveal, rotation, revocation and optional expiry.
 - Aggregate and purge data hourly. Retention can be 1, 7, or 30 days, defaulting to 7, and applies to raw metrics, hourly aggregates, extended snapshots, and events.
 
 KV is optional: missing or failed cache reads fall back to D1. Server rules evaluate alerts. Webhooks receive events; the repository does not provide a general alert-message delivery channel.
@@ -70,7 +71,7 @@ This starts Vite on 7025 and a local Worker on 37025. Production GitHub Actions 
 
 ## Tests
 
-Install dependencies and run `bun run build` in a clean, separate checkout to prepare Worker assets. The API runner overwrites `packages/worker/.dev.vars` without restoring an existing file, so do not run it in a checkout containing personal development configuration.
+Install dependencies and run `bun run build` to prepare Worker assets. API and browser tests generate isolated keyrings under `.wrangler` without overwriting personal `.dev.vars` configuration.
 
 ```bash
 bun run test
@@ -103,6 +104,7 @@ Keep both ports free and unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, 
 - [Probe installation, development, and releases](21-development.md)
 - [Architecture and design background](02-architecture.md)
 - [Monitoring API](16-monitoring-api.md)
+- [Connect API, permissions and deployment](22-connect.md)
 - [D1 / KV changes](20-d1-to-kv-migration.md)
 
 ## License

@@ -6,6 +6,7 @@
 
 import type { Context, Next } from "hono";
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { isVersionedPath } from "../domain/connect.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
@@ -23,7 +24,13 @@ function getJWKS(teamDomain: string) {
 }
 
 export async function accessAuth(c: Context<AppEnv>, next: Next) {
-	const host = c.req.header("host") || "";
+	const host =
+		c.env?.ENVIRONMENT === "production"
+			? new URL(c.req.url).hostname
+			: c.req.header("host") || new URL(c.req.url).hostname;
+	// Access runs at Cloudflare's edge before Worker auth. Only this versioned
+	// API is bypassed at the edge, and it always requires connectBearer here.
+	if (isVersionedPath(c.req.path)) return next();
 
 	// localhost: skip Access JWT, continue with apiKeyAuth (local dev / E2E tests)
 	if (isLocalhost(host)) {
@@ -63,10 +70,14 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 
 	try {
 		const jwks = getJWKS(teamDomain);
-		await jwtVerify(jwt, jwks, {
+		const verified = await jwtVerify(jwt, jwks, {
 			issuer: `https://${teamDomain}`,
 			audience: aud,
 		});
+		if (typeof verified.payload.email === "string" && verified.payload.email.includes("@"))
+			c.set("accessPrincipal", `email:${verified.payload.email.toLowerCase()}`);
+		else if (typeof verified.payload.common_name === "string" && verified.payload.common_name)
+			c.set("accessPrincipal", `service:${verified.payload.common_name}`);
 	} catch {
 		return c.json({ error: "Invalid Access JWT" }, 403);
 	}

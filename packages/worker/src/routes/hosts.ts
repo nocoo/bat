@@ -71,7 +71,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	// Short-TTL KV cache — stale tolerated up to TTL. Disabled outside
 	// production so dev / e2e snapshots see fresh state. Cache API is not
 	// usable behind Cloudflare Access, so this is KV-backed.
-	const cacheEnabled = c.env.ENVIRONMENT === "production";
+	const cacheEnabled = c.env.ENVIRONMENT === "production" && !c.var.connectToken;
 	const cacheOpts = { route: "hosts", ttlSeconds: HOSTS_CACHE_TTL_SECONDS };
 	if (cacheEnabled) {
 		const cached = await tryReadCache(c.env.BAT_KV, c.req.raw, cacheOpts);

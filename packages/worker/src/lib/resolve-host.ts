@@ -29,6 +29,7 @@ export async function resolveHostIdByHash(
 	if (!isOpaqueHid(id)) {
 		return id;
 	}
+	if (await repo.getActiveFlag(id)) return id;
 	const rows = await repo.listActiveHostIds();
 	for (const row of rows) {
 		if (hashHostId(row.host_id) === id) {
@@ -50,6 +51,8 @@ export async function resolveHostRecord(
 	if (!isOpaqueHid(id)) {
 		return repo.getActiveFlag(id);
 	}
+	const exact = await repo.getActiveFlag(id);
+	if (exact) return exact;
 	const rows = await repo.listAllHostIdsWithActive();
 	for (const row of rows) {
 		if (hashHostId(row.host_id) === id) {

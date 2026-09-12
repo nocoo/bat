@@ -1,0 +1,2866 @@
+{
+	"AgentHeartbeatResponse": {
+		"type": "object",
+		"properties": {
+			"updated": {
+				"type": "number"
+			},
+			"created": {
+				"type": "number"
+			},
+			"missing": {
+				"type": "number"
+			}
+		},
+		"required": ["updated", "created", "missing"]
+	},
+	"AgentItem": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": ["string", "null"]
+			},
+			"hostname": {
+				"type": ["string", "null"]
+			},
+			"source_key_short": {
+				"type": "string"
+			},
+			"match_key": {
+				"type": "string"
+			},
+			"nickname": {
+				"type": ["string", "null"]
+			},
+			"role": {
+				"type": ["string", "null"]
+			},
+			"runtime_app": {
+				"type": ["string", "null"]
+			},
+			"runtime_version": {
+				"type": ["string", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/AgentStatus"
+			},
+			"metadata": {
+				"type": "object",
+				"additionalProperties": {}
+			},
+			"tags": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetTagRef"
+				}
+			},
+			"created_at": {
+				"type": "number"
+			},
+			"last_seen_at": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": [
+			"id",
+			"host_id",
+			"hostname",
+			"source_key_short",
+			"match_key",
+			"nickname",
+			"role",
+			"runtime_app",
+			"runtime_version",
+			"status",
+			"metadata",
+			"tags",
+			"created_at",
+			"last_seen_at"
+		]
+	},
+	"AgentStatus": {
+		"enum": ["running", "stopped", "missing", "unknown"]
+	},
+	"AlertItem": {
+		"type": "object",
+		"properties": {
+			"hid": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"rule_id": {
+				"type": "string"
+			},
+			"severity": {
+				"$ref": "#/components/schemas/AlertSeverity"
+			},
+			"value": {
+				"type": ["number", "null"]
+			},
+			"triggered_at": {
+				"type": "number"
+			},
+			"message": {
+				"type": ["string", "null"]
+			}
+		},
+		"required": [
+			"hid",
+			"host_id",
+			"hostname",
+			"rule_id",
+			"severity",
+			"value",
+			"triggered_at",
+			"message"
+		]
+	},
+	"AlertSeverity": {
+		"enum": ["info", "warning", "critical"]
+	},
+	"AllowedPort": {
+		"type": "object",
+		"properties": {
+			"port": {
+				"type": "number"
+			},
+			"reason": {
+				"type": "string"
+			},
+			"created_at": {
+				"type": "number"
+			}
+		},
+		"required": ["port", "reason", "created_at"]
+	},
+	"AssetItem": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": ["string", "null"]
+			},
+			"hostname": {
+				"type": ["string", "null"]
+			},
+			"type": {
+				"$ref": "#/components/schemas/AssetType"
+			},
+			"subtype": {
+				"type": ["string", "null"]
+			},
+			"name": {
+				"type": "string"
+			},
+			"provider": {
+				"type": ["string", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/AssetStatus"
+			},
+			"metadata": {
+				"type": "object",
+				"additionalProperties": {}
+			},
+			"tags": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetTagRef"
+				}
+			},
+			"created_at": {
+				"type": "number"
+			},
+			"updated_at": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": [
+			"id",
+			"host_id",
+			"hostname",
+			"type",
+			"subtype",
+			"name",
+			"provider",
+			"status",
+			"metadata",
+			"tags",
+			"created_at",
+			"updated_at"
+		]
+	},
+	"AssetMapAgent": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": ["string", "null"]
+			},
+			"source_key_short": {
+				"type": "string"
+			},
+			"nickname": {
+				"type": ["string", "null"]
+			},
+			"runtime_app": {
+				"type": ["string", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/AgentStatus"
+			}
+		},
+		"required": ["id", "host_id", "source_key_short", "nickname", "runtime_app", "status"]
+	},
+	"AssetMapAsset": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": ["string", "null"]
+			},
+			"type": {
+				"$ref": "#/components/schemas/AssetType"
+			},
+			"subtype": {
+				"type": ["string", "null"]
+			},
+			"name": {
+				"type": "string"
+			},
+			"provider": {
+				"type": ["string", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/AssetStatus"
+			}
+		},
+		"required": ["id", "host_id", "type", "subtype", "name", "provider", "status"]
+	},
+	"AssetMapBinding": {
+		"type": "object",
+		"properties": {
+			"agent_id": {
+				"type": "string"
+			},
+			"asset_id": {
+				"type": "string"
+			}
+		},
+		"required": ["agent_id", "asset_id"]
+	},
+	"AssetMapHost": {
+		"type": "object",
+		"properties": {
+			"host_id": {
+				"type": "string"
+			},
+			"hid": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"status": {
+				"type": "string"
+			}
+		},
+		"required": ["host_id", "hid", "hostname", "status"]
+	},
+	"AssetMapResponse": {
+		"type": "object",
+		"properties": {
+			"hosts": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetMapHost"
+				}
+			},
+			"agents": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetMapAgent"
+				}
+			},
+			"assets": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetMapAsset"
+				}
+			},
+			"bindings": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetMapBinding"
+				}
+			},
+			"tags": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/AssetMapTagEntry"
+				}
+			}
+		},
+		"required": ["hosts", "agents", "assets", "bindings", "tags"]
+	},
+	"AssetMapTagEntry": {
+		"type": "object",
+		"properties": {
+			"entity_type": {
+				"enum": ["agent", "asset", "host"]
+			},
+			"entity_id": {
+				"type": "string"
+			},
+			"tag_id": {
+				"type": "number"
+			},
+			"tag_name": {
+				"type": "string"
+			},
+			"tag_color": {
+				"type": "number"
+			}
+		},
+		"required": ["entity_type", "entity_id", "tag_id", "tag_name", "tag_color"]
+	},
+	"AssetStatus": {
+		"enum": ["active", "inactive", "missing", "unknown"]
+	},
+	"AssetTagRef": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "number"
+			},
+			"name": {
+				"type": "string"
+			},
+			"color": {
+				"type": "number"
+			}
+		},
+		"required": ["id", "name", "color"]
+	},
+	"AssetType": {
+		"enum": ["cloud_service", "domain", "container", "cli_tool", "mcp_service"]
+	},
+	"AssetsOverview": {
+		"type": "object",
+		"properties": {
+			"agents": {
+				"type": "object",
+				"properties": {
+					"total": {
+						"type": "number"
+					},
+					"by_status": {
+						"type": "object",
+						"properties": {
+							"running": {
+								"type": "number"
+							},
+							"stopped": {
+								"type": "number"
+							},
+							"missing": {
+								"type": "number"
+							},
+							"unknown": {
+								"type": "number"
+							}
+						},
+						"required": ["running", "stopped", "missing", "unknown"]
+					}
+				},
+				"required": ["total", "by_status"]
+			},
+			"assets": {
+				"type": "object",
+				"properties": {
+					"total": {
+						"type": "number"
+					},
+					"by_type": {
+						"type": "object",
+						"properties": {
+							"cloud_service": {
+								"type": "number"
+							},
+							"domain": {
+								"type": "number"
+							},
+							"container": {
+								"type": "number"
+							},
+							"cli_tool": {
+								"type": "number"
+							},
+							"mcp_service": {
+								"type": "number"
+							}
+						},
+						"required": ["cloud_service", "domain", "container", "cli_tool", "mcp_service"]
+					},
+					"by_status": {
+						"type": "object",
+						"properties": {
+							"active": {
+								"type": "number"
+							},
+							"inactive": {
+								"type": "number"
+							},
+							"missing": {
+								"type": "number"
+							},
+							"unknown": {
+								"type": "number"
+							}
+						},
+						"required": ["active", "inactive", "missing", "unknown"]
+					}
+				},
+				"required": ["total", "by_type", "by_status"]
+			},
+			"bindings": {
+				"type": "number"
+			}
+		},
+		"required": ["agents", "assets", "bindings"]
+	},
+	"BindingItem": {
+		"type": "object",
+		"properties": {
+			"agent_id": {
+				"type": "string"
+			},
+			"agent_nickname": {
+				"type": ["string", "null"]
+			},
+			"asset_id": {
+				"type": "string"
+			},
+			"asset_name": {
+				"type": "string"
+			},
+			"asset_type": {
+				"$ref": "#/components/schemas/AssetType"
+			},
+			"created_at": {
+				"type": "number"
+			}
+		},
+		"required": ["agent_id", "agent_nickname", "asset_id", "asset_name", "asset_type", "created_at"]
+	},
+	"BlockDeviceDTO": {
+		"type": "object",
+		"properties": {
+			"device": {
+				"type": "string"
+			},
+			"size_bytes": {
+				"type": "number"
+			},
+			"rotational": {
+				"type": "boolean"
+			}
+		},
+		"required": ["device", "size_bytes", "rotational"]
+	},
+	"ConnectAudit": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"request_id": {
+				"type": "string"
+			},
+			"server_id": {
+				"type": ["string", "null"]
+			},
+			"token_id": {
+				"type": ["string", "null"]
+			},
+			"actor": {
+				"type": "string"
+			},
+			"operation": {
+				"type": "string"
+			},
+			"status": {
+				"type": "number"
+			},
+			"code": {
+				"type": ["string", "null"]
+			},
+			"created_at": {
+				"type": "number"
+			}
+		},
+		"required": [
+			"id",
+			"request_id",
+			"server_id",
+			"token_id",
+			"actor",
+			"operation",
+			"status",
+			"code",
+			"created_at"
+		]
+	},
+	"ConntrackMetrics": {
+		"type": "object",
+		"properties": {
+			"count": {
+				"type": "number"
+			},
+			"max": {
+				"type": "number"
+			}
+		},
+		"required": ["count", "max"]
+	},
+	"CpuMetrics": {
+		"type": "object",
+		"properties": {
+			"load1": {
+				"type": "number"
+			},
+			"load5": {
+				"type": "number"
+			},
+			"load15": {
+				"type": "number"
+			},
+			"usage_pct": {
+				"type": "number"
+			},
+			"iowait_pct": {
+				"type": "number"
+			},
+			"steal_pct": {
+				"type": "number"
+			},
+			"count": {
+				"type": "number"
+			},
+			"context_switches_sec": {
+				"type": "number"
+			},
+			"forks_sec": {
+				"type": "number"
+			},
+			"procs_running": {
+				"type": "number"
+			},
+			"procs_blocked": {
+				"type": "number"
+			},
+			"interrupts_sec": {
+				"type": "number"
+			},
+			"softirq_net_rx_sec": {
+				"type": "number"
+			},
+			"softirq_block_sec": {
+				"type": "number"
+			},
+			"tasks_running": {
+				"type": "number"
+			},
+			"tasks_total": {
+				"type": "number"
+			}
+		},
+		"required": ["load1", "load5", "load15", "usage_pct", "iowait_pct", "steal_pct", "count"]
+	},
+	"DetectedSoftware": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"name": {
+				"type": "string"
+			},
+			"category": {
+				"$ref": "#/components/schemas/SoftwareCategory"
+			},
+			"version": {
+				"type": ["string", "null"]
+			},
+			"source": {
+				"enum": ["port", "process", "systemd", "binary", "package", "docker"]
+			},
+			"running": {
+				"type": "boolean"
+			},
+			"listening_ports": {
+				"type": "array",
+				"items": {
+					"type": "number"
+				}
+			}
+		},
+		"required": ["id", "name", "category", "version", "source", "running", "listening_ports"]
+	},
+	"DiscoveredWebsite": {
+		"type": "object",
+		"properties": {
+			"domain": {
+				"type": "string"
+			},
+			"web_server": {
+				"enum": ["nginx", "apache"]
+			},
+			"ssl": {
+				"type": "boolean"
+			}
+		},
+		"required": ["domain", "web_server", "ssl"]
+	},
+	"DiskDeepScanData": {
+		"type": "object",
+		"properties": {
+			"top_dirs": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/TopDir"
+				}
+			},
+			"journal_bytes": {
+				"type": ["number", "null"]
+			},
+			"large_files": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/LargeFile"
+				}
+			}
+		},
+		"required": ["top_dirs", "journal_bytes", "large_files"]
+	},
+	"DiskIoMetric": {
+		"type": "object",
+		"properties": {
+			"device": {
+				"type": "string"
+			},
+			"read_iops": {
+				"type": "number"
+			},
+			"write_iops": {
+				"type": "number"
+			},
+			"read_bytes_sec": {
+				"type": "number"
+			},
+			"write_bytes_sec": {
+				"type": "number"
+			},
+			"io_util_pct": {
+				"type": "number"
+			},
+			"read_await_ms": {
+				"type": "number"
+			},
+			"write_await_ms": {
+				"type": "number"
+			},
+			"io_queue_depth": {
+				"type": "number"
+			}
+		},
+		"required": [
+			"device",
+			"read_iops",
+			"write_iops",
+			"read_bytes_sec",
+			"write_bytes_sec",
+			"io_util_pct"
+		]
+	},
+	"DiskMetric": {
+		"type": "object",
+		"properties": {
+			"mount": {
+				"type": "string"
+			},
+			"total_bytes": {
+				"type": "number"
+			},
+			"avail_bytes": {
+				"type": "number"
+			},
+			"used_pct": {
+				"type": "number"
+			},
+			"inodes_total": {
+				"type": "number"
+			},
+			"inodes_avail": {
+				"type": "number"
+			},
+			"inodes_used_pct": {
+				"type": "number"
+			}
+		},
+		"required": ["mount", "total_bytes", "avail_bytes", "used_pct"]
+	},
+	"DockerContainer": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "string"
+			},
+			"name": {
+				"type": "string"
+			},
+			"image": {
+				"type": "string"
+			},
+			"status": {
+				"type": "string"
+			},
+			"state": {
+				"type": "string"
+			},
+			"cpu_pct": {
+				"type": ["number", "null"]
+			},
+			"mem_bytes": {
+				"type": ["number", "null"]
+			},
+			"restart_count": {
+				"type": "number"
+			},
+			"started_at": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": [
+			"id",
+			"name",
+			"image",
+			"status",
+			"state",
+			"cpu_pct",
+			"mem_bytes",
+			"restart_count",
+			"started_at"
+		]
+	},
+	"DockerImagesInfo": {
+		"type": "object",
+		"properties": {
+			"total_count": {
+				"type": "number"
+			},
+			"total_bytes": {
+				"type": "number"
+			},
+			"reclaimable_bytes": {
+				"type": "number"
+			}
+		},
+		"required": ["total_count", "total_bytes", "reclaimable_bytes"]
+	},
+	"DockerStatusData": {
+		"type": "object",
+		"properties": {
+			"installed": {
+				"type": "boolean"
+			},
+			"version": {
+				"type": ["string", "null"]
+			},
+			"containers": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/DockerContainer"
+				}
+			},
+			"images": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/DockerImagesInfo"
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"required": ["installed", "version", "containers", "images"]
+	},
+	"EventItem": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "number"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"title": {
+				"type": "string"
+			},
+			"body": {
+				"type": "string"
+			},
+			"tags": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"source_ip": {
+				"type": "string"
+			},
+			"created_at": {
+				"type": "number"
+			}
+		},
+		"required": ["id", "host_id", "hostname", "title", "body", "tags", "source_ip", "created_at"]
+	},
+	"FailedService": {
+		"type": "object",
+		"properties": {
+			"unit": {
+				"type": "string"
+			},
+			"load_state": {
+				"type": "string"
+			},
+			"active_state": {
+				"type": "string"
+			},
+			"sub_state": {
+				"type": "string"
+			},
+			"description": {
+				"type": "string"
+			}
+		},
+		"required": ["unit", "load_state", "active_state", "sub_state", "description"]
+	},
+	"FdMetrics": {
+		"type": "object",
+		"properties": {
+			"allocated": {
+				"type": "number"
+			},
+			"max": {
+				"type": "number"
+			}
+		},
+		"required": ["allocated", "max"]
+	},
+	"HealthResponse": {
+		"type": "object",
+		"properties": {
+			"status": {
+				"$ref": "#/components/schemas/HealthStatus"
+			},
+			"version": {
+				"type": "string"
+			},
+			"total_hosts": {
+				"type": "number"
+			},
+			"healthy": {
+				"type": "number"
+			},
+			"warning": {
+				"type": "number"
+			},
+			"critical": {
+				"type": "number"
+			},
+			"maintenance": {
+				"type": "number"
+			},
+			"checked_at": {
+				"type": "number"
+			}
+		},
+		"required": [
+			"status",
+			"version",
+			"total_hosts",
+			"healthy",
+			"warning",
+			"critical",
+			"maintenance",
+			"checked_at"
+		]
+	},
+	"HealthStatus": {
+		"enum": ["healthy", "degraded", "critical", "empty"]
+	},
+	"HostDetailItem": {
+		"type": "object",
+		"properties": {
+			"hid": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"os": {
+				"type": ["string", "null"]
+			},
+			"kernel": {
+				"type": ["string", "null"]
+			},
+			"arch": {
+				"type": ["string", "null"]
+			},
+			"cpu_model": {
+				"type": ["string", "null"]
+			},
+			"boot_time": {
+				"type": ["number", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/HostStatus"
+			},
+			"cpu_usage_pct": {
+				"type": ["number", "null"]
+			},
+			"mem_used_pct": {
+				"type": ["number", "null"]
+			},
+			"uptime_seconds": {
+				"type": ["number", "null"]
+			},
+			"last_seen": {
+				"type": "number"
+			},
+			"alert_count": {
+				"type": "number"
+			},
+			"cpu_logical": {
+				"type": ["number", "null"]
+			},
+			"cpu_physical": {
+				"type": ["number", "null"]
+			},
+			"mem_total_bytes": {
+				"type": ["number", "null"]
+			},
+			"virtualization": {
+				"type": ["string", "null"]
+			},
+			"public_ip": {
+				"type": ["string", "null"]
+			},
+			"probe_version": {
+				"type": ["string", "null"]
+			},
+			"cpu_load1": {
+				"type": ["number", "null"]
+			},
+			"swap_used_pct": {
+				"type": ["number", "null"]
+			},
+			"disk_root_used_pct": {
+				"type": ["number", "null"]
+			},
+			"net_rx_rate": {
+				"type": ["number", "null"]
+			},
+			"net_tx_rate": {
+				"type": ["number", "null"]
+			},
+			"cpu_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"mem_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"net_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"maintenance_start": {
+				"type": ["string", "null"]
+			},
+			"maintenance_end": {
+				"type": ["string", "null"]
+			},
+			"maintenance_reason": {
+				"type": ["string", "null"]
+			},
+			"description": {
+				"type": ["string", "null"]
+			},
+			"swap_total_bytes": {
+				"type": ["number", "null"]
+			},
+			"boot_mode": {
+				"type": ["string", "null"]
+			},
+			"timezone": {
+				"type": ["string", "null"]
+			},
+			"dns_resolvers": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"dns_search": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"net_interfaces": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/NetInterfaceDTO"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"disks": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/BlockDeviceDTO"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"top_processes_json": {
+				"type": ["string", "null"]
+			},
+			"top_processes_ts": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": [
+			"hid",
+			"host_id",
+			"hostname",
+			"os",
+			"kernel",
+			"arch",
+			"cpu_model",
+			"boot_time",
+			"status",
+			"cpu_usage_pct",
+			"mem_used_pct",
+			"uptime_seconds",
+			"last_seen",
+			"alert_count",
+			"cpu_logical",
+			"cpu_physical",
+			"mem_total_bytes",
+			"virtualization",
+			"public_ip",
+			"probe_version",
+			"cpu_load1",
+			"swap_used_pct",
+			"disk_root_used_pct",
+			"net_rx_rate",
+			"net_tx_rate",
+			"cpu_sparkline",
+			"mem_sparkline",
+			"net_sparkline",
+			"maintenance_start",
+			"maintenance_end",
+			"maintenance_reason",
+			"description",
+			"swap_total_bytes",
+			"boot_mode",
+			"timezone",
+			"dns_resolvers",
+			"dns_search",
+			"net_interfaces",
+			"disks",
+			"top_processes_json",
+			"top_processes_ts"
+		]
+	},
+	"HostOverviewItem": {
+		"type": "object",
+		"properties": {
+			"hid": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"os": {
+				"type": ["string", "null"]
+			},
+			"kernel": {
+				"type": ["string", "null"]
+			},
+			"arch": {
+				"type": ["string", "null"]
+			},
+			"cpu_model": {
+				"type": ["string", "null"]
+			},
+			"boot_time": {
+				"type": ["number", "null"]
+			},
+			"status": {
+				"$ref": "#/components/schemas/HostStatus"
+			},
+			"cpu_usage_pct": {
+				"type": ["number", "null"]
+			},
+			"mem_used_pct": {
+				"type": ["number", "null"]
+			},
+			"uptime_seconds": {
+				"type": ["number", "null"]
+			},
+			"last_seen": {
+				"type": "number"
+			},
+			"alert_count": {
+				"type": "number"
+			},
+			"cpu_logical": {
+				"type": ["number", "null"]
+			},
+			"cpu_physical": {
+				"type": ["number", "null"]
+			},
+			"mem_total_bytes": {
+				"type": ["number", "null"]
+			},
+			"virtualization": {
+				"type": ["string", "null"]
+			},
+			"public_ip": {
+				"type": ["string", "null"]
+			},
+			"probe_version": {
+				"type": ["string", "null"]
+			},
+			"cpu_load1": {
+				"type": ["number", "null"]
+			},
+			"swap_used_pct": {
+				"type": ["number", "null"]
+			},
+			"disk_root_used_pct": {
+				"type": ["number", "null"]
+			},
+			"net_rx_rate": {
+				"type": ["number", "null"]
+			},
+			"net_tx_rate": {
+				"type": ["number", "null"]
+			},
+			"cpu_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"mem_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"net_sparkline": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/SparklinePoint"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"maintenance_start": {
+				"type": ["string", "null"]
+			},
+			"maintenance_end": {
+				"type": ["string", "null"]
+			},
+			"maintenance_reason": {
+				"type": ["string", "null"]
+			}
+		},
+		"required": [
+			"hid",
+			"host_id",
+			"hostname",
+			"os",
+			"kernel",
+			"arch",
+			"cpu_model",
+			"boot_time",
+			"status",
+			"cpu_usage_pct",
+			"mem_used_pct",
+			"uptime_seconds",
+			"last_seen",
+			"alert_count",
+			"cpu_logical",
+			"cpu_physical",
+			"mem_total_bytes",
+			"virtualization",
+			"public_ip",
+			"probe_version",
+			"cpu_load1",
+			"swap_used_pct",
+			"disk_root_used_pct",
+			"net_rx_rate",
+			"net_tx_rate",
+			"cpu_sparkline",
+			"mem_sparkline",
+			"net_sparkline",
+			"maintenance_start",
+			"maintenance_end",
+			"maintenance_reason"
+		]
+	},
+	"HostStatus": {
+		"enum": ["healthy", "warning", "critical", "offline", "maintenance"]
+	},
+	"HostTag": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "number"
+			},
+			"name": {
+				"type": "string"
+			},
+			"color": {
+				"type": "number"
+			}
+		},
+		"required": ["id", "name", "color"]
+	},
+	"IdentityPayload": {
+		"type": "object",
+		"properties": {
+			"probe_version": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"os": {
+				"type": "string"
+			},
+			"kernel": {
+				"type": "string"
+			},
+			"arch": {
+				"type": "string"
+			},
+			"cpu_model": {
+				"type": "string"
+			},
+			"uptime_seconds": {
+				"type": "number"
+			},
+			"boot_time": {
+				"type": "number"
+			},
+			"cpu_logical": {
+				"type": "number"
+			},
+			"cpu_physical": {
+				"type": "number"
+			},
+			"mem_total_bytes": {
+				"type": "number"
+			},
+			"swap_total_bytes": {
+				"type": "number"
+			},
+			"virtualization": {
+				"type": "string"
+			},
+			"net_interfaces": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/NetInterfaceDTO"
+				}
+			},
+			"disks": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/BlockDeviceDTO"
+				}
+			},
+			"boot_mode": {
+				"type": "string"
+			},
+			"public_ip": {
+				"type": "string"
+			}
+		},
+		"required": [
+			"host_id",
+			"hostname",
+			"os",
+			"kernel",
+			"arch",
+			"cpu_model",
+			"uptime_seconds",
+			"boot_time"
+		]
+	},
+	"LargeFile": {
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string"
+			},
+			"size_bytes": {
+				"type": "number"
+			}
+		},
+		"required": ["path", "size_bytes"]
+	},
+	"ListeningPort": {
+		"type": "object",
+		"properties": {
+			"port": {
+				"type": "number"
+			},
+			"bind": {
+				"type": "string"
+			},
+			"protocol": {
+				"enum": ["tcp", "tcp6"]
+			},
+			"pid": {
+				"type": ["number", "null"]
+			},
+			"process": {
+				"type": ["string", "null"]
+			}
+		},
+		"required": ["port", "bind", "protocol", "pid", "process"]
+	},
+	"MaintenanceWindow": {
+		"type": "object",
+		"properties": {
+			"start": {
+				"type": "string"
+			},
+			"end": {
+				"type": "string"
+			},
+			"reason": {
+				"type": "string"
+			}
+		},
+		"required": ["start", "end", "reason"]
+	},
+	"MemMetrics": {
+		"type": "object",
+		"properties": {
+			"total_bytes": {
+				"type": "number"
+			},
+			"available_bytes": {
+				"type": "number"
+			},
+			"used_pct": {
+				"type": "number"
+			},
+			"oom_kills_delta": {
+				"type": "number"
+			},
+			"buffers": {
+				"type": "number"
+			},
+			"cached": {
+				"type": "number"
+			},
+			"dirty": {
+				"type": "number"
+			},
+			"writeback": {
+				"type": "number"
+			},
+			"shmem": {
+				"type": "number"
+			},
+			"slab_reclaimable": {
+				"type": "number"
+			},
+			"slab_unreclaim": {
+				"type": "number"
+			},
+			"committed_as": {
+				"type": "number"
+			},
+			"commit_limit": {
+				"type": "number"
+			},
+			"hw_corrupted": {
+				"type": "number"
+			},
+			"swap_in_sec": {
+				"type": "number"
+			},
+			"swap_out_sec": {
+				"type": "number"
+			},
+			"pgmajfault_sec": {
+				"type": "number"
+			},
+			"pgpgin_sec": {
+				"type": "number"
+			},
+			"pgpgout_sec": {
+				"type": "number"
+			}
+		},
+		"required": ["total_bytes", "available_bytes", "used_pct"]
+	},
+	"MetricsDataPoint": {
+		"type": "object",
+		"properties": {
+			"ts": {
+				"type": "number"
+			},
+			"cpu_usage_pct": {
+				"type": ["number", "null"]
+			},
+			"cpu_iowait": {
+				"type": ["number", "null"]
+			},
+			"cpu_steal": {
+				"type": ["number", "null"]
+			},
+			"cpu_load1": {
+				"type": ["number", "null"]
+			},
+			"cpu_load5": {
+				"type": ["number", "null"]
+			},
+			"cpu_load15": {
+				"type": ["number", "null"]
+			},
+			"cpu_count": {
+				"type": ["number", "null"]
+			},
+			"mem_total": {
+				"type": ["number", "null"]
+			},
+			"mem_available": {
+				"type": ["number", "null"]
+			},
+			"mem_used_pct": {
+				"type": ["number", "null"]
+			},
+			"swap_total": {
+				"type": ["number", "null"]
+			},
+			"swap_used": {
+				"type": ["number", "null"]
+			},
+			"swap_used_pct": {
+				"type": ["number", "null"]
+			},
+			"disk_json": {
+				"type": ["string", "null"]
+			},
+			"net_json": {
+				"type": ["string", "null"]
+			},
+			"net_rx_bytes_avg": {
+				"type": ["number", "null"]
+			},
+			"net_rx_bytes_max": {
+				"type": ["number", "null"]
+			},
+			"net_tx_bytes_avg": {
+				"type": ["number", "null"]
+			},
+			"net_tx_bytes_max": {
+				"type": ["number", "null"]
+			},
+			"net_rx_errors": {
+				"type": ["number", "null"]
+			},
+			"net_tx_errors": {
+				"type": ["number", "null"]
+			},
+			"uptime_seconds": {
+				"type": ["number", "null"]
+			},
+			"sample_count": {
+				"type": "number"
+			},
+			"psi_cpu_some_avg10": {
+				"type": ["number", "null"]
+			},
+			"psi_cpu_some_avg60": {
+				"type": ["number", "null"]
+			},
+			"psi_cpu_some_avg300": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_some_avg10": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_some_avg60": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_some_avg300": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_full_avg10": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_full_avg60": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_full_avg300": {
+				"type": ["number", "null"]
+			},
+			"psi_io_some_avg10": {
+				"type": ["number", "null"]
+			},
+			"psi_io_some_avg60": {
+				"type": ["number", "null"]
+			},
+			"psi_io_some_avg300": {
+				"type": ["number", "null"]
+			},
+			"psi_io_full_avg10": {
+				"type": ["number", "null"]
+			},
+			"psi_io_full_avg60": {
+				"type": ["number", "null"]
+			},
+			"psi_io_full_avg300": {
+				"type": ["number", "null"]
+			},
+			"disk_io_json": {
+				"type": ["string", "null"]
+			},
+			"tcp_established": {
+				"type": ["number", "null"]
+			},
+			"tcp_time_wait": {
+				"type": ["number", "null"]
+			},
+			"tcp_orphan": {
+				"type": ["number", "null"]
+			},
+			"tcp_allocated": {
+				"type": ["number", "null"]
+			},
+			"context_switches_sec": {
+				"type": ["number", "null"]
+			},
+			"forks_sec": {
+				"type": ["number", "null"]
+			},
+			"procs_running": {
+				"type": ["number", "null"]
+			},
+			"procs_blocked": {
+				"type": ["number", "null"]
+			},
+			"oom_kills": {
+				"type": ["number", "null"]
+			},
+			"fd_allocated": {
+				"type": ["number", "null"]
+			},
+			"fd_max": {
+				"type": ["number", "null"]
+			},
+			"interrupts_sec": {
+				"type": ["number", "null"]
+			},
+			"softirq_net_rx_sec": {
+				"type": ["number", "null"]
+			},
+			"softirq_block_sec": {
+				"type": ["number", "null"]
+			},
+			"tasks_running": {
+				"type": ["number", "null"]
+			},
+			"tasks_total": {
+				"type": ["number", "null"]
+			},
+			"mem_buffers": {
+				"type": ["number", "null"]
+			},
+			"mem_cached": {
+				"type": ["number", "null"]
+			},
+			"mem_dirty": {
+				"type": ["number", "null"]
+			},
+			"mem_writeback": {
+				"type": ["number", "null"]
+			},
+			"mem_shmem": {
+				"type": ["number", "null"]
+			},
+			"mem_slab_reclaimable": {
+				"type": ["number", "null"]
+			},
+			"mem_slab_unreclaim": {
+				"type": ["number", "null"]
+			},
+			"mem_committed_as": {
+				"type": ["number", "null"]
+			},
+			"mem_commit_limit": {
+				"type": ["number", "null"]
+			},
+			"mem_hw_corrupted": {
+				"type": ["number", "null"]
+			},
+			"swap_in_sec": {
+				"type": ["number", "null"]
+			},
+			"swap_out_sec": {
+				"type": ["number", "null"]
+			},
+			"pgmajfault_sec": {
+				"type": ["number", "null"]
+			},
+			"pgpgin_sec": {
+				"type": ["number", "null"]
+			},
+			"pgpgout_sec": {
+				"type": ["number", "null"]
+			},
+			"psi_cpu_some_total_delta": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_some_total_delta": {
+				"type": ["number", "null"]
+			},
+			"psi_mem_full_total_delta": {
+				"type": ["number", "null"]
+			},
+			"psi_io_some_total_delta": {
+				"type": ["number", "null"]
+			},
+			"psi_io_full_total_delta": {
+				"type": ["number", "null"]
+			},
+			"tcp_mem_pages": {
+				"type": ["number", "null"]
+			},
+			"sockets_used": {
+				"type": ["number", "null"]
+			},
+			"udp_inuse": {
+				"type": ["number", "null"]
+			},
+			"udp_mem_pages": {
+				"type": ["number", "null"]
+			},
+			"snmp_retrans_segs_sec": {
+				"type": ["number", "null"]
+			},
+			"snmp_active_opens_sec": {
+				"type": ["number", "null"]
+			},
+			"snmp_passive_opens_sec": {
+				"type": ["number", "null"]
+			},
+			"snmp_attempt_fails_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_estab_resets_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_in_errs_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_out_rsts_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_udp_rcvbuf_errors_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_udp_sndbuf_errors_delta": {
+				"type": ["number", "null"]
+			},
+			"snmp_udp_in_errors_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_listen_overflows_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_listen_drops_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_tcp_timeouts_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_tcp_syn_retrans_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_tcp_fast_retrans_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_tcp_ofo_queue_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_tcp_abort_on_memory_delta": {
+				"type": ["number", "null"]
+			},
+			"netstat_syncookies_sent_delta": {
+				"type": ["number", "null"]
+			},
+			"softnet_processed_delta": {
+				"type": ["number", "null"]
+			},
+			"softnet_dropped_delta": {
+				"type": ["number", "null"]
+			},
+			"softnet_time_squeeze_delta": {
+				"type": ["number", "null"]
+			},
+			"conntrack_count": {
+				"type": ["number", "null"]
+			},
+			"conntrack_max": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": [
+			"ts",
+			"cpu_usage_pct",
+			"cpu_iowait",
+			"cpu_steal",
+			"cpu_load1",
+			"cpu_load5",
+			"cpu_load15",
+			"cpu_count",
+			"mem_total",
+			"mem_available",
+			"mem_used_pct",
+			"swap_total",
+			"swap_used",
+			"swap_used_pct",
+			"disk_json",
+			"net_json",
+			"net_rx_bytes_avg",
+			"net_rx_bytes_max",
+			"net_tx_bytes_avg",
+			"net_tx_bytes_max",
+			"net_rx_errors",
+			"net_tx_errors",
+			"uptime_seconds",
+			"psi_cpu_some_avg10",
+			"psi_cpu_some_avg60",
+			"psi_cpu_some_avg300",
+			"psi_mem_some_avg10",
+			"psi_mem_some_avg60",
+			"psi_mem_some_avg300",
+			"psi_mem_full_avg10",
+			"psi_mem_full_avg60",
+			"psi_mem_full_avg300",
+			"psi_io_some_avg10",
+			"psi_io_some_avg60",
+			"psi_io_some_avg300",
+			"psi_io_full_avg10",
+			"psi_io_full_avg60",
+			"psi_io_full_avg300",
+			"disk_io_json",
+			"tcp_established",
+			"tcp_time_wait",
+			"tcp_orphan",
+			"tcp_allocated",
+			"context_switches_sec",
+			"forks_sec",
+			"procs_running",
+			"procs_blocked",
+			"oom_kills",
+			"fd_allocated",
+			"fd_max",
+			"interrupts_sec",
+			"softirq_net_rx_sec",
+			"softirq_block_sec",
+			"tasks_running",
+			"tasks_total",
+			"mem_buffers",
+			"mem_cached",
+			"mem_dirty",
+			"mem_writeback",
+			"mem_shmem",
+			"mem_slab_reclaimable",
+			"mem_slab_unreclaim",
+			"mem_committed_as",
+			"mem_commit_limit",
+			"mem_hw_corrupted",
+			"swap_in_sec",
+			"swap_out_sec",
+			"pgmajfault_sec",
+			"pgpgin_sec",
+			"pgpgout_sec",
+			"psi_cpu_some_total_delta",
+			"psi_mem_some_total_delta",
+			"psi_mem_full_total_delta",
+			"psi_io_some_total_delta",
+			"psi_io_full_total_delta",
+			"tcp_mem_pages",
+			"sockets_used",
+			"udp_inuse",
+			"udp_mem_pages",
+			"snmp_retrans_segs_sec",
+			"snmp_active_opens_sec",
+			"snmp_passive_opens_sec",
+			"snmp_attempt_fails_delta",
+			"snmp_estab_resets_delta",
+			"snmp_in_errs_delta",
+			"snmp_out_rsts_delta",
+			"snmp_udp_rcvbuf_errors_delta",
+			"snmp_udp_sndbuf_errors_delta",
+			"snmp_udp_in_errors_delta",
+			"netstat_listen_overflows_delta",
+			"netstat_listen_drops_delta",
+			"netstat_tcp_timeouts_delta",
+			"netstat_tcp_syn_retrans_delta",
+			"netstat_tcp_fast_retrans_delta",
+			"netstat_tcp_ofo_queue_delta",
+			"netstat_tcp_abort_on_memory_delta",
+			"netstat_syncookies_sent_delta",
+			"softnet_processed_delta",
+			"softnet_dropped_delta",
+			"softnet_time_squeeze_delta",
+			"conntrack_count",
+			"conntrack_max"
+		]
+	},
+	"MetricsPayload": {
+		"type": "object",
+		"properties": {
+			"probe_version": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"timestamp": {
+				"type": "number"
+			},
+			"interval": {
+				"type": "number"
+			},
+			"cpu": {
+				"$ref": "#/components/schemas/CpuMetrics"
+			},
+			"mem": {
+				"$ref": "#/components/schemas/MemMetrics"
+			},
+			"swap": {
+				"$ref": "#/components/schemas/SwapMetrics"
+			},
+			"disk": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/DiskMetric"
+				}
+			},
+			"net": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/NetMetric"
+				}
+			},
+			"uptime_seconds": {
+				"type": "number"
+			},
+			"psi": {
+				"$ref": "#/components/schemas/PsiMetrics"
+			},
+			"disk_io": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/DiskIoMetric"
+				}
+			},
+			"tcp": {
+				"$ref": "#/components/schemas/TcpMetrics"
+			},
+			"fd": {
+				"$ref": "#/components/schemas/FdMetrics"
+			},
+			"socket": {
+				"$ref": "#/components/schemas/SocketMetrics"
+			},
+			"udp": {
+				"$ref": "#/components/schemas/UdpMetrics"
+			},
+			"snmp": {
+				"$ref": "#/components/schemas/SnmpMetrics"
+			},
+			"netstat": {
+				"$ref": "#/components/schemas/NetstatMetrics"
+			},
+			"softnet": {
+				"$ref": "#/components/schemas/SoftnetMetrics"
+			},
+			"conntrack": {
+				"$ref": "#/components/schemas/ConntrackMetrics"
+			},
+			"top_processes": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/TopProcess"
+				}
+			}
+		},
+		"required": [
+			"host_id",
+			"timestamp",
+			"interval",
+			"cpu",
+			"mem",
+			"swap",
+			"disk",
+			"net",
+			"uptime_seconds"
+		]
+	},
+	"MetricsQueryResponse": {
+		"type": "object",
+		"properties": {
+			"host_id": {
+				"type": "string"
+			},
+			"resolution": {
+				"$ref": "#/components/schemas/MetricsResolution"
+			},
+			"from": {
+				"type": "number"
+			},
+			"to": {
+				"type": "number"
+			},
+			"data": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/MetricsDataPoint"
+				}
+			}
+		},
+		"required": ["host_id", "resolution", "from", "to", "data"]
+	},
+	"MetricsResolution": {
+		"enum": ["raw", "hourly"]
+	},
+	"MonitoringAlertItem": {
+		"type": "object",
+		"properties": {
+			"host_id": {
+				"type": "string"
+			},
+			"hostname": {
+				"type": "string"
+			},
+			"rule_id": {
+				"type": "string"
+			},
+			"severity": {
+				"type": "string"
+			},
+			"value": {
+				"type": ["number", "null"]
+			},
+			"message": {
+				"type": ["string", "null"]
+			},
+			"triggered_at": {
+				"type": "number"
+			},
+			"duration_seconds": {
+				"type": "number"
+			},
+			"tags": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			}
+		},
+		"required": [
+			"host_id",
+			"hostname",
+			"rule_id",
+			"severity",
+			"value",
+			"message",
+			"triggered_at",
+			"duration_seconds",
+			"tags"
+		]
+	},
+	"MonitoringGroup": {
+		"type": "object",
+		"properties": {
+			"tag": {
+				"type": "string"
+			},
+			"host_count": {
+				"type": "number"
+			},
+			"tier": {
+				"$ref": "#/components/schemas/HostStatus"
+			},
+			"by_tier": {
+				"type": "object",
+				"properties": {
+					"healthy": {
+						"type": "number"
+					},
+					"warning": {
+						"type": "number"
+					},
+					"critical": {
+						"type": "number"
+					},
+					"offline": {
+						"type": "number"
+					},
+					"maintenance": {
+						"type": "number"
+					}
+				},
+				"required": ["healthy", "warning", "critical", "offline", "maintenance"]
+			},
+			"alert_count": {
+				"type": "number"
+			},
+			"hosts": {
+				"type": "array",
+				"items": {
+					"type": "object",
+					"properties": {
+						"host_id": {
+							"type": "string"
+						},
+						"hostname": {
+							"type": "string"
+						}
+					},
+					"required": ["host_id", "hostname"]
+				}
+			}
+		},
+		"required": ["tag", "host_count", "tier", "by_tier", "alert_count", "hosts"]
+	},
+	"NetInterfaceDTO": {
+		"type": "object",
+		"properties": {
+			"iface": {
+				"type": "string"
+			},
+			"mac": {
+				"type": "string"
+			},
+			"ipv4": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"ipv6": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"speed_mbps": {
+				"type": ["number", "null"]
+			}
+		},
+		"required": ["iface", "mac", "ipv4", "ipv6", "speed_mbps"]
+	},
+	"NetMetric": {
+		"type": "object",
+		"properties": {
+			"iface": {
+				"type": "string"
+			},
+			"rx_bytes_rate": {
+				"type": "number"
+			},
+			"tx_bytes_rate": {
+				"type": "number"
+			},
+			"rx_errors": {
+				"type": "number"
+			},
+			"tx_errors": {
+				"type": "number"
+			},
+			"rx_packets_rate": {
+				"type": "number"
+			},
+			"tx_packets_rate": {
+				"type": "number"
+			},
+			"rx_dropped": {
+				"type": "number"
+			},
+			"tx_dropped": {
+				"type": "number"
+			}
+		},
+		"required": ["iface", "rx_bytes_rate", "tx_bytes_rate", "rx_errors", "tx_errors"]
+	},
+	"NetstatMetrics": {
+		"type": "object",
+		"properties": {
+			"listen_overflows_delta": {
+				"type": "number"
+			},
+			"listen_drops_delta": {
+				"type": "number"
+			},
+			"tcp_timeouts_delta": {
+				"type": "number"
+			},
+			"tcp_syn_retrans_delta": {
+				"type": "number"
+			},
+			"tcp_fast_retrans_delta": {
+				"type": "number"
+			},
+			"tcp_ofo_queue_delta": {
+				"type": "number"
+			},
+			"tcp_abort_on_memory_delta": {
+				"type": "number"
+			},
+			"syncookies_sent_delta": {
+				"type": "number"
+			}
+		},
+		"required": []
+	},
+	"PsiMetrics": {
+		"type": "object",
+		"properties": {
+			"cpu_some_avg10": {
+				"type": "number"
+			},
+			"cpu_some_avg60": {
+				"type": "number"
+			},
+			"cpu_some_avg300": {
+				"type": "number"
+			},
+			"mem_some_avg10": {
+				"type": "number"
+			},
+			"mem_some_avg60": {
+				"type": "number"
+			},
+			"mem_some_avg300": {
+				"type": "number"
+			},
+			"mem_full_avg10": {
+				"type": "number"
+			},
+			"mem_full_avg60": {
+				"type": "number"
+			},
+			"mem_full_avg300": {
+				"type": "number"
+			},
+			"io_some_avg10": {
+				"type": "number"
+			},
+			"io_some_avg60": {
+				"type": "number"
+			},
+			"io_some_avg300": {
+				"type": "number"
+			},
+			"io_full_avg10": {
+				"type": "number"
+			},
+			"io_full_avg60": {
+				"type": "number"
+			},
+			"io_full_avg300": {
+				"type": "number"
+			},
+			"cpu_some_total_delta": {
+				"type": "number"
+			},
+			"mem_some_total_delta": {
+				"type": "number"
+			},
+			"mem_full_total_delta": {
+				"type": "number"
+			},
+			"io_some_total_delta": {
+				"type": "number"
+			},
+			"io_full_total_delta": {
+				"type": "number"
+			}
+		},
+		"required": [
+			"cpu_some_avg10",
+			"cpu_some_avg60",
+			"cpu_some_avg300",
+			"mem_some_avg10",
+			"mem_some_avg60",
+			"mem_some_avg300",
+			"mem_full_avg10",
+			"mem_full_avg60",
+			"mem_full_avg300",
+			"io_some_avg10",
+			"io_some_avg60",
+			"io_some_avg300",
+			"io_full_avg10",
+			"io_full_avg60",
+			"io_full_avg300"
+		]
+	},
+	"SecurityPostureData": {
+		"type": "object",
+		"properties": {
+			"ssh_password_auth": {
+				"type": ["boolean", "null"]
+			},
+			"ssh_root_login": {
+				"type": ["string", "null"]
+			},
+			"ssh_failed_logins_7d": {
+				"type": ["number", "null"]
+			},
+			"firewall_active": {
+				"type": ["boolean", "null"]
+			},
+			"firewall_default_policy": {
+				"type": ["string", "null"]
+			},
+			"fail2ban_active": {
+				"type": ["boolean", "null"]
+			},
+			"fail2ban_banned_count": {
+				"type": ["number", "null"]
+			},
+			"unattended_upgrades_active": {
+				"type": ["boolean", "null"]
+			}
+		},
+		"required": [
+			"ssh_password_auth",
+			"ssh_root_login",
+			"ssh_failed_logins_7d",
+			"firewall_active",
+			"firewall_default_policy",
+			"fail2ban_active",
+			"fail2ban_banned_count",
+			"unattended_upgrades_active"
+		]
+	},
+	"ServicePortsData": {
+		"type": "object",
+		"properties": {
+			"listening": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/ListeningPort"
+				}
+			}
+		},
+		"required": ["listening"]
+	},
+	"SnmpMetrics": {
+		"type": "object",
+		"properties": {
+			"retrans_segs_sec": {
+				"type": "number"
+			},
+			"active_opens_sec": {
+				"type": "number"
+			},
+			"passive_opens_sec": {
+				"type": "number"
+			},
+			"attempt_fails_delta": {
+				"type": "number"
+			},
+			"estab_resets_delta": {
+				"type": "number"
+			},
+			"in_errs_delta": {
+				"type": "number"
+			},
+			"out_rsts_delta": {
+				"type": "number"
+			},
+			"udp_rcvbuf_errors_delta": {
+				"type": "number"
+			},
+			"udp_sndbuf_errors_delta": {
+				"type": "number"
+			},
+			"udp_in_errors_delta": {
+				"type": "number"
+			}
+		},
+		"required": []
+	},
+	"SocketMetrics": {
+		"type": "object",
+		"properties": {
+			"sockets_used": {
+				"type": "number"
+			}
+		},
+		"required": ["sockets_used"]
+	},
+	"SoftnetMetrics": {
+		"type": "object",
+		"properties": {
+			"processed_delta": {
+				"type": "number"
+			},
+			"dropped_delta": {
+				"type": "number"
+			},
+			"time_squeeze_delta": {
+				"type": "number"
+			}
+		},
+		"required": []
+	},
+	"SoftwareCategory": {
+		"enum": [
+			"web",
+			"database",
+			"cache",
+			"queue",
+			"runtime",
+			"monitoring",
+			"security",
+			"infra",
+			"container",
+			"proxy"
+		]
+	},
+	"SoftwareDiscoveryData": {
+		"type": "object",
+		"properties": {
+			"detected": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/DetectedSoftware"
+				}
+			},
+			"scan_duration_ms": {
+				"type": "number"
+			},
+			"version_duration_ms": {
+				"type": "number"
+			}
+		},
+		"required": ["detected", "scan_duration_ms", "version_duration_ms"]
+	},
+	"SparklinePoint": {
+		"type": "object",
+		"properties": {
+			"ts": {
+				"type": "number"
+			},
+			"v": {
+				"type": "number"
+			}
+		},
+		"required": ["ts", "v"]
+	},
+	"SwapMetrics": {
+		"type": "object",
+		"properties": {
+			"total_bytes": {
+				"type": "number"
+			},
+			"used_bytes": {
+				"type": "number"
+			},
+			"used_pct": {
+				"type": "number"
+			}
+		},
+		"required": ["total_bytes", "used_bytes", "used_pct"]
+	},
+	"SystemdServicesData": {
+		"type": "object",
+		"properties": {
+			"failed_count": {
+				"type": "number"
+			},
+			"failed": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/FailedService"
+				}
+			}
+		},
+		"required": ["failed_count", "failed"]
+	},
+	"TagItem": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "number"
+			},
+			"name": {
+				"type": "string"
+			},
+			"color": {
+				"type": "number"
+			},
+			"host_count": {
+				"type": "number"
+			}
+		},
+		"required": ["id", "name", "color", "host_count"]
+	},
+	"TcpMetrics": {
+		"type": "object",
+		"properties": {
+			"established": {
+				"type": "number"
+			},
+			"time_wait": {
+				"type": "number"
+			},
+			"orphan": {
+				"type": "number"
+			},
+			"allocated": {
+				"type": "number"
+			},
+			"mem_pages": {
+				"type": "number"
+			}
+		},
+		"required": ["established", "time_wait", "orphan", "allocated"]
+	},
+	"Tier2Payload": {
+		"type": "object",
+		"properties": {
+			"probe_version": {
+				"type": "string"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"timestamp": {
+				"type": "number"
+			},
+			"ports": {
+				"$ref": "#/components/schemas/ServicePortsData"
+			},
+			"systemd": {
+				"$ref": "#/components/schemas/SystemdServicesData"
+			},
+			"security": {
+				"$ref": "#/components/schemas/SecurityPostureData"
+			},
+			"docker": {
+				"$ref": "#/components/schemas/DockerStatusData"
+			},
+			"disk_deep": {
+				"$ref": "#/components/schemas/DiskDeepScanData"
+			},
+			"software": {
+				"$ref": "#/components/schemas/SoftwareDiscoveryData"
+			},
+			"websites": {
+				"$ref": "#/components/schemas/WebsiteDiscoveryData"
+			},
+			"timezone": {
+				"type": "string"
+			},
+			"dns_resolvers": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			},
+			"dns_search": {
+				"type": "array",
+				"items": {
+					"type": "string"
+				}
+			}
+		},
+		"required": ["host_id", "timestamp"]
+	},
+	"Tier2Snapshot": {
+		"type": "object",
+		"properties": {
+			"host_id": {
+				"type": "string"
+			},
+			"ts": {
+				"type": "number"
+			},
+			"ports": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/ServicePortsData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"systemd": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/SystemdServicesData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"security": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/SecurityPostureData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"docker": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/DockerStatusData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"disk_deep": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/DiskDeepScanData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"software": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/SoftwareDiscoveryData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"websites": {
+				"anyOf": [
+					{
+						"$ref": "#/components/schemas/WebsiteDiscoveryData"
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"timezone": {
+				"type": ["string", "null"]
+			},
+			"dns_resolvers": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			},
+			"dns_search": {
+				"anyOf": [
+					{
+						"type": "array",
+						"items": {
+							"type": "string"
+						}
+					},
+					{
+						"type": "null"
+					}
+				]
+			}
+		},
+		"required": [
+			"host_id",
+			"ts",
+			"ports",
+			"systemd",
+			"security",
+			"docker",
+			"disk_deep",
+			"software",
+			"websites",
+			"timezone",
+			"dns_resolvers",
+			"dns_search"
+		]
+	},
+	"TopDir": {
+		"type": "object",
+		"properties": {
+			"path": {
+				"type": "string"
+			},
+			"size_bytes": {
+				"type": "number"
+			}
+		},
+		"required": ["path", "size_bytes"]
+	},
+	"TopProcess": {
+		"type": "object",
+		"properties": {
+			"pid": {
+				"type": "number"
+			},
+			"name": {
+				"type": "string"
+			},
+			"cmd": {
+				"type": "string"
+			},
+			"state": {
+				"type": "string"
+			},
+			"ppid": {
+				"type": "number"
+			},
+			"user": {
+				"type": "string"
+			},
+			"cpu_pct": {
+				"type": ["number", "null"]
+			},
+			"mem_rss": {
+				"type": "number"
+			},
+			"mem_pct": {
+				"type": "number"
+			},
+			"mem_virt": {
+				"type": "number"
+			},
+			"num_threads": {
+				"type": "number"
+			},
+			"uptime": {
+				"type": "number"
+			},
+			"majflt_rate": {
+				"type": ["number", "null"]
+			},
+			"io_read_rate": {
+				"type": ["number", "null"]
+			},
+			"io_write_rate": {
+				"type": ["number", "null"]
+			},
+			"processor": {
+				"type": "number"
+			}
+		},
+		"required": [
+			"pid",
+			"name",
+			"cmd",
+			"state",
+			"ppid",
+			"user",
+			"cpu_pct",
+			"mem_rss",
+			"mem_pct",
+			"mem_virt",
+			"num_threads",
+			"uptime",
+			"majflt_rate",
+			"processor"
+		]
+	},
+	"UdpMetrics": {
+		"type": "object",
+		"properties": {
+			"inuse": {
+				"type": "number"
+			},
+			"mem_pages": {
+				"type": "number"
+			}
+		},
+		"required": ["inuse", "mem_pages"]
+	},
+	"WebhookConfig": {
+		"type": "object",
+		"properties": {
+			"id": {
+				"type": "number"
+			},
+			"host_id": {
+				"type": "string"
+			},
+			"token": {
+				"type": "string"
+			},
+			"rate_limit": {
+				"type": "number"
+			},
+			"is_active": {
+				"type": "boolean"
+			},
+			"created_at": {
+				"type": "number"
+			},
+			"updated_at": {
+				"type": "number"
+			}
+		},
+		"required": ["id", "host_id", "token", "rate_limit", "is_active", "created_at", "updated_at"]
+	},
+	"WebsiteDiscoveryData": {
+		"type": "object",
+		"properties": {
+			"sites": {
+				"type": "array",
+				"items": {
+					"$ref": "#/components/schemas/DiscoveredWebsite"
+				}
+			}
+		},
+		"required": ["sites"]
+	}
+}

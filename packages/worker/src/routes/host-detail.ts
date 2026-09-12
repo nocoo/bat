@@ -10,7 +10,7 @@ import type { AppEnv } from "../types.js";
 import { getMaintenanceWindow } from "./monitoring.js";
 
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
-	const idParam = c.req.param("id");
+	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
 	const repos = c.var.repos;
 
 	const hostId = await resolveHostIdByHash(repos.hosts, idParam);

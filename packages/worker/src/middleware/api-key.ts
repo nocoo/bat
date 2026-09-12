@@ -7,6 +7,7 @@
 
 import type { Context, Next } from "hono";
 import { hashToken } from "../domain/cli-token.js";
+import { isConnectPath } from "../domain/connect.js";
 import { lookupToken, rememberToken } from "../lib/cli-token-cache.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
@@ -128,6 +129,9 @@ export function isCliAssetsScopePath(path: string): boolean {
 
 export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	const path = c.req.path;
+	// Connect has its own authentication. Static keys, CLI tokens and Access
+	// sessions must never short-circuit the v1 Bearer permission checks.
+	if (isConnectPath(path)) return next();
 	const host = c.req.header("host") || "";
 
 	// Public routes — no auth

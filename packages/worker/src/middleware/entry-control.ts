@@ -4,6 +4,7 @@
 // - bat.*: require Access JWT (handled by accessAuth)
 
 import type { Context, Next } from "hono";
+import { coordinates, isVersionedPath } from "../domain/connect.js";
 import type { AppEnv } from "../types.js";
 
 // Machine endpoint whitelist: method + path
@@ -32,6 +33,7 @@ function isCliMachineRoute(path: string): boolean {
 }
 
 function isAllowedMachineRoute(method: string, path: string): boolean {
+	if (isVersionedPath(path)) return true; // Authenticated exclusively by connectBearer.
 	// CLI asset routes: any method, prefix match (auth delegated to apiKeyAuth)
 	if (isCliMachineRoute(path)) {
 		return true;
@@ -49,18 +51,34 @@ function isAllowedMachineRoute(method: string, path: string): boolean {
 
 export function isLocalhost(host: string): boolean {
 	return (
-		host.startsWith("localhost") || host.startsWith("127.0.0.1") || host.endsWith(".dev.hexly.ai") // Caddy local dev via *.dev.hexly.ai
+		/^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(host) ||
+		/^[a-z0-9-]+\.dev\.hexly\.ai(?::\d+)?$/.test(host)
 	);
 }
 
 export function isMachineEndpoint(host: string): boolean {
-	return host.includes("bat-ingest");
+	return /^bat-ingest(?:-[a-z0-9-]+)?\.worker\.hexly\.ai(?::\d+)?$/.test(host);
 }
 
 export async function entryControl(c: Context<AppEnv>, next: Next) {
-	const host = c.req.header("host") || "";
+	const host =
+		c.env?.ENVIRONMENT === "production"
+			? new URL(c.req.url).hostname
+			: c.req.header("host") || new URL(c.req.url).hostname;
 	const path = c.req.path;
 	const method = c.req.method;
+	if (
+		c.env?.ENVIRONMENT === "production" &&
+		host !== "bat.hexly.ai" &&
+		host !== "bat-ingest.worker.hexly.ai"
+	)
+		return c.json({ error: "Unknown production hostname" }, 403);
+	if (
+		c.env?.ENVIRONMENT === "production" &&
+		coordinates(method, path) &&
+		c.env.CONNECT_COORDINATED !== true
+	)
+		return c.json({ error: "Configuration coordination required" }, 503);
 
 	// localhost: skip entry control, continue with apiKeyAuth (local dev / E2E tests)
 	if (isLocalhost(host)) {
@@ -69,7 +87,7 @@ export async function entryControl(c: Context<AppEnv>, next: Next) {
 
 	// bat-ingest.* endpoint: whitelist mode (method + path)
 	if (isMachineEndpoint(host)) {
-		if (!isAllowedMachineRoute(method, path)) {
+		if (!isAllowedMachineRoute(method === "HEAD" ? "GET" : method, path)) {
 			return c.json({ error: "Route not allowed on machine endpoint" }, 403);
 		}
 		// Allowed routes continue to apiKeyAuth

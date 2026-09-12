@@ -21,6 +21,7 @@ import {
 	Database,
 	Download,
 	PanelLeft,
+	Plug,
 	ScrollText,
 	Server,
 	Tag,
@@ -65,6 +66,7 @@ const NAV_GROUPS: NavGroup[] = [
 		label: "Settings",
 		defaultOpen: true,
 		items: [
+			{ href: "/connect", label: "Connect", icon: Plug },
 			{ href: "/setup", label: "Setup", icon: Download },
 			{ href: "/settings/webhooks", label: "Webhooks", icon: Webhook },
 			{ href: "/settings/data", label: "Data Retention", icon: Database },

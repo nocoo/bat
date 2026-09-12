@@ -31,6 +31,8 @@ import type {
 	Tier2Snapshot,
 	WebhookConfigRow,
 } from "@bat/shared";
+import type { ConnectRepository } from "./connect.js";
+import type { ConnectProductsRepository } from "./connect-products.js";
 
 /**
  * Host inventory + read/write surface. Powers the host overview/detail/
@@ -771,6 +773,8 @@ export interface AggregationRepository {
 }
 
 export interface Repositories {
+	connect: ConnectRepository;
+	connectProducts: ConnectProductsRepository;
 	hosts: HostsRepository;
 	metrics: MetricsRepository;
 	alerts: AlertsRepository;

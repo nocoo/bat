@@ -14,6 +14,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { CONNECT_OPERATIONS } from "../packages/worker/src/domain/connect-contract.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const WORKER_INDEX = join(ROOT, "packages/worker/src/index.ts");
@@ -40,7 +41,11 @@ function discoverDeclaredRoutes(): Route[] {
 			routes.push({ method: method.toUpperCase() as RouteMethod, path });
 		}
 	}
-	return routes;
+	return [
+		...routes,
+		...CONNECT_OPERATIONS.map(({ method, path }) => ({ method, path })),
+		{ method: "GET", path: "/api/v1" },
+	];
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +67,15 @@ function discoverE2ERequests(): Route[] {
 
 	for (const file of files) {
 		const src = readFileSync(join(E2E_DIR, file), "utf-8");
+		// Connect's named operation helper resolves the same explicit route manifest.
+		// Literal operation IDs in executed scenarios/parameter tables count as hits.
+		for (const operation of CONNECT_OPERATIONS) {
+			if (src.includes(`"${operation.id}"`))
+				requests.push({
+					method: operation.method,
+					path: operation.path.replace(/:[A-Za-z]+/g, "x"),
+				});
+		}
 
 		// Pattern 1: fetch(`${BASE}/api/x`, { method: "POST" })
 		const fetchRe =

@@ -308,6 +308,7 @@ describe("host-tag routes", () => {
 
 	test("hostTagsAdd: bad JSON", async () => {
 		const ctx = {
+			var: {},
 			env: { DB: db },
 			req: {
 				json: async () => {
@@ -359,6 +360,7 @@ describe("host-tag routes", () => {
 
 	test("hostTagsReplace: bad JSON", async () => {
 		const ctx = {
+			var: {},
 			env: { DB: db },
 			req: {
 				json: async () => {

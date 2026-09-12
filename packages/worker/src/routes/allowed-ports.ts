@@ -91,7 +91,7 @@ export function groupPortsByHost(
 export async function hostAllowedPortsListRoute(
 	c: Context<AppEnv, "/api/hosts/:id/allowed-ports">,
 ) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 	const result = await c.var.repos.ports.listForHost(hostId);
 	if (result.ok === "host_not_found") {
 		return c.json({ error: "Host not found" }, 404);
@@ -101,7 +101,7 @@ export async function hostAllowedPortsListRoute(
 
 /** POST /api/hosts/:id/allowed-ports */
 export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:id/allowed-ports">) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 
 	let body: unknown;
 	try {
@@ -129,7 +129,7 @@ export async function hostAllowedPortsAddRoute(c: Context<AppEnv, "/api/hosts/:i
 export async function hostAllowedPortsRemoveRoute(
 	c: Context<AppEnv, "/api/hosts/:id/allowed-ports/:port">,
 ) {
-	const hostId = c.req.param("id");
+	const hostId = c.var.connectToken?.server_id ?? c.req.param("id");
 	const port = parsePortParam(c.req.param("port"));
 
 	if (port === null) {

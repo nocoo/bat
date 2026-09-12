@@ -99,6 +99,7 @@ export {
 	validateOptionalString,
 	validateString,
 } from "./assets.js";
+export * from "./connect.js";
 // Constants
 export {
 	ALERT_THRESHOLDS,
@@ -159,7 +160,6 @@ export type {
 	TopProcess,
 	UdpMetrics,
 } from "./metrics.js";
-
 // Settings types and utilities
 export type { RetentionDays, SettingsResponse, SettingsUpdateBody } from "./settings.js";
 export {

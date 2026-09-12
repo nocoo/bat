@@ -4,6 +4,7 @@ import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router";
 import { SWRConfig } from "swr";
 import {
 	AlertsPage,
+	ConnectPage,
 	DataRetentionPage,
 	EventsPage,
 	HostDetailPage,
@@ -64,6 +65,7 @@ export function App() {
 									<Route path="/settings/webhooks" element={<WebhooksPage />} />
 									<Route path="/settings/data" element={<DataRetentionPage />} />
 									<Route path="/setup" element={<SetupPage />} />
+									<Route path="/connect" element={<ConnectPage />} />
 								</Routes>
 							</BrowserRouter>
 						</SWRConfig>

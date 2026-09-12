@@ -82,7 +82,7 @@ CLI 的 `agent`、`asset`、`binding` 提供管理操作。`service run` 接收 
 
 测试使用明确的本地资源；先安装依赖并构建静态资源。API runner 为 `packages/worker/test/e2e/global-setup.ts`，显式使用 `--local --persist-to .wrangler/e2e`，逐个应用迁移、写入测试标记，然后在 17025 启动 Worker。
 
-这个 runner 无条件写入 `packages/worker/.dev.vars`，仅当文件原先不存在时才在结束后删除。执行前应使用干净的独立 checkout，避免覆盖自己的开发配置。测试进程还不能携带 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 或 `CF_API_TOKEN`。
+API runner 和浏览器测试在 `.wrangler` 下生成各自独立的测试 keyring，显式通过 `--env-file` 加载，不会覆盖个人 `.dev.vars`。测试进程不能携带 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 或 `CF_API_TOKEN`。
 
 Playwright 使用 27025 与 `.wrangler/e2e-pw`，调用 `scripts/l3-webserver.sh` 初始化迁移与测试记录后启动本地 Worker。其配置在非 CI 模式可复用已有服务，因此运行前保持该端口空闲。L3 初始化脚本会忽略单条 SQL 的失败，最终应以测试结果判断，不能只看“Database ready”输出。
 

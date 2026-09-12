@@ -1,6 +1,8 @@
 name = "bat"
-main = "src/index.ts"
-compatibility_date = "2025-03-14"
+main = "src/entry.ts"
+compatibility_date = "2026-09-12"
+workers_dev = false
+preview_urls = false
 
 # Sidecar worker: main UI 7025 + 30000. Do not use wrangler default 8787.
 [dev]
@@ -17,7 +19,7 @@ crons = ["0 * * * *"]
 directory = "./static"
 binding = "ASSETS"
 # API routes handled by Worker first, everything else goes to static assets
-run_worker_first = ["/api/*"]
+run_worker_first = true
 # SPA fallback: 404 returns index.html for client-side routing
 not_found_handling = "single-page-application"
 
@@ -29,17 +31,39 @@ database_id = "89d4d080-3f18-4a40-a118-9f97c5cce2ae"
 
 [vars]
 ENVIRONMENT = "development"
+CONNECT_DEPLOYMENT_ID = "bat-local"
+
+[[durable_objects.bindings]]
+name = "CONNECT_COORDINATOR"
+class_name = "ConnectCoordinator"
+
+[[migrations]]
+tag = "connect-v1"
+new_sqlite_classes = ["ConnectCoordinator"]
+
+[[ratelimits]]
+name = "CONNECT_EDGE_LIMITER"
+namespace_id = "702501"
+simple = { limit = 600, period = 60 }
+
+[limits]
+cpu_ms = 1000
+
+# Connect audit records live in D1; do not collect invocation URLs/headers/bodies.
+[observability]
+enabled = false
 
 # Production environment overrides
 # Usage: wrangler deploy --env production
-# Secrets (set via `wrangler secret put`): BAT_WRITE_KEY, BAT_READ_KEY, CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD
+# Secrets: BAT_WRITE_KEY, BAT_READ_KEY, CF_ACCESS_TEAM_DOMAIN, CF_ACCESS_AUD,
+# CONNECT_TOKEN_KEYS (versioned 256-bit keyring), CONNECT_MANAGERS (product admins).
 [env.production]
 name = "bat"
 
 [env.production.assets]
 directory = "./static"
 binding = "ASSETS"
-run_worker_first = ["/api/*"]
+run_worker_first = true
 not_found_handling = "single-page-application"
 
 [[env.production.d1_databases]]
@@ -57,6 +81,16 @@ id = "57d8209ea2394f4cb76436a964b5618b"
 
 [env.production.vars]
 ENVIRONMENT = "production"
+CONNECT_DEPLOYMENT_ID = "bat-production"
+
+[[env.production.durable_objects.bindings]]
+name = "CONNECT_COORDINATOR"
+class_name = "ConnectCoordinator"
+
+[[env.production.ratelimits]]
+name = "CONNECT_EDGE_LIMITER"
+namespace_id = "702501"
+simple = { limit = 600, period = 60 }
 
 # Dual domain routing: machine endpoint + browser endpoint
 [[env.production.routes]]
