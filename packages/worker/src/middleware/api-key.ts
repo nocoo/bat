@@ -132,7 +132,8 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	// Connect has its own authentication. Static keys, CLI tokens and Access
 	// sessions must never short-circuit the v1 Bearer permission checks.
 	if (isConnectPath(path)) return next();
-	const host = c.req.header("host") || "";
+	const host =
+		c.env?.ENVIRONMENT === "production" ? new URL(c.req.url).hostname : c.req.header("host") || "";
 
 	// Public routes — no auth
 	if (PUBLIC_ROUTES.includes(path)) {

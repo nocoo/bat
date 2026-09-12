@@ -72,6 +72,39 @@ function req(
 describe("apiKeyAuth middleware", () => {
 	const app = createApp();
 
+	test("production machine authentication ignores a forged local Host header", async () => {
+		const production = new Hono<AppEnv>();
+		production.use("*", apiKeyAuth);
+		production.all("*", (c) => c.body(null, 204));
+		const env = {
+			DB: {} as D1Database,
+			ENVIRONMENT: "production",
+			BAT_WRITE_KEY: WRITE_KEY,
+			BAT_READ_KEY: READ_KEY,
+		};
+		for (const host of ["localhost", "127.0.0.1", "bat.dev.hexly.ai"]) {
+			for (const [method, path, key] of [
+				["POST", "/api/identity", WRITE_KEY],
+				["GET", "/api/monitoring/hosts", READ_KEY],
+				["GET", "/api/assets", READ_KEY],
+			] as const) {
+				const url = `https://bat-ingest.worker.hexly.ai${path}`;
+				expect((await production.request(url, { method, headers: { host } }, env)).status).toBe(
+					401,
+				);
+				expect(
+					(
+						await production.request(
+							url,
+							{ method, headers: { host, Authorization: `Bearer ${key}` } },
+							env,
+						)
+					).status,
+				).toBe(204);
+			}
+		}
+	});
+
 	describe("public routes", () => {
 		test("GET /api/live requires no auth", async () => {
 			const res = await app.request(req("GET", "/api/live"));
