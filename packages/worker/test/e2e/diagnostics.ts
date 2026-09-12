@@ -2,12 +2,7 @@ import { errorCategory } from "../../src/lib/error-category.js";
 
 const request = globalThis.fetch;
 globalThis.fetch = async (...args) => {
-	const [input, init] = args;
-	const headers = new Headers(
-		init?.headers ?? (input instanceof Request ? input.headers : undefined),
-	);
-	headers.set("Connection", "close");
-	const response = await request(input, { ...init, headers });
+	const response = await request(...args);
 	// Drain the transport even when a test only asserts status. Otherwise fetch's
 	// pooled sockets remain occupied by unread bodies until garbage collection.
 	const body = await response.clone().arrayBuffer();
