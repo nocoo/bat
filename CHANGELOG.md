@@ -1,5 +1,35 @@
 # Changelog
 
+## v2.3.0
+
+### Added
+- Add server-bound connect api
+
+### Changed
+- Record verified access configuration
+- Isolate local http connections
+- Drain http responses between checks
+- Diagnose worker errors without secrets
+- Audit connect access deployment
+- Pin docker and rust actions
+- Pin base-ci to ad43150
+- Pin base-ci to verified sha
+- Migrate workflows to base-ci
+- Upgrade basalt to 2.1.7
+
+### Fixed
+- Preserve locked dependencies during release
+- Use the protected dual-domain api boundary
+- Buffer queued configuration request bodies
+- Retain production runtime compatibility
+- Trust production url for api key auth
+- Make connect route gate build independent
+- Pass stable toolchain to rust action
+- Add release proof permissions
+
+### Removed
+- Drop unused ci secrets inherit
+
 ## v2.2.0
 
 ### Added
