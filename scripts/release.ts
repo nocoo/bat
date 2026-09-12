@@ -439,13 +439,13 @@ async function main(): Promise<void> {
 			console.error("❌ bun install failed");
 			process.exit(1);
 		}
-		// Sync Rust lockfile so probe/Cargo.lock matches new probe/Cargo.toml version.
-		const cargoResult = await run("cargo", ["generate-lockfile"], {
+		// Sync only the probe's version, preserving the tested dependency graph.
+		const cargoResult = await run("cargo", ["update", "--offline", "--package", "bat-probe"], {
 			cwd: pathResolve(PROJECT_ROOT, "probe"),
 			inherit: true,
 		});
 		if (cargoResult.code !== 0) {
-			console.error("❌ cargo generate-lockfile failed");
+			console.error("❌ cargo lockfile version sync failed");
 			process.exit(1);
 		}
 	}
