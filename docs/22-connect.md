@@ -81,7 +81,7 @@ Errors use one schema:
 | 501 | Explicitly unsupported product operation |
 | 503 / 504 | Dependency unavailable or deadline exceeded; a mutation may have an unknown outcome |
 
-Every response is `no-store`, has `X-Request-Id`, and never reflects an Authorization header. Connect permits no browser CORS; cross-origin/OPTIONS requests are denied. Management mutations additionally require the exact same Origin and `X-Bat-Management: 1`. Bearer credentials are not taken from URLs, forms or cookies.
+Every response is `no-store` and `no-transform`, has `X-Request-Id`, and never reflects an Authorization header. `no-transform` prevents CDN compression from weakening the configuration ETag: clients must be able to copy the returned strong validator into `If-Match` unchanged. Connect permits no browser CORS; cross-origin/OPTIONS requests are denied. Management mutations additionally require the exact same Origin and `X-Bat-Management: 1`. Bearer credentials are not taken from URLs, forms or cookies.
 
 Limits are 64 KiB streamed request bodies, five seconds to receive a body, 2 MiB responses and fifteen seconds for an operation. Native Cloudflare rate limiting applies 600 requests/minute per hashed source IP; D1 enforces 120 reads or 30 writes/minute per token and 60 management requests/minute per principal. The shared configuration queue holds at most 32 requests. The edge limiter is approximate per Cloudflare location; the D1 token limiter is authoritative across locations.
 

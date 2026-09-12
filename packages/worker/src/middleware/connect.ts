@@ -68,7 +68,7 @@ export function connectError(c: Context<AppEnv>, error: unknown): Response {
 }
 
 export function sensitiveHeaders(c: Context<AppEnv>): void {
-	c.header("Cache-Control", "no-store, private, max-age=0");
+	c.header("Cache-Control", "no-store, private, max-age=0, no-transform");
 	c.header("Pragma", "no-cache");
 	c.header("Referrer-Policy", "no-referrer");
 	c.header("X-Content-Type-Options", "nosniff");

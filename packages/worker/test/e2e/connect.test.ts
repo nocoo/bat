@@ -131,9 +131,12 @@ describe("Connect real HTTP / D1 / Durable Object", () => {
 			return value.data;
 		}
 
-		expect(
-			(await fetch(`${BASE}/api/v1`, { headers: { Authorization: `Bearer ${read}` } })).status,
-		).toBe(200);
+		const discovery = await fetch(`${BASE}/api/v1`, {
+			headers: { Authorization: `Bearer ${read}`, "Accept-Encoding": "gzip, br, zstd" },
+		});
+		expect(discovery.status).toBe(200);
+		expect(discovery.headers.get("Cache-Control")).toContain("no-transform");
+		expect(discovery.headers.get("ETag")).toMatch(/^"[^"\s]+"$/);
 		for (const operation of CONNECT_OPERATIONS.filter((op) => op.method !== "GET"))
 			expect((await call(operation.id, {}, {}, read)).status, `${operation.id} read scope`).toBe(
 				403,

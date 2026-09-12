@@ -18,6 +18,7 @@
 - Upgrade basalt to 2.1.7
 
 ### Fixed
+- Preserve strong Connect ETags through CDN compression so API clients can reuse them in If-Match.
 - Preserve locked dependencies during release
 - Use the protected dual-domain api boundary
 - Buffer queued configuration request bodies
