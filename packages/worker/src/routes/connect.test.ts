@@ -2,11 +2,11 @@ import { Validator } from "@cfworker/json-schema";
 import { describe, expect, test } from "vitest";
 import { fingerprint } from "../domain/connect.js";
 import {
-	CONNECT_OPERATIONS,
 	CONNECT_SCHEMAS,
 	connectOpenApi,
 	connectResponseSchema,
 } from "../domain/connect-contract.js";
+import { CONNECT_OPERATIONS } from "../domain/connect-operations.js";
 import { connectFixture, SERVER_A, SERVER_B } from "../test-helpers/connect.js";
 
 describe("Connect authentication and server authority", () => {

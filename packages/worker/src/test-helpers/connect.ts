@@ -1,6 +1,6 @@
 import type { ConnectScope, ConnectToken } from "@bat/shared";
 import { randomSecret } from "../domain/connect.js";
-import { CONNECT_OPERATIONS } from "../domain/connect-contract.js";
+import { CONNECT_OPERATIONS } from "../domain/connect-operations.js";
 import { app } from "../index.js";
 import type { Bindings } from "../types.js";
 import { createMockD1 } from "./mock-d1.js";

@@ -2,13 +2,12 @@ import { BAT_VERSION, CONNECT_LIMITS } from "@bat/shared";
 import type { Context, Hono } from "hono";
 import type { StatusCode } from "hono/utils/http-status";
 import { base64url, ConnectFault, fingerprint, seal, unseal } from "../domain/connect.js";
+import { connectOpenApi, validateConnectInput } from "../domain/connect-contract.js";
 import {
 	CONNECT_OPERATIONS,
 	CONNECT_UNSUPPORTED,
 	type ConnectOperation,
-	connectOpenApi,
-	validateConnectInput,
-} from "../domain/connect-contract.js";
+} from "../domain/connect-operations.js";
 import {
 	auditEntry,
 	connectBody,

@@ -16,7 +16,7 @@ Only local development with `ENVIRONMENT=development` and a loopback hostname pe
 
 API base: `https://bat.hexly.ai/api/v1`. An authenticated GET to the base or `/capabilities` describes the token's server, permissions, operation IDs, supported operations, limits and unsupported features. GET `/openapi.json` returns OpenAPI 3.1, including request/response JSON Schemas and security requirements. HEAD works for every GET. The release also provides an exported OpenAPI artifact.
 
-The contract and route registration share `CONNECT_OPERATIONS` in `packages/worker/src/domain/connect-contract.ts`; there is no arbitrary handler, SQL, upstream URL or method dispatch endpoint. The DTO schema snapshot is validated against actual resource responses by both unit and HTTP integration tests.
+The contract and route registration share `CONNECT_OPERATIONS` in `packages/worker/src/domain/connect-operations.ts`; there is no arbitrary handler, SQL, upstream URL or method dispatch endpoint. The DTO schema snapshot is validated against actual resource responses by both unit and HTTP integration tests.
 
 In this table, `S` means `/servers/{serverId}` under `/api/v1`.
 

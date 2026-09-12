@@ -14,7 +14,7 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { CONNECT_OPERATIONS } from "../packages/worker/src/domain/connect-contract.js";
+import { CONNECT_OPERATIONS } from "../packages/worker/src/domain/connect-operations.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const WORKER_INDEX = join(ROOT, "packages/worker/src/index.ts");

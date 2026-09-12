@@ -1,11 +1,8 @@
 import type { ConnectToken } from "@bat/shared";
 import { Validator } from "@cfworker/json-schema";
 import { describe, expect, test } from "vitest";
-import {
-	CONNECT_OPERATIONS,
-	CONNECT_SCHEMAS,
-	connectResponseSchema,
-} from "../../src/domain/connect-contract.js";
+import { CONNECT_SCHEMAS, connectResponseSchema } from "../../src/domain/connect-contract.js";
+import { CONNECT_OPERATIONS } from "../../src/domain/connect-operations.js";
 import { BASE, makeIdentityPayload, writeHeaders } from "./helpers.js";
 
 const SERVER = "e2e-connect-a",
