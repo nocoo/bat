@@ -1,8 +1,9 @@
-import type {
-	ConnectScope,
-	ConnectSensitiveAction,
-	ConnectServer,
-	ConnectToken,
+import {
+	CONNECT_API_ORIGIN,
+	type ConnectScope,
+	type ConnectSensitiveAction,
+	type ConnectServer,
+	type ConnectToken,
 } from "@bat/shared";
 import {
 	Badge,
@@ -86,7 +87,9 @@ export function ConnectPage() {
 	const [example, setExample] = useState<"curl" | "agent">("curl");
 	const opener = useRef<HTMLElement | null>(null);
 	const generation = useRef(0);
-	const baseUrl = servers.data?.apiBaseUrl ?? `${window.location.origin}/api/v1`;
+	const baseUrl =
+		servers.data?.apiBaseUrl ??
+		`${window.location.hostname === "bat.hexly.ai" ? CONNECT_API_ORIGIN : window.location.origin}/api/v1`;
 	const examples = connectExamples(baseUrl, serverId);
 	const active =
 		tokens.data?.data.filter((token) => connectTokenStatus(token) === "Active").length ?? 0;

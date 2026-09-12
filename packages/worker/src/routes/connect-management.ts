@@ -14,6 +14,7 @@ import {
 } from "../domain/connect.js";
 import {
 	auditEntry,
+	connectApiBaseUrl,
 	connectBody,
 	deploymentId,
 	isDevelopmentManager,
@@ -76,7 +77,7 @@ export async function connectServersRoute(c: Context<AppEnv>) {
 	);
 	return c.json({
 		data,
-		apiBaseUrl: `${new URL(c.req.url).origin}/api/v1`,
+		apiBaseUrl: connectApiBaseUrl(c),
 		requestId: c.var.connectRequestId,
 	});
 }

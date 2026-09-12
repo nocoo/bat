@@ -245,7 +245,9 @@ describe("Connect Access and request boundaries", () => {
 				f.env,
 			);
 		const empty = await browser("/api/connect/servers");
-		expect(((await empty.json()) as { data: unknown[] }).data).toHaveLength(0);
+		const discovery = (await empty.json()) as { data: unknown[]; apiBaseUrl: string };
+		expect(discovery.data).toHaveLength(0);
+		expect(discovery.apiBaseUrl).toBe("https://bat-ingest.worker.hexly.ai/api/v1");
 		await f.db
 			.prepare(
 				"INSERT INTO connect_server_grants(server_id,principal) VALUES (?, 'email:limited@example.invalid')",
@@ -290,10 +292,31 @@ describe("Connect Access and request boundaries", () => {
 		expect(reveal.status).toBe(200);
 		const secret = ((await reveal.json()) as { token: string }).token;
 		const bearer = () =>
-			browser(`/api/v1/servers/${SERVER_A}`, "", "GET", undefined, undefined, {
-				Authorization: `Bearer ${secret}`,
-			});
+			app.request(
+				`https://bat-ingest.worker.hexly.ai/api/v1/servers/${SERVER_A}`,
+				{ headers: { Authorization: `Bearer ${secret}` } },
+				f.env,
+			);
 		expect((await bearer()).status).toBe(200);
+		for (const [path, expected] of [
+			["/api/v1/capabilities", { baseUrl: discovery.apiBaseUrl }],
+			["/api/v1/openapi.json", { servers: [{ url: "https://bat-ingest.worker.hexly.ai" }] }],
+		] as const) {
+			const response = await app.request(
+				`https://bat-ingest.worker.hexly.ai${path}`,
+				{ headers: { Authorization: `Bearer ${secret}` } },
+				f.env,
+			);
+			expect(response.status).toBe(200);
+			expect(await response.json()).toMatchObject(expected);
+		}
+		expect(
+			(
+				await browser(`/api/v1/servers/${SERVER_A}`, "", "GET", undefined, undefined, {
+					Authorization: `Bearer ${secret}`,
+				})
+			).status,
+		).toBe(401);
 		expect((await browser("/api/v1/capabilities", "signed-manager")).status).toBe(401);
 		expect(
 			(
@@ -319,15 +342,21 @@ describe("Connect Access and request boundaries", () => {
 		expect(html.status).toBe(200);
 		expect(html.headers.get("Content-Security-Policy")).toContain("frame-ancestors 'none'");
 		expect(html.headers.get("Cache-Control")).toContain("no-store");
-		expect(
-			(
-				await app.request(
-					"https://bat-ingest.worker.hexly.ai/api/connect/servers",
-					{ headers: { "Cf-Access-Jwt-Assertion": "signed-manager" } },
-					f.env,
-				)
-			).status,
-		).toBe(403);
+		for (const path of ["/connect", "/api/connect/servers", "/api/auth/request-token"])
+			expect(
+				(
+					await app.request(
+						`https://bat-ingest.worker.hexly.ai${path}`,
+						{
+							headers: {
+								"Cf-Access-Jwt-Assertion": "signed-manager",
+								Host: "bat.hexly.ai",
+							},
+						},
+						f.env,
+					)
+				).status,
+			).toBe(403);
 		expect(
 			(
 				await app.request(

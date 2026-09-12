@@ -1,4 +1,10 @@
-import { BAT_VERSION, CONNECT_LIMITS, RETENTION_OPTIONS, TAG_COLOR_COUNT } from "@bat/shared";
+import {
+	BAT_VERSION,
+	CONNECT_API_ORIGIN,
+	CONNECT_LIMITS,
+	RETENTION_OPTIONS,
+	TAG_COLOR_COUNT,
+} from "@bat/shared";
 import { dereference, type Schema as JsonSchema, validate } from "@cfworker/json-schema";
 import { ConnectFault } from "./connect.js";
 import DTO_SCHEMAS from "./connect-dtos.json";
@@ -488,7 +494,7 @@ export function connectOpenApi() {
 			description:
 				"Server-bound Bearer API. write includes read. HEAD is supported for every GET. All responses are no-store. No browser CORS; cookies and legacy keys never authenticate v1. Runtime observation payloads retain Bat's existing extensible DTO fields.",
 		},
-		servers: [{ url: "https://bat.hexly.ai" }],
+		servers: [{ url: CONNECT_API_ORIGIN }],
 		paths,
 		components: {
 			securitySchemes: {

@@ -6,7 +6,6 @@
 
 import type { Context, Next } from "hono";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { isVersionedPath } from "../domain/connect.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
@@ -28,10 +27,6 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 		c.env?.ENVIRONMENT === "production"
 			? new URL(c.req.url).hostname
 			: c.req.header("host") || new URL(c.req.url).hostname;
-	// Access runs at Cloudflare's edge before Worker auth. Only this versioned
-	// API is bypassed at the edge, and it always requires connectBearer here.
-	if (isVersionedPath(c.req.path)) return next();
-
 	// localhost: skip Access JWT, continue with apiKeyAuth (local dev / E2E tests)
 	if (isLocalhost(host)) {
 		return next();

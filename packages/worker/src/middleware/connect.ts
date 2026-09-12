@@ -1,4 +1,4 @@
-import { CONNECT_LIMITS } from "@bat/shared";
+import { CONNECT_API_ORIGIN, CONNECT_LIMITS } from "@bat/shared";
 import type { Context, Next } from "hono";
 import {
 	ConnectFault,
@@ -13,6 +13,12 @@ import type { AppEnv } from "../types.js";
 import { isLocalhost } from "./entry-control.js";
 
 export const nowSeconds = (): number => Math.floor(Date.now() / 1000);
+
+export function connectApiBaseUrl(c: Context<AppEnv>): string {
+	const origin =
+		c.env.ENVIRONMENT === "production" ? CONNECT_API_ORIGIN : new URL(c.req.url).origin;
+	return `${origin}/api/v1`;
+}
 
 export function auditEntry(
 	c: Context<AppEnv>,

@@ -1,6 +1,7 @@
 /** Connect v1: a server is an existing Bat host, never an arbitrary tenant ID. */
 export type ConnectScope = "read" | "write";
 export type ConnectSensitiveAction = "reveal" | "rotate" | "revoke";
+export const CONNECT_API_ORIGIN = "https://bat-ingest.worker.hexly.ai";
 
 export interface ConnectToken {
 	id: string;

@@ -14,7 +14,7 @@ Only local development with `ENVIRONMENT=development` and a loopback hostname pe
 
 ## Discovery and resource coverage
 
-API base: `https://bat.hexly.ai/api/v1`. An authenticated GET to the base or `/capabilities` describes the token's server, permissions, operation IDs, supported operations, limits and unsupported features. GET `/openapi.json` returns OpenAPI 3.1, including request/response JSON Schemas and security requirements. HEAD works for every GET. The release also provides an exported OpenAPI artifact.
+API base: `https://bat-ingest.worker.hexly.ai/api/v1`. An authenticated GET to the base or `/capabilities` describes the token's server, permissions, operation IDs, supported operations, limits and unsupported features. GET `/openapi.json` returns OpenAPI 3.1, including request/response JSON Schemas and security requirements. HEAD works for every GET. The release also provides an exported OpenAPI artifact.
 
 The contract and route registration share `CONNECT_OPERATIONS` in `packages/worker/src/domain/connect-operations.ts`; there is no arbitrary handler, SQL, upstream URL or method dispatch endpoint. The DTO schema snapshot is validated against actual resource responses by both unit and HTTP integration tests.
 
@@ -122,16 +122,16 @@ Read `BAT_TOKEN` from your secret store. Keep it out of prompts, shell history, 
 
 ```bash
 printf 'Authorization: Bearer %s\n' "$BAT_TOKEN" |
-  curl --fail-with-body --header @- https://bat.hexly.ai/api/v1/capabilities
+  curl --fail-with-body --header @- https://bat-ingest.worker.hexly.ai/api/v1/capabilities
 
 printf 'Authorization: Bearer %s\n' "$BAT_TOKEN" |
-  curl --fail-with-body --header @- https://bat.hexly.ai/api/v1/openapi.json \
+  curl --fail-with-body --header @- https://bat-ingest.worker.hexly.ai/api/v1/openapi.json \
   --output bat-connect-openapi.json
 
 # Read SERVER_ID from capabilities; record ETag from this response.
 printf 'Authorization: Bearer %s\n' "$BAT_TOKEN" |
   curl --fail-with-body --header @- --include \
-  "https://bat.hexly.ai/api/v1/servers/$SERVER_ID"
+  "https://bat-ingest.worker.hexly.ai/api/v1/servers/$SERVER_ID"
 
 # Persist INTENT_ID and this exact request before sending.
 printf 'Authorization: Bearer %s\n' "$BAT_TOKEN" |
@@ -139,16 +139,16 @@ printf 'Authorization: Bearer %s\n' "$BAT_TOKEN" |
   --header 'Content-Type: application/json' \
   --header "If-Match: $ETAG" --header "Idempotency-Key: $INTENT_ID" \
   --data '{"description":"Primary application server"}' \
-  "https://bat.hexly.ai/api/v1/servers/$SERVER_ID/description"
+  "https://bat-ingest.worker.hexly.ai/api/v1/servers/$SERVER_ID/description"
 ```
 
 Agent instructions: discover capabilities and the OpenAPI contract first; operate only on the returned canonical server; follow pagination; read current state and ETag before writing; persist one idempotency key per intent; acknowledge destructive actions with `X-Bat-Confirm`; inspect unknown outcomes before any new intent. A read credential is sufficient for inventory, diagnostics and reconciliation reports.
 
 ## Access and deployment
 
-Cloudflare Access evaluates before the Worker. A valid Connect Bearer header alone cannot pass an interactive Access login application. The browser application must retain its existing Allow/Service Auth rules and JWT audience. Only the precise machine paths `bat.hexly.ai/api/v1` and `bat.hexly.ai/api/v1/*` receive an Access **Bypass** policy, so those requests reach the Worker's compulsory Connect authentication. The wildcard does not cover the exact parent. Do not bypass `/api/*`, `/connect`, `/api/connect/*`, `/api/auth/*` or the root hostname.
+Cloudflare Access evaluates before the Worker. A valid Connect Bearer header alone cannot pass an interactive Access login application. Connect uses Bat's existing dedicated machine hostname, `bat-ingest.worker.hexly.ai`, for `/api/v1` and `/api/v1/*`. This hostname is outside the browser Access application, and the Worker requires Connect Bearer authentication on every versioned request. No new Bypass, Service Auth or Allow policy is needed for the Agent API. The browser application retains its existing Allow/Service Auth rules and JWT audience. Its entire hostname, including `/connect`, `/api/connect/*`, `/api/auth/*` and `/api/v1`, remains protected by Access at both the edge and Worker. Only the existing `/api/live` health exception remains public.
 
-The existing production controls were verified through an authenticated, read-only browser export on 2026-09-12. Preserve these when adding the two Connect paths:
+The existing production controls were verified through an authenticated, read-only browser export on 2026-09-12. Preserve these existing controls for the dual-hostname deployment:
 
 | Application | Existing path coverage | Policies |
 |---|---|---|
@@ -157,12 +157,12 @@ The existing production controls were verified through an authenticated, read-on
 
 The browser audience is `f9289df18aed3f2a3f08ada1587c2a5fde199934b873c2026a94bf68863bdcd0`. These are legacy zone-scoped Access applications under zone `c64f1264b07d306e9ec8810cbec9f60f`; an empty account-scoped application listing does not mean the browser is unprotected. Verify access to the zone application/policy endpoints before attempting changes. Browser read access alone does not establish that an API credential can edit those policies.
 
-The independent machine domain `bat-ingest.worker.hexly.ai` also accepts `/api/v1` through the same Bearer validation; its whitelist rejects Connect management and SPA paths. Existing probe, event webhook and monitoring authentication stay separate. `GET /api/live` remains public. `run_worker_first=true` ensures the Worker verifies browser Access JWTs before serving SPA/assets, including the Connect UI.
+The canonical machine domain `bat-ingest.worker.hexly.ai` accepts `/api/v1` through compulsory Bearer validation; its whitelist rejects Connect management, browser authentication and SPA paths, including requests with forged Host or Access headers. The UI, capabilities and OpenAPI advertise this machine hostname. Browser requests to `/api/v1` would require both a valid Access session and a Connect Bearer token; Agents use the advertised machine endpoint instead. Existing probe, event webhook and monitoring authentication stay separate. `GET /api/live` remains public. `run_worker_first=true` ensures the Worker verifies browser Access JWTs before serving SPA/assets, including the Connect UI.
 
 Production requires these existing secrets: `BAT_READ_KEY`, `BAT_WRITE_KEY`, `CF_ACCESS_AUD`, `CF_ACCESS_TEAM_DOMAIN`. New secret names are `CONNECT_TOKEN_KEYS` and `CONNECT_MANAGERS`. Variables are `ENVIRONMENT=production` and `CONNECT_DEPLOYMENT_ID=bat-production`. Bindings are `DB`, optional `BAT_KV`, `ASSETS`, `CONNECT_COORDINATOR` and `CONNECT_EDGE_LIMITER`. The first DO class migration is `connect-v1`; D1 migration `0028_connect.sql` adds credential/grant/audit/retry tables, host tag ownership and configuration revision triggers.
 
 Deploy through the repository's Release workflow, which applies production D1 migrations **before** deploying Worker code. The `connect-access-audit` dispatch performs only metadata reads using the existing production environment token; it never deploys, changes policies or prints credentials. Keep the actual Access application/policy IDs, audience and predeployment Worker version in the release evidence.
 
-Rollback first removes only the two Connect Bypass applications (or disables those two policies), restoring inherited browser Access protection. Cloudflare [does not allow a direct version rollback across a Durable Object class lifecycle migration](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/#bindings). Recover by deploying the previous product source through CI **with the `ConnectCoordinator` export, its bindings and the `connect-v1` migration retained**. A compatibility export can return `503` for any old coordinator calls while the original Worker entry serves the previous product. Restore the previous asset routing configuration as well as its UI build. Keep the additive D1 schema and DO namespace; do not drop tables while any deployment may still use them. Keep encryption key versions so an eventual forward deployment can recover existing credentials. Revoking a compromised token and removing its issuer's grant take effect without redeploying. Secret removal must follow withdrawal of Connect traffic and code.
+No Access policy rollback is needed because Connect preserves the existing browser application and adds no Bypass. Cloudflare [does not allow a direct version rollback across a Durable Object class lifecycle migration](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/#bindings). Recover by deploying the previous product source through CI **with the `ConnectCoordinator` export, its bindings and the `connect-v1` migration retained**. A compatibility export can return `503` for any old coordinator calls while the original Worker entry serves the previous product. Restore the previous asset routing configuration as well as its UI build. Keep the additive D1 schema and DO namespace; do not drop tables while any deployment may still use them. Keep encryption key versions so an eventual forward deployment can recover existing credentials. Revoking a compromised token and removing its issuer's grant take effect without redeploying. Secret removal must follow withdrawal of Connect traffic and code.
 
-Validation includes the complete manifest's response contracts, read/write and host ownership matrices, real D1/DO HTTP tests, browser privacy/keyboard/mobile flows, audit and encryption failures, concurrent ETags, idempotency and every credential lifecycle transition. L2 and L3 always use separate local Wrangler databases and generated mode-0600 test keyrings under `.wrangler`; they never overwrite `.dev.vars` or use production D1. Production smoke uses dedicated temporary hosts, credentials and product records, then revokes/deletes those fixtures and temporary Access authorization.
+Validation includes the complete manifest's response contracts, read/write and host ownership matrices, real D1/DO HTTP tests, browser privacy/keyboard/mobile flows, audit and encryption failures, concurrent ETags, idempotency and every credential lifecycle transition. L2 and L3 always use separate local Wrangler databases and generated mode-0600 test keyrings under `.wrangler`; they never overwrite `.dev.vars` or use production D1. Production smoke uses dedicated temporary hosts, credentials and product records, then revokes/deletes those fixtures. Management and browser smoke use a short-lived human session obtained through the standard `cloudflared access login --quiet` flow, scoped to the existing application and configured user. This operator session is kept in a mode-0600 file, sent only as an Access header or authorization cookie, and never supplied to Agents. The normal Agent API needs only its own Connect Bearer token; it has no interactive login or Access service-token requirement.

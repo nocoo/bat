@@ -10,6 +10,7 @@ import {
 } from "../domain/connect-operations.js";
 import {
 	auditEntry,
+	connectApiBaseUrl,
 	connectBody,
 	connectError,
 	deploymentId,
@@ -179,7 +180,7 @@ function capabilities(c: Context<AppEnv>) {
 		serverId: token?.server_id,
 		scope: token?.scope,
 		permissions: token?.scope === "write" ? ["read", "write"] : ["read"],
-		baseUrl: `${new URL(c.req.url).origin}/api/v1`,
+		baseUrl: connectApiBaseUrl(c),
 		openapi: "/api/v1/openapi.json",
 		authorization:
 			"Every request checks the token, its server, the issuer's current product grant, and resource ownership. write includes read. Tokens cannot manage credentials or cross-server resources.",

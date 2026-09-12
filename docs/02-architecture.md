@@ -139,7 +139,7 @@ bat/
 
 ## Auth Model
 
-Connect extends this model with a separate server-bound Bearer surface at `/api/v1` and Access-protected credential management at `/api/connect`. Every request rechecks the token issuer's product grant and resource ownership. All static assets now pass Worker Access validation, and a Durable Object serializes control mutations across entry points. See [Connect architecture and deployment](22-connect.md) for the current permission matrix, encryption, discovery contract and precise Access path exceptions.
+Connect extends this model with a separate server-bound Bearer surface at `https://bat-ingest.worker.hexly.ai/api/v1` and Access-protected credential management at `/api/connect`. Every request rechecks the token issuer's product grant and resource ownership. All static assets now pass Worker Access validation, and a Durable Object serializes control mutations across entry points. See [Connect architecture and deployment](22-connect.md) for the current permission matrix, encryption, discovery contract and existing Access protection and machine hostname boundary.
 
 ### Three auth scopes
 
