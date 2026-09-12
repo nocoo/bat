@@ -87,8 +87,19 @@ import {
 type ProductHandler = (c: Context<AppEnv>) => Response | Promise<Response>;
 
 async function etag(c: Context<AppEnv>): Promise<string> {
-	const server = c.var.connectToken?.server_id ?? "";
+	// Preserve the existing singleton discovery ETag. Multi-server callers read
+	// the target server's ETag; a credential ETag cannot authorize a write.
+	const server =
+		c.var.connectServerId ??
+		(c.var.connectServerIds?.length === 1 ? c.var.connectServerIds[0] : undefined);
+	if (!server) return `"token:${c.var.connectToken?.id}:${c.var.connectToken?.version}"`;
 	return `"${(await fingerprint(`${deploymentId(c)}:${server}`)).slice(0, 16)}:${await c.var.repos.connect.revision(server)}"`;
+}
+
+async function pageServer(c: Context<AppEnv>): Promise<string> {
+	return (
+		c.var.connectServerId ?? fingerprint(JSON.stringify([...(c.var.connectServerIds ?? [])].sort()))
+	);
 }
 
 interface PageInput {
@@ -116,7 +127,7 @@ async function pageInput(c: Context<AppEnv>, operation: string): Promise<PageInp
 			if (rawCursor.length > 2048) throw new Error();
 			const cursor = JSON.parse(atob(rawCursor.replaceAll("-", "+").replaceAll("_", "/")));
 			if (
-				cursor.server !== c.var.connectToken?.server_id ||
+				cursor.server !== (await pageServer(c)) ||
 				cursor.operation !== operation ||
 				cursor.filter !== filter ||
 				typeof cursor.after !== "string" ||
@@ -135,10 +146,15 @@ async function pageInput(c: Context<AppEnv>, operation: string): Promise<PageInp
 	return { limit: Number(rawLimit), after, filter };
 }
 
-function cursor(c: Context<AppEnv>, operation: string, after: string, filter: string): string {
+async function cursor(
+	c: Context<AppEnv>,
+	operation: string,
+	after: string,
+	filter: string,
+): Promise<string> {
 	return base64url(
 		new TextEncoder().encode(
-			JSON.stringify({ server: c.var.connectToken?.server_id, operation, after, filter }),
+			JSON.stringify({ server: await pageServer(c), operation, after, filter }),
 		),
 	);
 }
@@ -165,10 +181,17 @@ async function page(c: Context<AppEnv>, operation: string, items: unknown[]) {
 		page: {
 			limit: input.limit,
 			nextCursor:
-				ordered.length > input.limit && last ? cursor(c, operation, last.key, input.filter) : null,
+				ordered.length > input.limit && last
+					? await cursor(c, operation, last.key, input.filter)
+					: null,
 		},
 		requestId: c.var.connectRequestId,
-		serverId: c.var.connectToken?.server_id,
+		...(c.var.connectServerId
+			? { serverId: c.var.connectServerId }
+			: {
+					serverIds: c.var.connectServerIds,
+					...(c.var.connectServerIds?.length === 1 ? { serverId: c.var.connectServerIds[0] } : {}),
+				}),
 	};
 }
 
@@ -177,13 +200,14 @@ function capabilities(c: Context<AppEnv>) {
 	return c.json({
 		apiVersion: "v1",
 		productVersion: BAT_VERSION,
-		serverId: token?.server_id,
+		serverIds: c.var.connectServerIds,
+		...(c.var.connectServerIds?.length === 1 ? { serverId: c.var.connectServerIds[0] } : {}),
 		scope: token?.scope,
 		permissions: token?.scope === "write" ? ["read", "write"] : ["read"],
 		baseUrl: connectApiBaseUrl(c),
 		openapi: "/api/v1/openapi.json",
 		authorization:
-			"Every request checks the token, its server, the issuer's current product grant, and resource ownership. write includes read. Tokens cannot manage credentials or cross-server resources.",
+			"A key can authorize multiple servers, and servers can have multiple keys. Every request checks the current selected servers, active hosts, issuer grants and target resource ownership. An empty set grants no server access. write includes read. Tokens cannot manage credentials or move resources across server paths.",
 		operations: CONNECT_OPERATIONS.map((operation) => ({
 			...operation,
 			path: operation.path.replace(/:([A-Za-z]+)/g, "{$1}"),
@@ -204,7 +228,18 @@ function capabilities(c: Context<AppEnv>) {
 const productHandlers: Record<string, ProductHandler> = {
 	"capabilities.get": capabilities,
 	"contract.get": (c) => c.json(connectOpenApi()),
-	"servers.list": hostsListRoute,
+	"servers.list": async (c) => {
+		const base = c.var.repos;
+		const allowed = new Set(c.var.connectServerIds);
+		c.set("repos", {
+			...base,
+			hosts: Object.assign(Object.create(base.hosts), {
+				listOverviewRows: async () =>
+					(await base.hosts.listOverviewRows()).filter((row) => allowed.has(row.host_id)),
+			}),
+		});
+		return hostsListRoute(c);
+	},
 	"server.get": hostDetailRoute,
 	"server.description.update": hostDescriptionPatchRoute,
 	"metrics.list": async (c) => {
@@ -239,7 +274,7 @@ const productHandlers: Record<string, ProductHandler> = {
 		if (input.after && !/^\d{20}$/.test(input.after))
 			throw new ConnectFault(400, "invalid_cursor", "Invalid event cursor.");
 		const rows = await c.var.repos.connectProducts.eventsPage(
-			c.var.connectToken?.server_id ?? "",
+			c.var.connectServerId ?? "",
 			Number(input.after || 0),
 			input.limit + 1,
 		);
@@ -249,7 +284,7 @@ const productHandlers: Record<string, ProductHandler> = {
 		const result = validateEventPayload(await connectBody(c));
 		if (!result.ok) throw new ConnectFault(400, "invalid_event", result.error);
 		await c.var.repos.connectProducts.appendEvent(
-			c.var.connectToken?.server_id ?? "",
+			c.var.connectServerId ?? "",
 			result.title,
 			result.bodyStr,
 			result.tags,
@@ -308,7 +343,7 @@ const productHandlers: Record<string, ProductHandler> = {
 				throw new ConnectFault(400, "invalid_cursor", "Invalid audit cursor.");
 		}
 		const rows = await c.var.repos.connect.audits(
-			c.var.connectToken?.server_id ?? "",
+			c.var.connectServerId ?? "",
 			before,
 			beforeId,
 			input.limit + 1,
@@ -321,11 +356,11 @@ const productHandlers: Record<string, ProductHandler> = {
 				limit: input.limit,
 				nextCursor:
 					rows.length > input.limit && last
-						? cursor(c, "audit.list", `${last.created_at}:${last.id}`, input.filter)
+						? await cursor(c, "audit.list", `${last.created_at}:${last.id}`, input.filter)
 						: null,
 			},
 			requestId: c.var.connectRequestId,
-			serverId: c.var.connectToken?.server_id,
+			serverId: c.var.connectServerId,
 		});
 	},
 	"requests.get": async (c) => {
@@ -333,7 +368,13 @@ const productHandlers: Record<string, ProductHandler> = {
 			c.var.connectToken?.id ?? "",
 			await fingerprint(c.req.param("key") ?? ""),
 		);
-		if (!row) throw new ConnectFault(404, "not_found", "Request not found for this token.");
+		if (!row || !c.var.connectServerIds?.includes(row.server_id))
+			throw new ConnectFault(
+				404,
+				"not_found",
+				"Request not found within this token's current server authorization.",
+			);
+		c.set("connectServerId", row.server_id);
 		return c.json({
 			state: row.state,
 			status: row.status,
@@ -402,7 +443,7 @@ async function invoke(c: Context<AppEnv>, operation: ConnectOperation): Promise<
 		return c.json(await page(c, operation.id, items), response.status as 200);
 	}
 	return c.json(
-		{ data: value, requestId: c.var.connectRequestId, serverId: c.var.connectToken?.server_id },
+		{ data: value, requestId: c.var.connectRequestId, serverId: c.var.connectServerId },
 		response.status as 200,
 	);
 }
@@ -412,8 +453,8 @@ async function runOperation(c: Context<AppEnv>, operation: ConnectOperation): Pr
 	const token = c.var.connectToken;
 	if (!token) throw new ConnectFault(401, "invalid_token", "A Connect token is required.");
 	const serverId = c.req.param("serverId");
-	if (serverId && serverId !== token.server_id)
-		throw new ConnectFault(403, "server_mismatch", "This token is bound to a different server.");
+	if (serverId && !c.var.connectServerIds?.includes(serverId))
+		throw new ConnectFault(403, "server_mismatch", "This token does not authorize this server.");
 	for (const name of [
 		"tagId",
 		"port",
@@ -437,7 +478,7 @@ async function runOperation(c: Context<AppEnv>, operation: ConnectOperation): Pr
 			"idempotency_required",
 			"Provide an Idempotency-Key (8–128 letters, digits, underscores or hyphens).",
 		);
-	if (operation.dangerous && c.req.header("X-Bat-Confirm") !== token.server_id)
+	if (operation.dangerous && c.req.header("X-Bat-Confirm") !== serverId)
 		throw new ConnectFault(
 			428,
 			"confirmation_required",
@@ -449,7 +490,7 @@ async function runOperation(c: Context<AppEnv>, operation: ConnectOperation): Pr
 	const digest = await fingerprint(
 		JSON.stringify([operation.id, c.req.path, new URL(c.req.url).search, body]),
 	);
-	const context = JSON.stringify(["request", deploymentId(c), token.server_id, token.id, keyHash]);
+	const context = JSON.stringify(["request", deploymentId(c), serverId, token.id, keyHash]);
 	const prior = await c.var.repos.connect.request(token.id, keyHash);
 	if (prior) {
 		if (prior.fingerprint !== digest)
@@ -490,6 +531,7 @@ async function runOperation(c: Context<AppEnv>, operation: ConnectOperation): Pr
 	await seal(c.env.CONNECT_TOKEN_KEYS, context, "");
 	const record: ConnectRequest = {
 		token_id: token.id,
+		server_id: serverId ?? "",
 		key_hash: keyHash,
 		fingerprint: digest,
 		request_id: c.var.connectRequestId as string,
@@ -560,8 +602,8 @@ export function registerConnectApi(app: Hono<AppEnv>): void {
 	app.all("/api/v1/*", (c) => {
 		const path = c.req.path;
 		const serverId = /\/servers\/([^/]+)/.exec(path)?.[1];
-		if (serverId && decodeURIComponent(serverId) !== c.var.connectToken?.server_id)
-			throw new ConnectFault(403, "server_mismatch", "This token is bound to a different server.");
+		if (serverId && !c.var.connectServerIds?.includes(decodeURIComponent(serverId)))
+			throw new ConnectFault(403, "server_mismatch", "This token does not authorize this server.");
 		if (
 			/^\/api\/v1\/(?:tokens|cli-tokens)(?:\/|$)/.test(path) ||
 			/\/execute$/.test(path) ||
@@ -570,7 +612,7 @@ export function registerConnectApi(app: Hono<AppEnv>): void {
 			throw new ConnectFault(
 				501,
 				"not_supported",
-				"This operation is not available to server-bound tokens. See capabilities.unsupported.",
+				"This operation is not available to Connect tokens. See capabilities.unsupported.",
 			);
 		throw new ConnectFault(404, "not_found", "Unknown Connect API resource or method.");
 	});

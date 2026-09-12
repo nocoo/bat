@@ -163,7 +163,7 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ steps.ver.outputs.version }}"
-          WRANGLER="./node_modules/.bin/wrangler"
+          WRANGLER="./packages/worker/node_modules/.bin/wrangler"
           test -x "$WRANGLER"
           reported=$("$WRANGLER" --version)
           echo "$reported" | grep -q "4.130.0"

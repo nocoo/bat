@@ -16,7 +16,7 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		id: "capabilities.get",
 		method: "GET",
 		path: `${root}/capabilities`,
-		summary: "Discover this token's authorized server, scopes, operations and limits",
+		summary: "Discover this key's currently authorized servers, scope, operations and limits",
 	},
 	{
 		id: "contract.get",
@@ -28,7 +28,7 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		id: "servers.list",
 		method: "GET",
 		path: `${root}/servers`,
-		summary: "List only the token's bound server",
+		summary: "List only the key's currently authorized servers (empty set returns an empty list)",
 		list: true,
 	},
 	{
@@ -385,7 +385,7 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		id: "settings.update",
 		method: "PUT",
 		path: `${server}/settings`,
-		summary: "Global retention cannot be changed with a server-bound token",
+		summary: "Global retention cannot be changed with a Connect token",
 		unsupported: "Retention applies to every server. Use browser workspace administration.",
 	},
 	{
@@ -424,7 +424,7 @@ export const CONNECT_UNSUPPORTED = [
 	{
 		feature: "cross_server.bindings",
 		reason:
-			"Both ends must belong to the bound server; unassigned resources are outside the token's authority.",
+			"Both ends must belong to the request's target server, even if the key also authorizes other servers; unassigned resources remain outside its authority.",
 	},
 	{
 		feature: "credentials.management",

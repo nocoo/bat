@@ -10,8 +10,10 @@ import {
 	tokenContext,
 	tokenMetadata,
 	unseal,
+	validateServerIds,
 	validateTokenInput,
 } from "../domain/connect.js";
+import { connectManagementOpenApi } from "../domain/connect-contract.js";
 import {
 	auditEntry,
 	connectApiBaseUrl,
@@ -37,9 +39,67 @@ async function server(c: Context<AppEnv>): Promise<string> {
 }
 
 async function token(c: Context<AppEnv>): Promise<ConnectTokenRow> {
-	const row = await c.var.repos.connect.token(c.req.param("tokenId") ?? "", await server(c));
-	if (!row) throw new ConnectFault(404, "not_found", "Token not found on this server.");
+	if (c.req.param("serverId")) await server(c);
+	const row = await c.var.repos.connect.token(
+		c.req.param("tokenId") ?? "",
+		c.req.param("serverId"),
+	);
+	if (!row) throw new ConnectFault(404, "not_found", "Token not found.");
+	const authority = await managementAuthority(c);
+	if (!canManage(row, authority))
+		throw new ConnectFault(
+			403,
+			"token_forbidden",
+			"Managing a key requires authority over its entire server set.",
+		);
 	return row;
+}
+
+async function managementAuthority(c: Context<AppEnv>) {
+	const principal = c.var.accessPrincipal ?? "";
+	const global = isDevelopmentManager(c) || configuredManager(c.env.CONNECT_MANAGERS, principal);
+	const ids = new Set((await c.var.repos.connect.servers(principal, global)).map((row) => row.id));
+	return { principal, global, ids };
+}
+
+function canManage(
+	row: ConnectTokenRow,
+	authority: Awaited<ReturnType<typeof managementAuthority>>,
+): boolean {
+	return (
+		authority.global ||
+		(row.server_ids.length
+			? row.server_ids.every((id) => authority.ids.has(id))
+			: row.owner === authority.principal)
+	);
+}
+
+async function selectedServers(c: Context<AppEnv>, value: unknown): Promise<string[]> {
+	const ids = validateServerIds(value);
+	const authority = await managementAuthority(c);
+	if (ids.some((id) => !authority.ids.has(id)))
+		throw new ConnectFault(
+			403,
+			"server_forbidden",
+			"Every selected server must exist, be active, and be authorized for you.",
+		);
+	return ids;
+}
+
+function tokenAudit(
+	c: Context<AppEnv>,
+	row: ConnectTokenRow,
+	operation: string,
+	status: number,
+	previous: string[] | null = null,
+) {
+	return {
+		...auditEntry(c, operation, status),
+		server_id: null,
+		token_id: row.id,
+		server_ids: [...row.server_ids],
+		previous_server_ids: previous,
+	};
 }
 
 function expectVersion(c: Context<AppEnv>, row: ConnectTokenRow): void {
@@ -84,20 +144,41 @@ export async function connectServersRoute(c: Context<AppEnv>) {
 
 export async function connectTokensListRoute(c: Context<AppEnv>) {
 	c.set("connectOperation", "management.tokens.list");
+	if (c.req.param("serverId")) await server(c);
+	const authority = await managementAuthority(c);
 	return c.json({
-		data: (await c.var.repos.connect.tokens(await server(c))).map(tokenMetadata),
+		data: (await c.var.repos.connect.tokens(c.req.param("serverId")))
+			.filter((row) => canManage(row, authority))
+			.map(tokenMetadata),
 		requestId: c.var.connectRequestId,
 	});
 }
 
 export async function connectTokensCreateRoute(c: Context<AppEnv>) {
 	c.set("connectOperation", "management.tokens.create");
-	const serverId = await server(c);
+	const body = await connectBody(c);
+	if (Object.keys(body).some((key) => !["name", "scope", "expiresAt", "serverIds"].includes(key)))
+		throw new ConnectFault(400, "invalid_field", "Use name, scope, expiresAt and serverIds.");
+	const authority = await managementAuthority(c);
+	if (!authority.global && !authority.ids.size)
+		throw new ConnectFault(403, "server_forbidden", "A product grant is required to create keys.");
+	const legacyServer = c.req.param("serverId");
+	const serverIds = await selectedServers(
+		c,
+		Object.hasOwn(body, "serverIds") ? body.serverIds : legacyServer ? [legacyServer] : undefined,
+	);
+	if (legacyServer && !serverIds.includes(legacyServer))
+		throw new ConnectFault(
+			400,
+			"invalid_servers",
+			"The legacy server path must be included in serverIds.",
+		);
 	const now = nowSeconds();
-	const input = validateTokenInput(await connectBody(c), now);
+	const input = validateTokenInput(body, now);
 	const row: ConnectTokenRow = {
 		id: crypto.randomUUID(),
-		server_id: serverId,
+		server_id: "",
+		server_ids: serverIds,
 		name: input.name,
 		scope: input.scope,
 		prefix: "",
@@ -111,13 +192,12 @@ export async function connectTokensCreateRoute(c: Context<AppEnv>) {
 		version: 1,
 	};
 	await replaceSecret(c, row);
-	const audit = auditEntry(c, "management.tokens.create", 201);
-	audit.token_id = row.id;
+	const audit = tokenAudit(c, row, "management.tokens.create", 201);
 	if (!(await c.var.repos.connect.createToken(row, audit)))
 		throw new ConnectFault(
 			422,
 			"token_limit",
-			"Revoke an existing token before creating another (50 active tokens per server).",
+			"Revoke an existing token before creating another (50 active tokens per server, 200 per issuer).",
 		);
 	c.set("connectAudited", true);
 	c.header("ETag", `"${row.id}:1"`);
@@ -125,27 +205,69 @@ export async function connectTokensCreateRoute(c: Context<AppEnv>) {
 }
 
 export async function connectTokenRenameRoute(c: Context<AppEnv>) {
-	c.set("connectOperation", "management.tokens.rename");
+	c.set("connectOperation", "management.tokens.update");
 	const row = await token(c);
 	expectVersion(c, row);
 	const body = await connectBody(c);
-	if (Object.keys(body).some((key) => key !== "name"))
+	const allowed = c.req.param("serverId")
+		? ["name", "serverIds"]
+		: ["name", "serverIds", "scope", "expiresAt"];
+	if (!Object.keys(body).length || Object.keys(body).some((key) => !allowed.includes(key)))
 		throw new ConnectFault(
 			400,
 			"invalid_field",
-			"Only name can be changed; create a new token to change scope or expiry.",
+			"Use name, serverIds, scope or expiresAt; scope and expiry changes require the canonical /api/connect/tokens endpoint.",
 		);
-	row.name = validateTokenInput({ name: body.name, scope: row.scope }, nowSeconds()).name;
+	const previous = [...row.server_ids];
+	if (Object.hasOwn(body, "serverIds")) row.server_ids = await selectedServers(c, body.serverIds);
+	// A co-manager must not grant servers outside the issuer's current authority.
+	const issuerGlobal =
+		configuredManager(c.env.CONNECT_MANAGERS, row.owner) ||
+		(isDevelopmentManager(c) && row.owner === "local:developer");
+	const issuerServers = new Set(
+		(await c.var.repos.connect.servers(row.owner, issuerGlobal)).map((entry) => entry.id),
+	);
+	if (row.server_ids.some((id) => !previous.includes(id) && !issuerServers.has(id)))
+		throw new ConnectFault(
+			403,
+			"server_forbidden",
+			"The key issuer must also be authorized for every added server.",
+		);
+	const input = validateTokenInput(
+		{
+			name: Object.hasOwn(body, "name") ? body.name : row.name,
+			scope: Object.hasOwn(body, "scope") ? body.scope : row.scope,
+			expiresAt: body.expiresAt,
+		},
+		nowSeconds(),
+	);
+	const expiry = Object.hasOwn(body, "expiresAt") ? input.expiresAt : row.expires_at;
+	if (input.scope !== row.scope || expiry !== row.expires_at) {
+		const plaintext = await unseal(
+			c.env.CONNECT_TOKEN_KEYS,
+			tokenContext(deploymentId(c), row),
+			row.ciphertext,
+		);
+		row.scope = input.scope;
+		row.expires_at = expiry;
+		row.ciphertext = await seal(
+			c.env.CONNECT_TOKEN_KEYS,
+			tokenContext(deploymentId(c), row),
+			plaintext,
+		);
+	}
+	row.name = input.name;
 	if (
 		!(await c.var.repos.connect.changeToken(
 			row,
 			row.version,
-			auditEntry(c, "management.tokens.rename", 200),
+			tokenAudit(c, row, "management.tokens.update", 200, previous),
 		))
 	)
 		throw new ConnectFault(412, "version_conflict", "The token changed. Refresh the list.");
 	c.set("connectAudited", true);
 	row.version++;
+	c.header("ETag", `"${row.id}:${row.version}"`);
 	return c.json({ data: tokenMetadata(row), requestId: c.var.connectRequestId });
 }
 
@@ -169,6 +291,8 @@ export async function connectTokenChallengeRoute(c: Context<AppEnv>) {
 		action,
 		expiresAt,
 	);
+	await c.var.repos.connect.audit(tokenAudit(c, row, "management.tokens.confirmation", 200));
+	c.set("connectAudited", true);
 	return c.json({
 		challenge,
 		expiresAt: new Date(expiresAt * 1000).toISOString(),
@@ -211,7 +335,7 @@ async function sensitiveAction(c: Context<AppEnv>, action: ConnectSensitiveActio
 			tokenContext(deploymentId(c), row),
 			row.ciphertext,
 		);
-		await c.var.repos.connect.audit(auditEntry(c, "management.tokens.reveal", 200));
+		await c.var.repos.connect.audit(tokenAudit(c, row, "management.tokens.reveal", 200));
 		c.set("connectAudited", true);
 		return c.json({ token: plaintext, hideAfterSeconds: 30, requestId: c.var.connectRequestId });
 	}
@@ -224,18 +348,49 @@ async function sensitiveAction(c: Context<AppEnv>, action: ConnectSensitiveActio
 		!(await c.var.repos.connect.changeToken(
 			row,
 			row.version,
-			auditEntry(c, `management.tokens.${action}`, 200),
+			tokenAudit(c, row, `management.tokens.${action}`, 200, row.server_ids),
 		))
 	)
 		throw new ConnectFault(412, "version_conflict", "The token changed. Refresh the list.");
 	c.set("connectAudited", true);
 	row.version++;
+	c.header("ETag", `"${row.id}:${row.version}"`);
 	return c.json({ data: tokenMetadata(row), requestId: c.var.connectRequestId });
 }
 
 export const connectTokenRevealRoute = (c: Context<AppEnv>) => sensitiveAction(c, "reveal");
 export const connectTokenRotateRoute = (c: Context<AppEnv>) => sensitiveAction(c, "rotate");
 export const connectTokenRevokeRoute = (c: Context<AppEnv>) => sensitiveAction(c, "revoke");
+
+export async function connectTokenGetRoute(c: Context<AppEnv>) {
+	c.set("connectOperation", "management.tokens.get");
+	const row = await token(c);
+	c.header("ETag", `"${row.id}:${row.version}"`);
+	return c.json({ data: tokenMetadata(row), requestId: c.var.connectRequestId });
+}
+
+export async function connectTokenAuditRoute(c: Context<AppEnv>) {
+	c.set("connectOperation", "management.tokens.audit");
+	const row = await token(c);
+	const authority = await managementAuthority(c);
+	const history = await c.var.repos.connect.tokenAudits(row.id);
+	const data = authority.global
+		? history
+		: history
+				.filter((entry) => !entry.server_id || authority.ids.has(entry.server_id))
+				.map((entry) => ({
+					...entry,
+					server_ids: entry.server_ids?.filter((id) => authority.ids.has(id)) ?? [],
+					previous_server_ids:
+						entry.previous_server_ids?.filter((id) => authority.ids.has(id)) ?? null,
+				}));
+	return c.json({ data, requestId: c.var.connectRequestId });
+}
+
+export function connectManagementOpenApiRoute(c: Context<AppEnv>) {
+	c.set("connectOperation", "management.contract.get");
+	return c.json(connectManagementOpenApi());
+}
 
 export async function connectAuditRoute(c: Context<AppEnv>) {
 	c.set("connectOperation", "management.audit.list");

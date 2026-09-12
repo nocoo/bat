@@ -5,7 +5,9 @@ export const CONNECT_API_ORIGIN = "https://bat-ingest.worker.hexly.ai";
 
 export interface ConnectToken {
 	id: string;
-	serverId: string;
+	serverIds: string[];
+	/** @deprecated Singleton compatibility only; use serverIds for authorization. */
+	serverId?: string;
 	name: string;
 	scope: ConnectScope;
 	prefix: string;
@@ -41,6 +43,8 @@ export const CONNECT_LIMITS = {
 	readPerMinute: 120,
 	writePerMinute: 30,
 	tokensPerServer: 50,
+	tokensPerOwner: 200,
+	serversPerToken: 100,
 	confirmationSeconds: 60,
 	auditRetentionDays: 90,
 	idempotencyResponseDays: 7,

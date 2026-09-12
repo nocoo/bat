@@ -173,7 +173,7 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 /** GET /api/monitoring/hosts/:id — single host health for keyword monitoring */
 export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitoring/hosts/:id">) {
 	const repos = c.var.repos;
-	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
+	const idParam = c.var.connectServerId ?? c.req.param("id");
 	const now = Math.floor(Date.now() / 1000);
 
 	const hostId = await resolveHostIdByHash(repos.hosts, idParam);

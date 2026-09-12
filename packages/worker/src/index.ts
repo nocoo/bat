@@ -47,8 +47,11 @@ import { cliTokensDeleteRoute, cliTokensListRoute } from "./routes/cli-tokens.js
 import { registerConnectApi } from "./routes/connect-api.js";
 import {
 	connectAuditRoute,
+	connectManagementOpenApiRoute,
 	connectServersRoute,
+	connectTokenAuditRoute,
 	connectTokenChallengeRoute,
+	connectTokenGetRoute,
 	connectTokenRenameRoute,
 	connectTokenRevealRoute,
 	connectTokenRevokeRoute,
@@ -143,6 +146,16 @@ app.onError((error, c) => {
 });
 
 app.get("/api/connect/servers", connectServersRoute);
+app.get("/api/connect/openapi.json", connectManagementOpenApiRoute);
+app.get("/api/connect/tokens", connectTokensListRoute);
+app.post("/api/connect/tokens", connectTokensCreateRoute);
+app.get("/api/connect/tokens/:tokenId", connectTokenGetRoute);
+app.patch("/api/connect/tokens/:tokenId", connectTokenRenameRoute);
+app.post("/api/connect/tokens/:tokenId/challenge", connectTokenChallengeRoute);
+app.post("/api/connect/tokens/:tokenId/reveal", connectTokenRevealRoute);
+app.post("/api/connect/tokens/:tokenId/rotate", connectTokenRotateRoute);
+app.post("/api/connect/tokens/:tokenId/revoke", connectTokenRevokeRoute);
+app.get("/api/connect/tokens/:tokenId/audit", connectTokenAuditRoute);
 app.get("/api/connect/servers/:serverId/tokens", connectTokensListRoute);
 app.post("/api/connect/servers/:serverId/tokens", connectTokensCreateRoute);
 app.patch("/api/connect/servers/:serverId/tokens/:tokenId", connectTokenRenameRoute);

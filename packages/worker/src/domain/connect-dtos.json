@@ -494,6 +494,16 @@
 			"server_id": {
 				"type": ["string", "null"]
 			},
+			"server_ids": {
+				"type": "array",
+				"items": { "type": "string" },
+				"description": "Authorization after the operation. Server audit endpoints include only their own server."
+			},
+			"previous_server_ids": {
+				"type": ["array", "null"],
+				"items": { "type": "string" },
+				"description": "Authorization before a key change; null when not applicable."
+			},
 			"token_id": {
 				"type": ["string", "null"]
 			},

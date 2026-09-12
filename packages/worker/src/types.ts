@@ -25,6 +25,8 @@ export type Variables = {
 	accessAuthenticated?: boolean;
 	accessPrincipal?: string;
 	connectToken?: ConnectTokenRow;
+	connectServerId?: string;
+	connectServerIds?: string[];
 	connectRequestId?: string;
 	connectOperation?: string;
 	connectErrorCode?: string;

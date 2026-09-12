@@ -11,10 +11,13 @@ export interface ConnectAudit {
 	status: number;
 	code: string | null;
 	created_at: number;
+	server_ids?: string[];
+	previous_server_ids?: string[] | null;
 }
 
 export interface ConnectRequest {
 	token_id: string;
+	server_id: string;
 	key_hash: string;
 	fingerprint: string;
 	request_id: string;
@@ -28,8 +31,8 @@ export interface ConnectRequest {
 export interface ConnectRepository {
 	servers(principal: string, globalManager: boolean): Promise<ConnectServer[]>;
 	authorized(serverId: string, principal: string, globalManager: boolean): Promise<boolean>;
-	tokens(serverId: string): Promise<ConnectTokenRow[]>;
-	token(id: string, serverId: string): Promise<ConnectTokenRow | null>;
+	tokens(serverId?: string): Promise<ConnectTokenRow[]>;
+	token(id: string, serverId?: string): Promise<ConnectTokenRow | null>;
 	findToken(hash: string): Promise<ConnectTokenRow | null>;
 	createToken(row: ConnectTokenRow, audit: ConnectAudit): Promise<boolean>;
 	changeToken(row: ConnectTokenRow, expectedVersion: number, audit: ConnectAudit): Promise<boolean>;
@@ -60,5 +63,6 @@ export interface ConnectRepository {
 		beforeId: string,
 		limit: number,
 	): Promise<ConnectAudit[]>;
+	tokenAudits(tokenId: string): Promise<ConnectAudit[]>;
 	maintenance(now: number): Promise<void>;
 }

@@ -172,7 +172,7 @@ class MockD1PreparedStatement implements D1PreparedStatement {
  * Create an in-memory D1Database mock backed by bun:sqlite.
  * Applies the initial migration schema automatically.
  */
-export function createMockD1(): D1Database {
+export function createMockD1(connectVersion: 28 | 29 = 29): D1Database {
 	const db = new Database(":memory:");
 	// WAL mode not needed for in-memory, but matches production
 	db.exec("PRAGMA journal_mode = WAL");
@@ -411,6 +411,10 @@ export function createMockD1(): D1Database {
 	);
 	db.exec(dropTopProcessesFromRawSchema);
 	db.exec(readFileSync(resolve(__dirname, "../../migrations/0028_connect.sql"), "utf-8"));
+	if (connectVersion === 29)
+		db.exec(
+			readFileSync(resolve(__dirname, "../../migrations/0029_connect_token_servers.sql"), "utf-8"),
+		);
 
 	return {
 		prepare(sql: string): D1PreparedStatement {

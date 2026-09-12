@@ -31,6 +31,23 @@ const object = (properties: Record<string, Schema>, required: string[] = []): Sc
 const enumString = (...values: string[]): Schema => ({ type: "string", enum: values });
 const ref = (name: string): Schema => ({ $ref: `#/components/schemas/${name}` });
 const array = (items: Schema): Schema => ({ type: "array", items });
+const serverIds = {
+	...array({ ...string, minLength: 1, maxLength: 256 }),
+	maxItems: CONNECT_LIMITS.serversPerToken,
+	description:
+		"Explicit canonical server IDs. Duplicates are normalized. [] grants no server access; it never means all servers.",
+};
+const tokenFields = {
+	name: { ...string, minLength: 1, maxLength: 64 },
+	scope: enumString("read", "write"),
+	serverIds,
+	expiresAt: {
+		...nullableString,
+		format: "date-time",
+		default: null,
+		description: "Omit or use null for no expiry.",
+	},
+};
 const tagIds = object(
 	{
 		tag_ids: {
@@ -65,6 +82,45 @@ const assetFields = {
 
 export const CONNECT_SCHEMAS: Record<string, Schema> = {
 	...DTO_SCHEMAS,
+	ConnectToken: object(
+		{
+			...tokenFields,
+			serverIds: { ...serverIds, uniqueItems: true },
+			serverId: {
+				...string,
+				deprecated: true,
+				description: "Singleton compatibility only; use serverIds.",
+			},
+			id: string,
+			prefix: string,
+			createdAt: string,
+			lastUsedAt: nullableString,
+			revokedAt: nullableString,
+			version: { type: "integer", minimum: 1 },
+		},
+		[
+			"id",
+			"name",
+			"scope",
+			"serverIds",
+			"prefix",
+			"createdAt",
+			"lastUsedAt",
+			"expiresAt",
+			"revokedAt",
+			"version",
+		],
+	),
+	ConnectTokenCreate: {
+		...object(tokenFields, ["name", "scope", "serverIds"]),
+		additionalProperties: false,
+	},
+	ConnectTokenUpdate: { ...object(tokenFields), minProperties: 1, additionalProperties: false },
+	ConnectConfirmation: object({ action: enumString("reveal", "rotate", "revoke") }, ["action"]),
+	ConnectSensitiveAction: object({ challenge: string, confirmation: string }, [
+		"challenge",
+		"confirmation",
+	]),
 	AgentCreate: object(
 		{
 			...agentFields,
@@ -181,9 +237,18 @@ export const CONNECT_SCHEMAS: Record<string, Schema> = {
 	),
 	Capabilities: object(
 		{
+			serverId: {
+				...string,
+				deprecated: true,
+				description: "Present only for one effective server; use serverIds.",
+			},
 			apiVersion: { const: "v1" },
 			productVersion: string,
-			serverId: string,
+			serverIds: {
+				...array(string),
+				uniqueItems: true,
+				description: "Currently authorized active servers. Empty means no server access.",
+			},
 			scope: enumString("read", "write"),
 			permissions: array(enumString("read", "write")),
 			baseUrl: string,
@@ -212,7 +277,7 @@ export const CONNECT_SCHEMAS: Record<string, Schema> = {
 		[
 			"apiVersion",
 			"productVersion",
-			"serverId",
+			"serverIds",
 			"scope",
 			"permissions",
 			"operations",
@@ -369,6 +434,15 @@ export function connectResponseSchema(operation: ConnectOperation): Schema {
 	if (operation.list || operation.id === "hostTags.replace") data = array(data);
 	const properties: Record<string, Schema> = { data, requestId: string, serverId: string };
 	const required = ["data", "requestId", "serverId"];
+	if (operation.id === "servers.list") {
+		properties.serverId = {
+			...string,
+			deprecated: true,
+			description: "Singleton compatibility only; use serverIds.",
+		};
+		properties.serverIds = array(string);
+		required[2] = "serverIds";
+	}
 	if (operation.list) {
 		properties.page = object(
 			{ limit: { type: "integer", minimum: 1, maximum: 100 }, nextCursor: nullableString },
@@ -440,7 +514,7 @@ export function connectOpenApi() {
 					required: true,
 					schema: string,
 					description:
-						"Configuration ETag from a GET; stale writes return 412. Includes browser and CLI control changes, excludes probe samples.",
+						"Configuration ETag from a GET on the target server; stale writes return 412. Shared by all keys authorizing that server. Includes browser and CLI control changes, excludes probe samples.",
 				},
 			);
 		if (operation.dangerous)
@@ -461,7 +535,8 @@ export function connectOpenApi() {
 			"x-supported": !operation.unsupported,
 			responses: {
 				"200": {
-					description: "Success (GET responses carry a server configuration ETag)",
+					description:
+						"Success (server-scoped GET responses carry that server's configuration ETag)",
 					content: { "application/json": { schema: connectResponseSchema(operation) } },
 				},
 				"201": {
@@ -492,7 +567,7 @@ export function connectOpenApi() {
 			title: "Bat Connect API",
 			version: BAT_VERSION,
 			description:
-				"Server-bound Bearer API. write includes read. HEAD is supported for every GET. All responses are no-store. No browser CORS; cookies and legacy keys never authenticate v1. Runtime observation payloads retain Bat's existing extensible DTO fields.",
+				"Many-to-many key/server authorization. A key selects an explicit server set; a server can have multiple keys. Empty means no server access. Authorization, issuer grants and host activity are checked on every request. Each resource path remains confined to its selected server, even when the key authorizes others. write includes read. HEAD is supported for every GET. All responses are no-store. No browser CORS; cookies and legacy keys never authenticate v1. Runtime observation payloads retain Bat's existing extensible DTO fields.",
 		},
 		servers: [{ url: CONNECT_API_ORIGIN }],
 		paths,
@@ -508,5 +583,174 @@ export function connectOpenApi() {
 		},
 		"x-limits": CONNECT_LIMITS,
 		"x-unsupported": CONNECT_UNSUPPORTED,
+		"x-management-openapi": "https://bat.hexly.ai/api/connect/openapi.json",
+	};
+}
+
+/** Browser management has its own Access-protected contract and authority. */
+export function connectManagementOpenApi() {
+	const paths: Record<string, Record<string, unknown>> = {};
+	const tokenEnvelope = object({ data: ref("ConnectToken"), requestId: string }, [
+		"data",
+		"requestId",
+	]);
+	const endpoints = [
+		{
+			path: "/servers",
+			method: "get",
+			summary: "List servers this manager may select",
+			response: object(
+				{
+					data: array(object({ id: string, name: string }, ["id", "name"])),
+					apiBaseUrl: string,
+					requestId: string,
+				},
+				["data", "apiBaseUrl", "requestId"],
+			),
+		},
+		{
+			path: "/tokens",
+			method: "get",
+			summary: "List keys the manager may manage in full",
+			response: object({ data: array(ref("ConnectToken")), requestId: string }, [
+				"data",
+				"requestId",
+			]),
+		},
+		{
+			path: "/tokens",
+			method: "post",
+			summary: "Create a key with an explicit server set",
+			body: "ConnectTokenCreate",
+			response: tokenEnvelope,
+		},
+		{
+			path: "/tokens/{tokenId}",
+			method: "get",
+			summary: "Read key metadata and its ETag",
+			response: tokenEnvelope,
+		},
+		{
+			path: "/tokens/{tokenId}",
+			method: "patch",
+			summary: "Atomically edit the server set, name, scope or expiry without rotating the key",
+			body: "ConnectTokenUpdate",
+			response: tokenEnvelope,
+		},
+		{
+			path: "/tokens/{tokenId}/challenge",
+			method: "post",
+			summary: "Issue a single-use confirmation bound to this key version and action",
+			body: "ConnectConfirmation",
+			response: object({ challenge: string, expiresAt: string, requestId: string }, [
+				"challenge",
+				"expiresAt",
+				"requestId",
+			]),
+		},
+		{
+			path: "/tokens/{tokenId}/reveal",
+			method: "post",
+			summary: "Reveal the same key again after a fresh confirmation; never cached",
+			body: "ConnectSensitiveAction",
+			response: object({ token: string, hideAfterSeconds: { const: 30 }, requestId: string }, [
+				"token",
+				"hideAfterSeconds",
+				"requestId",
+			]),
+		},
+		{
+			path: "/tokens/{tokenId}/rotate",
+			method: "post",
+			summary: "Replace the secret immediately while retaining the server set, scope and expiry",
+			body: "ConnectSensitiveAction",
+			response: tokenEnvelope,
+		},
+		{
+			path: "/tokens/{tokenId}/revoke",
+			method: "post",
+			summary: "Permanently revoke the key for every authorized server",
+			body: "ConnectSensitiveAction",
+			response: tokenEnvelope,
+		},
+		{
+			path: "/tokens/{tokenId}/audit",
+			method: "get",
+			summary: "Read the key's audit trail, filtered to the manager's current server authority",
+			response: object({ data: array(ref("ConnectAudit")), requestId: string }, [
+				"data",
+				"requestId",
+			]),
+		},
+	];
+	for (const endpoint of endpoints) {
+		const writing = endpoint.method !== "get";
+		const parameters: Record<string, unknown>[] = [];
+		if (endpoint.path.includes("{tokenId}")) {
+			parameters.push({ name: "tokenId", in: "path", required: true, schema: string });
+			if (writing)
+				parameters.push({
+					name: "If-Match",
+					in: "header",
+					required: true,
+					schema: string,
+					description:
+						'Strong ETag "<tokenId>:<version>". Stale edits/challenges/actions return 412.',
+				});
+		}
+		if (writing)
+			parameters.push(
+				{ name: "Origin", in: "header", required: true, schema: { const: "https://bat.hexly.ai" } },
+				{ name: "X-Bat-Management", in: "header", required: true, schema: { const: "1" } },
+			);
+		const path = `/api/connect${endpoint.path}`;
+		paths[path] ??= {};
+		(paths[path] as Record<string, unknown>)[endpoint.method] = {
+			summary: endpoint.summary,
+			security: [{ CloudflareAccess: [] }],
+			parameters,
+			...(endpoint.body
+				? {
+						requestBody: {
+							required: true,
+							content: { "application/json": { schema: ref(endpoint.body) } },
+						},
+					}
+				: {}),
+			responses: {
+				[endpoint.path === "/tokens" && writing ? "201" : "200"]: {
+					description: "Success; all responses are no-store",
+					content: { "application/json": { schema: endpoint.response } },
+				},
+				default: {
+					description:
+						"400 invalid input; 403 insufficient product authority; 404 unavailable key; 409 revoked; 412 stale version; 422 token quota; 428 missing If-Match; 429 rate limit; 503 encryption/audit unavailable",
+					content: { "application/json": { schema: ref("Error") } },
+				},
+			},
+		};
+	}
+	return {
+		openapi: "3.1.0",
+		info: {
+			title: "Bat Connect Key Management",
+			version: BAT_VERSION,
+			description:
+				"Requires verified Cloudflare Access plus product authority over every configured server. Empty keys require their owner or a global manager. All selected servers must be active and authorized; additions must also be within the issuer's authority. Expiry defaults to never. Changes take effect on the next Bearer request. Bearer tokens cannot call management endpoints. Legacy /servers/{serverId}/tokens routes remain compatible, with singleton creation when serverIds is omitted; scope/expiry edits use canonical routes.",
+		},
+		servers: [{ url: "https://bat.hexly.ai" }],
+		paths,
+		components: {
+			securitySchemes: {
+				CloudflareAccess: {
+					type: "apiKey",
+					in: "header",
+					name: "Cf-Access-Jwt-Assertion",
+					description:
+						"Verified Access assertion, supplied by the Access edge for an authorized browser session.",
+				},
+			},
+			schemas: CONNECT_SCHEMAS,
+		},
 	};
 }

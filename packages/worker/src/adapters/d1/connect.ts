@@ -1,6 +1,28 @@
 import { CONNECT_LIMITS, type ConnectSensitiveAction, type ConnectServer } from "@bat/shared";
-import type { ConnectTokenRow } from "../../domain/connect.js";
+import { ConnectFault, type ConnectTokenRow } from "../../domain/connect.js";
 import type { ConnectAudit, ConnectRepository, ConnectRequest } from "../../repos/connect.js";
+
+type StoredToken = Omit<ConnectTokenRow, "server_ids"> & { server_ids: string };
+type StoredAudit = Omit<ConnectAudit, "server_ids" | "previous_server_ids"> & {
+	server_ids: string;
+	previous_server_ids: string | null;
+};
+const tokenSelect = `SELECT t.*, (SELECT json_group_array(server_id) FROM
+  (SELECT server_id FROM connect_token_servers WHERE token_id = t.id ORDER BY server_id)) AS server_ids
+  FROM connect_tokens t`;
+const tokenRow = (row: StoredToken): ConnectTokenRow => ({
+	...row,
+	server_ids: JSON.parse(row.server_ids),
+});
+const auditRow = (row: StoredAudit): ConnectAudit => ({
+	...row,
+	server_ids: JSON.parse(row.server_ids),
+	previous_server_ids:
+		row.previous_server_ids === null ? null : JSON.parse(row.previous_server_ids),
+});
+const belowServerLimit = `NOT EXISTS (SELECT 1 FROM json_each(?) selected WHERE
+  (SELECT COUNT(*) FROM connect_token_servers s JOIN connect_tokens t ON t.id = s.token_id
+   WHERE s.server_id = selected.value AND t.revoked_at IS NULL AND t.id != ?) >= ?)`;
 
 export class D1ConnectRepository implements ConnectRepository {
 	constructor(private readonly db: D1Database) {}
@@ -24,36 +46,40 @@ export class D1ConnectRepository implements ConnectRepository {
 			.first());
 	}
 
-	async tokens(serverId: string): Promise<ConnectTokenRow[]> {
+	async tokens(serverId?: string): Promise<ConnectTokenRow[]> {
 		return (
 			await this.db
 				.prepare(
-					"SELECT * FROM connect_tokens WHERE server_id = ? ORDER BY created_at DESC, id DESC",
+					`${tokenSelect} WHERE (? IS NULL OR EXISTS (SELECT 1 FROM connect_token_servers s WHERE s.token_id = t.id AND s.server_id = ?)) ORDER BY t.created_at DESC, t.id DESC`,
 				)
-				.bind(serverId)
-				.all<ConnectTokenRow>()
-		).results;
+				.bind(serverId ?? null, serverId ?? null)
+				.all<StoredToken>()
+		).results.map(tokenRow);
 	}
 
-	token(id: string, serverId: string): Promise<ConnectTokenRow | null> {
-		return this.db
-			.prepare("SELECT * FROM connect_tokens WHERE id = ? AND server_id = ?")
-			.bind(id, serverId)
-			.first<ConnectTokenRow>();
+	async token(id: string, serverId?: string): Promise<ConnectTokenRow | null> {
+		const row = await this.db
+			.prepare(
+				`${tokenSelect} WHERE t.id = ? AND (? IS NULL OR EXISTS (SELECT 1 FROM connect_token_servers s WHERE s.token_id = t.id AND s.server_id = ?))`,
+			)
+			.bind(id, serverId ?? null, serverId ?? null)
+			.first<StoredToken>();
+		return row ? tokenRow(row) : null;
 	}
 
-	findToken(hash: string): Promise<ConnectTokenRow | null> {
-		return this.db
-			.prepare("SELECT * FROM connect_tokens WHERE token_hash = ?")
+	async findToken(hash: string): Promise<ConnectTokenRow | null> {
+		const row = await this.db
+			.prepare(`${tokenSelect} WHERE t.token_hash = ?`)
 			.bind(hash)
-			.first<ConnectTokenRow>();
+			.first<StoredToken>();
+		return row ? tokenRow(row) : null;
 	}
 
 	async createToken(row: ConnectTokenRow, audit: ConnectAudit): Promise<boolean> {
 		const results = await this.db.batch([
 			this.db
 				.prepare(
-					`INSERT INTO connect_tokens(id, server_id, name, scope, prefix, token_hash, ciphertext, owner, created_at, expires_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM connect_tokens WHERE server_id = ? AND revoked_at IS NULL) < ?`,
+					`INSERT INTO connect_tokens(id, server_id, name, scope, prefix, token_hash, ciphertext, owner, created_at, expires_at) SELECT ?,?,?,?,?,?,?,?,?,? WHERE (SELECT COUNT(*) FROM connect_tokens WHERE owner = ? AND revoked_at IS NULL) < ? AND ${belowServerLimit}`,
 				)
 				.bind(
 					row.id,
@@ -66,10 +92,14 @@ export class D1ConnectRepository implements ConnectRepository {
 					row.owner,
 					row.created_at,
 					row.expires_at,
-					row.server_id,
+					row.owner,
+					CONNECT_LIMITS.tokensPerOwner,
+					JSON.stringify(row.server_ids),
+					row.id,
 					CONNECT_LIMITS.tokensPerServer,
 				),
 			this.auditStatement(audit, true),
+			this.grantsStatement(row, audit.id),
 		]);
 		return (results[0]?.meta.changes ?? 0) === 1;
 	}
@@ -82,22 +112,46 @@ export class D1ConnectRepository implements ConnectRepository {
 		const results = await this.db.batch([
 			this.db
 				.prepare(
-					`UPDATE connect_tokens SET name = ?, prefix = ?, token_hash = ?, ciphertext = ?, revoked_at = ?, last_used_at = ?, version = version + 1 WHERE id = ? AND server_id = ? AND version = ? AND revoked_at IS NULL`,
+					`UPDATE connect_tokens SET name = ?, scope = ?, expires_at = ?, prefix = ?, token_hash = ?, ciphertext = ?, revoked_at = ?, last_used_at = ?, version = version + 1 WHERE id = ? AND version = ? AND revoked_at IS NULL AND ${belowServerLimit}`,
 				)
 				.bind(
 					row.name,
+					row.scope,
+					row.expires_at,
 					row.prefix,
 					row.token_hash,
 					row.ciphertext,
 					row.revoked_at,
 					row.last_used_at,
 					row.id,
-					row.server_id,
 					expectedVersion,
+					JSON.stringify(row.server_ids),
+					row.id,
+					CONNECT_LIMITS.tokensPerServer,
 				),
 			this.auditStatement(audit, true),
+			// The unique audit row is the CAS success marker. A concurrent winner
+			// with the same next version must never authorize this request's grants.
+			this.db
+				.prepare(
+					`DELETE FROM connect_token_servers WHERE token_id = ? AND server_id NOT IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
+				)
+				.bind(row.id, JSON.stringify(row.server_ids), audit.id),
+			this.grantsStatement(row, audit.id),
 		]);
-		return (results[0]?.meta.changes ?? 0) === 1;
+		if ((results[0]?.meta.changes ?? 0) === 1) return true;
+		const current = await this.token(row.id);
+		if (current?.version === expectedVersion && current.revoked_at === null)
+			throw new ConnectFault(422, "token_limit", "A selected server already has 50 active tokens.");
+		return false;
+	}
+
+	private grantsStatement(row: ConnectTokenRow, auditId: string): D1PreparedStatement {
+		return this.db
+			.prepare(
+				`INSERT OR IGNORE INTO connect_token_servers(token_id, server_id) SELECT ?, value FROM json_each(?) WHERE EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
+			)
+			.bind(row.id, JSON.stringify(row.server_ids), auditId);
 	}
 
 	async touchToken(id: string, now: number): Promise<void> {
@@ -172,9 +226,16 @@ export class D1ConnectRepository implements ConnectRepository {
 	async beginRequest(row: ConnectRequest): Promise<boolean> {
 		const result = await this.db
 			.prepare(
-				"INSERT OR IGNORE INTO connect_requests(token_id, key_hash, fingerprint, request_id, state, created_at) VALUES (?,?,?,?, 'pending',?)",
+				"INSERT OR IGNORE INTO connect_requests(token_id, server_id, key_hash, fingerprint, request_id, state, created_at) VALUES (?,?,?,?,?, 'pending',?)",
 			)
-			.bind(row.token_id, row.key_hash, row.fingerprint, row.request_id, row.created_at)
+			.bind(
+				row.token_id,
+				row.server_id,
+				row.key_hash,
+				row.fingerprint,
+				row.request_id,
+				row.created_at,
+			)
 			.run();
 		return result.meta.changes === 1;
 	}
@@ -197,7 +258,7 @@ export class D1ConnectRepository implements ConnectRepository {
 	private auditStatement(row: ConnectAudit, ifChanged = false): D1PreparedStatement {
 		return this.db
 			.prepare(
-				`INSERT INTO connect_audit(id, request_id, server_id, token_id, actor, operation, status, code, created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ${ifChanged ? "changes() = 1" : "1 = 1"}`,
+				`INSERT INTO connect_audit(id, request_id, server_id, token_id, actor, operation, status, code, created_at, server_ids, previous_server_ids) SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE ${ifChanged ? "changes() = 1" : "1 = 1"}`,
 			)
 			.bind(
 				row.id,
@@ -209,6 +270,8 @@ export class D1ConnectRepository implements ConnectRepository {
 				row.status,
 				row.code,
 				row.created_at,
+				JSON.stringify(row.server_ids ?? (row.server_id ? [row.server_id] : [])),
+				row.previous_server_ids ? JSON.stringify(row.previous_server_ids) : null,
 			);
 	}
 
@@ -221,11 +284,31 @@ export class D1ConnectRepository implements ConnectRepository {
 		return (
 			await this.db
 				.prepare(
-					"SELECT * FROM connect_audit WHERE server_id = ? AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?",
+					`SELECT * FROM connect_audit WHERE (server_id = ? OR EXISTS (SELECT 1 FROM json_each(server_ids) WHERE value = ?) OR EXISTS (SELECT 1 FROM json_each(previous_server_ids) WHERE value = ?)) AND (created_at < ? OR (created_at = ? AND id < ?)) ORDER BY created_at DESC, id DESC LIMIT ?`,
 				)
-				.bind(serverId, before, before, beforeId, limit)
-				.all<ConnectAudit>()
-		).results;
+				.bind(serverId, serverId, serverId, before, before, beforeId, limit)
+				.all<StoredAudit>()
+		).results.map((stored) => {
+			const row = auditRow(stored);
+			// A server reader must not learn the other servers of a shared key.
+			return {
+				...row,
+				server_id: serverId,
+				server_ids: row.server_ids?.filter((id) => id === serverId) ?? [],
+				previous_server_ids: row.previous_server_ids?.filter((id) => id === serverId) ?? null,
+			};
+		});
+	}
+
+	async tokenAudits(tokenId: string): Promise<ConnectAudit[]> {
+		return (
+			await this.db
+				.prepare(
+					"SELECT * FROM connect_audit WHERE token_id = ? ORDER BY created_at DESC, id DESC LIMIT 100",
+				)
+				.bind(tokenId)
+				.all<StoredAudit>()
+		).results.map(auditRow);
 	}
 
 	async maintenance(now: number): Promise<void> {

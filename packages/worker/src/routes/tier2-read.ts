@@ -4,7 +4,7 @@ import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
 export async function hostTier2Route(c: Context<AppEnv, "/api/hosts/:id/tier2">) {
-	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
+	const idParam = c.var.connectServerId ?? c.req.param("id");
 
 	const hostId = await resolveHostIdByHash(c.var.repos.hosts, idParam);
 	if (!hostId) {

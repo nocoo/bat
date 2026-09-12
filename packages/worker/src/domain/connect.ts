@@ -1,4 +1,4 @@
-import type { ConnectScope, ConnectToken } from "@bat/shared";
+import { CONNECT_LIMITS, type ConnectScope, type ConnectToken } from "@bat/shared";
 
 export class ConnectFault extends Error {
 	constructor(
@@ -27,7 +27,9 @@ export class ConnectFault extends Error {
 
 export interface ConnectTokenRow {
 	id: string;
+	/** Immutable legacy AEAD context only; authorization uses server_ids. */
 	server_id: string;
+	server_ids: string[];
 	name: string;
 	scope: ConnectScope;
 	prefix: string;
@@ -173,7 +175,8 @@ const iso = (value: number | null): string | null =>
 export function tokenMetadata(row: ConnectTokenRow): ConnectToken {
 	return {
 		id: row.id,
-		serverId: row.server_id,
+		serverIds: row.server_ids,
+		...(row.server_ids.length === 1 ? { serverId: row.server_ids[0] } : {}),
 		name: row.name,
 		scope: row.scope,
 		prefix: row.prefix,
@@ -183,6 +186,29 @@ export function tokenMetadata(row: ConnectTokenRow): ConnectToken {
 		revokedAt: iso(row.revoked_at),
 		version: row.version,
 	};
+}
+
+/** An explicit empty set grants no servers. IDs are canonical, deduplicated and sorted. */
+export function validateServerIds(value: unknown): string[] {
+	if (
+		!Array.isArray(value) ||
+		value.length > CONNECT_LIMITS.serversPerToken ||
+		value.some(
+			(id) =>
+				typeof id !== "string" ||
+				!id ||
+				id.length > 256 ||
+				id !== id.trim() ||
+				[...id].some((char) => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127) ||
+				id.includes("batc_"),
+		)
+	)
+		throw new ConnectFault(
+			400,
+			"invalid_servers",
+			"serverIds must be an array of up to 100 canonical server IDs; [] grants no server access.",
+		);
+	return [...new Set(value as string[])].sort();
 }
 
 export function validateTokenInput(

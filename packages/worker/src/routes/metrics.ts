@@ -30,7 +30,7 @@ export function parseMetricsRange(
 }
 
 export async function hostMetricsRoute(c: Context<AppEnv, "/api/hosts/:id/metrics">) {
-	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
+	const idParam = c.var.connectServerId ?? c.req.param("id");
 	const parsedRange = parseMetricsRange(c.req.query("from"), c.req.query("to"));
 	if (!parsedRange.ok) {
 		return c.json({ error: parsedRange.error }, 400);

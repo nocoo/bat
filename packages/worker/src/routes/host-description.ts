@@ -3,7 +3,7 @@ import { resolveHostRecord } from "../lib/resolve-host.js";
 import type { AppEnv } from "../types.js";
 
 export async function hostDescriptionPatchRoute(c: Context<AppEnv, "/api/hosts/:id/description">) {
-	const idParam = c.var.connectToken?.server_id ?? c.req.param("id");
+	const idParam = c.var.connectServerId ?? c.req.param("id");
 	const repos = c.var.repos;
 
 	const host = await resolveHostRecord(repos.hosts, idParam);

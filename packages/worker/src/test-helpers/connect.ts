@@ -85,11 +85,17 @@ export async function connectFixture() {
 		);
 	async function mint(
 		scope: ConnectScope = "write",
-		serverId = SERVER_A,
+		serverId: string | string[] = SERVER_A,
 		expiresAt: string | null = null,
 	) {
-		const path = `/api/connect/servers/${serverId}/tokens`;
-		const created = await management(path, "POST", { name: `Fixture ${scope}`, scope, expiresAt });
+		const path = "/api/connect/tokens";
+		const serverIds = typeof serverId === "string" ? [serverId] : serverId;
+		const created = await management(path, "POST", {
+			name: `Fixture ${scope}`,
+			scope,
+			expiresAt,
+			serverIds,
+		});
 		if (created.status !== 201)
 			throw new Error(
 				`Token creation failed (${created.status}): ${((await created.json()) as { error?: { code?: string } }).error?.code}`,
@@ -99,7 +105,7 @@ export async function connectFixture() {
 		return { token, secret };
 	}
 	async function reveal(token: ConnectToken) {
-		const path = `/api/connect/servers/${token.serverId}/tokens/${token.id}`;
+		const path = `/api/connect/tokens/${token.id}`;
 		const response = await management(`${path}/challenge`, "POST", { action: "reveal" }, token);
 		const challenge = ((await response.json()) as { challenge: string }).challenge;
 		const revealed = await management(
@@ -165,7 +171,10 @@ export async function connectFixture() {
 			path += `?from=${Math.floor(Date.now() / 1000) - 3600}&to=${Math.floor(Date.now() / 1000)}`;
 		let etag = "";
 		if (operation.method !== "GET")
-			etag = (await request("/api/v1/capabilities", secret)).headers.get("ETag") ?? "";
+			etag =
+				(
+					await request(`/api/v1/servers/${encodeURIComponent(selectedServer)}`, secret)
+				).headers.get("ETag") ?? "";
 		return request(path, secret, operation.method, body, {
 			"If-Match": etag,
 			"Idempotency-Key": crypto.randomUUID(),

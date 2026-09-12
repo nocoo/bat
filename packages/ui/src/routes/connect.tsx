@@ -40,37 +40,99 @@ import useSWR from "swr";
 import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { connectDate, connectExamples, connectRequest, connectTokenStatus } from "@/lib/connect";
+import {
+	connectDate,
+	connectExamples,
+	connectExpiryInput,
+	connectRequest,
+	connectTokenStatus,
+} from "@/lib/connect";
 
 interface Action {
 	token: ConnectToken;
-	kind: ConnectSensitiveAction | "rename";
+	kind: ConnectSensitiveAction | "edit";
 }
 const actionLabels = {
 	reveal: "Reveal key",
 	rotate: "Rotate key",
 	revoke: "Revoke token",
-	rename: "Rename token",
+	edit: "Edit token",
 };
 const actionDescriptions = {
 	reveal:
-		"This key grants access to the selected server. Confirm that your screen is private. The key hides after 30 seconds or when you leave this window.",
+		"This key grants access to its authorized servers. Confirm that your screen is private. The key hides after 30 seconds or when you leave this window.",
 	rotate:
-		"The current key stops working immediately. The replacement keeps the same server, scope and expiry. Reveal it again to update your agent.",
+		"The current key stops working immediately. The replacement keeps the same authorized servers, scope and expiry. Reveal it again to update your agent.",
 	revoke:
-		"This token stops working immediately. Agents using it will lose access to this server. Revocation cannot be undone.",
-	rename: "Choose a name that helps you recognize the agent or integration using this token.",
+		"This token stops working immediately. Agents using it will lose access to all its authorized servers. Revocation cannot be undone.",
+	edit: "Update the name, authorized servers, permissions and expiry. Changes take effect immediately; the key stays the same.",
 };
+
+function ServerSelection({
+	servers,
+	serverIds,
+	onChange,
+	disabled,
+}: {
+	servers: ConnectServer[];
+	serverIds: string[];
+	onChange: (ids: string[]) => void;
+	disabled: boolean;
+}) {
+	const options = [
+		...servers,
+		...serverIds
+			.filter((id) => !servers.some((server) => server.id === id))
+			.map((id) => ({ id, name: "Unavailable server (remove this authorization)" })),
+	];
+	return (
+		<fieldset className="space-y-2" disabled={disabled}>
+			<legend className="mb-2 text-sm font-medium">Authorized servers</legend>
+			<p className="text-xs leading-relaxed text-muted-foreground">
+				Select the servers this key can access. No selection means no server access. Each server can
+				be authorized for multiple keys.
+			</p>
+			<div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border border-border p-2">
+				{options.map((server) => (
+					<label
+						key={server.id}
+						className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-accent"
+					>
+						<input
+							type="checkbox"
+							className="mt-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring"
+							checked={serverIds.includes(server.id)}
+							onChange={(event) =>
+								onChange(
+									event.target.checked
+										? [...new Set([...serverIds, server.id])].sort()
+										: serverIds.filter((id) => id !== server.id),
+								)
+							}
+						/>
+						<span className="min-w-0 break-all">
+							<span className="block text-sm font-medium">{server.name}</span>
+							<span className="block font-mono text-xs text-muted-foreground">{server.id}</span>
+						</span>
+					</label>
+				))}
+				{!options.length && (
+					<p className="p-2 text-sm text-muted-foreground">No servers available to authorize.</p>
+				)}
+			</div>
+			<p className="text-xs text-muted-foreground">
+				{serverIds.length ? `${serverIds.length} selected` : "No server access"}
+			</p>
+		</fieldset>
+	);
+}
 
 export function ConnectPage() {
 	const servers = useSWR<{ data: ConnectServer[]; apiBaseUrl: string }>(
 		"/api/connect/servers",
 		connectRequest,
 	);
-	const [selected, setSelected] = useState("");
-	const serverId = selected || servers.data?.data[0]?.id || "";
-	const serverName = servers.data?.data.find((server) => server.id === serverId)?.name ?? "";
-	const listUrl = serverId ? `/api/connect/servers/${encodeURIComponent(serverId)}/tokens` : null;
+	const listUrl = "/api/connect/tokens";
 	const tokens = useSWR<{ data: ConnectToken[] }>(listUrl, connectRequest, {
 		refreshInterval: 30_000,
 	});
@@ -78,6 +140,7 @@ export function ConnectPage() {
 	const [name, setName] = useState("");
 	const [scope, setScope] = useState<ConnectScope>("read");
 	const [expiry, setExpiry] = useState("");
+	const [serverIds, setServerIds] = useState<string[]>([]);
 	const [action, setAction] = useState<Action | null>(null);
 	const [confirmation, setConfirmation] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -90,7 +153,7 @@ export function ConnectPage() {
 	const baseUrl =
 		servers.data?.apiBaseUrl ??
 		`${window.location.hostname === "bat.hexly.ai" ? CONNECT_API_ORIGIN : window.location.origin}/api/v1`;
-	const examples = connectExamples(baseUrl, serverId);
+	const examples = connectExamples(baseUrl);
 	const active =
 		tokens.data?.data.filter((token) => connectTokenStatus(token) === "Active").length ?? 0;
 
@@ -119,20 +182,25 @@ export function ConnectPage() {
 
 	function openAction(token: ConnectToken, kind: Action["kind"]) {
 		opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+		generation.current++;
 		setSecret(null);
 		setError("");
-		setConfirmation(kind === "rename" ? token.name : "");
+		setConfirmation(kind === "edit" ? token.name : "");
+		setServerIds(token.serverIds);
+		setScope(token.scope);
+		setExpiry(connectExpiryInput(token.expiresAt));
 		setAction({ token, kind });
 	}
 
-	function changeServer(id: string) {
-		generation.current++;
-		setSelected(id);
-		setSecret(null);
-		setAction(null);
-		setCreating(false);
-		setError("");
-		setNotice("");
+	function serverNames(ids: string[]) {
+		return ids.length
+			? ids
+					.map(
+						(id) =>
+							servers.data?.data.find((server) => server.id === id)?.name ?? `${id} (unavailable)`,
+					)
+					.join(", ")
+			: "No server access";
 	}
 
 	async function copy(value: string, label: string) {
@@ -145,18 +213,18 @@ export function ConnectPage() {
 	}
 
 	async function create() {
-		if (!listUrl) return;
 		setBusy(true);
 		setError("");
 		try {
 			await connectRequest(listUrl, {
 				method: "POST",
-				body: { name, scope, expiresAt: expiry ? new Date(expiry).toISOString() : null },
+				body: { name, serverIds, scope, expiresAt: expiry ? new Date(expiry).toISOString() : null },
 			});
 			setCreating(false);
 			setName("");
 			setExpiry("");
 			setScope("read");
+			setServerIds([]);
 			setNotice("Token created. Reveal its key when you are ready to connect your agent.");
 			await tokens.mutate();
 		} catch (cause) {
@@ -167,19 +235,29 @@ export function ConnectPage() {
 	}
 
 	async function confirmAction() {
-		if (!action || !listUrl) return;
+		if (!action) return;
 		const current = generation.current;
-		const path = `${listUrl}/${action.token.id}`;
+		const path = `${listUrl}/${encodeURIComponent(action.token.id)}`;
 		setBusy(true);
 		setError("");
 		try {
-			if (action.kind === "rename") {
+			if (action.kind === "edit") {
 				await connectRequest(path, {
 					method: "PATCH",
-					body: { name: confirmation },
+					body: {
+						name: confirmation,
+						serverIds,
+						scope,
+						// Preserve the original instant when local time is unchanged, including DST overlaps.
+						...(expiry === connectExpiryInput(action.token.expiresAt)
+							? {}
+							: { expiresAt: expiry ? new Date(expiry).toISOString() : null }),
+					},
 					token: action.token,
 				});
-				setNotice("Token renamed.");
+				setNotice(
+					"Token updated. Its current permissions and expiry are now in effect; its key is unchanged.",
+				);
 			} else {
 				const challenge = await connectRequest<{ challenge: string }>(`${path}/challenge`, {
 					method: "POST",
@@ -214,6 +292,61 @@ export function ConnectPage() {
 		}
 	}
 
+	const accessControls = (
+		<>
+			<ServerSelection
+				servers={servers.data?.data ?? []}
+				serverIds={serverIds}
+				onChange={setServerIds}
+				disabled={busy}
+			/>
+			<fieldset className="space-y-2" disabled={busy}>
+				<legend className="mb-2 text-sm font-medium">Permissions</legend>
+				{(["read", "write"] as const).map((choice) => (
+					<label
+						key={choice}
+						className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${scope === choice ? "border-primary bg-accent" : "border-border"}`}
+					>
+						<input
+							className="mt-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring"
+							type="radio"
+							name="connect-scope"
+							value={choice}
+							checked={scope === choice}
+							onChange={() => setScope(choice)}
+						/>
+						<span>
+							<span className="block text-sm font-medium">
+								{choice === "read" ? "Read only" : "Read + write"}
+							</span>
+							<span className="mt-0.5 block text-xs text-muted-foreground">
+								{choice === "read"
+									? "Read server data and discover available operations."
+									: "Also create, update, delete and perform server actions."}
+							</span>
+						</span>
+					</label>
+				))}
+			</fieldset>
+			<div className="space-y-2">
+				<Label htmlFor="token-expiry">
+					Expiry{" "}
+					<span className="font-normal text-muted-foreground">(optional, your local time)</span>
+				</Label>
+				<Input
+					id="token-expiry"
+					type="datetime-local"
+					step={1}
+					disabled={busy}
+					value={expiry}
+					onChange={(event) => setExpiry(event.target.value)}
+				/>
+				<p className="text-xs leading-relaxed text-muted-foreground">
+					Leave blank for no expiry. This grants ongoing access until you revoke the token.
+				</p>
+			</div>
+		</>
+	);
 	const loadError = servers.error ?? tokens.error;
 	return (
 		<AppShell breadcrumbs={[{ label: "Connect" }]}>
@@ -241,39 +374,18 @@ export function ConnectPage() {
 					{notice}
 				</div>
 				<Card>
-					<CardContent className="flex flex-col gap-5 py-2 sm:flex-row sm:items-center sm:justify-between">
+					<CardContent className="py-2">
 						<div className="flex items-start gap-4">
 							<div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
 								<ShieldCheck className="size-5" aria-hidden="true" />
 							</div>
 							<div>
-								<h2 className="text-sm font-semibold">One server. Explicit permissions.</h2>
+								<h2 className="text-sm font-semibold">One key. Your authorized servers.</h2>
 								<p className="mt-1 max-w-lg text-sm text-muted-foreground">
-									Every token stays bound to its server. Choose read access for observation, or
-									write access for authorized changes.
+									Choose which servers each key can access. Multiple keys can access the same
+									server, each with its own read or write permission.
 								</p>
 							</div>
-						</div>
-						<div className="w-full shrink-0 space-y-2 sm:w-64">
-							<Label htmlFor="connect-server">Server</Label>
-							<select
-								id="connect-server"
-								value={serverId}
-								onChange={(event) => changeServer(event.target.value)}
-								disabled={busy || servers.isLoading || !servers.data?.data.length}
-								className="h-10 w-full rounded-lg border border-border bg-secondary px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-							>
-								{!servers.data?.data.length && (
-									<option value="">
-										{servers.isLoading ? "Loading servers…" : "No authorized servers"}
-									</option>
-								)}
-								{servers.data?.data.map((server) => (
-									<option key={server.id} value={server.id}>
-										{server.name}
-									</option>
-								))}
-							</select>
 						</div>
 					</CardContent>
 				</Card>
@@ -289,10 +401,16 @@ export function ConnectPage() {
 							<Button
 								onClick={() => {
 									opener.current = document.activeElement as HTMLElement;
+									generation.current++;
+									setSecret(null);
 									setError("");
+									setName("");
+									setScope("read");
+									setExpiry("");
+									setServerIds([]);
 									setCreating(true);
 								}}
-								disabled={!serverId || busy}
+								disabled={!servers.data || !tokens.data || !!loadError || busy}
 							>
 								<Plus className="size-4" aria-hidden="true" /> Create token
 							</Button>
@@ -315,9 +433,8 @@ export function ConnectPage() {
 									/>
 									<h3 className="font-medium">Your next connection starts here</h3>
 									<p className="mt-2 max-w-xs text-sm text-muted-foreground">
-										{serverId
-											? "Create a token for an agent, script or integration. Start with read access."
-											: "A server administrator must grant you access before you can manage tokens."}
+										Create a token for an agent, script or integration. Select its authorized
+										servers and start with read access.
 									</p>
 								</CardContent>
 							</Card>
@@ -337,20 +454,41 @@ export function ConnectPage() {
 														{status !== "Active" && <Badge variant="outline">{status}</Badge>}
 													</div>
 													<p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-														<span>{serverName}</span>
-														<span aria-hidden="true">·</span>
 														<span className="font-mono">{token.prefix}</span>
 													</p>
 												</div>
 												<Button
 													variant="ghost"
 													size="icon"
-													aria-label={`Rename ${token.name}`}
+													aria-label={`Edit ${token.name}`}
 													disabled={busy || status === "Revoked"}
-													onClick={() => openAction(token, "rename")}
+													onClick={() => openAction(token, "edit")}
 												>
 													<Pencil className="size-3.5" aria-hidden="true" />
 												</Button>
+											</div>
+											<div className="space-y-2 text-xs">
+												<p className="text-muted-foreground">
+													Authorized servers ({token.serverIds.length})
+												</p>
+												{token.serverIds.length ? (
+													<ul
+														className="flex flex-wrap gap-2"
+														aria-label={`Authorized servers for ${token.name}`}
+													>
+														{token.serverIds.map((id) => (
+															<li
+																key={id}
+																className="min-w-0 break-all rounded-md border border-border px-2 py-1"
+															>
+																<span className="block">{serverNames([id])}</span>
+																<span className="font-mono text-muted-foreground">{id}</span>
+															</li>
+														))}
+													</ul>
+												) : (
+													<p>No server access</p>
+												)}
 											</div>
 											<dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
 												<div>
@@ -548,6 +686,7 @@ export function ConnectPage() {
 			>
 				<DialogContent
 					size="lg"
+					className="max-h-[90dvh] overflow-y-auto"
 					onCloseAutoFocus={(event) => {
 						event.preventDefault();
 						opener.current?.focus();
@@ -563,7 +702,7 @@ export function ConnectPage() {
 						<DialogHeader>
 							<DialogTitle>Create access token</DialogTitle>
 							<DialogDescription>
-								Connect an agent to {serverName}. Its key will be encrypted and can be revealed
+								Connect an agent to the servers you select. Its key is encrypted and can be revealed
 								again.
 							</DialogDescription>
 						</DialogHeader>
@@ -579,51 +718,7 @@ export function ConnectPage() {
 								autoComplete="off"
 							/>
 						</div>
-						<fieldset className="space-y-2">
-							<legend className="mb-2 text-sm font-medium">Permissions</legend>
-							{(["read", "write"] as const).map((choice) => (
-								<label
-									key={choice}
-									className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${scope === choice ? "border-primary bg-accent" : "border-border"}`}
-								>
-									<input
-										className="mt-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring"
-										type="radio"
-										name="connect-scope"
-										value={choice}
-										checked={scope === choice}
-										onChange={() => setScope(choice)}
-									/>
-									<span>
-										<span className="block text-sm font-medium">
-											{choice === "read" ? "Read only" : "Read + write"}
-										</span>
-										<span className="mt-0.5 block text-xs text-muted-foreground">
-											{choice === "read"
-												? "Read server data and discover available operations."
-												: "Also create, update, delete and perform server actions."}
-										</span>
-									</span>
-								</label>
-							))}
-						</fieldset>
-						<div className="space-y-2">
-							<Label htmlFor="token-expiry">
-								Expiry{" "}
-								<span className="font-normal text-muted-foreground">
-									(optional, your local time)
-								</span>
-							</Label>
-							<Input
-								id="token-expiry"
-								type="datetime-local"
-								value={expiry}
-								onChange={(event) => setExpiry(event.target.value)}
-							/>
-							<p className="text-xs leading-relaxed text-muted-foreground">
-								Leave blank for no expiry. This grants ongoing access until you revoke the token.
-							</p>
-						</div>
+						{accessControls}
 						{error && (
 							<p role="alert" className="text-sm text-destructive">
 								{error}
@@ -657,6 +752,7 @@ export function ConnectPage() {
 			>
 				<DialogContent
 					size="lg"
+					className="max-h-[90dvh] overflow-y-auto"
 					onCloseAutoFocus={(event) => {
 						event.preventDefault();
 						opener.current?.focus();
@@ -675,17 +771,18 @@ export function ConnectPage() {
 						</DialogHeader>
 						{action && (
 							<>
-								<div className="rounded-lg border border-border bg-secondary px-3 py-2 text-sm">
+								<div className="break-words rounded-lg border border-border bg-secondary px-3 py-2 text-sm">
 									<span className="font-medium">{action.token.name}</span>
 									<span className="ml-2 text-muted-foreground">
-										· {serverName} · {action.token.scope === "write" ? "Read + write" : "Read only"}
+										· {action.token.scope === "write" ? "Read + write" : "Read only"}
 									</span>
+									<p className="mt-1 text-xs text-muted-foreground">
+										{serverNames(action.token.serverIds)}
+									</p>
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor="token-confirmation">
-										{action.kind === "rename"
-											? "New token name"
-											: `Type ${action.token.name} to confirm`}
+										{action.kind === "edit" ? "Token name" : `Type ${action.token.name} to confirm`}
 									</Label>
 									<Input
 										id="token-confirmation"
@@ -698,6 +795,7 @@ export function ConnectPage() {
 										required
 									/>
 								</div>
+								{action.kind === "edit" && accessControls}
 							</>
 						)}
 						{error && (
@@ -723,12 +821,18 @@ export function ConnectPage() {
 								disabled={
 									busy ||
 									!action ||
-									(action.kind === "rename"
+									(action.kind === "edit"
 										? !confirmation.trim()
 										: confirmation !== action.token.name)
 								}
 							>
-								{busy ? "Working…" : action ? actionLabels[action.kind] : "Confirm"}
+								{busy
+									? "Working…"
+									: action?.kind === "edit"
+										? "Save changes"
+										: action
+											? actionLabels[action.kind]
+											: "Confirm"}
 							</Button>
 						</DialogFooter>
 					</form>

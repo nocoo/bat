@@ -31,7 +31,7 @@ export function auditEntry(
 	return {
 		id: crypto.randomUUID(),
 		request_id: c.var.connectRequestId ?? crypto.randomUUID(),
-		server_id: redact(c.var.connectToken?.server_id ?? c.req.param("serverId") ?? null),
+		server_id: redact(c.var.connectServerId ?? c.req.param("serverId") ?? null),
 		token_id: redact(c.var.connectToken?.id ?? c.req.param("tokenId") ?? null),
 		actor: c.var.connectToken
 			? `token:${c.var.connectToken.id}`
@@ -261,18 +261,27 @@ export async function connectBearer(c: Context<AppEnv>, next: Next) {
 	const globalManager =
 		configuredManager(c.env.CONNECT_MANAGERS, row.owner) ||
 		(isDevelopmentManager(c) && row.owner === "local:developer");
-	if (!(await c.var.repos.connect.authorized(row.server_id, row.owner, globalManager)))
-		throw new ConnectFault(
-			403,
-			"authorization_revoked",
-			"The token's server authorization is no longer active.",
-		);
-	const requestedServer = c.req.param("serverId");
-	if (requestedServer && requestedServer !== row.server_id)
+	// Direct D1 reads (no KV/session replicas): edits and issuer grant withdrawal
+	// take effect on the next request, independently for each selected server.
+	const permitted = new Set(
+		(await c.var.repos.connect.servers(row.owner, globalManager)).map((server) => server.id),
+	);
+	const serverIds = row.server_ids.filter((id) => permitted.has(id));
+	c.set("connectServerIds", serverIds);
+	// Wildcard middleware runs before Hono exposes the endpoint's named params.
+	const encodedServer = /^\/api\/v1\/servers\/([^/]+)(?:\/|$)/.exec(c.req.path)?.[1];
+	let requestedServer: string | undefined;
+	try {
+		requestedServer = encodedServer ? decodeURIComponent(encodedServer) : undefined;
+	} catch {
+		throw new ConnectFault(400, "invalid_id", "Server ID must be valid URL-encoded text.");
+	}
+	if (requestedServer) c.set("connectServerId", requestedServer);
+	if (requestedServer && !serverIds.includes(requestedServer))
 		throw new ConnectFault(
 			403,
 			"server_mismatch",
-			"This token is bound to a different server. Use its canonical server ID.",
+			"This token does not currently authorize this server. Use an ID from GET /servers.",
 		);
 	const writing = !["GET", "HEAD"].includes(c.req.method);
 	if (writing && row.scope !== "write")
@@ -296,13 +305,24 @@ export async function connectBearer(c: Context<AppEnv>, next: Next) {
 	await c.var.repos.connect.touchToken(row.id, now);
 	if (writing) {
 		const body = await connectBody(c);
-		if (Object.hasOwn(body, "host_id") && body.host_id !== row.server_id)
-			throw new ConnectFault(403, "server_mismatch", "host_id must match the token's server.");
+		for (const key of ["host_id", "server_id", "serverId"])
+			if (Object.hasOwn(body, key) && (!requestedServer || body[key] !== requestedServer))
+				throw new ConnectFault(
+					403,
+					"server_mismatch",
+					"Body server selectors must match the request's server.",
+				);
 	}
 	for (const key of ["host_id", "server_id", "serverId"]) {
-		if (c.req.query(key) !== undefined && c.req.query(key) !== row.server_id)
-			throw new ConnectFault(403, "server_mismatch", "Query filters cannot select another server.");
+		const values = c.req.queries(key);
+		if (values?.some((value) => !requestedServer || value !== requestedServer))
+			throw new ConnectFault(
+				403,
+				"server_mismatch",
+				"Query filters must match the request's server.",
+			);
 	}
-	c.set("repos", c.var.repos.connectProducts.forServer(c.var.repos, row.server_id));
+	if (requestedServer)
+		c.set("repos", c.var.repos.connectProducts.forServer(c.var.repos, requestedServer));
 	return next();
 }
