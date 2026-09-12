@@ -37,7 +37,7 @@ jobs:
       runtime-version: "1.3.11"
       install-policy: "blocked"
       build-command: "bun run build"
-      wrangler-version: "4.130.0"
+      wrangler-version: "4.131.1"
       wrangler-working-directory: "packages/worker"
       d1-migrations: true
       d1-command: "d1 migrations apply bat-db --remote --env production"
@@ -166,7 +166,7 @@ jobs:
           WRANGLER="./packages/worker/node_modules/.bin/wrangler"
           test -x "$WRANGLER"
           reported=$("$WRANGLER" --version)
-          echo "$reported" | grep -q "4.130.0"
+          echo "$reported" | grep -q "4.131.1"
           for tier in "$VERSION" latest; do
             for f in bat-probe-linux-x86_64 bat-probe-linux-aarch64 \
                      bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256; do
