@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.3.1
+
+### Fixed
+- Authorize keys across multiple servers
+- Preserve strong connect etags at edge
+
 ## v2.3.0
 
 ### Added
