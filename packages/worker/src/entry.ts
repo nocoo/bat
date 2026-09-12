@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { CONNECT_LIMITS } from "@bat/shared";
-import { coordinates, fingerprint } from "./domain/connect.js";
+import { ConnectFault, coordinates, fingerprint, isConnectPath } from "./domain/connect.js";
+import { readBody } from "./lib/read-body.js";
 
 export { coordinates } from "./domain/connect.js";
 
@@ -108,9 +109,20 @@ export default {
 				).success
 			)
 				return failure("rate_limited", "Too many configuration changes. Retry later.", 429);
-			return env.CONNECT_COORDINATOR.getByName(env.CONNECT_DEPLOYMENT_ID ?? "bat-local").fetch(
-				request,
-			);
+			try {
+				// A queued configuration request must own its bytes: an early response
+				// from the coordinator must not cancel the incoming HTTP body stream.
+				const body = await readBody(
+					request,
+					isConnectPath(url.pathname) ? CONNECT_LIMITS.bodyBytes : 1024 * 1024,
+				);
+				return env.CONNECT_COORDINATOR.getByName(env.CONNECT_DEPLOYMENT_ID ?? "bat-local").fetch(
+					new Request(request, { body }),
+				);
+			} catch (error) {
+				if (error instanceof ConnectFault) return failure(error.code, error.message, error.status);
+				throw error;
+			}
 		}
 		return app.fetch(request, { ...env, CONNECT_COORDINATED: false }, ctx);
 	},

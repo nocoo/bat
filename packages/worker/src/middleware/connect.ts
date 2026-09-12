@@ -7,6 +7,7 @@ import {
 	isConnectPath,
 	isVersionedPath,
 } from "../domain/connect.js";
+import { readBody } from "../lib/read-body.js";
 import type { ConnectAudit } from "../repos/connect.js";
 import type { AppEnv } from "../types.js";
 import { isLocalhost } from "./entry-control.js";
@@ -155,52 +156,16 @@ export async function connectEnvelope(c: Context<AppEnv>, next: Next) {
 	sensitiveHeaders(c);
 }
 
-/** Bound streaming read; Content-Length is only an early rejection, never trusted. */
 export async function connectBody(c: Context<AppEnv>): Promise<Record<string, unknown>> {
 	if (c.var.connectBody) return c.var.connectBody;
-	const contentLength = Number(c.req.header("Content-Length") ?? 0);
-	if (contentLength > CONNECT_LIMITS.bodyBytes)
-		throw new ConnectFault(413, "body_too_large", "Request body exceeds 64 KiB.");
 	if (c.req.raw.body && !/^application\/json(?:;|$)/i.test(c.req.header("Content-Type") ?? ""))
 		throw new ConnectFault(415, "unsupported_media_type", "Use Content-Type: application/json.");
-	const reader = c.req.raw.body?.getReader();
-	let raw = "";
-	if (reader) {
-		const chunks: Uint8Array[] = [];
-		let size = 0;
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const expired = new Promise<never>((_, reject) => {
-			timer = setTimeout(() => {
-				void reader.cancel().catch(() => undefined);
-				reject(new ConnectFault(504, "body_timeout", "Request body was not received in time."));
-			}, CONNECT_LIMITS.bodyTimeoutMs);
-		});
-		try {
-			while (true) {
-				const item = await Promise.race([reader.read(), expired]);
-				if (item.done) break;
-				size += item.value.byteLength;
-				if (size > CONNECT_LIMITS.bodyBytes) {
-					await reader.cancel();
-					throw new ConnectFault(413, "body_too_large", "Request body exceeds 64 KiB.");
-				}
-				chunks.push(item.value);
-			}
-			const bytes = new Uint8Array(size);
-			let offset = 0;
-			for (const chunk of chunks) {
-				bytes.set(chunk, offset);
-				offset += chunk.byteLength;
-			}
-			try {
-				raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-			} catch {
-				throw new ConnectFault(400, "invalid_json", "Request body must be valid UTF-8 JSON.");
-			}
-		} finally {
-			clearTimeout(timer);
-			reader.releaseLock();
-		}
+	const bytes = await readBody(c.req.raw);
+	let raw: string;
+	try {
+		raw = new TextDecoder("utf-8", { fatal: true }).decode(bytes ?? new ArrayBuffer(0));
+	} catch {
+		throw new ConnectFault(400, "invalid_json", "Request body must be valid UTF-8 JSON.");
 	}
 	let body: unknown;
 	try {
