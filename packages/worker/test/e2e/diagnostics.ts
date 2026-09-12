@@ -2,11 +2,17 @@ import { errorCategory } from "../../src/lib/error-category.js";
 
 const request = globalThis.fetch;
 globalThis.fetch = async (...args) => {
-	const response = await request(...args);
+	const [input, init] = args;
+	const headers = new Headers(
+		init?.headers ?? (input instanceof Request ? input.headers : undefined),
+	);
+	headers.set("Connection", "close");
+	const response = await request(input, { ...init, headers });
 	// Drain the transport even when a test only asserts status. Otherwise fetch's
 	// pooled sockets remain occupied by unread bodies until garbage collection.
 	const body = await response.clone().arrayBuffer();
 	if (response.status >= 500 && response.status !== 501) {
+		const text = new TextDecoder().decode(body);
 		const diagnostic = response.headers.get("X-Bat-Diagnostic");
 		const category = [
 			"database_busy",
@@ -25,9 +31,16 @@ globalThis.fetch = async (...args) => {
 			"unexpected",
 		].includes(diagnostic ?? "")
 			? diagnostic
-			: errorCategory(new TextDecoder().decode(body));
+			: errorCategory(text);
+		const frames = [
+			...new Set(
+				text.match(
+					/\b(?:index|cli|entry|ProxyWorker|InspectorProxyWorker)\.(?:[cm]?js|ts):\d+:\d+/g,
+				),
+			),
+		].slice(0, 8);
 		console.error(
-			`L2 HTTP ${response.status}: ${diagnostic ? "application" : "runtime"}/${category}`,
+			`L2 HTTP ${response.status}: ${diagnostic ? "application" : "runtime"}/${category}; network_lost=${/network connection lost/i.test(text)}; frames=${frames.join(",")}`,
 		);
 	}
 	return response;
