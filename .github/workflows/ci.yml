@@ -16,7 +16,6 @@ jobs:
       prepare-command: "bash scripts/ci-pre-command.sh"
       test-command: "bun run test:unit:coverage"
       osv-config: "osv-scanner.toml"
-    secrets: inherit
 
   coverage-gates:
     name: "Coverage Gates"
