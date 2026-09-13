@@ -23,7 +23,12 @@
 			"dependsOn": ["^build"]
 		},
 		"test:e2e": {
-			"dependsOn": ["^build"]
+			"dependsOn": ["^build"],
+			"cache": false
+		},
+		"@bat/worker#test:e2e": {
+			"dependsOn": ["@bat/ui#build"],
+			"cache": false
 		},
 		"dev": {
 			"cache": false,

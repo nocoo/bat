@@ -80,7 +80,7 @@ CLI 的 `agent`、`asset`、`binding` 提供管理操作。`service run` 接收 
 
 ## 本地测试
 
-测试使用明确的本地资源；先安装依赖并构建静态资源。API runner 为 `packages/worker/test/e2e/global-setup.ts`，显式使用 `--local --persist-to .wrangler/e2e`，逐个应用迁移、写入测试标记，然后在 17025 启动 Worker。
+测试使用明确的本地资源；先安装依赖并构建静态资源。API runner 为 `packages/worker/test/e2e/global-setup.ts`，显式使用 `--local --persist-to .wrangler/e2e/<random>`，逐个应用迁移、写入测试标记，然后在临时 loopback 端口启动 Worker。
 
 API runner 和浏览器测试在 `.wrangler` 下生成各自独立的测试 keyring，显式通过 `--env-file` 加载，不会覆盖个人 `.dev.vars`。测试进程不能携带 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 或 `CF_API_TOKEN`。
 

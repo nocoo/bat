@@ -75,14 +75,14 @@ Install dependencies and run `bun run build` to prepare Worker assets. API and b
 
 ```bash
 bun run test
-bun turbo test:e2e --filter=@bat/worker
+bun run turbo test:e2e --filter=@bat/worker
 bunx playwright install chromium
 bun run test:e2e:pw
 ```
 
-The first command runs TypeScript and Rust unit tests. API E2E uses port 17025 and `packages/worker/.wrangler/e2e`; browser tests use 27025 and `.wrangler/e2e-pw`. Both explicitly use local Wrangler resources, rebuilding their state directories.
+The first command runs TypeScript and Rust unit tests. API E2E chooses an ephemeral loopback port and a unique `packages/worker/.wrangler/e2e/<random>` state directory per run; browser tests use port 27025 and `.wrangler/e2e-pw`. Both explicitly use local Wrangler resources.
 
-Keep both ports free and unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CF_API_TOKEN` in the test process. The API runner rejects these remote credentials. Browser tests need Playwright Chromium. Tests use synthetic records without real probes or VPS credentials.
+Keep the browser-test port 27025 free and unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CF_API_TOKEN` in the test process. The API runner rejects these remote credentials. Browser tests need Playwright Chromium. Tests use synthetic records without real probes or VPS credentials.
 
 ## Stack
 

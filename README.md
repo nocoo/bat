@@ -75,14 +75,14 @@ bun run dev
 
 ```bash
 bun run test
-bun turbo test:e2e --filter=@bat/worker
+bun run turbo test:e2e --filter=@bat/worker
 bunx playwright install chromium
 bun run test:e2e:pw
 ```
 
-第一条命令运行 TypeScript 与 Rust 单元测试。API E2E 使用 17025 端口和 `packages/worker/.wrangler/e2e`，浏览器测试使用 27025 和 `.wrangler/e2e-pw`，均显式使用本地 Wrangler 资源；这些状态目录会重建。
+第一条命令运行 TypeScript 与 Rust 单元测试。API E2E 为每次运行选择临时 loopback 端口，并使用独有的 `packages/worker/.wrangler/e2e/<random>` 状态目录；浏览器测试使用 27025 和 `.wrangler/e2e-pw`。两者均显式使用本地 Wrangler 资源。
 
-保持两个端口空闲，并在测试进程中取消 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`CF_API_TOKEN`；API runner 会拒绝携带这些远程凭据启动。浏览器测试需要 Playwright Chromium。它们使用测试记录，不需要真实探针或 VPS 凭据。
+保持浏览器测试的 27025 端口空闲，并在测试进程中取消 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`CF_API_TOKEN`；API runner 会拒绝携带这些远程凭据启动。浏览器测试需要 Playwright Chromium。它们使用测试记录，不需要真实探针或 VPS 凭据。
 
 ## 技术栈
 

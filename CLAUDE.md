@@ -21,8 +21,8 @@ This file is the **contract**. Hooks, CI, and config are **enforcement**. If the
 ## Project Invariants
 
 - Browser: `bat.hexly.ai` (Access). Ingest: `bat-ingest.worker.hexly.ai` (`BAT_WRITE_KEY` / `BAT_READ_KEY`). One Worker serves API + SPA.
-- Daily UI: Vite :7025 (or `https://bat.dev.hexly.ai`) proxies `/api` to prod; needs `packages/ui/.env.local` Access service-token vars. Wrangler :37025 is local worker **dev**, not E2E (L2 :17025, L3 :27025). Not 8787.
-- E2E is `--local --persist-to` only. Never `--remote` D1. L2 `.wrangler/e2e` :17025; L3 `.wrangler/e2e-pw` :27025.
+- Daily UI: Vite :7025 (or `https://bat.dev.hexly.ai`) proxies `/api` to prod; needs `packages/ui/.env.local` Access service-token vars. Wrangler :37025 is local worker **dev**, not E2E. L2 selects an ephemeral loopback port; L3 uses :27025. Not 8787.
+- E2E is `--local --persist-to` only. Never `--remote` D1. L2 creates `.wrangler/e2e/<random>` for each run; L3 uses `.wrangler/e2e-pw`.
 - Apply production D1 migrations before Worker code that uses new columns. Do not `wrangler deploy` from a laptop.
 - `gate:routes` is a static `(method, path)` scan vs e2e files — structural hit, not assertion quality.
 - Version with `bun run release`. `bun run deploy` races CD (`.github/workflows/release.yml`).
@@ -52,7 +52,7 @@ bun run typecheck
 bun run lint
 bun run build
 bun run test:unit:coverage
-bun turbo test:e2e --filter=@bat/worker
+bun run turbo test:e2e --filter=@bat/worker
 cd packages/ui && bunx playwright test
 bun run release -- --dry-run
 ```
@@ -90,7 +90,7 @@ Org gaps: index-snapshot pre-commit; stdin-range pre-push; `.skip`/`.only` (Play
 |---|---|---|
 | Dev | 7025 Vite (`bat.dev.hexly.ai`) | `/api` → prod; `.env.local` Access tokens |
 | Dev wrangler | 37025 | local worker dev; `.dev.vars` |
-| L2 | 17025 | `--local --persist-to .wrangler/e2e` + test marker |
+| L2 | ephemeral | `--local --persist-to .wrangler/e2e/<random>` + test marker |
 | L3 | 27025 | `--local --persist-to .wrangler/e2e-pw` |
 
 E2E never touches prod D1/KV.
