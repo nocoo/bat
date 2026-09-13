@@ -30,7 +30,7 @@ wait_stage() {
 }
 
 # L2: Worker API E2E tests
-run_bg l2_e2e bun turbo test:e2e --filter=@bat/worker
+run_bg l2_e2e bun run turbo test:e2e --filter=@bat/worker
 
 # G2: Security scanning (osv-scanner + gitleaks unified)
 run_bg g2_security bun run gate:security

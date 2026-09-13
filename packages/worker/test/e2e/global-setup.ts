@@ -11,8 +11,8 @@
 //
 // Isolation guard (five layers, mirroring zhe docs/05-testing.md §L2):
 //   1. `--local` — wrangler dev points at a local miniflare D1, never prod.
-//   2. `--persist-to .wrangler/e2e` — dedicated ephemeral state dir.
-//   3. We delete `.wrangler/e2e` before booting, so each run is clean.
+//   2. `--persist-to .wrangler/e2e/<random>` — a per-run state dir.
+//   3. OS-assigned HTTP and Inspector ports prevent listener collisions.
 //   4. After production migrations, we apply `fixtures/test_marker.sql` to
 //      stamp the local DB, then assert the marker row exists. This file lives
 //      outside `migrations/` so it's never applied to production D1 — the
@@ -33,32 +33,52 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const WORKER_ROOT = join(__dirname, "../..");
-const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e");
-const E2E_ENV_PATH = join(WORKER_ROOT, ".wrangler/connect-e2e.env");
+// Every invocation gets its own resources. A shared port allowed one run to
+// pass readiness against another run's Worker, while a shared persist dir let
+// simultaneous setup/teardown delete each other's D1 state.
+const RUN_ID = randomBytes(12).toString("hex");
+const PERSIST_DIR = join(WORKER_ROOT, ".wrangler/e2e", RUN_ID);
+const E2E_ENV_PATH = join(WORKER_ROOT, `.wrangler/connect-e2e-${RUN_ID}.env`);
 const MIGRATIONS_DIR = join(WORKER_ROOT, "migrations");
 const TEST_MARKER_SQL = join(__dirname, "fixtures/test_marker.sql");
 
-const PORT = 17025;
-const BASE = `http://localhost:${PORT}`;
 const WRITE_KEY = "e2e-write-key";
 const READ_KEY = "e2e-read-key";
 
 let wranglerProc: ChildProcess | null = null;
+let wranglerOutput = "";
 
-async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
+function readyBase(): string | null {
+	const match = wranglerOutput.match(
+		/\[wrangler:info\] Ready on http:\/\/(?:127\.0\.0\.1|localhost):(\d+)/,
+	);
+	return match ? `http://localhost:${match[1]}` : null;
+}
+
+async function waitForServer(timeoutMs = 30_000): Promise<string> {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
+		if (wranglerProc && (wranglerProc.exitCode !== null || wranglerProc.signalCode !== null)) {
+			throw new Error(
+				`Wrangler exited before the Worker E2E server became ready:\n${wranglerOutput}`,
+			);
+		}
+		const base = readyBase();
+		if (!base) {
+			await sleep(300);
+			continue;
+		}
 		try {
-			const res = await fetch(url);
+			const res = await fetch(`${base}/`);
 			if (res.ok || res.status === 401 || res.status === 503) {
-				return;
+				return base;
 			}
 		} catch {
 			// not ready yet
 		}
 		await sleep(300);
 	}
-	throw new Error(`Wrangler did not start within ${timeoutMs}ms`);
+	throw new Error(`Wrangler did not start within ${timeoutMs}ms:\n${wranglerOutput}`);
 }
 
 async function runCommand(cmd: string[], cwd: string): Promise<string> {
@@ -120,10 +140,6 @@ export async function setup(): Promise<void> {
 		{ mode: 0o600 },
 	);
 
-	if (existsSync(PERSIST_DIR)) {
-		rmSync(PERSIST_DIR, { recursive: true, force: true });
-	}
-
 	const migrations = discoverMigrations();
 	for (const migration of migrations) {
 		await runCommand(
@@ -135,7 +151,7 @@ export async function setup(): Promise<void> {
 				"bat-db",
 				"--local",
 				"--persist-to",
-				".wrangler/e2e",
+				PERSIST_DIR,
 				"--file",
 				migration,
 			],
@@ -154,7 +170,7 @@ export async function setup(): Promise<void> {
 			"bat-db",
 			"--local",
 			"--persist-to",
-			".wrangler/e2e",
+			PERSIST_DIR,
 			"--file",
 			TEST_MARKER_SQL,
 		],
@@ -173,7 +189,7 @@ export async function setup(): Promise<void> {
 			"bat-db",
 			"--local",
 			"--persist-to",
-			".wrangler/e2e",
+			PERSIST_DIR,
 			"--command",
 			"SELECT value FROM _test_marker WHERE key = 'env'",
 		],
@@ -183,36 +199,46 @@ export async function setup(): Promise<void> {
 		throw new Error("E2E isolation guard failed: _test_marker.env != 'test'. Refusing to proceed.");
 	}
 
+	wranglerOutput = "";
 	wranglerProc = spawn(
 		"npx",
 		[
 			"wrangler",
 			"dev",
 			"--port",
-			String(PORT),
+			"0",
+			"--inspector-port",
+			"0",
 			"--local",
 			"--persist-to",
-			".wrangler/e2e",
+			PERSIST_DIR,
 			"--env-file",
 			E2E_ENV_PATH,
-			"--log-level",
-			"error",
 		],
-		{ cwd: WORKER_ROOT, stdio: "ignore" },
+		{ cwd: WORKER_ROOT, stdio: ["ignore", "pipe", "pipe"] },
 	);
+	for (const stream of [wranglerProc.stdout, wranglerProc.stderr]) {
+		stream?.on("data", (chunk) => {
+			wranglerOutput = `${wranglerOutput}${chunk}`.slice(-4_000);
+		});
+	}
 
-	await waitForServer(`${BASE}/`);
+	const base = await waitForServer();
 
-	process.env.BAT_E2E_BASE = BASE;
+	process.env.BAT_E2E_BASE = base;
 	process.env.BAT_E2E_WRITE_KEY = WRITE_KEY;
 	process.env.BAT_E2E_READ_KEY = READ_KEY;
 }
 
 export async function teardown(): Promise<void> {
 	if (wranglerProc) {
-		wranglerProc.kill();
+		const proc = wranglerProc;
 		wranglerProc = null;
+		const exited = new Promise<void>((resolve) => proc.once("exit", resolve));
+		proc.kill();
+		await Promise.race([exited, sleep(5_000)]);
 	}
+	wranglerOutput = "";
 	rmSync(E2E_ENV_PATH, { force: true });
 	if (existsSync(PERSIST_DIR)) {
 		rmSync(PERSIST_DIR, { recursive: true, force: true });

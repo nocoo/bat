@@ -95,9 +95,9 @@ Pre-commit hook blocks the commit. Developer must fix before retrying.
 
 ### How it works
 
-1. `test:e2e` script starts Wrangler on port 18787 with `--persist-to .wrangler/e2e`
+1. `test:e2e` starts Wrangler on an ephemeral loopback port with `--persist-to .wrangler/e2e/<random>`
 2. Applies all D1 migrations to the local database
-3. Runs Bun test suite against `http://localhost:18787`
+3. Runs the Vitest suite against the per-run loopback URL
 4. Tests execute sequentially (some tests depend on prior state, e.g. create → read → delete)
 5. Wrangler process is killed on exit
 
@@ -108,7 +108,7 @@ Entry control detects `localhost` → all auth bypassed. Tests call routes direc
 ### Run
 
 ```bash
-bun turbo test:e2e --filter=@bat/worker
+bun run turbo test:e2e --filter=@bat/worker
 ```
 
 ### Migration sync requirement
@@ -280,8 +280,8 @@ Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
 | Layer | Mechanism | What it prevents |
 |-------|-----------|------------------|
 | 1 | `--local` flag | Wrangler uses in-process Miniflare, not remote CF |
-| 2 | `--persist-to .wrangler/e2e` | Dedicated state dir, separate from other runs |
-| 3 | Dir wiped before each run | Clean slate, no stale data |
+| 2 | `--persist-to .wrangler/e2e/<random>` | Dedicated state dir, separate from other runs |
+| 3 | OS-assigned HTTP and Inspector ports | Concurrent runs cannot collide or probe another run's Worker |
 | 4 | `_test_marker` row asserted | Test-only marker table (applied from `fixtures/test_marker.sql`, not in production migrations) |
 | 5 | Env var guard | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set |
 
@@ -319,7 +319,7 @@ Runs before `git push`. All stages execute in parallel; any failure blocks the p
 
 | Stage | Command | What |
 |-------|---------|------|
-| `l2_e2e` | `bun turbo test:e2e --filter=@bat/worker` | L2: Full API E2E |
+| `l2_e2e` | `bun run turbo test:e2e --filter=@bat/worker` | L2: Full API E2E |
 | `osv_js` | `osv-scanner scan --lockfile=bun.lock` | G2: CVE scanning for JS deps |
 | `osv_rust` | `osv-scanner scan --lockfile=probe/Cargo.lock` | G2: CVE scanning for Rust deps |
 
@@ -397,7 +397,7 @@ bun turbo typecheck
 bunx lint-staged
 
 # L2 (same as pre-push)
-bun turbo test:e2e --filter=@bat/worker
+bun run turbo test:e2e --filter=@bat/worker
 
 # L3 (CI only, but runnable locally)
 cd packages/ui && bunx playwright test
