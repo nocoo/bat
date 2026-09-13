@@ -12,7 +12,7 @@
 // Isolation guard (five layers, mirroring zhe docs/05-testing.md §L2):
 //   1. `--local` — wrangler dev points at a local miniflare D1, never prod.
 //   2. `--persist-to .wrangler/e2e/<random>` — a per-run state dir.
-//   3. A random loopback port prevents a run from probing another run's Worker.
+//   3. OS-assigned HTTP and Inspector ports prevent listener collisions.
 //   4. After production migrations, we apply `fixtures/test_marker.sql` to
 //      stamp the local DB, then assert the marker row exists. This file lives
 //      outside `migrations/` so it's never applied to production D1 — the
@@ -27,7 +27,6 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
-import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -49,29 +48,14 @@ const READ_KEY = "e2e-read-key";
 let wranglerProc: ChildProcess | null = null;
 let wranglerOutput = "";
 
-async function findAvailablePort(): Promise<number> {
-	const server = createServer();
-	await new Promise<void>((resolve, reject) => {
-		server.once("error", reject);
-		server.listen(0, "127.0.0.1", () => {
-			server.off("error", reject);
-			resolve();
-		});
-	});
-
-	const address = server.address();
-	if (!address || typeof address === "string") {
-		server.close();
-		throw new Error("Could not allocate an ephemeral port for the Worker E2E server");
-	}
-
-	await new Promise<void>((resolve, reject) => {
-		server.close((error) => (error ? reject(error) : resolve()));
-	});
-	return address.port;
+function readyBase(): string | null {
+	const match = wranglerOutput.match(
+		/\[wrangler:info\] Ready on http:\/\/(?:127\.0\.0\.1|localhost):(\d+)/,
+	);
+	return match ? `http://localhost:${match[1]}` : null;
 }
 
-async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
+async function waitForServer(timeoutMs = 30_000): Promise<string> {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		if (wranglerProc && (wranglerProc.exitCode !== null || wranglerProc.signalCode !== null)) {
@@ -79,17 +63,22 @@ async function waitForServer(url: string, timeoutMs = 30_000): Promise<void> {
 				`Wrangler exited before the Worker E2E server became ready:\n${wranglerOutput}`,
 			);
 		}
+		const base = readyBase();
+		if (!base) {
+			await sleep(300);
+			continue;
+		}
 		try {
-			const res = await fetch(url);
+			const res = await fetch(`${base}/`);
 			if (res.ok || res.status === 401 || res.status === 503) {
-				return;
+				return base;
 			}
 		} catch {
 			// not ready yet
 		}
 		await sleep(300);
 	}
-	throw new Error(`Wrangler did not start within ${timeoutMs}ms`);
+	throw new Error(`Wrangler did not start within ${timeoutMs}ms:\n${wranglerOutput}`);
 }
 
 async function runCommand(cmd: string[], cwd: string): Promise<string> {
@@ -210,8 +199,6 @@ export async function setup(): Promise<void> {
 		throw new Error("E2E isolation guard failed: _test_marker.env != 'test'. Refusing to proceed.");
 	}
 
-	const port = await findAvailablePort();
-	const base = `http://localhost:${port}`;
 	wranglerOutput = "";
 	wranglerProc = spawn(
 		"npx",
@@ -219,14 +206,14 @@ export async function setup(): Promise<void> {
 			"wrangler",
 			"dev",
 			"--port",
-			String(port),
+			"0",
+			"--inspector-port",
+			"0",
 			"--local",
 			"--persist-to",
 			PERSIST_DIR,
 			"--env-file",
 			E2E_ENV_PATH,
-			"--log-level",
-			"error",
 		],
 		{ cwd: WORKER_ROOT, stdio: ["ignore", "pipe", "pipe"] },
 	);
@@ -236,7 +223,7 @@ export async function setup(): Promise<void> {
 		});
 	}
 
-	await waitForServer(`${base}/`);
+	const base = await waitForServer();
 
 	process.env.BAT_E2E_BASE = base;
 	process.env.BAT_E2E_WRITE_KEY = WRITE_KEY;

@@ -281,7 +281,7 @@ Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
 |-------|-----------|------------------|
 | 1 | `--local` flag | Wrangler uses in-process Miniflare, not remote CF |
 | 2 | `--persist-to .wrangler/e2e/<random>` | Dedicated state dir, separate from other runs |
-| 3 | Random loopback port | A run cannot probe another run's Worker |
+| 3 | OS-assigned HTTP and Inspector ports | Concurrent runs cannot collide or probe another run's Worker |
 | 4 | `_test_marker` row asserted | Test-only marker table (applied from `fixtures/test_marker.sql`, not in production migrations) |
 | 5 | Env var guard | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set |
 
