@@ -3,6 +3,7 @@ import { Hono } from "hono";
 // Worker integration tests — full request lifecycle through Hono app with mock D1
 import { beforeEach, describe, expect, test } from "vitest";
 import { apiKeyAuth } from "../../src/middleware/api-key";
+import { reposMiddleware } from "../../src/middleware/repos";
 import { alertsListRoute } from "../../src/routes/alerts";
 import { fleetStatusRoute } from "../../src/routes/fleet-status";
 import { hostsListRoute } from "../../src/routes/hosts";
@@ -22,6 +23,7 @@ function createApp(db: D1Database) {
 		c.env = { DB: db, BAT_WRITE_KEY: WRITE_KEY, BAT_READ_KEY: READ_KEY };
 		return next();
 	});
+	app.use("*", reposMiddleware);
 	app.use("/api/*", apiKeyAuth);
 	app.get("/api/live", liveRoute);
 	app.post("/api/identity", identityRoute);
