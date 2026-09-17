@@ -1,3 +1,4 @@
+import { HeaderTooltip, HexlyLink } from "./header-links";
 import {
 	ContentIsland,
 	Sheet,
@@ -88,14 +89,16 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 				<header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-6">
 					<div className="flex min-w-0 flex-1 items-center gap-3">
 						{showHamburger && (
-							<button
-								type="button"
-								onClick={() => setMobileOpen(true)}
-								aria-label="Open navigation menu"
-								className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
-							>
-								<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
-							</button>
+							<HeaderTooltip label="Open navigation menu">
+								<button
+									type="button"
+									onClick={() => setMobileOpen(true)}
+									aria-label="Open navigation menu"
+									className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
+								>
+									<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
+								</button>
+							</HeaderTooltip>
 						)}
 						<Breadcrumbs
 							items={[{ label: "Home", href: "/" }, ...breadcrumbs]}
@@ -103,15 +106,18 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 						/>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
-						<a
-							href="https://github.com/nocoo/bat"
-							target="_blank"
-							rel="noopener noreferrer"
-							aria-label="GitHub repository"
-							className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-						>
-							<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
-						</a>
+						<HeaderTooltip label="GitHub repository">
+							<a
+								href="https://github.com/nocoo/bat"
+								target="_blank"
+								rel="noopener noreferrer"
+								aria-label="GitHub repository"
+								className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+							>
+								<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
+							</a>
+						</HeaderTooltip>
+						<HexlyLink />
 						<ThemeToggle aria-label="Toggle theme" />
 					</div>
 				</header>
