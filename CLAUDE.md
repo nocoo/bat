@@ -1,116 +1,100 @@
 # Bat
 
-Lightweight VPS monitoring: Rust probe, Cloudflare Worker (Hono + D1 + SPA assets), Vite dashboard.
-Profile: native-hybrid
-Direction: [docs/02-architecture.md](docs/02-architecture.md). Other `docs/NN` and README may be stale (ports, alerts, Next). Frameworks must not rewrite this file.
+VPS monitoring with a Rust probe, Cloudflare Worker API and Vite dashboard.
+Profile: native-hybrid, with TypeScript and Rust lanes.
+Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](docs/21-development.md). Frameworks must not rewrite this file.
 
 ## Sources of Truth
 
-This file is the **contract**. Hooks, CI, and config are **enforcement**. If they disagree, that is a failure — raise enforcement; never lower this file to a weaker hook.
+This file is the contract; hooks, CI and configuration enforce it. Raise weaker enforcement instead of lowering this contract.
 
 | Fact | Where |
 |---|---|
-| Agent handbook | this file |
-| Human docs | README.md; current architecture is `docs/02` (not every numbered doc) |
-| Version | root `package.json` `"version"` (synced by `scripts/release.ts`) |
-| Enforcement | `.husky/*`, `.github/workflows/{ci,release}.yml`, vitest configs, `scripts/check-coverage.sh` |
-| Machine rules | global `AGENTS.md`, `rules/git-commit.md` |
-| Accidents | [Retrospective.md](Retrospective.md) |
-| Env files | `packages/worker/.dev.vars`, `packages/ui/.env.local` gitignored. Secrets via `wrangler secret put` |
+| Human docs | [README.md](README.md), [docs index](docs/README.md) |
+| Version | Root `package.json`, synchronized by `scripts/release.ts` |
+| Enforcement | `.husky/`, CI/release workflows, per-package Vitest configs, `scripts/check-coverage.sh` |
+| Local secrets | Ignored `packages/worker/.dev.vars` and `packages/ui/.env.local`; production Worker secrets are managed separately |
+| Machine rules / accidents | Global `AGENTS.md` and `rules/`; [Retrospective.md](Retrospective.md) |
 
 ## Project Invariants
 
-- Browser: `bat.hexly.ai` (Access). Ingest: `bat-ingest.worker.hexly.ai` (`BAT_WRITE_KEY` / `BAT_READ_KEY`). One Worker serves API + SPA.
-- Daily UI: Vite :7025 (or `https://bat.dev.hexly.ai`) proxies `/api` to prod; needs `packages/ui/.env.local` Access service-token vars. Wrangler :37025 is local worker **dev**, not E2E. L2 selects an ephemeral loopback port; L3 uses :27025. Not 8787.
-- E2E is `--local --persist-to` only. Never `--remote` D1. L2 creates `.wrangler/e2e/<random>` for each run; L3 uses `.wrangler/e2e-pw`.
-- Apply production D1 migrations before Worker code that uses new columns. Do not `wrangler deploy` from a laptop.
-- `gate:routes` is a static `(method, path)` scan vs e2e files — structural hit, not assertion quality.
-- Version with `bun run release`. `bun run deploy` races CD (`.github/workflows/release.yml`).
+- One Worker serves API and SPA. Browser host `bat.hexly.ai` uses Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
+- Daily Vite 7025 (`bat.dev.hexly.ai`) proxies API traffic to production with explicit Access service-token configuration. Worker 37025 is local development, never an E2E endpoint.
+- L2/L3 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
+- Apply production D1 migrations before code that needs new columns. Preserve migration data with copy/rename rather than destructive table replacement; the E2E harness discovers numbered migrations automatically.
+- `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
+- Keep MVVM boundaries and thin routes. Route/page scan hits are structural evidence, not assertion quality.
+- Use Bun, not pnpm. Release through the existing script and CD; laptop `bun run deploy` / `wrangler deploy` would race CD. Probe fleet upgrades remain manual.
 
 ## Stack / Layout
 
 | Component | Choice |
 |---|---|
-| Language | TypeScript 7 strict + Rust (probe) |
-| Package manager | Bun workspaces + Turbo |
-| Runtime | Cloudflare Workers (Hono) + Vite SPA + static Rust probe |
-| Lint | Biome `--error-on-warnings`; probe `clippy -D warnings` + `fmt` |
-| Tests | Vitest L1; wrangler L2; Playwright L3; `cargo test` |
-| Data | D1 `bat-db` (+ prod KV `BAT_KV`) |
-
-```
-packages/shared  types    packages/worker  Hono + D1
-packages/ui      Vite :7025    packages/cli
-probe/           Rust    docs/  numbered Chinese
-```
+| Runtime / install | TypeScript 7, Bun 1.3.11/Turbo, Hono Worker, Vite SPA |
+| Native lane | Rust probe, cargo, clippy, rustfmt, cargo-llvm-cov |
+| State | D1 `bat-db`, optional production `BAT_KV`, Connect coordinator Durable Object |
+| `packages/shared/`, `packages/worker/` | Types and Worker/API/SPA assets |
+| `packages/ui/`, `packages/cli/`, `probe/` | Dashboard, CLI and Rust agent |
 
 ## Commands
 
+Run from the root after a frozen Bun install. Rust coverage needs `cargo-llvm-cov` and LLVM tools; nightly preserves existing `coverage(off)` annotations. Browser tests need Chromium in `packages/ui`.
+
 ```bash
-bun run dev
+bun install --frozen-lockfile
 bun run typecheck
 bun run lint
 bun run build
 bun run test:unit:coverage
-bun run turbo test:e2e --filter=@bat/worker
-cd packages/ui && bunx playwright test
-bun run release -- --dry-run
+bun turbo test:e2e --filter=@bat/worker
+bun run test:e2e:pw
+cargo test --manifest-path probe/Cargo.toml
+cargo clippy --manifest-path probe/Cargo.toml -- -D warnings
+cargo fmt --manifest-path probe/Cargo.toml --check
+bun run gate:security
 ```
+
+Build the UI before L2/L3 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CF_API_TOKEN` for isolated tests; the L2 runner rejects production-capable credentials. Never run tests against the daily Vite proxy.
 
 ## Verification
 
-Status: `enforced` | `planned` | `manual` | `N/A`. `enforced` Evidence = hook/CI/config/script. `planned` has no Evidence.
+6DQ = L1/L2/L3 + G1/G2 + D1. Status: `enforced`, `planned`, `manual`, `N/A`.
 
-Org gaps: index-snapshot pre-commit; stdin-range pre-push; `.skip`/`.only` (Playwright `forbidOnly` only in CI). Today: pre-commit coverage/typecheck/lint-staged/gitleaks/gates on the working tree. pre-push L2 + `gate:security`. CI bun-quality `@aec4adc1a817c56790d1698329ef9398a15a754a` (v2026.5) + L2 + L3 + probe. L3 is CI-only.
-
-| Change | Proof | Status | Evidence |
+| Dimension | Required proof | Status | Current enforcement / gap |
 |---|---|---|---|
-| Logic TS | L1 line ≥90% pre-commit (`check-coverage.sh 90 95`); CI default script is 95% TS | enforced | pre-commit; CI `test:unit:coverage` |
-| Logic Rust | pre-commit llvm-cov ≥95%; CI `test:unit:coverage` llvm-cov ≥90%; `probe` job is `cargo test` | enforced | `check-coverage.sh`; CI quality + `probe` |
-| API L2 | real HTTP wrangler `--local`; structural 100% `/api` routes | enforced | pre-push → `turbo test:e2e --filter=@bat/worker`; CI `l2-e2e`; `gate:routes` |
-| UI L3 | Playwright Chromium | enforced | CI `l3-playwright` (`packages/ui` + `l3-webserver.sh`) |
-| Types / lint | tsc + Biome 0 warning; clippy | enforced | pre-commit typecheck + lint-staged; CI lint/typecheck/clippy |
-| G2 secrets | gitleaks | enforced | pre-commit `--staged`; pre-push + CI bun-quality |
-| G2 deps JS | osv `bun.lock` | enforced | pre-push `gate:security`; CI bun-quality |
-| G2 deps Rust | osv `probe/Cargo.lock` | enforced | pre-push `gate:security` only (CI does not scan Cargo.lock) |
-| Bundler | `turbo build --filter=@bat/ui` | enforced | CI L2/L3 `bun run build`; `scripts/ci-pre-command.sh` |
-| Docs | numbered doc if behavior changes | manual | human review |
-| Release | version + changelog + tag; CD deploy | enforced | `scripts/release.ts` (GitHub Release is skipped/non-fatal without `gh`); `release.yml` |
+| L1 TypeScript | Statements, branches, functions and lines each ≥95%; no `.skip` / `.only` | planned | Shared config is four-metric 95%; Worker/UI branches are 90%. Script checks lines, commit passes TS=90, CI defaults TS=95; skip/focus gate incomplete |
+| L1 Rust | Preserve ≥95% lines and raise measurable remaining coverage to ≥95% | planned | Commit requires llvm-cov 95% lines; script/CI default is 90%. Branch/function/statement enforcement is absent |
+| L2 API | Real local HTTP over 100% of endpoint/method combinations | planned | Pre-push/CI run real Wrangler tests and route mapping; static coverage hits do not verify every assertion/method |
+| L3 UI/probe | Critical dashboard and probe-to-server workflows | planned | CI Chromium covers dashboard; complete native probe system acceptance is not enforced |
+| G1 TypeScript | Strict types and check-only lint, zero errors/warnings | enforced | Commit typecheck/lint-staged and CI typecheck/lint |
+| G1 Rust | Clippy warnings denied and rustfmt check | enforced | Commit when probe changes; CI probe job always tests/lints/formats |
+| G2 security | Secret and dependency scans in both lanes; missing tools fail | enforced | Pre-push scans Bun/Cargo locks and secrets; CI default quality scan covers Bun only. Local secret range uses upstream or a recent-commit fallback |
+| D1 isolation | Per-run local stores, guards and verified marker before mutations/cleanup | planned | L2 allocates random state/ports and checks `_test_marker`; L3 still reuses `.wrangler/e2e-pw` and may reuse an existing server |
+| Build | Real dashboard bundle and native artifact | enforced | CI prepares UI, probe compiles during tests; release packages its intended artifacts |
+| Docs / operations | Architecture and migration/release behavior reviewed | manual | Numbered docs and maintainer checks |
 
-| Hook | Org bar | Status | Evidence |
-|---|---|---|---|
-| pre-commit | index snapshot for G1+L1 | planned | — |
-| pre-push | stdin ref range | planned | — |
+| Hook | Current behavior | Required follow-up |
+|---|---|---|
+| pre-commit | Working-tree coverage/types/staged lint/secrets/route/page gates; conditional Rust lint | G1+L1 on index snapshot, <30s |
+| pre-push | Local Worker L2 and G2 in parallel | Test commits named by stdin push refs, <3min |
 
-`--no-verify` forbidden on commits and branch pushes. Tag-only may skip.
+Install restores Husky. Hooks must stay check-only; never use `--no-verify` on commits or branch pushes. CI pins shared workflows at `ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f`.
 
 ## Resources / Isolation
 
-| Purpose | Port / resource | Isolation |
+| Lane | Resource | Boundary |
 |---|---|---|
-| Dev | 7025 Vite (`bat.dev.hexly.ai`) | `/api` → prod; `.env.local` Access tokens |
-| Dev wrangler | 37025 | local worker dev; `.dev.vars` |
-| L2 | ephemeral | `--local --persist-to .wrangler/e2e/<random>` + test marker |
-| L3 | 27025 | `--local --persist-to .wrangler/e2e-pw` |
+| Daily dev | UI 7025, Worker 37025 | UI proxy can reach production; separate test traffic |
+| L2 | Ephemeral loopback/inspector ports; `.wrangler/e2e/<random>` | Local SQLite/fixtures; rejects remote credentials and verifies marker |
+| L3 | 27025, `.wrangler/e2e-pw` | Local only; per-run storage and no-reuse guard still planned |
 
-E2E never touches prod D1/KV.
+Every Worker test lane must reject remote bindings, assert test context, initialize `_test_marker(key,value)` with `env=test` and verify it before resets/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid workerd pipe failures.
 
 ## Operations / Release
 
-- Entry: `bun run release` (patch default; `-- minor` / `-- major` / `-- x.y.z`; `-- --dry-run`). Who: GitHub write on `nocoo/bat` (`gh`) plus the `production` GitHub Environment for CD.
-- Do not `bun run deploy` / `wrangler deploy` in the same breath. CD: `.github/workflows/release.yml` (tag `v*.*.*` and CI-green `main`). Probe VPS upgrade stays manual.
-- Live-check: `https://bat.hexly.ai` (Access) and ingest health on `bat-ingest.worker.hexly.ai`. Runbook: [docs/19-edge-deployment.md](docs/19-edge-deployment.md).
+Authorized maintainers use `bun run release` (patch default; `-- minor`, `-- major`, explicit version, or `-- --dry-run`). GitHub Release creation is nonfatal without `gh`; verify it separately. CD owns migration/deployment after source proof; fleet probe installation is manual.
+Preserve static musl probe packaging and version targets, including release snapshots. Procedures and live checks: [edge deployment](docs/19-edge-deployment.md), [probe](docs/04-probe.md), [Connect](docs/22-connect.md).
 
 ## Retrospective
 
-| Kind | Where |
-|---|---|
-| Accident narrative | [Retrospective.md](Retrospective.md) |
-| Recurring project rule | one line here (cap ~10) |
-| Cross-project | nmem / global rules |
-| Checkable rule | hook or test |
-
-- SPA is Vite on the Worker. Do not restore Next/Railway.
-- L2/L3 stay `--local --persist-to`. Never `--remote`.
-- Migrate prod D1 before the Worker that needs the new schema.
-- Do not add pnpm.
+Narratives remain in [Retrospective.md](Retrospective.md); keep only recurring rules here, cross-project lessons in global rules/nmem and deterministic checks in hooks/tests.
