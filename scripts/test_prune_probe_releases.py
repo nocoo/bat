@@ -50,6 +50,7 @@ class RetentionTests(unittest.TestCase):
             response([{"key": "b"}]),
         ]) as fetch:
             self.assertEqual(prune.list_objects("test"), [{"key": "a"}, {"key": "b"}])
+            self.assertNotIn("cursor=", fetch.call_args_list[0].args[0].full_url)
             self.assertIn("cursor=next", fetch.call_args.args[0].full_url)
         for info in [{"is_truncated": True}, {"is_truncated": True, "cursor": "same"}]:
             with patch.object(prune.urllib.request, "urlopen", side_effect=lambda *a, **k: response([], info)):

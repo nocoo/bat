@@ -26,7 +26,10 @@ def list_objects(token):
     cursor = ""
     seen = set()
     while True:
-        query = urllib.parse.urlencode({"prefix": PREFIX, "per_page": 1000, "cursor": cursor})
+        params = {"prefix": PREFIX, "per_page": 1000}
+        if cursor:
+            params["cursor"] = cursor
+        query = urllib.parse.urlencode(params)
         request = urllib.request.Request(
             f"https://api.cloudflare.com/client/v4/accounts/{ACCOUNT}/r2/buckets/{BUCKET}/objects?{query}",
             headers={"Authorization": f"Bearer {token}"},
