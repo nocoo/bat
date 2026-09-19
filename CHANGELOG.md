@@ -1,5 +1,53 @@
 # Changelog
 
+## v2.3.2
+
+### Added
+- Add Hexly project link and header tooltips
+
+### Changed
+- Avoid D1 history scans and restore dashboard caching
+- Update wrangler
+- Update lucide-react
+- Update node
+- Update workers-types
+- Update biome
+- Normalize claude handbook and quality contract
+- Update @nocoo/basalt to 2.1.8
+- Align release wrangler-version with lockfile
+- Wire integration repositories
+- Update react-router
+- Update hono
+- Align vitest 5.0.1
+- Upgrade lucide-react to 1.46.0
+- Upgrade turbo to 2.10.13
+- STU-5884: chore(deps): upgrade rustls to 0.23.45
+- Upgrade rustls to 0.23.45
+- Bump wrangler to 4.131.2
+- Upgrade workers types
+- Bump @types/node to 26.5.1
+- Upgrade testing-library dom to 10.4.2
+- Upgrade tailwind-merge to 3.7.0
+- Include lucide-react 1.45.0 upgrade
+- Sync latest main
+- Bump wrangler to 4.131.1
+- Update @types/react-dom to 19.3.0
+- Upgrade lucide-react to 1.45.0
+- Upgrade happy-dom to 20.14.5
+- Bump workers-types to 5.20260911.1
+- Bump @biomejs/biome 2.5.12 → 2.5.13 (STU-5627)
+- Upgrade React to 19.3.0
+- Upgrade React packages to 19.3.0
+- Upgrade @types/react to 19.3.0
+- Update lint-staged to 17.5.1
+
+### Fixed
+- Align release wrangler version
+- Add accessible sr-only text and fix Biome lint in toolbar
+- Isolate worker e2e inspector ports
+- Isolate concurrent worker e2e runs
+- Upgrade lucide-react to 1.44.0
+
 ## v2.3.1
 
 ### Fixed
