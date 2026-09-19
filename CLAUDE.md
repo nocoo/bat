@@ -93,6 +93,9 @@ Every Worker test lane must reject remote bindings, assert test context, initial
 ## Operations / Release
 
 Authorized maintainers use `bun run release` (patch default; `-- minor`, `-- major`, explicit version, or `-- --dry-run`). GitHub Release creation is nonfatal without `gh`; verify it separately. CD owns migration/deployment after source proof; fleet probe installation is manual.
+
+R2 probe release retention: after both architectures and their SHA-256 files are successfully uploaded to the version directory and `latest/`, run `python3 scripts/prune-probe-releases.py --release-version X.Y.Z --apply`. Keep only the three newest numeric `X.Y.Z` version directories under `zhe/apps/bat/`, plus `latest/`; never delete other prefixes or non-version keys. The script defaults to a dry run, requires complete retained releases and matching `latest/`, and verifies the remaining inventory. Serialize probe releases so upload and cleanup cannot overlap. For one-time cleanup, wait for any in-flight probe upload to finish and use the same script. Required credentials: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; never print them.
+
 Preserve static musl probe packaging and version targets, including release snapshots. Procedures and live checks: [edge deployment](docs/19-edge-deployment.md), [probe](docs/04-probe.md), [Connect](docs/22-connect.md).
 
 ## Retrospective

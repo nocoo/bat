@@ -75,6 +75,9 @@ jobs:
 
   probe-release:
     name: "Probe Release"
+    concurrency:
+      group: bat-probe-r2-release
+      cancel-in-progress: false
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -176,3 +179,9 @@ jobs:
                 --file "probe/out/$f" --remote
             done
           done
+
+      - name: Retain newest three probe releases
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: python3 scripts/prune-probe-releases.py --release-version "${{ steps.ver.outputs.version }}" --apply

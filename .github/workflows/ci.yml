@@ -27,6 +27,7 @@ jobs:
       command: |
         bun run gate:routes
         bun run gate:pages
+        python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
 
   l2-e2e:
     name: "L2 Worker E2E"
