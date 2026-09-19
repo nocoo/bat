@@ -11,11 +11,12 @@
 //   - One KV entry per (method, path, query, verified-auth-identity).
 //   - The auth digest is part of the KV key (a flat string), so two
 //     clients with different keys never collide.
-//   - Stored value is the JSON response body string. Re-served as a
+//   - Stored value includes the JSON body and its freshness deadline. Re-served as a
 //     `Response` with `Content-Type: application/json` and a short
 //     `Cache-Control: max-age=...` so dashboards can keep their own
 //     SWR cadence honest.
-//   - 30s TTL; stale up to TTL is acceptable for the dashboard.
+//   - 30s freshness checked on read; KV storage TTL is at least 60s.
+//     The deadline also rejects stale values propagated between locations.
 //   - KV failure (read or write) → never throws; caller falls back to
 //     the underlying handler.
 //   - No write-path invalidation: TTL bounds staleness; KV cannot be
@@ -66,11 +67,19 @@ export async function tryReadCache(
 		if (body == null) {
 			return null;
 		}
-		return new Response(body, {
+		const entry = JSON.parse(body);
+		if (typeof entry?.body !== "string" || !Number.isFinite(entry?.expiresAt)) {
+			return null;
+		}
+		const remainingSeconds = Math.floor((entry.expiresAt - Date.now()) / 1000);
+		if (remainingSeconds <= 0) {
+			return null;
+		}
+		return new Response(entry.body, {
 			status: 200,
 			headers: {
 				"Content-Type": "application/json",
-				"Cache-Control": `max-age=${opts.ttlSeconds}`,
+				"Cache-Control": `private, max-age=${remainingSeconds}`,
 				"X-Bat-Cache": "hit",
 			},
 		});
@@ -97,7 +106,9 @@ export async function writeCache(
 	try {
 		const key = await buildCacheKey(req, opts.route);
 		const body = await response.clone().text();
-		await kv.put(key, body, { expirationTtl: opts.ttlSeconds });
+		await kv.put(key, JSON.stringify({ body, expiresAt: Date.now() + opts.ttlSeconds * 1000 }), {
+			expirationTtl: Math.max(60, opts.ttlSeconds),
+		});
 	} catch {
 		// best-effort
 	}

@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { buildCacheKey, tryReadCache, writeCache } from "./dashboard-cache";
 
 interface PutEntry {
@@ -13,6 +13,9 @@ function makeKv() {
 		kv: {
 			get: vi.fn(async (key: string) => store.get(key)?.value ?? null),
 			put: vi.fn(async (key: string, value: string, opts?: { expirationTtl?: number }) => {
+				if (opts?.expirationTtl !== undefined && opts.expirationTtl < 60) {
+					throw new Error("KV expirationTtl must be at least 60 seconds");
+				}
 				store.set(key, { value, ttl: opts?.expirationTtl });
 			}),
 			delete: vi.fn(async (key: string) => {
@@ -91,6 +94,11 @@ describe("buildCacheKey", () => {
 });
 
 describe("tryReadCache / writeCache round-trip", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date("2026-09-19T00:00:00Z"));
+	});
+	afterEach(() => vi.useRealTimers());
 	test("miss → null without throwing", async () => {
 		const { kv } = makeKv();
 		const r = new Request("https://x/api/hosts");
@@ -113,21 +121,49 @@ describe("tryReadCache / writeCache round-trip", () => {
 		expect(hit).not.toBeNull();
 		expect(hit?.status).toBe(200);
 		expect(hit?.headers.get("Content-Type")).toBe("application/json");
-		expect(hit?.headers.get("Cache-Control")).toBe("max-age=30");
+		expect(hit?.headers.get("Cache-Control")).toBe("private, max-age=30");
 		expect(hit?.headers.get("X-Bat-Cache")).toBe("hit");
 		expect(await hit?.text()).toBe(JSON.stringify([{ id: 1 }]));
 	});
 
-	test("ttl is propagated as KV expirationTtl", async () => {
-		const { kv, store } = makeKv();
-		const r = new Request("https://x/api/hosts");
-		await writeCache(kv, r, new Response("[]", { status: 200 }), {
-			route: "hosts",
-			ttlSeconds: 45,
-		});
-		const [entry] = [...store.values()];
-		expect(entry.ttl).toBe(45);
+	test.each([30, 45, 120])(
+		"storage TTL respects KV minimum for %is freshness",
+		async (ttlSeconds) => {
+			const { kv, store } = makeKv();
+			const r = new Request("https://x/api/hosts");
+			await writeCache(kv, r, new Response("[]", { status: 200 }), {
+				route: "hosts",
+				ttlSeconds,
+			});
+			const [entry] = [...store.values()];
+			expect(entry.ttl).toBe(Math.max(60, ttlSeconds));
+		},
+	);
+
+	test("freshness deadline rejects stale KV values and bounds browser caching", async () => {
+		const { kv } = makeKv();
+		const req = new Request("https://x/api/hosts");
+		const opts = { route: "hosts", ttlSeconds: 30 };
+		await writeCache(kv, req, new Response("[]"), opts);
+		vi.advanceTimersByTime(20_000);
+		expect((await tryReadCache(kv, req, opts))?.headers.get("Cache-Control")).toBe(
+			"private, max-age=10",
+		);
+		vi.advanceTimersByTime(10_000);
+		expect(await tryReadCache(kv, req, opts)).toBeNull();
+		vi.advanceTimersByTime(60_000);
+		expect(await tryReadCache(kv, req, opts)).toBeNull();
 	});
+
+	test.each(["not-json", "null", "[]", '{"body":42,"expiresAt":9999999999999}', '{"body":"[]"}'])(
+		"invalid or legacy cached value falls back: %s",
+		async (value) => {
+			const { kv, store } = makeKv();
+			const req = new Request("https://x/api/hosts");
+			store.set(await buildCacheKey(req, "hosts"), { value });
+			expect(await tryReadCache(kv, req, { route: "hosts", ttlSeconds: 30 })).toBeNull();
+		},
+	);
 
 	test("two requests with different auth do NOT share entries", async () => {
 		const { kv } = makeKv();

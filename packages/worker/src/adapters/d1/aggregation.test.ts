@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { createMockD1 } from "../../test-helpers/mock-d1";
 import { D1AggregationRepository } from "./aggregation";
 
@@ -139,6 +139,31 @@ describe("aggregateHour", () => {
 
 	beforeEach(() => {
 		db = createMockD1();
+	});
+
+	test("host discovery uses indexed existence checks with an exclusive hour end", async () => {
+		const hour = 1700000000;
+		for (const hostId of ["inside", "outside", "empty"]) await insertHost(db, hostId, hour);
+		await insertRawMetrics(db, "inside", hour);
+		await insertRawMetrics(db, "inside", hour + 1);
+		await insertRawMetrics(db, "outside", hour - 1);
+		await insertRawMetrics(db, "outside", hour + 3600);
+		const prepare = vi.spyOn(db, "prepare");
+		await new D1AggregationRepository(db).aggregateHour(hour);
+		const discovery = prepare.mock.calls[0][0];
+		prepare.mockRestore();
+		const plan = await db
+			.prepare(`EXPLAIN QUERY PLAN ${discovery}`)
+			.bind(hour, hour + 3600)
+			.all<{ detail: string }>();
+		expect(
+			plan.results.some(
+				(row) => row.detail.includes("SEARCH mr") && row.detail.includes("idx_raw_host_ts"),
+			),
+		).toBe(true);
+		expect(plan.results.some((row) => row.detail.startsWith("SCAN mr"))).toBe(false);
+		const rows = await db.prepare("SELECT host_id, sample_count FROM metrics_hourly").all();
+		expect(rows.results).toEqual([{ host_id: "inside", sample_count: 2 }]);
 	});
 
 	test("computes correct avg/max/min", async () => {
@@ -594,6 +619,49 @@ describe("purgeOldData — unified retention", () => {
 			.bind(hostId, hourTs)
 			.run();
 	}
+
+	test("indexed cleanup includes retired hosts and preserves cutoff across all tables", async () => {
+		const now = 1700000000;
+		const cutoff = now - 7 * 86400;
+		for (const hostId of ["active", "retired"]) {
+			await insertHost(db, hostId, now);
+			for (const ts of [cutoff - 1, cutoff, cutoff + 1]) {
+				await insertRawMetrics(db, hostId, ts);
+				await insertHourly(db, hostId, ts);
+				await insertTier2(db, hostId, ts);
+				await insertEvent(db, hostId, ts);
+			}
+		}
+		await db.prepare("UPDATE hosts SET is_active = 0 WHERE host_id = 'retired'").run();
+		const prepare = vi.spyOn(db, "prepare");
+		await new D1AggregationRepository(db).purgeOldData(now, 7);
+		const deletes = prepare.mock.calls.map(([sql]) => sql);
+		prepare.mockRestore();
+		for (const sql of deletes) {
+			const plan = await db
+				.prepare(`EXPLAIN QUERY PLAN ${sql}`)
+				.bind(cutoff)
+				.all<{ detail: string }>();
+			expect(plan.results.some((row) => row.detail.startsWith("SEARCH "))).toBe(true);
+			expect(plan.results.some((row) => row.detail.startsWith("SCAN "))).toBe(false);
+		}
+		for (const [table, column] of [
+			["metrics_raw", "ts"],
+			["metrics_hourly", "hour_ts"],
+			["tier2_snapshots", "ts"],
+			["events", "created_at"],
+		]) {
+			const rows = await db
+				.prepare(`SELECT host_id, ${column} AS ts FROM ${table} ORDER BY host_id, ts`)
+				.all();
+			expect(rows.results).toEqual([
+				{ host_id: "active", ts: cutoff },
+				{ host_id: "active", ts: cutoff + 1 },
+				{ host_id: "retired", ts: cutoff },
+				{ host_id: "retired", ts: cutoff + 1 },
+			]);
+		}
+	});
 
 	test("retention_days=7: removes data older than 7 days across all tables", async () => {
 		const now = 1700000000;

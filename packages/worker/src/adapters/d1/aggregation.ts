@@ -145,13 +145,14 @@ export class D1AggregationRepository implements AggregationRepository {
 	async aggregateHour(hourTs: number): Promise<void> {
 		const hourEnd = hourTs + 3600;
 
-		// Get all active hosts that have raw data in this hour
+		// Probe each active host through (host_id, ts), stopping at its first sample.
 		const hostsResult = await this.db
 			.prepare(
-				`SELECT DISTINCT mr.host_id
-FROM metrics_raw mr
-JOIN hosts h ON mr.host_id = h.host_id
-WHERE h.is_active = 1 AND mr.ts >= ? AND mr.ts < ?`,
+				`SELECT h.host_id FROM hosts h
+WHERE h.is_active = 1 AND EXISTS (
+  SELECT 1 FROM metrics_raw mr
+  WHERE mr.host_id = h.host_id AND mr.ts >= ? AND mr.ts < ?
+)`,
 			)
 			.bind(hourTs, hourEnd)
 			.all<{ host_id: string }>();
@@ -317,11 +318,29 @@ WHERE h.is_active = 1 AND mr.ts >= ? AND mr.ts < ?`,
 	 * tables use the same retentionDays cutoff.
 	 */
 	async purgeOldData(nowSeconds: number, retentionDays: RetentionDays): Promise<void> {
+		// Foreign keys guarantee a parent host. Include retired hosts and reuse
+		// each table's (host_id, time) index instead of scanning retained history.
 		const cutoff = nowSeconds - retentionDays * 86400;
-		await this.db.prepare("DELETE FROM metrics_raw WHERE ts < ?").bind(cutoff).run();
-		await this.db.prepare("DELETE FROM metrics_hourly WHERE hour_ts < ?").bind(cutoff).run();
-		await this.db.prepare("DELETE FROM tier2_snapshots WHERE ts < ?").bind(cutoff).run();
-		await this.db.prepare("DELETE FROM events WHERE created_at < ?").bind(cutoff).run();
+		await this.db
+			.prepare("DELETE FROM metrics_raw WHERE host_id IN (SELECT host_id FROM hosts) AND ts < ?")
+			.bind(cutoff)
+			.run();
+		await this.db
+			.prepare(
+				"DELETE FROM metrics_hourly WHERE host_id IN (SELECT host_id FROM hosts) AND hour_ts < ?",
+			)
+			.bind(cutoff)
+			.run();
+		await this.db
+			.prepare(
+				"DELETE FROM tier2_snapshots WHERE host_id IN (SELECT host_id FROM hosts) AND ts < ?",
+			)
+			.bind(cutoff)
+			.run();
+		await this.db
+			.prepare("DELETE FROM events WHERE host_id IN (SELECT host_id FROM hosts) AND created_at < ?")
+			.bind(cutoff)
+			.run();
 	}
 
 	/**

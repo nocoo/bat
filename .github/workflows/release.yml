@@ -166,7 +166,8 @@ jobs:
           WRANGLER="./packages/worker/node_modules/.bin/wrangler"
           test -x "$WRANGLER"
           reported=$("$WRANGLER" --version)
-          echo "$reported" | grep -q "4.134.0"
+          expected=$(jq -r .devDependencies.wrangler packages/worker/package.json)
+          test "$reported" = "$expected"
           for tier in "$VERSION" latest; do
             for f in bat-probe-linux-x86_64 bat-probe-linux-aarch64 \
                      bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256; do
