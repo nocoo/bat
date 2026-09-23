@@ -104,7 +104,7 @@ async function runCommand(cmd: string[], cwd: string): Promise<string> {
 
 /** Auto-discover migrations in lexical order — replaces the hardcoded list
  *  that previously lived inline in wrangler.test.ts. New migrations no longer
- *  need a manual edit here (a recurring foot-gun documented in CLAUDE.md). */
+ *  need a manual edit here (a recurring foot-gun documented in AGENTS.md). */
 function discoverMigrations(): string[] {
 	return readdirSync(MIGRATIONS_DIR)
 		.filter((f) => /^\d{4}_.+\.sql$/.test(f))
