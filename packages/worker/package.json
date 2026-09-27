@@ -17,13 +17,12 @@
 	"dependencies": {
 		"@bat/shared": "workspace:*",
 		"@cfworker/json-schema": "4.1.1",
-		"hono": "4.13.8",
+		"hono": "4.13.9",
 		"jose": "^6.2.12"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "5.20260922.1",
-		"@types/bun": "1.4.2",
+		"@cloudflare/workers-types": "5.20260927.1",
 		"typescript": "^7.0.2",
-		"wrangler": "4.136.3"
+		"wrangler": "4.142.0"
 	}
 }

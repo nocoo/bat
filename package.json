@@ -31,22 +31,18 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.5.14",
 		"@types/better-sqlite3": "^9.6.0",
-		"@vitest/coverage-v8": "5.0.1",
+		"@vitest/coverage-v8": "5.0.2",
 		"better-sqlite3": "13.0.3",
 		"husky": "^9.1.0",
-		"lint-staged": "17.5.1",
-		"picomatch": "^4.0.7",
-		"turbo": "2.11.3",
+		"lint-staged": "17.6.0",
+		"turbo": "2.11.4",
 		"typescript": "^7.0.2",
-		"vitest": "5.0.1"
+		"vitest": "5.0.2"
 	},
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json,css}": [
 			"biome check --error-on-warnings --no-errors-on-unmatched"
 		]
-	},
-	"dependencies": {
-		"postcss": "8.5.28"
 	},
 	"overrides": {
 		"esbuild": "0.28.1",
