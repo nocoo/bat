@@ -72,11 +72,20 @@ scheduled crons (a demonstration must not silently purge its persistent history)
 Probe upload and collection code is unchanged.
 
 Prod is an explicit local interactive selection using `https://bat.hexly.ai`.
-It requires `CF_ACCESS_CLIENT_ID` and `CF_ACCESS_CLIENT_SECRET` in the UI's local
-server configuration. Secrets never enter bootstrap JS or localStorage. Missing
-configuration fails visibly and leaves the current environment intact.
-Production access, real login/MFA, provider availability and deployed-revision
-parity were not exercised in this implementation; no production writes were made.
+Install `cloudflared` and authenticate with
+`cloudflared access login --quiet https://bat.hexly.ai`. Selecting Prod reuses the
+application-scoped user token; if missing or expired, it opens the normal Access
+browser login (90-second timeout). No service token is required. The launcher
+verifies `/api/me` reports an authenticated user before accepting the switch.
+The token remains server-side and is fixed to that instance; browser cookies and
+auth headers cannot replace it. Failure preserves the current environment.
+An expired live session requires a fresh login and leaving/reentering Prod.
+
+Explicit read-only live verification on 2026-09-28 passed for `/api/me`,
+`/api/hosts`, and `/api/live` (backend version 2.3.2). The local frontend is based
+on `847af18` plus the authentication/toolbar fix. The deployed commit hash and
+MFA challenge were not exposed/independently verified; no production writes were made.
+Offline authentication regression: `bun test scripts/environments/production.test.mjs`.
 
 ## Fixture matrix and evidence
 

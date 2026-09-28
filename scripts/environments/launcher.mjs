@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { authenticateProd } from "./production.mjs";
 import {
 	assertTestEnvironment,
 	createRuntime,
@@ -38,19 +39,7 @@ export async function launch({
 			runtime = demo = await demoStarting;
 		}
 		if (mode === "e2e") runtime = await createRuntime({ mode, dataset });
-		let credentials = {};
-		if (mode === "prod") {
-			const { loadEnv } = await import("../../packages/ui/node_modules/vite/dist/node/index.js");
-			const env = loadEnv("development", join(root, "packages/ui"), "");
-			if (!env.CF_ACCESS_CLIENT_ID || !env.CF_ACCESS_CLIENT_SECRET)
-				throw new Error(
-					"Prod requires the configured Access service token and real browser authentication",
-				);
-			credentials = {
-				"CF-Access-Client-Id": env.CF_ACCESS_CLIENT_ID,
-				"CF-Access-Client-Secret": env.CF_ACCESS_CLIENT_SECRET,
-			};
-		}
+		const credentials = mode === "prod" ? await authenticateProd() : {};
 		const id = randomUUID(),
 			instance = { id, mode, runtime, credentials, pending: new Set(), active: true };
 		instances.set(id, instance);
@@ -164,6 +153,7 @@ export async function launch({
 							"x-bat-local",
 							"CF-Access-Client-Id",
 							"CF-Access-Client-Secret",
+							"cf-access-token",
 						])
 							headers.delete(key);
 						if (origin) headers.set("Origin", target.origin);
@@ -172,9 +162,13 @@ export async function launch({
 								headers.delete("cookie");
 								if (!headers.has("Authorization") && !headers.has("Cf-Access-Jwt-Assertion"))
 									headers.set("Cf-Access-Jwt-Assertion", await instance.runtime.token());
-							} else
+							} else {
+								headers.delete("cookie");
+								headers.delete("Authorization");
+								headers.delete("Cf-Access-Jwt-Assertion");
 								for (const [key, value] of Object.entries(instance.credentials))
 									headers.set(key, value);
+							}
 							const response = await fetch(target, {
 								method: request.method,
 								headers,

@@ -111,3 +111,12 @@ non-creating SQLite connection that can handle WAL sidecars after Worker shutdow
 All failures were in owned local resources; the old daily database and production
 were untouched. Keep the native HTTP/browser checks as part of environment changes
 rather than treating launcher readiness or source inspection as acceptance.
+
+## 2026-09-28 — Local Prod authentication prerequisite
+
+The environment launcher required an unconfigured Access service token without
+verifying the existing user authentication path, so selecting Prod failed before
+reaching the API. Use application-scoped cloudflared user login, verify the real
+`/api/me` response before accepting a switch, and test the explicit read-only live
+path separately from isolated automation. Toolbar order also needs a rendered
+position check against the shared environment contract.
