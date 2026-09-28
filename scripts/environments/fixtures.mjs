@@ -123,6 +123,7 @@ export function fixtureSql(dataset, anchor) {
 		}
 	}
 	sql += `INSERT INTO hosts(host_id,hostname,os,arch,last_seen,is_active,description) VALUES ('demo-offline','archive.example.test','Debian 12','x86_64',${anchor - 86400},1,'Synthetic archive node — awaiting maintenance'),('demo-paused','standby.example.test','Ubuntu 24.04','aarch64',${anchor - 7200},0,'Synthetic standby node — intentionally paused');`;
+	sql += `UPDATE metrics_raw SET psi_cpu_some_avg10=1.2,psi_mem_some_avg60=0.4,psi_io_some_avg60=0.8,tcp_established=48,tcp_time_wait=12,tcp_orphan=0,tcp_allocated=64,context_switches_sec=1200,forks_sec=8,procs_running=3,procs_blocked=0,oom_kills=0,fd_allocated=850,fd_max=1048576,disk_io_json='${JSON.stringify([{ device: "vda", read_iops: 24, write_iops: 16, read_bytes_sec: 262144, write_bytes_sec: 131072, io_util_pct: 12, read_await_ms: 1.4, write_await_ms: 2.1, io_queue_depth: 0.3 }])}'; UPDATE hosts SET top_processes_ts=${anchor},top_processes_json='${JSON.stringify([{ pid: 1400, name: "postgres", cmd: "postgres -D /var/lib/postgresql/data", state: "S", ppid: 1, user: "postgres", cpu_pct: 18, mem_rss: 536870912, mem_pct: 6.25, mem_virt: 1073741824, num_threads: 4, uptime: 86400, majflt_rate: 0, io_read_rate: 262144, io_write_rate: 131072, processor: 2 }])}';`;
 	return sql;
 }
 

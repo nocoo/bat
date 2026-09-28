@@ -24,7 +24,8 @@
 		"gate:security": "bun run scripts/run-security.ts",
 		"prepare": "husky",
 		"test:environments": "bun scripts/environments/verify.mjs",
-		"capture:environments": "bun scripts/environments/capture.mjs"
+		"capture:environments": "bun scripts/environments/capture.mjs",
+		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive"
 	},
 	"trustedDependencies": [
 		"@biomejs/biome",

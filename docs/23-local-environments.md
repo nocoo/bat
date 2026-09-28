@@ -78,7 +78,7 @@ parity were not exercised in this implementation; no production writes were made
 
 ## Fixture matrix and evidence
 
-Catalog version 1 uses a recorded UTC epoch anchor, stable host/tag IDs, reserved
+Catalog version 2 uses a recorded UTC epoch anchor, stable host/tag IDs, reserved
 documentation IPs and example.test domains. Focused fixtures preserve two hosts;
 rich Demo adds full snapshots, 120 historical samples per active host, offline and
 inactive inventory, related assets/agents, maintenance and a scoped Connect key.
@@ -89,6 +89,7 @@ Application authentication uses real current time.
 | --- | --- | --- | --- |
 | Hosts, sorting/filtering | Critical alpha, healthy beta, offline archive; inactive standby; three colored tags | L3 hosts, filter, navigation; rich catalog assertions | Desktop list |
 | Host detail and charts | CPU/memory/network history, inventory, descriptions, disk capacity | L3 detail; real description update L2 | Desktop detail and charts |
+| Tier 3 charts/processes | PSI pressure, disk I/O, TCP connections, PostgreSQL process snapshot | Native fixture/API assertion and capture | Process table and disk/TCP charts |
 | Tier 2 detail | Ports, SSH/firewall/fail2ban, failed backup service, running/exited containers, disk files, Nginx/PostgreSQL, TLS/plain websites | Rich native seeding; L2 tier2 read/write | Lower detail sections not individually reviewed |
 | Alerts | Warning memory and critical disk records | L2 alerts, L3 alert table and navigation | Summary on detail |
 | Tags | production/staging/us-east; matching and nonmatching hosts | L3 create/rename/delete/filter; draft cancellation | List chips |
@@ -110,12 +111,14 @@ Rust unit/coverage checks.
 
 ## Capture evidence
 
-`bun run capture:environments` uses rich data in disposable manual E2E storage,
+`bun run capture:environments` uses rich data in disposable locked E2E storage,
 a fresh Chromium profile, 1440 × 1000 viewport, en-US locale and UTC timezone.
-It additionally exercises manual switching through persistent Demo without
-resetting or editing daily Demo records. Captures are ignored under
-`artifacts/environments/`: hosts.png, detail.png, switch.png and manifest.json.
-The manifest records fixture version, anchor and routes. The host detail route is
+It can run alongside daily Demo. Captures are ignored under
+`artifacts/environments/automated/`: hosts.png, detail.png, processes.png and manifest.json.
+For manual switching acceptance, stop the daily Demo launcher and run
+`bun run test:environments:ui`; this writes the sibling manual capture set and
+exercises switching through persistent Demo without resetting its data.
+The manifest records application revision, fixture version, anchor and routes. The host detail route is
 the actual hashed route `/hosts/f0d3fd30`.
 
 The list/detail captures were opened and reviewed: loaded synthetic avatar,
@@ -126,12 +129,12 @@ capture covers its initial viewport rather than every lower panel.
 For an automated capture with the control hidden, use:
 
 ```sh
-CI=1 bun scripts/environments/capture.mjs --automated
+CI=1 bun run capture:environments
 ```
 
 This command uses rich data in locked E2E storage, checks that browser preferences
 remain unchanged, and writes a separate `artifacts/environments/automated/` set.
-The local capture command verifies manual switching; the automated variant does
+The manual acceptance command verifies switching; the default capture does
 not access daily Demo. Both also open the unmodified hosted bundle directly and
 check that no local capability/control is present.
 

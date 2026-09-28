@@ -38,6 +38,8 @@ try {
 	);
 	const hosts = await (await fetch(`${prefix}/api/hosts`)).json();
 	assert.equal(hosts.length, 3);
+	const detail = await (await fetch(`${prefix}/api/hosts/f0d3fd30`)).json();
+	assert.equal(JSON.parse(detail.top_processes_json)[0].name, "postgres");
 	assert.throws(() => removeOwned(runtime.path, runtime.owner), /running/);
 	const prod = productionConfig(),
 		local = JSON.parse(readFileSync(`${runtime.path}/wrangler.json`, "utf8"));

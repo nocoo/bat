@@ -173,7 +173,7 @@ export async function createRuntime({
 					owner,
 					anchor,
 					dataset,
-					fixtureVersion: 1,
+					fixtureVersion: 2,
 					ready: false,
 				}),
 				{ mode: 0o600 },

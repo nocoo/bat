@@ -5,7 +5,7 @@ import { chromium } from "../../packages/ui/node_modules/@playwright/test/index.
 import { launch } from "./launcher.mjs";
 import { root } from "./runtime.mjs";
 
-const automated = process.argv.includes("--automated");
+const automated = !process.argv.includes("--interactive");
 const output = `${root}/artifacts/environments${automated ? "/automated" : ""}`;
 mkdirSync(output, { recursive: true });
 const app = await launch({ automated, built: true, port: 0, initial: "e2e", dataset: "demo" });
@@ -43,6 +43,8 @@ try {
 	await page.getByText("alpha.test.local", { exact: true }).first().waitFor();
 	await page.waitForTimeout(600);
 	await page.screenshot({ path: `${output}/detail.png`, fullPage: true });
+	await page.getByText("Top Processes").first().scrollIntoViewIfNeeded();
+	await page.screenshot({ path: `${output}/processes.png` });
 	if (!automated) {
 		await page.goto(`${app.base}/tags`);
 		const name = page.getByPlaceholder(/tag name/i).first();
@@ -80,7 +82,7 @@ try {
 					cwd: root,
 					encoding: "utf8",
 				}).trim(),
-				fixtureVersion: 1,
+				fixtureVersion: 2,
 				viewport: { width: 1440, height: 1000 },
 				locale: "en-US",
 				timezone: "UTC",
