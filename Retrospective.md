@@ -87,3 +87,9 @@ Routing: narrative stays here. A project-specific rule that will recur may becom
 The dependency-upgrade UI run initially placed a temporary TypeScript config under `node_modules` and invoked Playwright from the repository root. Node refused TypeScript stripping in that directory, and the root invocation resolved a separate Playwright runner. Run the workspace-installed executable with `--no-install`; use a JavaScript temporary config when it lives under `node_modules`.
 
 The isolated UI database setup also exceeded the 120-second startup budget while launching Wrangler separately for every migration. For this verification run, concatenate the ordered migrations and seed into one temporary SQL file after creating and verifying the test marker. Keep the random local persistence directory, reject remote credentials, disable server reuse, and verify the marker again before cleanup. The Bun wrapper still stalled during startup; invoking the installed Wrangler executable directly started the same seeded Worker successfully. Run Playwright through its exact workspace executable against that verified task-owned server. Do not relax assertions or use the daily production proxy to bypass setup failures.
+
+## 2026-09-28 — Restoring only the frontend left the API unavailable
+
+When restoring the daily development server, I started Vite on 7025 and verified only the HTML response. The local environment selected `VITE_API_TARGET=http://127.0.0.1:37025`, but the Worker was stopped, so host loading failed with proxy connection refusals and HTTP 502. Starting the local Worker restored all dashboard APIs and the existing 36-host local database.
+
+Before declaring development restored, inspect the effective proxy target without printing credentials, start its required local backend, and verify JSON responses from hosts, identity, tags, and alerts through the browser-facing domain. An HTTP 200 for the SPA alone is insufficient.
