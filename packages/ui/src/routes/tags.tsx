@@ -95,7 +95,7 @@ export function TagsPage() {
 					<p className="mt-2 text-sm">{error.message}</p>
 				</div>
 			) : (
-				<div className="space-y-4">
+				<div className="space-y-4" data-bat-dirty={!!newName || editingId !== null}>
 					<PageHeader
 						title="Tags"
 						description="Labels and categorization rules for grouping monitored hosts."

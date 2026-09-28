@@ -48,7 +48,12 @@ export async function meRoute(c: Context<AppEnv>) {
 	}
 
 	const email = payload.email ?? null;
-	const profile = email ? await fetchAuthorProfile(email) : { name: null, avatar: null };
+	const profile = email
+		? await fetchAuthorProfile(
+				email,
+				c.env?.ENVIRONMENT === "development" ? c.env.AUTHOR_PROFILE_URL : undefined,
+			)
+		: { name: null, avatar: null };
 
 	return c.json({
 		email,

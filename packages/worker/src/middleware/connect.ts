@@ -196,13 +196,17 @@ export function deploymentId(c: Context<AppEnv>): string {
 	return c.env.CONNECT_DEPLOYMENT_ID;
 }
 
-export function isDevelopmentManager(c: Context<AppEnv>): boolean {
-	return c.env.ENVIRONMENT === "development" && isLocalhost(new URL(c.req.url).hostname);
+function isLocalAccessSession(c: Context<AppEnv>): boolean {
+	return (
+		c.env.ENVIRONMENT === "development" &&
+		isLocalhost(new URL(c.req.url).hostname) &&
+		c.var.accessAuthenticated === true
+	);
 }
 
 export async function connectManager(c: Context<AppEnv>, next: Next) {
-	const local = isDevelopmentManager(c);
-	if (local) c.set("accessPrincipal", "local:developer");
+	const local = isLocalAccessSession(c);
+
 	if (
 		!local &&
 		(!c.var.accessAuthenticated ||
@@ -233,7 +237,7 @@ export async function connectManager(c: Context<AppEnv>, next: Next) {
 		!(await c.var.repos.connect.authorized(
 			serverId,
 			principal,
-			local || configuredManager(c.env.CONNECT_MANAGERS, principal),
+			configuredManager(c.env.CONNECT_MANAGERS, principal),
 		))
 	)
 		throw new ConnectFault(403, "server_forbidden", "You cannot manage this server.");
@@ -258,9 +262,7 @@ export async function connectBearer(c: Context<AppEnv>, next: Next) {
 	if (!row || row.revoked_at !== null || (row.expires_at !== null && row.expires_at <= now))
 		throw new ConnectFault(401, "invalid_token", "The token is invalid, revoked, or expired.");
 	c.set("connectToken", row);
-	const globalManager =
-		configuredManager(c.env.CONNECT_MANAGERS, row.owner) ||
-		(isDevelopmentManager(c) && row.owner === "local:developer");
+	const globalManager = configuredManager(c.env.CONNECT_MANAGERS, row.owner);
 	// Direct D1 reads (no KV/session replicas): edits and issuer grant withdrawal
 	// take effect on the next request, independently for each selected server.
 	const permitted = new Set(

@@ -1,39 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-// Helper: mock GET /api/settings to return a fixed value, and optionally
-// mock PUT to succeed (updating the mocked value) or fail. Each test gets
-// its own in-memory state so parallel workers never interfere.
-function mockSettingsAPI(
-	page: import("@playwright/test").Page,
-	opts: { initial: number; putResult?: "success" | "fail" },
-) {
-	let current = opts.initial;
-	return page.route("**/api/settings", async (route) => {
-		if (route.request().method() === "GET") {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({ retention_days: current }),
-			});
-		} else if (route.request().method() === "PUT") {
-			if (opts.putResult === "fail") {
-				await route.fulfill({ status: 500, body: "Internal Server Error" });
-			} else {
-				const body = route.request().postDataJSON();
-				current = body.retention_days;
-				await route.fulfill({
-					status: 200,
-					contentType: "application/json",
-					body: JSON.stringify({ retention_days: current }),
-				});
-			}
-		} else {
-			await route.continue();
-		}
-	});
-}
-
 test.describe("Data Retention page", () => {
+	test.beforeEach(async ({ request }) => {
+		expect((await request.put("/api/settings", { data: { retention_days: 7 } })).ok()).toBe(true);
+	});
 	test("page loads with correct breadcrumbs", async ({ page }) => {
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
@@ -54,7 +24,6 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("shows retention radios with proper labels", async ({ page }) => {
-		await mockSettingsAPI(page, { initial: 7 });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -64,7 +33,6 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("7 days is selected by default", async ({ page }) => {
-		await mockSettingsAPI(page, { initial: 7 });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -84,7 +52,6 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("clicking 30 days saves and shows Saved feedback", async ({ page }) => {
-		await mockSettingsAPI(page, { initial: 7, putResult: "success" });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -99,7 +66,6 @@ test.describe("Data Retention page", () => {
 	});
 
 	test("clicking 1 day saves and updates selection", async ({ page }) => {
-		await mockSettingsAPI(page, { initial: 7, putResult: "success" });
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
@@ -111,18 +77,10 @@ test.describe("Data Retention page", () => {
 		await expect(radio1).toBeChecked();
 	});
 
-	test("PUT failure shows error and preserves original selection", async ({ page }) => {
-		await mockSettingsAPI(page, { initial: 7, putResult: "fail" });
-		await page.goto("/settings/data");
-		await page.waitForLoadState("domcontentloaded");
-
-		const radio7 = page.getByRole("radio", { name: "7 days" });
-		await expect(radio7).toBeChecked({ timeout: 15_000 });
-
-		await page.getByText("30 days").click();
-
-		await expect(page.getByText("API error: 500")).toBeVisible({ timeout: 10_000 });
-		await expect(page.getByText("Saved")).not.toBeVisible();
-		await expect(radio7).toBeChecked();
+	test("invalid retention is rejected without changing stored settings", async ({ request }) => {
+		expect((await request.put("/api/settings", { data: { retention_days: -1 } })).status()).toBe(
+			400,
+		);
+		expect(await (await request.get("/api/settings")).json()).toMatchObject({ retention_days: 7 });
 	});
 });

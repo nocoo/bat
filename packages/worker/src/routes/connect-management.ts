@@ -19,7 +19,6 @@ import {
 	connectApiBaseUrl,
 	connectBody,
 	deploymentId,
-	isDevelopmentManager,
 	nowSeconds,
 } from "../middleware/connect.js";
 import type { AppEnv } from "../types.js";
@@ -31,7 +30,7 @@ async function server(c: Context<AppEnv>): Promise<string> {
 		!(await c.var.repos.connect.authorized(
 			id,
 			principal,
-			isDevelopmentManager(c) || configuredManager(c.env.CONNECT_MANAGERS, principal),
+			configuredManager(c.env.CONNECT_MANAGERS, principal),
 		))
 	)
 		throw new ConnectFault(403, "server_forbidden", "You cannot manage this server.");
@@ -57,7 +56,7 @@ async function token(c: Context<AppEnv>): Promise<ConnectTokenRow> {
 
 async function managementAuthority(c: Context<AppEnv>) {
 	const principal = c.var.accessPrincipal ?? "";
-	const global = isDevelopmentManager(c) || configuredManager(c.env.CONNECT_MANAGERS, principal);
+	const global = configuredManager(c.env.CONNECT_MANAGERS, principal);
 	const ids = new Set((await c.var.repos.connect.servers(principal, global)).map((row) => row.id));
 	return { principal, global, ids };
 }
@@ -133,7 +132,7 @@ export async function connectServersRoute(c: Context<AppEnv>) {
 	const principal = c.var.accessPrincipal ?? "";
 	const data = await c.var.repos.connect.servers(
 		principal,
-		isDevelopmentManager(c) || configuredManager(c.env.CONNECT_MANAGERS, principal),
+		configuredManager(c.env.CONNECT_MANAGERS, principal),
 	);
 	return c.json({
 		data,
@@ -221,9 +220,7 @@ export async function connectTokenRenameRoute(c: Context<AppEnv>) {
 	const previous = [...row.server_ids];
 	if (Object.hasOwn(body, "serverIds")) row.server_ids = await selectedServers(c, body.serverIds);
 	// A co-manager must not grant servers outside the issuer's current authority.
-	const issuerGlobal =
-		configuredManager(c.env.CONNECT_MANAGERS, row.owner) ||
-		(isDevelopmentManager(c) && row.owner === "local:developer");
+	const issuerGlobal = configuredManager(c.env.CONNECT_MANAGERS, row.owner);
 	const issuerServers = new Set(
 		(await c.var.repos.connect.servers(row.owner, issuerGlobal)).map((entry) => entry.id),
 	);

@@ -109,6 +109,7 @@ function DescriptionEditor({
 	if (editing) {
 		return (
 			<input
+				data-bat-dirty={draft !== (value ?? "")}
 				ref={inputRef}
 				type="text"
 				maxLength={200}

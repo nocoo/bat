@@ -3,6 +3,7 @@ import type { ConnectToken } from "@bat/shared";
 import { describe, expect, test } from "vitest";
 import { fingerprint, randomSecret, seal, tokenContext, unseal } from "../../domain/connect.js";
 import { app } from "../../index.js";
+import { fixtureIdentity } from "../../test-helpers/identity";
 import { createMockD1 } from "../../test-helpers/mock-d1.js";
 import type { Bindings } from "../../types.js";
 import { D1ConnectRepository } from "./connect.js";
@@ -18,7 +19,9 @@ describe("Connect legacy database migration", () => {
 	test("preserves ciphertext, confirmations, completed/pending requests and permanent tombstones, including after the original host is deleted", async () => {
 		const db = createMockD1(28);
 		const keys = JSON.stringify({ active: "old", keys: { old: randomSecret() } });
+		const identity = await fixtureIdentity();
 		const env: Bindings = {
+			...identity.env,
 			DB: db,
 			ENVIRONMENT: "development",
 			CONNECT_DEPLOYMENT_ID: "migration",
@@ -33,7 +36,7 @@ describe("Connect legacy database migration", () => {
 			id: "legacy-key",
 			server_id: SERVER,
 			scope: "write" as const,
-			owner: "local:developer",
+			owner: "email:operator@example.test",
 			expires_at: null,
 		};
 		const secret = `batc_${randomSecret()}`;
@@ -135,6 +138,7 @@ describe("Connect legacy database migration", () => {
 					headers: {
 						Origin: "http://localhost",
 						"X-Bat-Management": "1",
+						"Cf-Access-Jwt-Assertion": identity.jwt,
 						"Content-Type": "application/json",
 						"If-Match": `"${legacy.id}:${version}"`,
 					},
@@ -218,7 +222,7 @@ describe("Connect legacy database migration", () => {
 		const insertOld = (id: string, server: string) =>
 			db
 				.prepare(
-					"INSERT INTO connect_tokens(id,server_id,name,scope,prefix,token_hash,ciphertext,owner,created_at) VALUES (?,?,?,'read',? ,?,'encrypted','local:developer',1)",
+					"INSERT INTO connect_tokens(id,server_id,name,scope,prefix,token_hash,ciphertext,owner,created_at) VALUES (?,?,?,'read',? ,?,'encrypted','email:operator@example.test',1)",
 				)
 				.bind(id, server, id, id, id)
 				.run();

@@ -7,6 +7,8 @@ export type Bindings = Pick<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_K
 	Partial<Omit<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_KEY">> & {
 		// Cloudflare Access configuration (optional, for browser endpoint)
 		CF_ACCESS_TEAM_DOMAIN?: string; // e.g., "hexly.cloudflareaccess.com"
+		CF_ACCESS_LOCAL_JWKS?: string;
+		AUTHOR_PROFILE_URL?: string;
 		CF_ACCESS_AUD?: string; // Access Application audience
 		// Optional KV namespace for D1 query reduction (cache + sentinels).
 		// Absent → all KV-backed paths transparently fall back to D1.

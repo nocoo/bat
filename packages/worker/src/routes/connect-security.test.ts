@@ -5,15 +5,23 @@ import { D1ConnectProductsRepository } from "../adapters/d1/connect-products.js"
 import { app } from "../index.js";
 import { connectFixture, SERVER_A, SERVER_B } from "../test-helpers/connect.js";
 
-vi.mock("jose", () => ({
-	createRemoteJWKSet: vi.fn(),
-	jwtVerify: vi.fn(async (jwt: string) => {
-		if (jwt === "signed-manager") return { payload: { email: "manager@example.invalid" } };
-		if (jwt === "signed-limited") return { payload: { email: "limited@example.invalid" } };
-		if (jwt === "signed-service") return { payload: { common_name: "fixture-service" } };
-		throw new Error("Invalid signature");
-	}),
-}));
+vi.mock("jose", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("jose")>();
+	return {
+		...actual,
+		createRemoteJWKSet: vi.fn(),
+		jwtVerify: vi.fn(async (jwt: string, ...args: unknown[]) => {
+			if (jwt === "signed-manager") return { payload: { email: "manager@example.invalid" } };
+			if (jwt === "signed-limited") return { payload: { email: "limited@example.invalid" } };
+			if (jwt === "signed-service") return { payload: { common_name: "fixture-service" } };
+			return actual.jwtVerify(
+				jwt,
+				args[0] as Parameters<typeof actual.jwtVerify>[1],
+				args[1] as Parameters<typeof actual.jwtVerify>[2],
+			);
+		}),
+	};
+});
 afterEach(() => {
 	vi.restoreAllMocks();
 	vi.useRealTimers();
@@ -168,7 +176,7 @@ describe("Connect credential lifecycle", () => {
 		const { token } = await f.mint();
 		await f.db
 			.prepare(
-				"WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<49) INSERT INTO connect_tokens(id,server_id,name,scope,prefix,token_hash,ciphertext,owner,created_at) SELECT 'limit-'||i,?, 'Limit', 'read', '', 'hash-'||i, '', 'local:developer',unixepoch() FROM n",
+				"WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<49) INSERT INTO connect_tokens(id,server_id,name,scope,prefix,token_hash,ciphertext,owner,created_at) SELECT 'limit-'||i,?, 'Limit', 'read', '', 'hash-'||i, '', 'email:operator@example.test',unixepoch() FROM n",
 			)
 			.bind(SERVER_A)
 			.run();

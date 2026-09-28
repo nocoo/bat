@@ -3,7 +3,7 @@
 	"version": "2.3.2",
 	"type": "module",
 	"scripts": {
-		"dev": "vite",
+		"dev": "bun ../../scripts/environments/launcher.mjs",
 		"dev:watch": "vite build --watch",
 		"build": "tsc && vite build",
 		"preview": "vite preview",

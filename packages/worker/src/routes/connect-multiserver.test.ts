@@ -5,14 +5,22 @@ import { CONNECT_SCHEMAS, connectManagementOpenApi } from "../domain/connect-con
 import { app } from "../index.js";
 import { connectFixture, SERVER_A, SERVER_B } from "../test-helpers/connect.js";
 
-vi.mock("jose", () => ({
-	createRemoteJWKSet: vi.fn(),
-	jwtVerify: vi.fn(async (jwt: string) => {
-		if (jwt === "manager") return { payload: { email: "manager@example.invalid" } };
-		if (jwt === "limited") return { payload: { email: "limited@example.invalid" } };
-		throw new Error("Invalid signature");
-	}),
-}));
+vi.mock("jose", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("jose")>();
+	return {
+		...actual,
+		createRemoteJWKSet: vi.fn(),
+		jwtVerify: vi.fn(async (jwt: string, ...args: unknown[]) => {
+			if (jwt === "manager") return { payload: { email: "manager@example.invalid" } };
+			if (jwt === "limited") return { payload: { email: "limited@example.invalid" } };
+			return actual.jwtVerify(
+				jwt,
+				args[0] as Parameters<typeof actual.jwtVerify>[1],
+				args[1] as Parameters<typeof actual.jwtVerify>[2],
+			);
+		}),
+	};
+});
 
 const metadata = async (response: Response) =>
 	((await response.json()) as { data: ConnectToken }).data;

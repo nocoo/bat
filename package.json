@@ -7,7 +7,9 @@
 		"packages/*"
 	],
 	"scripts": {
-		"dev": "turbo run dev --parallel --filter=!@bat/cli",
+		"dev": "bun scripts/environments/launcher.mjs",
+		"dev:built": "bun scripts/environments/launcher.mjs --built",
+		"demo:reset": "bun scripts/environments/launcher.mjs --reset-demo",
 		"release": "bun scripts/release.ts",
 		"build": "turbo build --filter=@bat/ui",
 		"deploy": "turbo build --filter=@bat/ui && cd packages/worker && npx wrangler deploy --env production",
@@ -20,7 +22,9 @@
 		"gate:routes": "bun run scripts/check-route-coverage.ts",
 		"gate:pages": "bun run scripts/check-page-coverage.ts",
 		"gate:security": "bun run scripts/run-security.ts",
-		"prepare": "husky"
+		"prepare": "husky",
+		"test:environments": "bun scripts/environments/verify.mjs",
+		"capture:environments": "bun scripts/environments/capture.mjs"
 	},
 	"trustedDependencies": [
 		"@biomejs/biome",

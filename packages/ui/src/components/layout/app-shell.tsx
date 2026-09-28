@@ -17,6 +17,7 @@ import { useLocation } from "react-router";
 import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Breadcrumbs } from "./breadcrumbs";
+import { EnvironmentSwitch } from "./environment-switch";
 import { HeaderTooltip, HexlyLink } from "./header-links";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
@@ -118,6 +119,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 							</a>
 						</HeaderTooltip>
 						<HexlyLink />
+						<EnvironmentSwitch />
 						<ThemeToggle aria-label="Toggle theme" />
 					</div>
 				</header>

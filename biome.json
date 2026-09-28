@@ -64,6 +64,7 @@
 			"!**/.turbo",
 			"!**/.next",
 			"!**/coverage",
+			"!artifacts/environments",
 			"!**/test-results",
 			"!**/playwright-report",
 			"!**/blob-report",

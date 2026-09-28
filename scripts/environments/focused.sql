@@ -1,5 +1,4 @@
--- L3 Playwright test seed data
--- Applied by scripts/l3-setup.sh after migrations
+-- Focused browser scenarios, applied after production migrations.
 
 -- Two test hosts with realistic data
 INSERT OR REPLACE INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at, is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, public_ip, probe_version)

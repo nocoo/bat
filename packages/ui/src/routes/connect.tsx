@@ -350,7 +350,7 @@ export function ConnectPage() {
 	const loadError = servers.error ?? tokens.error;
 	return (
 		<AppShell breadcrumbs={[{ label: "Connect" }]}>
-			<div className="mx-auto w-full max-w-6xl space-y-6">
+			<div className="mx-auto w-full max-w-6xl space-y-6" data-bat-dirty={creating || !!action}>
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<PageHeader title="Connect" description="Give your agents a secure connection to Bat." />
 					<Badge variant="outline" className="gap-2">

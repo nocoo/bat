@@ -1,4 +1,5 @@
 import type { ConnectToken } from "@bat/shared";
+import { environmentUrl } from "../environment";
 
 export async function connectRequest<T>(
 	path: string,
@@ -7,7 +8,7 @@ export async function connectRequest<T>(
 	const headers: Record<string, string> = { "X-Bat-Management": "1" };
 	if (options.body !== undefined) headers["Content-Type"] = "application/json";
 	if (options.token) headers["If-Match"] = `"${options.token.id}:${options.token.version}"`;
-	const response = await fetch(path, {
+	const response = await fetch(environmentUrl(path), {
 		method: options.method ?? "GET",
 		headers,
 		body: options.body === undefined ? undefined : JSON.stringify(options.body),

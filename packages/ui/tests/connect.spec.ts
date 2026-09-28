@@ -156,7 +156,7 @@ test.describe("Connect private credential management", () => {
 		await expect(page.locator("pre")).toContainText("GET /servers");
 		await expect(page.locator("pre")).toContainText("SERVER_ID");
 		await expect(page.getByLabel("API base URL", { exact: true })).toHaveValue(
-			"http://localhost:27025/api/v1",
+			`${process.env.BAT_E2E_WORKER}/api/v1`,
 		);
 		expect(
 			await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

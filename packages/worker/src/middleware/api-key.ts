@@ -10,7 +10,7 @@ import { hashToken } from "../domain/cli-token.js";
 import { isConnectPath } from "../domain/connect.js";
 import { lookupToken, rememberToken } from "../lib/cli-token-cache.js";
 import type { AppEnv } from "../types.js";
-import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
+import { isMachineEndpoint } from "./entry-control.js";
 
 /** Routes that require no authentication */
 const PUBLIC_ROUTES = ["/api/live", "/api/me"];
@@ -40,6 +40,7 @@ function extractBearerToken(header: string | undefined): string | null {
 
 /** Check if a request requires BAT_WRITE_KEY based on method + path */
 export function isWriteRequest(method: string, path: string): boolean {
+	if (method === "PATCH" && /^\/api\/hosts\/[^/]+\/description$/.test(path)) return true;
 	// Probe ingest routes
 	if (WRITE_ROUTES.includes(path)) {
 		return true;
@@ -142,11 +143,6 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 
 	// Webhook event ingest — uses its own token auth (validated in handler)
 	if (path === "/api/events" && c.req.method === "POST") {
-		return next();
-	}
-
-	// localhost / *.dev.hexly.ai: skip API key auth entirely (local dev / E2E tests)
-	if (isLocalhost(host)) {
 		return next();
 	}
 

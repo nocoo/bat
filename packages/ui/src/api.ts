@@ -1,3 +1,4 @@
+import { environmentUrl } from "./environment";
 // MVVM "Model" layer — thin fetch wrapper around the Worker /api/* routes.
 //
 // All HTTP verbs share a single `request` helper so error handling and
@@ -30,7 +31,7 @@ interface RequestOptions {
 
 async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
 	const hasBody = opts.body !== undefined;
-	const res = await fetch(buildUrl(path, opts.params), {
+	const res = await fetch(environmentUrl(buildUrl(path, opts.params)), {
 		method,
 		headers: hasBody ? { "Content-Type": "application/json" } : undefined,
 		body: hasBody ? JSON.stringify(opts.body) : undefined,

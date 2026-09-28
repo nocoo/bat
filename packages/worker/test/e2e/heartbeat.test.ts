@@ -3,7 +3,7 @@
 
 import type { AgentHeartbeatResponse, AgentItem } from "@bat/shared";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { assertStatus, BASE, writeHeaders } from "./helpers";
+import { assertStatus, BASE, readHeaders, writeHeaders } from "./helpers";
 
 const SUFFIX = Date.now().toString(36);
 const SOURCE_KEY = `e2e_hb_src_${SUFFIX}`;
@@ -33,7 +33,7 @@ describe("L2: POST /api/agents/heartbeat", () => {
 		// Clean up only agents created by this test run.
 		// List all agents, filter by our unique SUFFIX in match_key field.
 		const listRes = await fetch(`${BASE}/api/agents`, {
-			headers: writeHeaders(),
+			headers: readHeaders(),
 		});
 		if (listRes.ok) {
 			const agents = (await listRes.json()) as AgentItem[];
@@ -49,7 +49,7 @@ describe("L2: POST /api/agents/heartbeat", () => {
 		// Fallback: ensure pre-registered agent is cleaned up
 		await fetch(`${BASE}/api/agents/${preRegisteredAgentId}`, {
 			method: "DELETE",
-			headers: writeHeaders(),
+			headers: readHeaders(),
 		});
 	});
 
@@ -155,7 +155,7 @@ describe("L2: POST /api/agents/heartbeat", () => {
 
 		// Verify the agent was updated
 		const agentRes = await fetch(`${BASE}/api/agents/${preRegisteredAgentId}`, {
-			headers: writeHeaders(),
+			headers: readHeaders(),
 		});
 		expect(agentRes.status).toBe(200);
 		const agent = (await agentRes.json()) as {
@@ -215,7 +215,7 @@ describe("L2: POST /api/agents/heartbeat", () => {
 
 		// Verify pre-registered agent is now missing
 		const agentRes = await fetch(`${BASE}/api/agents/${preRegisteredAgentId}`, {
-			headers: writeHeaders(),
+			headers: readHeaders(),
 		});
 		expect(agentRes.status).toBe(200);
 		const agent = (await agentRes.json()) as { status: string };

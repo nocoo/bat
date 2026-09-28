@@ -86,7 +86,7 @@ export function WebhooksPage() {
 					<p className="mt-2 text-sm">{error.message}</p>
 				</div>
 			) : (
-				<div className="space-y-4 max-w-4xl">
+				<div className="space-y-4 max-w-4xl" data-bat-dirty={!!selectedHostId}>
 					<PageHeader
 						title="Webhooks"
 						description="Configure webhook tokens for hosts to send events via POST /api/events."

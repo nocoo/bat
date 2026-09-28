@@ -1,11 +1,11 @@
 // Access JWT authentication middleware for browser endpoint
 // Verifies Cloudflare Access JWT using jose library
-// - localhost: skip JWT verification (local dev / E2E tests)
+// - localhost: verify supplied JWTs; otherwise require API keys downstream.
 // - bat-ingest.*: skip (handled by apiKeyAuth)
 // - bat.*: require valid Access JWT, set context flag on success
 
 import type { Context, Next } from "hono";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createLocalJWKSet, createRemoteJWKSet, jwtVerify } from "jose";
 import type { AppEnv } from "../types.js";
 import { isLocalhost, isMachineEndpoint } from "./entry-control.js";
 
@@ -28,7 +28,7 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 			? new URL(c.req.url).hostname
 			: c.req.header("host") || new URL(c.req.url).hostname;
 	// localhost: skip Access JWT, continue with apiKeyAuth (local dev / E2E tests)
-	if (isLocalhost(host)) {
+	if (isLocalhost(host) && !c.req.header("Cf-Access-Jwt-Assertion")) {
 		return next();
 	}
 
@@ -64,7 +64,12 @@ export async function accessAuth(c: Context<AppEnv>, next: Next) {
 	}
 
 	try {
-		const jwks = getJWKS(teamDomain);
+		const jwks =
+			c.env.ENVIRONMENT === "development" &&
+			isLocalhost(new URL(c.req.url).hostname) &&
+			c.env.CF_ACCESS_LOCAL_JWKS
+				? createLocalJWKSet(JSON.parse(c.env.CF_ACCESS_LOCAL_JWKS))
+				: getJWKS(teamDomain);
 		const verified = await jwtVerify(jwt, jwks, {
 			issuer: `https://${teamDomain}`,
 			audience: aud,

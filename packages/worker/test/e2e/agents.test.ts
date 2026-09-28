@@ -1,5 +1,5 @@
 // L2 — Agent CRUD routes (POST/GET/PATCH/DELETE /api/agents)
-// These use the localhost bypass for auth. Validates full round-trip through
+// These use scoped keys against the isolated native Worker. Validates full round-trip through
 // the worker including route registration, body parsing, and DB operations.
 
 import type { AgentItem } from "@bat/shared";

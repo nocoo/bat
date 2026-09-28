@@ -150,7 +150,7 @@ describe("Connect authentication and server authority", () => {
 		expect((await f.call("server.get", read.secret)).status).toBe(403);
 		await f.db
 			.prepare(
-				"UPDATE connect_tokens SET owner = 'local:developer', expires_at = unixepoch() - 1 WHERE id = ?",
+				"UPDATE connect_tokens SET owner = 'email:operator@example.test', expires_at = unixepoch() - 1 WHERE id = ?",
 			)
 			.bind(read.token.id)
 			.run();

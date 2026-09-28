@@ -3,15 +3,18 @@ import { randomSecret } from "../domain/connect.js";
 import { CONNECT_OPERATIONS } from "../domain/connect-operations.js";
 import { app } from "../index.js";
 import type { Bindings } from "../types.js";
+import { fixtureIdentity } from "./identity";
 import { createMockD1 } from "./mock-d1.js";
 
 export const SERVER_A = "connect-server-a";
 export const SERVER_B = "connect-server-b";
 
 export async function connectFixture() {
+	const identity = await fixtureIdentity();
 	const db = createMockD1();
 	const env: Bindings = {
 		DB: db,
+		...identity.env,
 		BAT_READ_KEY: "legacy-read",
 		BAT_WRITE_KEY: "legacy-write",
 		ENVIRONMENT: "development",
@@ -75,6 +78,7 @@ export async function connectFixture() {
 					Host: "localhost",
 					Origin: "http://localhost",
 					"X-Bat-Management": "1",
+					"Cf-Access-Jwt-Assertion": identity.jwt,
 					"Content-Type": "application/json",
 					...(token ? { "If-Match": `"${token.id}:${token.version}"` } : {}),
 					...overrides,

@@ -28,9 +28,12 @@ export function parseAuthorProfile(data: unknown): AuthorProfile {
 	return { name, avatar };
 }
 
-export async function fetchAuthorProfile(email: string): Promise<AuthorProfile> {
+export async function fetchAuthorProfile(
+	email: string,
+	endpoint = AUTHOR_PROFILE_URL,
+): Promise<AuthorProfile> {
 	const hash = await hashEmail(email);
-	const url = `${AUTHOR_PROFILE_URL}?hash=${hash}`;
+	const url = `${endpoint}?hash=${hash}`;
 	try {
 		const res = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
 		if (!res.ok) {

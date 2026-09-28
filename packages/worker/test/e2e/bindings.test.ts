@@ -5,7 +5,7 @@ import type { AssetItem, AssetMapResponse, AssetsOverview, BindingItem } from "@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { assertStatus, BASE, makeIdentityPayload, readHeaders, writeHeaders } from "./helpers";
 
-// Use unique suffix per test run to avoid collisions on shared dev D1
+// Use unique suffix per test run to avoid collisions on the per-run D1 store
 const SUFFIX = Date.now().toString(36);
 const HOST_ID = `e2e-bind-host-${SUFFIX}`;
 let agentId = "";
