@@ -189,6 +189,8 @@ No `sysinfo` crate — direct procfs/sysfs parsing for minimal binary size.
 
 Static musl linking ensures the binary runs on any Linux without glibc dependencies.
 
+The probe configures reqwest with Rustls, the ring crypto provider, and bundled Mozilla roots from `webpki-roots`. Both metric ingestion and public-IP lookup share this configuration; TLS verification does not require the host certificate store. Keep this explicit when upgrading reqwest, whose 0.13 defaults use platform verification.
+
 ---
 
 ## Systemd Unit (`probe/dist/bat-probe.service`)

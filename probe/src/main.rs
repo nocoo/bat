@@ -611,7 +611,7 @@ async fn collect_tier2(host_id: &str, include_disk_deep: bool) -> payload::Tier2
 /// Returns `None` on any error (timeout, parse failure, network issue).
 #[cfg_attr(coverage_nightly, coverage(off))]
 async fn fetch_public_ip() -> Option<String> {
-    let client = reqwest::Client::builder()
+    let client = sender::client_builder()
         .timeout(Duration::from_secs(10))
         .build()
         .ok()?;

@@ -81,3 +81,9 @@ Routing: narrative stays here. A project-specific rule that will recur may becom
 - **What:** `Deploy v2.1.0` aborted `release.ts` stale-version scan.
 - **Why:** fixtures matched the version regex.
 - **Follow-up:** fixtures use a fixed `v1.2.3`.
+
+## 2026-09-28 — Dependency verification runner setup
+
+The dependency-upgrade UI run initially placed a temporary TypeScript config under `node_modules` and invoked Playwright from the repository root. Node refused TypeScript stripping in that directory, and the root invocation resolved a separate Playwright runner. Run the workspace-installed executable with `--no-install`; use a JavaScript temporary config when it lives under `node_modules`.
+
+The isolated UI database setup also exceeded the 120-second startup budget while launching Wrangler separately for every migration. For this verification run, concatenate the ordered migrations and seed into one temporary SQL file after creating and verifying the test marker. Keep the random local persistence directory, reject remote credentials, disable server reuse, and verify the marker again before cleanup. The Bun wrapper still stalled during startup; invoking the installed Wrangler executable directly started the same seeded Worker successfully. Run Playwright through its exact workspace executable against that verified task-owned server. Do not relax assertions or use the daily production proxy to bypass setup failures.

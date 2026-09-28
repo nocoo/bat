@@ -2,6 +2,18 @@ use reqwest::Client;
 use std::fmt;
 use std::time::Duration;
 
+pub fn client_builder() -> reqwest::ClientBuilder {
+    let roots: rustls::RootCertStore = webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect();
+    let tls = rustls::ClientConfig::builder_with_provider(
+        rustls::crypto::ring::default_provider().into(),
+    )
+    .with_safe_default_protocol_versions()
+    .expect("ring supports the default TLS versions")
+    .with_root_certificates(roots)
+    .with_no_client_auth();
+    Client::builder().tls_backend_preconfigured(tls)
+}
+
 /// Maximum number of retries for transient errors.
 const MAX_RETRIES: u32 = 5;
 /// Initial backoff delay.
@@ -54,7 +66,7 @@ pub struct Sender {
 
 impl Sender {
     pub fn new(worker_url: &str, write_key: &str) -> Self {
-        let client = Client::builder()
+        let client = client_builder()
             .timeout(Duration::from_secs(10))
             .build()
             .expect("failed to build HTTP client");
@@ -260,7 +272,7 @@ mod tests {
         let uri = mock_server.uri();
         drop(mock_server); // server is now gone → connection refused
 
-        let client = Client::builder()
+        let client = client_builder()
             .timeout(Duration::from_millis(200))
             .build()
             .unwrap();
@@ -283,7 +295,7 @@ mod tests {
         let uri = mock_server.uri();
         drop(mock_server);
 
-        let client = Client::builder()
+        let client = client_builder()
             .timeout(Duration::from_millis(200))
             .build()
             .unwrap();
