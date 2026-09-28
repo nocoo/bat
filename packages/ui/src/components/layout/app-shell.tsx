@@ -107,6 +107,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 						/>
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
+						<EnvironmentSwitch />
 						<HeaderTooltip label="GitHub repository">
 							<a
 								href="https://github.com/nocoo/bat"
@@ -119,7 +120,6 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 							</a>
 						</HeaderTooltip>
 						<HexlyLink />
-						<EnvironmentSwitch />
 						<ThemeToggle aria-label="Toggle theme" />
 					</div>
 				</header>
