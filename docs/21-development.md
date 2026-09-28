@@ -74,19 +74,24 @@ CLI 的 `agent`、`asset`、`binding` 提供管理操作。`service run` 接收 
 
 `bun run build` 构建 shared 和 UI，将网页产物写入 `packages/worker/static/`，不部署资源。
 
-普通 `bun run dev` 同时启动 Vite 7025 和本地 Wrangler 37025，但 Vite 的 `/api` 代理固定为 `https://bat.hexly.ai`，并不会连接这个本地 Worker。代理从 `packages/ui/.env.local` 读取 `CF_ACCESS_CLIENT_ID` 与 `CF_ACCESS_CLIENT_SECRET`，用于生产浏览器入口的 Access service token。页面操作会访问该远程服务。
+The canonical entry is `bun run dev`: a local gateway on 7025 starts persistent
+Demo data, with Vite and native Wrangler on private ephemeral ports. The top-right
+Demo / E2E / Prod control selects a fixed server instance. Manual E2E is disposable
+and switchable; dedicated test entrypoints lock E2E server-side.
 
-使用自己的开发环境时，先调整 Vite 代理目标、`allowedHosts` 和对应 Access 配置。`packages/worker/.dev.vars` 保存本地 Worker 的秘密配置；生产 secrets 包括 `BAT_WRITE_KEY`、`BAT_READ_KEY`、`CF_ACCESS_TEAM_DOMAIN`、`CF_ACCESS_AUD`。D1 / KV 名称、ID 和域名需要属于自己的账号。
+See [local environments](23-local-environments.md) for exact startup, reset,
+test and screenshot commands, ownership safeguards, authentication, configuration
+parity and the feature-to-fixture matrix. Production service credentials remain
+server-side in `packages/ui/.env.local`; they are required only for explicit Prod.
+The launcher does not use or rewrite daily Worker `.dev.vars`.
 
-## 本地测试
+## Local tests
 
-测试使用明确的本地资源；先安装依赖并构建静态资源。API runner 为 `packages/worker/test/e2e/global-setup.ts`，显式使用 `--local --persist-to .wrangler/e2e/<random>`，逐个应用迁移、写入测试标记，然后在临时 loopback 端口启动 Worker。
-
-API runner 和浏览器测试在 `.wrangler` 下生成各自独立的测试 keyring，显式通过 `--env-file` 加载，不会覆盖个人 `.dev.vars`。测试进程不能携带 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID` 或 `CF_API_TOKEN`。
-
-Playwright 使用 27025 与 `.wrangler/e2e-pw`，调用 `scripts/l3-webserver.sh` 初始化迁移与测试记录后启动本地 Worker。其配置在非 CI 模式可复用已有服务，因此运行前保持该端口空闲。L3 初始化脚本会忽略单条 SQL 的失败，最终应以测试结果判断，不能只看“Database ready”输出。
-
-根 `bun run test` 运行 TypeScript 与 Rust 单元测试；API E2E 和浏览器 E2E 使用根 README 中的单独命令。维护中的测试入口以当前 package scripts 和配置为准，不把旧文档里的 coverage 数字当作运行说明。
+Build first, then run `bun turbo test:e2e --filter=@bat/worker` and
+`bun run test:e2e:pw`. Each invocation creates its own D1, KV, Durable Objects,
+identity and ephemeral ports. Tests reject production credentials, apply all
+numbered migrations, verify ownership and remove only their own temporary store.
+Playwright runs conflicting mutations serially. Settings tests use the real API.
 
 ## 数据保留与发布
 

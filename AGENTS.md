@@ -13,7 +13,7 @@ Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](
 ## Project invariants
 
 - One Worker serves API and SPA. Browser host `bat.hexly.ai` uses Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
-- Daily Vite 7025 (`bat.dev.hexly.ai`) proxies API traffic to production with explicit Access service-token configuration. Worker 37025 is local development, never an E2E endpoint.
+- Daily local gateway 7025 (`bat.dev.hexly.ai`) starts Demo by default. Only explicit Prod selection uses the production Access proxy. Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway.
 - L2/L3 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
 - Apply production D1 migrations before code that needs new columns. Preserve migration data with copy/rename rather than destructive table replacement; the E2E harness discovers numbered migrations automatically.
 - `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
@@ -28,6 +28,11 @@ Run from the root after a frozen Bun install. Rust coverage needs `cargo-llvm-co
 
 ```bash
 bun install --frozen-lockfile
+bun run dev # persistent Demo; --mode e2e for switchable manual E2E
+bun run dev:built # build first; same local control
+bun run demo:reset # stop Demo launcher first
+bun run test:environments
+bun run capture:environments # disposable rich E2E captures
 bun run typecheck
 bun run lint
 bun run build
@@ -42,6 +47,8 @@ bun run gate:security
 
 Build the UI before L2/L3 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CF_API_TOKEN` for isolated tests; the L2 runner rejects production-capable credentials. Never run tests against the daily Vite proxy.
 
+Environment design, fixture matrix, and capture limitations: [local environments](docs/23-local-environments.md). Legacy `.wrangler/state` and `.wrangler/e2e-pw` are never reset by these commands.
+
 ## Testing and quality contract
 
 6DQ keeps its name with unified L1, L2/L3, G2 and D1; the owner merged former G1 into L1 on 2026-09-21. Statuses: `enforced`, `planned`, `manual`, `N/A`.
@@ -53,7 +60,7 @@ Build the UI before L2/L3 so Worker static assets are real. Unset `CLOUDFLARE_AP
 | L2 API | Real local HTTP over 100% of endpoint/method combinations | planned | Pre-push/CI run real Wrangler tests and route mapping; static coverage hits do not verify every assertion/method |
 | L3 UI/probe | Critical dashboard and probe-to-server workflows | planned | CI Chromium covers dashboard; complete native probe system acceptance is not enforced |
 | G2 security | Secret and dependency scans in both lanes; missing tools fail | enforced | Pre-push scans Bun/Cargo locks and secrets; CI default quality scan covers Bun only. Local secret range uses upstream or a recent-commit fallback |
-| D1 isolation | Per-run local stores, guards and verified marker before mutations/cleanup | planned | L2 allocates random state/ports and checks `_test_marker`; L3 still reuses `.wrangler/e2e-pw` and may reuse an existing server |
+| D1 isolation | Per-run local stores, guards and verified marker before mutations/cleanup | planned | Both lanes use fresh native stores/identities and ports through the shared launcher; owner and D1 markers gate cleanup |
 | Build | Real dashboard bundle and native artifact | enforced | CI prepares UI, probe compiles during tests; release packages its intended artifacts |
 | Docs / operations | Architecture and migration/release behavior reviewed | manual | Numbered docs and maintainer checks |
 
@@ -68,9 +75,9 @@ Install restores Husky. Hooks must stay check-only; never use `--no-verify` on c
 
 | Lane | Resource | Boundary |
 |---|---|---|
-| Daily dev | UI 7025, Worker 37025 | UI proxy can reach production; separate test traffic |
-| L2 | Ephemeral loopback/inspector ports; `.wrangler/e2e/<random>` | Local SQLite/fixtures; rejects remote credentials and verifies marker |
-| L3 | 27025, `.wrangler/e2e-pw` | Local only; per-run storage and no-reuse guard still planned |
+| Daily dev | Gateway 7025; `.wrangler/environments/demo` | Persistent synthetic CRUD; explicit Prod access only |
+| L2 | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Automated lock, fresh identity, owned D1 cleanup |
+| L3 | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
 
 Every Worker test lane must reject remote bindings, assert test context, initialize `_test_marker(key,value)` with `env=test` and verify it before resets/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid workerd pipe failures.
 

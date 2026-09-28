@@ -82,20 +82,19 @@ Pre-commit hook blocks the commit. Developer must fix before retrying.
 
 **When**: Every push (pre-push hook).
 
-**Scope**: All Worker API routes — 57 tests covering ingest, identity, alerts, hosts, tags, webhooks, events, monitoring, port allowlist.
+**Scope**: Native Worker API acceptance (171 tests in the environment migration verification).
 
 ### Port convention
 
 | Purpose | Port |
 |---------|------|
-| Worker dev | 37025 |
-| L2 E2E tests | 18787 |
-| L3 Playwright | 27787 |
-| UI Vite dev | 7025 |
+| Daily gateway | 7025 |
+| Native Worker / Vite / inspectors | Ephemeral loopback ports |
+| L2 and L3 gateways | Per-run ephemeral ports |
 
 ### How it works
 
-1. `test:e2e` starts Wrangler on an ephemeral loopback port with `--persist-to .wrangler/e2e/<random>`
+1. `test:e2e` starts Wrangler on an ephemeral loopback port with `--persist-to .wrangler/environments/e2e-<uuid>`
 2. Applies all D1 migrations to the local database
 3. Runs the Vitest suite against the per-run loopback URL
 4. Tests execute sequentially (some tests depend on prior state, e.g. create → read → delete)
@@ -103,7 +102,7 @@ Pre-commit hook blocks the commit. Developer must fix before retrying.
 
 ### Auth during L2
 
-Entry control detects `localhost` → all auth bypassed. Tests call routes directly without API keys or Access JWTs.
+Tests use normal scoped read/write keys or signed fixture Access JWTs. Localhost does not bypass authentication. Invalid signatures and unauthorized mutations fail normally.
 
 ### Run
 
@@ -113,7 +112,7 @@ bun run turbo test:e2e --filter=@bat/worker
 
 ### Migration sync requirement
 
-The E2E test file (`packages/worker/test/e2e/wrangler.test.ts`) has a **hardcoded migration list**. When adding a new migration file, it must also be added to this list — otherwise E2E tests get 500 on routes that touch new tables.
+Native Wrangler applies every numbered production migration through `d1 migrations apply --local`. Migration failure aborts startup; no hardcoded migration list is maintained.
 
 ### Failure behavior
 
@@ -135,65 +134,24 @@ Pre-push hook blocks the push. All 57 tests must pass.
 Playwright (Chromium)
       │
       ▼
-  localhost:27787 (Wrangler dev)
+  ephemeral loopback gateway → native Wrangler
       │
       ├── /* → static assets (built SPA)
       └── /api/* → Worker handlers → local D1
 ```
 
-### Auth strategy
+### Native isolation and authentication
 
-Cloudflare Access is external and not available in local testing. Localhost bypasses entry control entirely. The SPA works in "anonymous" mode — `/api/me` returns `authenticated: false`, and no login flow is needed.
+L2 and L3 use `scripts/environments/test-process.mjs` to start the dedicated
+automated launcher. Each run gets ephemeral ports, independent local D1/KV/DO,
+production migrations, signed fixture identity and guarded cleanup. There is no
+localhost authentication bypass and no business API mock in the browser suite.
+Read/write keys and Access JWTs follow their normal verification paths.
 
-### Test data seeding
-
-Tests require realistic data in D1. The seed pipeline:
-
-1. `scripts/l3-setup.sh` runs before Wrangler starts (via Playwright's `webServer.command`)
-2. Applies all D1 migrations to `.wrangler/e2e-pw` persist dir
-3. Runs `scripts/l3-seed.sql` — inserts:
-   - 2 hosts (`pw-host-alpha`, `pw-host-beta`) with full inventory
-   - Raw metrics (3 rows with CPU/mem/disk/net data)
-   - 3 tags (production, staging, us-east) with host assignments
-   - 2 alert states (warning + critical) for alpha
-   - 1 webhook config for alpha
-   - 2 events (deploy, config reload)
-
-Host IDs are FNV-1a hashes: `pw-host-alpha` → `f0d3fd30`, `pw-host-beta` → `4c494cde`.
-
-### Test specs
-
-| Spec | Tests | What |
-|------|-------|------|
-| `hosts.spec.ts` | 14 | Host cards render, hostname display, status badges, tag filter bar, tag filtering, card navigation, version badge |
-| `host-detail.spec.ts` | 14 | Header hostname, status badge, system info (OS, CPU, kernel, probe version, IP), breadcrumb navigation, unknown host fallback |
-| `alerts.spec.ts` | 8 | Alert table, headers, host names, severity levels, alert messages, host link navigation, row count |
-| `events.spec.ts` | 8 | Event table, headers, titles, host name, event tags, host link navigation, row count |
-| `tags.spec.ts` | 9 | Seeded tags display, host count badges, create tag, delete tag, inline rename |
-| `webhooks.spec.ts` | 11 | Existing webhook display, curl command, copy/regenerate/delete buttons, host dropdown filtering, generate for new host |
-| `setup.spec.ts` | 5 | Install guide, code blocks, copy buttons, collapsible uninstall section |
-
-### Self-contained tests
-
-Tests that modify state (create/delete/rename) are self-contained — they create their own data and clean up after themselves. This avoids cross-test dependencies.
-
-### Playwright config
-
-```typescript
-// packages/ui/playwright.config.ts
-{
-  testDir: './tests',
-  webServer: {
-    command: 'bash ../../scripts/l3-setup.sh && cd ../worker && bunx wrangler dev --port 27787 --local --persist-to .wrangler/e2e-pw',
-    url: 'http://localhost:27787',
-    reuseExistingServer: false,
-    timeout: 30_000,
-  },
-  use: {
-    baseURL: 'http://localhost:27787',
-  },
-}
-```
+Focused SQL fixtures live in `scripts/environments/focused.sql`; rich Demo
+fixtures and real API seed scenarios live in `fixtures.mjs`. Playwright runs
+conflicting mutations serially and never reuses a daily server.
+See [the environment matrix](23-local-environments.md) for commands and evidence.
 
 ### Run
 
@@ -273,16 +231,16 @@ Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
 
 **What**: L2/L3 tests run against local Miniflare D1 only, never touching production.
 
-**When**: Enforced at runtime by five-layer isolation guard in `global-setup.ts`.
+**When**: Enforced by the shared native launcher and ownership checks in `scripts/environments/runtime.mjs`.
 
 ### Isolation layers
 
 | Layer | Mechanism | What it prevents |
 |-------|-----------|------------------|
 | 1 | `--local` flag | Wrangler uses in-process Miniflare, not remote CF |
-| 2 | `--persist-to .wrangler/e2e/<random>` | Dedicated state dir, separate from other runs |
+| 2 | `--persist-to .wrangler/environments/e2e-<uuid>` | Dedicated state dir, separate from other runs |
 | 3 | OS-assigned HTTP and Inspector ports | Concurrent runs cannot collide or probe another run's Worker |
-| 4 | `_test_marker` row asserted | Test-only marker table (applied from `fixtures/test_marker.sql`, not in production migrations) |
+| 4 | `_test_marker` row asserted | Per-store owner and env markers created by the launcher, checked with its manifest |
 | 5 | Env var guard | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set |
 
 ### Failure behavior

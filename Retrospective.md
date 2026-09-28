@@ -93,3 +93,21 @@ The isolated UI database setup also exceeded the 120-second startup budget while
 When restoring the daily development server, I started Vite on 7025 and verified only the HTML response. The local environment selected `VITE_API_TARGET=http://127.0.0.1:37025`, but the Worker was stopped, so host loading failed with proxy connection refusals and HTTP 502. Starting the local Worker restored all dashboard APIs and the existing 36-host local database.
 
 Before declaring development restored, inspect the effective proxy target without printing credentials, start its required local backend, and verify JSON responses from hosts, identity, tags, and alerts through the browser-facing domain. An HTTP 200 for the SPA alone is insufficient.
+
+## 2026-09-28 — Native environment migration checks
+
+The first isolated gateway forwarded an already decompressed fetch body with the
+upstream content-encoding header. Native L2 requests exposed decompression errors;
+the gateway now removes content-encoding/content-length after buffering while
+preserving the no-transform requirement. The first Playwright adapter changed
+only globalSetup's config object, which did not propagate a dynamic baseURL to
+workers. Passing the allocated address through the runner environment fixed it.
+
+Real authentication also exposed a missing write-route classification for host
+descriptions and tests using write keys for reads. Those were corrected without
+restoring localhost bypasses. Browser verification caught a raw host ID used in a
+capture route instead of its public hash. Local cleanup verification needed a
+non-creating SQLite connection that can handle WAL sidecars after Worker shutdown.
+All failures were in owned local resources; the old daily database and production
+were untouched. Keep the native HTTP/browser checks as part of environment changes
+rather than treating launcher readiness or source inspection as acceptance.

@@ -61,13 +61,17 @@ cargo build --release --locked --manifest-path probe/Cargo.toml
 
 `build` builds the shared package and UI, writing the SPA to `packages/worker/static/`. `packages/shared/` contains types and rules, `packages/worker/` contains API and data access, `packages/ui/` is the dashboard, `packages/cli/` manages assets, and `probe/` contains the Rust collector.
 
-The ordinary Vite development proxy is fixed to the production browser endpoint and needs an Access service token in `packages/ui/.env.local`. It does not automatically use the local Worker started alongside it. Prepare your target and credentials using the [development guide](21-development.md#开发配置), then run:
+Local development defaults to persistent Demo data through a gateway on 7025:
 
 ```bash
 bun run dev
+bun run dev --mode e2e
+bun run dev:built
 ```
 
-This starts Vite on 7025 and a local Worker on 37025. Production GitHub Actions applies D1 migrations before deploying the Worker. Probe binaries are built only for version-tag releases; updating VPS installations remains manual.
+The local-only Demo / E2E / Prod control selects immutable backend instances.
+Only explicit Prod selection needs server-side Access credentials. See
+[local environments](23-local-environments.md) for reset, capture and safety rules.
 
 ## Tests
 
@@ -80,9 +84,13 @@ bunx playwright install chromium
 bun run test:e2e:pw
 ```
 
-The first command runs TypeScript and Rust unit tests. API E2E chooses an ephemeral loopback port and a unique `packages/worker/.wrangler/e2e/<random>` state directory per run; browser tests use port 27025 and `.wrangler/e2e-pw`. Both explicitly use local Wrangler resources.
-
-Keep the browser-test port 27025 free and unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CF_API_TOKEN` in the test process. The API runner rejects these remote credentials. Browser tests need Playwright Chromium. Tests use synthetic records without real probes or VPS credentials.
+The first command runs TypeScript and Rust unit tests. L2 and L3 use fresh native
+Worker/D1 resources, identities and ephemeral ports per run, with owned storage
+under `packages/worker/.wrangler/environments/e2e-<uuid>`.
+Test launchers reject inherited production credentials, enforce the automated
+E2E lock and preserve existing daily stores. Browser tests require Chromium.
+Run `bun run test:environments` for lifecycle/configuration checks and
+`bun run capture:environments` for rich disposable captures.
 
 ## Stack
 

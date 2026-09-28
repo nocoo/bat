@@ -61,13 +61,13 @@ cargo build --release --locked --manifest-path probe/Cargo.toml
 
 `build` 构建共享包和 UI，SPA 写入 `packages/worker/static/`。`packages/shared/` 保存类型与规则，`packages/worker/` 是 API 和数据层，`packages/ui/` 是网页，`packages/cli/` 管理资产，`probe/` 是 Rust 采集端。
 
-普通开发的 Vite 代理固定指向生产浏览器入口，需要 `packages/ui/.env.local` 中的 Access service token；它不会自动使用同时启动的本地 Worker。先按[开发配置](docs/21-development.md#开发配置)准备自己的目标和凭据，再启动：
+Local development starts persistent synthetic Demo data. The local-only Demo / E2E / Prod control selects an isolated native runtime; only explicit Prod selection requires Access service credentials. See [local environments](docs/23-local-environments.md).
 
 ```bash
 bun run dev
 ```
 
-此命令启动 Vite 7025 与本地 Worker 37025。生产发布由 GitHub Actions 先应用 D1 迁移，再部署 Worker；探针二进制只在版本 tag 发布时构建，VPS 上的更新仍需手动进行。
+The gateway listens on 7025; Vite and local Wrangler use private ephemeral ports. Use `bun run dev --mode e2e` for switchable manual E2E, `bun run demo:reset` after stopping Demo for an explicit reset, and `bun run capture:environments` for disposable rich captures.
 
 ## 测试
 
@@ -80,9 +80,9 @@ bunx playwright install chromium
 bun run test:e2e:pw
 ```
 
-第一条命令运行 TypeScript 与 Rust 单元测试。API E2E 为每次运行选择临时 loopback 端口，并使用独有的 `packages/worker/.wrangler/e2e/<random>` 状态目录；浏览器测试使用 27025 和 `.wrangler/e2e-pw`。两者均显式使用本地 Wrangler 资源。
+API and browser E2E each allocate fresh ports, identities and `packages/worker/.wrangler/environments/e2e-<uuid>` storage. Both use real authentication and native local Wrangler resources; automation is locked to E2E.
 
-保持浏览器测试的 27025 端口空闲，并在测试进程中取消 `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`、`CF_API_TOKEN`；API runner 会拒绝携带这些远程凭据启动。浏览器测试需要 Playwright Chromium。它们使用测试记录，不需要真实探针或 VPS 凭据。
+Test entrypoints reject inherited production API/Access/BAT credentials. Chromium is required. Run `bun run test:environments` for lifecycle, ownership and configuration-parity checks. Existing daily databases are preserved.
 
 ## 技术栈
 

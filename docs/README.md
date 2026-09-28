@@ -36,3 +36,5 @@ Current setup and operational boundaries are in [probe installation, development
 Historical design documents moved to `archive/`:
 - `06-dashboard-nextjs.md` — Original Next.js dashboard (replaced by UI)
 - `19-edge-dashboard-migration.md` — Migration plan from Next.js to edge
+
+- [Local environments](23-local-environments.md): Demo/E2E/Prod lifecycle, fixtures, commands and verification.
