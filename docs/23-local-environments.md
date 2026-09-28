@@ -30,8 +30,10 @@ Never delete the whole `.wrangler` directory.
 Gateway 7025 also works through the existing `https://bat.dev.hexly.ai` Caddy
 mapping. Vite, native Worker, inspector and external fixture provider use ephemeral
 loopback ports. A running storage lock prevents another launcher or reset from
-using the same Demo database. A failed startup retains its directory and log;
-inspect its owner marker and `running.lock` PID before manual recovery. Do not
+using the same Demo database. A failed E2E startup retains logs under `.wrangler/environment-failures` and
+removes verified temporary state. If ownership cannot be verified, it retains the
+store and fails explicitly. Failed Demo initialization retains its store; inspect
+its owner marker and `running.lock` PID before manual recovery. Do not
 remove another live process's lock or any unverified directory.
 
 Tests reject inherited Cloudflare API credentials, Access service credentials and

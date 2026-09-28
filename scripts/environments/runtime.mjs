@@ -147,6 +147,14 @@ async function execute(path, args) {
 		throw new Error(`Local Wrangler command failed (${code}): ${output.slice(-2500)}`);
 	return output;
 }
+async function stopWorker(child) {
+	if (!child || child.exitCode !== null || child.signalCode !== null) return;
+	const exited = new Promise((resolve) => child.once("exit", resolve));
+	child.kill();
+	await Promise.race([exited, Bun.sleep(5000)]);
+	if (child.exitCode === null && child.signalCode === null)
+		throw new Error("Worker did not stop; owned storage retained");
+}
 export async function createRuntime({
 	mode = "e2e",
 	dataset = "empty",
@@ -327,16 +335,32 @@ export async function createRuntime({
 				closed = true;
 				verifyOwnership(path, owner);
 				provider.stop(true);
-				child.kill();
-				await Promise.race([new Promise((r) => child.once("exit", r)), Bun.sleep(5000)]);
+				await stopWorker(child);
 				rmSync(lock);
 				if (remove) removeOwned(path, owner);
 			},
 		};
 	} catch (error) {
 		provider?.stop(true);
-		child?.kill();
+		await stopWorker(child);
 		rmSync(lock, { force: true });
+		if (mode === "e2e") {
+			const evidence = join(workerRoot, ".wrangler/environment-failures");
+			mkdirSync(evidence, { recursive: true });
+			const log = join(path, "worker.log");
+			writeFileSync(
+				join(evidence, `${owner}.log`),
+				String(error) + (existsSync(log) ? `\n${readFileSync(log, "utf8")}` : ""),
+				{ mode: 0o600 },
+			);
+			try {
+				removeOwned(path, owner);
+			} catch {
+				throw new Error(`Startup failed; ownership could not be verified, retained ${path}`, {
+					cause: error,
+				});
+			}
+		}
 		throw error;
 	}
 }

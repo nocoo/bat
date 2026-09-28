@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { launch } from "./launcher.mjs";
-import { productionConfig, removeOwned } from "./runtime.mjs";
+import { createRuntime, productionConfig, removeOwned, storageRoot } from "./runtime.mjs";
 
 const app = await launch({ built: true, port: 0, initial: "e2e", dataset: "demo" });
 try {
@@ -99,3 +99,8 @@ try {
 	await locked.close();
 	throw error;
 }
+
+const before = readdirSync(storageRoot).sort();
+await assert.rejects(createRuntime({ dataset: "invalid" }), /Unknown fixture catalog/);
+assert.deepEqual(readdirSync(storageRoot).sort(), before);
+console.log("PASS: failed seeding retains logs and cleans verified temporary state");
