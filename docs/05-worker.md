@@ -63,6 +63,14 @@ Receives Tier-1 metrics payload from Probe. Single Worker invocation, D1 batch f
 
 **Why UPSERT hosts first**: `metrics_raw.host_id` has a foreign key to `hosts.host_id`. For a brand-new host, inserting metrics before the host row would violate the FK constraint. The UPSERT guarantees the host row exists before any metrics reference it.
 
+Every accepted ingest updates D1 `hosts.last_seen` using Worker time, in the same
+atomic batch as the deduplicated metrics insert. Existing hosts use an UPDATE;
+new hosts use the UPSERT. Retries refresh liveness without duplicating metrics
+or reevaluating alerts. Host lists, detail, fleet and monitoring routes derive
+liveness directly from D1, with no per-host KV snapshot or five-minute throttle.
+The existing dashboard response cache remains unchanged. Legacy last-seen KV
+keys expire naturally within 600 seconds; no production key deletion is needed.
+
 ### POST /api/identity (`routes/identity.ts`)
 
 Receives host identity payload from Probe. Performs a **full overwrite** of all identity fields.

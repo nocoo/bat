@@ -1,10 +1,18 @@
 import type { MetricsPayload } from "@bat/shared";
 import { Hono } from "hono";
-import { beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { createD1Repositories } from "../adapters/d1/factory";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv } from "../types";
+import { fleetStatusRoute } from "./fleet-status";
+import { hostDetailRoute } from "./host-detail";
+import { hostsListRoute } from "./hosts";
 import { ingestRoute } from "./ingest";
+import {
+	monitoringGroupsRoute,
+	monitoringHostDetailRoute,
+	monitoringHostsRoute,
+} from "./monitoring";
 
 const WRITE_KEY = "test-write-key";
 
@@ -55,14 +63,20 @@ function makePayload(overrides?: Partial<MetricsPayload>): MetricsPayload {
 	};
 }
 
-function createApp(db: D1Database) {
+function createApp(db: D1Database, kv?: KVNamespace) {
 	const app = new Hono<AppEnv>();
 	app.use("*", async (c, next) => {
-		c.env = { DB: db, BAT_WRITE_KEY: WRITE_KEY, BAT_READ_KEY: "rk" };
+		c.env = { DB: db, BAT_WRITE_KEY: WRITE_KEY, BAT_READ_KEY: "rk", BAT_KV: kv };
 		c.set("repos", createD1Repositories(db));
 		return next();
 	});
 	app.post("/api/ingest", ingestRoute);
+	app.get("/api/hosts", hostsListRoute);
+	app.get("/api/hosts/:id", hostDetailRoute);
+	app.get("/api/fleet/status", fleetStatusRoute);
+	app.get("/api/monitoring/hosts", monitoringHostsRoute);
+	app.get("/api/monitoring/hosts/:id", monitoringHostDetailRoute);
+	app.get("/api/monitoring/groups", monitoringGroupsRoute);
 	return app;
 }
 
@@ -260,7 +274,7 @@ describe("POST /api/ingest", () => {
 		expect(after).toBeNull();
 	});
 
-	test("duplicate ingest is fully idempotent (no side effects on retry)", async () => {
+	test("duplicate ingest does not duplicate metrics or retrigger alerts", async () => {
 		const now = Math.floor(Date.now() / 1000);
 		const payload = makePayload({ timestamp: now });
 		payload.disk = [
@@ -605,147 +619,73 @@ describe("POST /api/ingest", () => {
 	});
 });
 
-describe("POST /api/ingest last_seen 5min flush (Task #19 T6)", () => {
-	function makeKv() {
-		const store = new Map<string, { value: string; ttl?: number }>();
-		const kv = {
-			get: async (key: string, type?: "json" | "text") => {
-				const entry = store.get(key);
-				if (!entry) {
-					return null;
+describe("D1 host liveness without KV snapshots", () => {
+	afterEach(() => vi.useRealTimers());
+
+	test.each(["absent", "stale", "unavailable"])(
+		"updates D1 on every ingest and derives all host statuses with KV %s",
+		async (mode) => {
+			vi.useFakeTimers();
+			const start = 1_790_000_000;
+			vi.setSystemTime(start * 1000);
+			const reads: string[] = [];
+			const writes: string[] = [];
+			const kv = {
+				get: async (key: string) => {
+					reads.push(key);
+					if (mode === "unavailable") throw new Error("KV unavailable");
+					return key.startsWith("bat:host:lastseen:")
+						? { last_observed_at: start + 3600, last_flush_at: start }
+						: null;
+				},
+				put: async (key: string) => {
+					writes.push(key);
+					if (mode === "unavailable") throw new Error("KV unavailable");
+				},
+			} as unknown as KVNamespace;
+			const db = createMockD1();
+			const app = createApp(db, mode === "absent" ? undefined : kv);
+			const payload = makePayload();
+			expect((await post(app, payload)).status).toBe(204);
+			vi.setSystemTime((start + 30) * 1000);
+			expect((await post(app, makePayload({ top_processes: [] }))).status).toBe(204);
+			const host = await db
+				.prepare("SELECT last_seen, top_processes_json, top_processes_ts FROM hosts")
+				.first();
+			expect(host).toEqual({
+				last_seen: start + 30,
+				top_processes_json: "[]",
+				top_processes_ts: start + 30,
+			});
+			vi.setSystemTime((start + 60) * 1000);
+			expect((await post(app, payload)).status).toBe(204);
+			expect(await db.prepare("SELECT COUNT(*) AS count FROM metrics_raw").first()).toEqual({
+				count: 2,
+			});
+			expect(await db.prepare("SELECT last_seen FROM hosts").first()).toEqual({
+				last_seen: start + 60,
+			});
+			for (const [elapsed, status] of [
+				[120, "healthy"],
+				[121, "offline"],
+			] as const) {
+				vi.setSystemTime((start + 60 + elapsed) * 1000);
+				for (const [url, expected] of [
+					["/api/hosts", [{ last_seen: start + 60, status }]],
+					["/api/hosts/host-001", { last_seen: start + 60, status }],
+					["/api/monitoring/hosts", { hosts: [{ last_seen: start + 60, tier: status }] }],
+					["/api/monitoring/hosts/host-001", { last_seen: start + 60, tier: status }],
+					["/api/monitoring/groups", { groups: [{ tier: status }] }],
+					["/api/fleet/status", { status: status === "offline" ? "critical" : "healthy" }],
+				] as const) {
+					const response = await app.request(url);
+					expect(response.status).toBe(200);
+					expect(await response.json()).toMatchObject(expected);
 				}
-				return type === "json" ? JSON.parse(entry.value) : entry.value;
-			},
-			put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
-				store.set(key, { value, ttl: opts?.expirationTtl });
-			},
-			delete: async (key: string) => {
-				store.delete(key);
-			},
-			list: async () => ({ keys: [], list_complete: true, cursor: "" }),
-			getWithMetadata: async () => ({ value: null, metadata: null }),
-		} as unknown as KVNamespace;
-		return { store, kv };
-	}
-
-	function appWithKv(db: D1Database, kv: KVNamespace) {
-		const app = new Hono<AppEnv>();
-		app.use("*", async (c, next) => {
-			c.env = {
-				DB: db,
-				BAT_WRITE_KEY: WRITE_KEY,
-				BAT_READ_KEY: "rk",
-				BAT_KV: kv,
-			};
-			c.set("repos", createD1Repositories(db));
-			return next();
-		});
-		app.post("/api/ingest", ingestRoute);
-		return app;
-	}
-
-	test("first ingest writes last_seen + populates KV snapshot", async () => {
-		const db = createMockD1();
-		const { kv, store } = makeKv();
-		const app = appWithKv(db, kv);
-		const HOST = "host-tt1";
-
-		await db
-			.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
-			.bind(HOST, HOST, Math.floor(Date.now() / 1000) - 1000)
-			.run();
-
-		const res = await post(app, makePayload({ host_id: HOST }));
-		expect(res.status).toBe(204);
-		expect(store.has(`bat:host:lastseen:${HOST}`)).toBe(true);
-
-		const row = await db
-			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
-			.bind(HOST)
-			.first<{ last_seen: number }>();
-		// last_seen advanced to ~now
-		expect(row?.last_seen).toBeGreaterThan(Math.floor(Date.now() / 1000) - 60);
-	});
-
-	test("second ingest within 5min does NOT advance last_seen but DOES insert metrics_raw", async () => {
-		const db = createMockD1();
-		const { kv } = makeKv();
-		const app = appWithKv(db, kv);
-		const HOST = "host-tt2";
-
-		await db
-			.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
-			.bind(HOST, HOST, Math.floor(Date.now() / 1000) - 1000)
-			.run();
-
-		// Call 1: populates KV
-		await post(app, makePayload({ host_id: HOST }));
-		const afterFirst = await db
-			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
-			.bind(HOST)
-			.first<{ last_seen: number }>();
-		const lastSeenAfterFirst = afterFirst?.last_seen ?? 0;
-
-		// Sleep 1s and call again with a fresh timestamp 1s later
-		await new Promise((r) => setTimeout(r, 1100));
-		const body2 = makePayload({ host_id: HOST });
-		body2.timestamp += 1;
-
-		await post(app, body2);
-
-		const afterSecond = await db
-			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
-			.bind(HOST)
-			.first<{ last_seen: number }>();
-		// last_seen did NOT advance — throttle skipped the host UPDATE
-		expect(afterSecond?.last_seen).toBe(lastSeenAfterFirst);
-
-		// But metrics_raw has BOTH samples
-		const cnt = await db
-			.prepare("SELECT COUNT(*) AS n FROM metrics_raw WHERE host_id = ?")
-			.bind(HOST)
-			.first<{ n: number }>();
-		expect(cnt?.n).toBe(2);
-	});
-
-	test("ingest without BAT_KV binding falls back to existing behaviour (always touches last_seen)", async () => {
-		const db = createMockD1();
-		const app = createApp(db); // no BAT_KV
-		const HOST = "host-tt3";
-
-		await db
-			.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
-			.bind(HOST, HOST, Math.floor(Date.now() / 1000) - 1000)
-			.run();
-
-		await post(app, makePayload({ host_id: HOST }));
-		const row = await db
-			.prepare("SELECT last_seen FROM hosts WHERE host_id = ?")
-			.bind(HOST)
-			.first<{ last_seen: number }>();
-		expect(row?.last_seen).toBeGreaterThan(Math.floor(Date.now() / 1000) - 60);
-	});
-
-	test("first-seen host (D1 returns null) ALWAYS flushes via INSERT … ON CONFLICT, even with stale KV", async () => {
-		const db = createMockD1();
-		const { kv, store } = makeKv();
-		const app = appWithKv(db, kv);
-		const HOST = "brand-new-host";
-
-		// Stale snapshot in KV claiming we recently flushed — must not bypass
-		// the first-seen INSERT path (host row doesn't exist yet).
-		store.set(`bat:host:lastseen:${HOST}`, {
-			value: JSON.stringify({
-				last_observed_at: Math.floor(Date.now() / 1000),
-				last_flush_at: Math.floor(Date.now() / 1000),
-			}),
-		});
-
-		const res = await post(app, makePayload({ host_id: HOST }));
-		expect(res.status).toBe(204);
-
-		// Host row must exist (FK satisfied for metrics)
-		const host = await db.prepare("SELECT host_id FROM hosts WHERE host_id = ?").bind(HOST).first();
-		expect(host).not.toBeNull();
-	});
+			}
+			expect([...reads, ...writes].filter((key) => key.startsWith("bat:host:lastseen:"))).toEqual(
+				[],
+			);
+		},
+	);
 });

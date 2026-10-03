@@ -3,7 +3,6 @@ import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { tryReadCache, writeCache } from "../lib/dashboard-cache.js";
-import { freshestLastSeen, loadObservedSeenBatch } from "../lib/host-lastseen-cache.js";
 import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -95,15 +94,13 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 
 	const hostIds = hosts.map((h) => h.host_id);
 
-	const [metricsRows, alertCountMap, alertRows, allowedByHost, sparklineRows, observedMap] =
-		await Promise.all([
-			repos.hosts.getLatestMetricsBatch(hostIds),
-			repos.alerts.countByHost(hostIds),
-			repos.alerts.listForHosts(hostIds),
-			repos.ports.listForHosts(hostIds),
-			repos.hosts.listSparklineRowsSince(hostIds, now - 86400),
-			loadObservedSeenBatch(c.env.BAT_KV, hostIds),
-		]);
+	const [metricsRows, alertCountMap, alertRows, allowedByHost, sparklineRows] = await Promise.all([
+		repos.hosts.getLatestMetricsBatch(hostIds),
+		repos.alerts.countByHost(hostIds),
+		repos.alerts.listForHosts(hostIds),
+		repos.ports.listForHosts(hostIds),
+		repos.hosts.listSparklineRowsSince(hostIds, now - 86400),
+	]);
 
 	const metricsMap = new Map(metricsRows.map((row) => [row.host_id, row]));
 	const alertsByHost = buildAlertsByHost(alertRows);
@@ -116,7 +113,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
 		const maintenance = getMaintenanceWindow(host);
-		const lastSeen = freshestLastSeen(host.last_seen, observedMap.get(host.host_id));
+		const lastSeen = host.last_seen;
 		const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts, maintenance);
 		const inMaintenance =
 			maintenance !== null && isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);

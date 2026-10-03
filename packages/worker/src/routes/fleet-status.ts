@@ -2,7 +2,6 @@
 import { BAT_VERSION, type HealthResponse, type HostStatus } from "@bat/shared";
 import type { Context } from "hono";
 import { summarizeHostStatuses } from "../lib/fleet-summary.js";
-import { freshestLastSeen, loadObservedSeenBatch } from "../lib/host-lastseen-cache.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
@@ -28,10 +27,9 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 	}
 
 	const hostIds = hosts.map((h) => h.host_id);
-	const [alertRows, allowedByHost, observedMap] = await Promise.all([
+	const [alertRows, allowedByHost] = await Promise.all([
 		repos.alerts.listForHosts(hostIds),
 		repos.ports.listForHosts(hostIds),
-		loadObservedSeenBatch(c.env.BAT_KV, hostIds),
 	]);
 
 	const alertsByHost = buildAlertsByHost(alertRows);
@@ -41,7 +39,7 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
 		const mw = getMaintenanceWindow(host);
-		const lastSeen = freshestLastSeen(host.last_seen, observedMap.get(host.host_id));
+		const lastSeen = host.last_seen;
 		return deriveHostStatus(lastSeen, now, alerts, allowedPorts, mw);
 	});
 	const { healthy, warning, critical, maintenance, overall } = summarizeHostStatuses(statuses);

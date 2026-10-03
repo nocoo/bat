@@ -315,23 +315,11 @@ export class D1MetricsRepository implements MetricsRepository {
 		hostname: string,
 		payload: MetricsPayload,
 		nowSeconds: number,
-		mode: "first-seen" | "existing" | "skip-host-touch",
+		mode: "first-seen" | "existing",
 	): Promise<{ inserted: boolean }> {
 		const metricsStmt = buildInsertMetricsRawStatement(this.db, hostId, payload);
 		const topProcessesJson = payload.top_processes ? JSON.stringify(payload.top_processes) : null;
 		const topProcessesTs = topProcessesJson != null ? payload.timestamp : null;
-
-		// "skip-host-touch": existing host whose last_seen was flushed recently
-		// (KV decision in the route). The host row is guaranteed to exist, so
-		// no FK risk and no host stmt is needed — only the metrics insert.
-		// `top_processes_json` refresh is intentionally skipped on this path: a
-		// 5min staleness window for the latest process list is invisible to
-		// users and lets the throttle keep its zero-write semantics.
-		if (mode === "skip-host-touch") {
-			const result = await metricsStmt.run();
-			const inserted = (result.meta?.changes ?? 0) > 0;
-			return { inserted };
-		}
 
 		const hostStmt =
 			mode === "first-seen"

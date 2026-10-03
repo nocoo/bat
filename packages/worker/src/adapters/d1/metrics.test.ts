@@ -91,6 +91,25 @@ describe("D1MetricsRepository", () => {
 	});
 
 	describe("insertRawWithHostUpsert (existing)", () => {
+		test("rolls back last_seen when the metrics insert fails", async () => {
+			await db
+				.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
+				.bind("host-a", "real-name", NOW - 30)
+				.run();
+			await db.exec(
+				"CREATE TRIGGER reject_sample BEFORE INSERT ON metrics_raw BEGIN SELECT RAISE(ABORT, 'rejected sample'); END;",
+			);
+			await expect(
+				repo.insertRawWithHostUpsert("host-a", "ignored", makePayload(), NOW, "existing"),
+			).rejects.toThrow("rejected sample");
+			expect(await db.prepare("SELECT last_seen FROM hosts").first()).toEqual({
+				last_seen: NOW - 30,
+			});
+			expect(await db.prepare("SELECT COUNT(*) AS count FROM metrics_raw").first()).toEqual({
+				count: 0,
+			});
+		});
+
 		test("touches last_seen without rewriting hostname", async () => {
 			await db
 				.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
@@ -109,54 +128,6 @@ describe("D1MetricsRepository", () => {
 				.bind("host-a")
 				.first<{ hostname: string; last_seen: number }>();
 			expect(host).toEqual({ hostname: "real-name", last_seen: NOW });
-		});
-	});
-
-	describe("insertRawWithHostUpsert (skip-host-touch, Task #19 T6)", () => {
-		test("inserts metrics_raw but does NOT touch last_seen", async () => {
-			await db
-				.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
-				.bind("host-a", "real-name", NOW - 1000)
-				.run();
-
-			const result = await repo.insertRawWithHostUpsert(
-				"host-a",
-				"ignored",
-				makePayload(),
-				NOW,
-				"skip-host-touch",
-			);
-			expect(result.inserted).toBe(true);
-
-			const host = await db
-				.prepare("SELECT hostname, last_seen FROM hosts WHERE host_id = ?")
-				.bind("host-a")
-				.first<{ hostname: string; last_seen: number }>();
-			// last_seen unchanged — the throttle skipped the UPDATE
-			expect(host).toEqual({ hostname: "real-name", last_seen: NOW - 1000 });
-		});
-
-		test("duplicate metrics retry returns inserted=false (idempotent)", async () => {
-			await db
-				.prepare("INSERT INTO hosts (host_id, hostname, last_seen) VALUES (?, ?, ?)")
-				.bind("host-a", "real-name", NOW - 1000)
-				.run();
-			const r1 = await repo.insertRawWithHostUpsert(
-				"host-a",
-				"ignored",
-				makePayload(),
-				NOW,
-				"skip-host-touch",
-			);
-			const r2 = await repo.insertRawWithHostUpsert(
-				"host-a",
-				"ignored",
-				makePayload(),
-				NOW,
-				"skip-host-touch",
-			);
-			expect(r1.inserted).toBe(true);
-			expect(r2.inserted).toBe(false);
 		});
 	});
 
