@@ -120,3 +120,13 @@ reaching the API. Use application-scoped cloudflared user login, verify the real
 `/api/me` response before accepting a switch, and test the explicit read-only live
 path separately from isolated automation. Toolbar order also needs a rendered
 position check against the shared environment contract.
+
+## 2026-10-03 — Mirror URL inspection must block staging
+
+Bun 1.4.2 wrote temporary mirror tarball URLs into the lockfile during a
+dependency update. I printed the matches but continued into staging and a commit
+attempt instead of treating them as a failure. I stopped the commit before it
+completed and removed only the mirror resolution URLs, preserving versions and
+integrity hashes. Before staging dependency changes, assert that mirror URLs are
+absent, inspect the reduced diff, and verify a frozen install. Diagnostic output
+followed by `|| true` is not an enforcement check.
