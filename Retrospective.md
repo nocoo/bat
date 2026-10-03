@@ -130,3 +130,11 @@ completed and removed only the mirror resolution URLs, preserving versions and
 integrity hashes. Before staging dependency changes, assert that mirror URLs are
 absent, inspect the reduced diff, and verify a frozen install. Diagnostic output
 followed by `|| true` is not an enforcement check.
+
+## 2026-10-03 — Browser acceptance must respect machine-only authentication
+
+The liveness acceptance probe incorrectly expected a browser-session request to
+`/api/monitoring/hosts` to return 200. It correctly returned 401 because monitoring
+requires a read key, even for an authenticated browser. The probe was corrected
+to check browser routes; monitoring authorization and status remain covered by
+isolated L2 tests. Do not weaken authentication to satisfy an invalid smoke test.
