@@ -18,7 +18,7 @@
     },
     "packages/cli": {
       "name": "@bat/cli",
-      "version": "2.3.2",
+      "version": "2.3.3",
       "bin": {
         "bat-cli": "./dist/bin/bat-cli.js",
       },
@@ -34,14 +34,14 @@
     },
     "packages/shared": {
       "name": "@bat/shared",
-      "version": "2.3.2",
+      "version": "2.3.3",
       "devDependencies": {
         "typescript": "^7.0.2",
       },
     },
     "packages/ui": {
       "name": "@bat/ui",
-      "version": "2.3.2",
+      "version": "2.3.3",
       "dependencies": {
         "@bat/shared": "workspace:*",
         "@nocoo/basalt": "2.2.0",
@@ -71,7 +71,7 @@
     },
     "packages/worker": {
       "name": "@bat/worker",
-      "version": "2.3.2",
+      "version": "2.3.3",
       "dependencies": {
         "@bat/shared": "workspace:*",
         "@cfworker/json-schema": "4.1.1",

@@ -1,5 +1,25 @@
 # Changelog
 
+## v2.3.3
+
+### Fixed
+- Persist host liveness directly in D1 on every probe ingest, removing high-frequency last-seen KV writes and per-host read overlays.
+- Preserve atomic metric insertion, retry deduplication, and the 120-second offline threshold across dashboard, fleet, and monitoring routes.
+- Align the deployment Wrangler version with the tested lockfile.
+- Clean up owned local state after failed startup and use real Access login for explicit local production access.
+
+### Added
+- Isolated local Demo and E2E environments, guarded fixtures, environment switching, and native screenshot scenarios.
+
+### Changed
+- Upgrade Biome to 2.5.15, Vitest and coverage to 5.0.3, Turbo to 2.11.7, and Basalt to 2.2.0.
+- Upgrade and clean up JavaScript and Rust dependencies, including reqwest 0.13.5 and toml 1.1.6, while preserving probe TLS and static-musl packaging.
+- Pin the patched Undici 7.29.1 dependency; an Undici 8.x migration is not included.
+- Document isolated development, verification, and operational lessons.
+
+### Removed
+- Obsolete autoresearch artifacts and the host last-seen KV throttle.
+
 ## v2.3.2
 
 ### Added
