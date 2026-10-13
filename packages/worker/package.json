@@ -1,6 +1,6 @@
 {
 	"name": "@bat/worker",
-	"version": "2.3.3",
+	"version": "2.3.4",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -17,12 +17,12 @@
 	"dependencies": {
 		"@bat/shared": "workspace:*",
 		"@cfworker/json-schema": "4.1.1",
-		"hono": "4.13.9",
+		"hono": "4.13.13",
 		"jose": "^6.2.12"
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "5.20260927.1",
+		"@cloudflare/workers-types": "5.20261012.1",
 		"typescript": "^7.0.2",
-		"wrangler": "4.142.0"
+		"wrangler": "4.149.0"
 	}
 }
