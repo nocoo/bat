@@ -138,3 +138,15 @@ The liveness acceptance probe incorrectly expected a browser-session request to
 requires a read key, even for an authenticated browser. The probe was corrected
 to check browser routes; monitoring authorization and status remain covered by
 isolated L2 tests. Do not weaken authentication to satisfy an invalid smoke test.
+
+## 2026-10-21 — Navigation patch sequencing
+
+The first navigation test selected collapsed icon links by a text name that was
+not exposed in that state. Selecting the existing route href exposed the actual
+regression: cross-page navigation reset the sidebar and disconnected the header.
+During the fix, a malformed second patch was rejected after page wrappers had
+already been removed, but the shell command continued into a partial-build test.
+The owned test was interrupted, the missing shell patch was applied, and the
+complete build and regression suite were rerun. No daily or production runtime
+was used. Keep dependent patch/build commands fail-fast, and distinguish selector
+failures from lifecycle failures before treating a red test as evidence.

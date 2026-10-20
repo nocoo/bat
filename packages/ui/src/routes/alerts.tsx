@@ -10,7 +10,6 @@ import {
 } from "@nocoo/basalt/components/table";
 import { AlertTriangle, Bell } from "lucide-react";
 import { Link } from "react-router";
-import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts } from "@/hooks";
@@ -73,47 +72,43 @@ function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 export function AlertsPage() {
 	const { data: alerts, error, isLoading } = useAlerts();
 
-	return (
-		<AppShell breadcrumbs={[{ label: "Alerts" }]}>
-			{isLoading && !alerts ? (
-				<Card>
-					<CardContent className="py-6 space-y-4">
-						{Array.from({ length: 5 }, (_, i) => (
-							<Skeleton key={`alert-skeleton-${i.toString()}`} className="h-8 w-full" />
-						))}
-					</CardContent>
-				</Card>
-			) : error && !alerts ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">Failed to load alerts</h2>
-					<p className="mt-2 text-sm">{error.message}</p>
-				</div>
-			) : !alerts || alerts.length === 0 ? (
-				<div className="space-y-4">
-					<PageHeader
-						title="Alerts"
-						description="Active alerts and incident notifications across your fleet."
-					/>
-					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-						<Bell className="h-12 w-12 mb-4" strokeWidth={1} />
-						<h2 className="text-lg font-semibold text-foreground">No active alerts</h2>
-						<p className="mt-2 text-sm">All systems are running normally.</p>
-					</div>
-				</div>
-			) : (
-				<div className="space-y-4">
-					<PageHeader
-						title="Alerts"
-						description="Active alerts and incident notifications across your fleet."
-					/>
-					<Card>
-						<CardContent className="py-2 overflow-x-auto">
-							<AlertTable alerts={alerts} />
-						</CardContent>
-					</Card>
-				</div>
-			)}
-		</AppShell>
+	return isLoading && !alerts ? (
+		<Card>
+			<CardContent className="py-6 space-y-4">
+				{Array.from({ length: 5 }, (_, i) => (
+					<Skeleton key={`alert-skeleton-${i.toString()}`} className="h-8 w-full" />
+				))}
+			</CardContent>
+		</Card>
+	) : error && !alerts ? (
+		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
+			<h2 className="text-lg font-semibold text-foreground">Failed to load alerts</h2>
+			<p className="mt-2 text-sm">{error.message}</p>
+		</div>
+	) : !alerts || alerts.length === 0 ? (
+		<div className="space-y-4">
+			<PageHeader
+				title="Alerts"
+				description="Active alerts and incident notifications across your fleet."
+			/>
+			<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+				<Bell className="h-12 w-12 mb-4" strokeWidth={1} />
+				<h2 className="text-lg font-semibold text-foreground">No active alerts</h2>
+				<p className="mt-2 text-sm">All systems are running normally.</p>
+			</div>
+		</div>
+	) : (
+		<div className="space-y-4">
+			<PageHeader
+				title="Alerts"
+				description="Active alerts and incident notifications across your fleet."
+			/>
+			<Card>
+				<CardContent className="py-2 overflow-x-auto">
+					<AlertTable alerts={alerts} />
+				</CardContent>
+			</Card>
+		</div>
 	);
 }

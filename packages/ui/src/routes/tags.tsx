@@ -4,7 +4,6 @@ import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
-import { AppShell } from "@/components/layout";
 import { TagChip } from "@/components/tag-chip";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -78,97 +77,93 @@ export function TagsPage() {
 		[mutate],
 	);
 
-	return (
-		<AppShell breadcrumbs={[{ label: "Tags" }]}>
-			{isLoading && !tags ? (
-				<Card>
-					<CardContent className="py-6 space-y-4">
-						{Array.from({ length: 5 }, (_, i) => (
-							<Skeleton key={`tag-skeleton-${i.toString()}`} className="h-8 w-full" />
-						))}
-					</CardContent>
-				</Card>
-			) : error && !tags ? (
+	return isLoading && !tags ? (
+		<Card>
+			<CardContent className="py-6 space-y-4">
+				{Array.from({ length: 5 }, (_, i) => (
+					<Skeleton key={`tag-skeleton-${i.toString()}`} className="h-8 w-full" />
+				))}
+			</CardContent>
+		</Card>
+	) : error && !tags ? (
+		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
+			<h2 className="text-lg font-semibold text-foreground">Failed to load tags</h2>
+			<p className="mt-2 text-sm">{error.message}</p>
+		</div>
+	) : (
+		<div className="space-y-4" data-bat-dirty={!!newName || editingId !== null}>
+			<PageHeader
+				title="Tags"
+				description="Labels and categorization rules for grouping monitored hosts."
+			/>
+
+			{/* Create new tag */}
+			<Card>
+				<CardContent className="py-3">
+					<form
+						className="flex items-center gap-2"
+						onSubmit={(e) => {
+							e.preventDefault();
+							handleCreate();
+						}}
+					>
+						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+						<Input
+							placeholder="New tag name…"
+							value={newName}
+							onChange={(e) => setNewName(e.target.value)}
+							size="sm"
+							className="flex-1"
+							maxLength={32}
+						/>
+						<Button
+							type="submit"
+							size="sm"
+							disabled={creating || !newName.trim() || newName.trim().length > TAG_MAX_LENGTH}
+						>
+							{creating ? "Creating..." : "Create"}
+						</Button>
+					</form>
+				</CardContent>
+			</Card>
+
+			{/* Tag list */}
+			{!tags || tags.length === 0 ? (
 				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">Failed to load tags</h2>
-					<p className="mt-2 text-sm">{error.message}</p>
+					<Tag className="h-12 w-12 mb-4" strokeWidth={1} />
+					<h2 className="text-lg font-semibold text-foreground">No tags yet</h2>
+					<p className="mt-2 text-sm">Create a tag above to get started.</p>
 				</div>
 			) : (
-				<div className="space-y-4" data-bat-dirty={!!newName || editingId !== null}>
-					<PageHeader
-						title="Tags"
-						description="Labels and categorization rules for grouping monitored hosts."
-					/>
-
-					{/* Create new tag */}
-					<Card>
-						<CardContent className="py-3">
-							<form
-								className="flex items-center gap-2"
-								onSubmit={(e) => {
-									e.preventDefault();
-									handleCreate();
-								}}
-							>
-								<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-								<Input
-									placeholder="New tag name…"
-									value={newName}
-									onChange={(e) => setNewName(e.target.value)}
-									size="sm"
-									className="flex-1"
-									maxLength={32}
+				<Card>
+					<CardContent className="py-2">
+						<div className="divide-y divide-border">
+							{tags.map((tag) => (
+								<TagRow
+									key={tag.id}
+									tag={tag}
+									editing={editingId === tag.id}
+									editName={editingId === tag.id ? editName : ""}
+									onStartEdit={() => {
+										setEditingId(tag.id);
+										setEditName(tag.name);
+									}}
+									onCancelEdit={() => {
+										setEditingId(null);
+										setEditName("");
+									}}
+									onEditNameChange={setEditName}
+									onRename={() => handleRename(tag.id)}
+									onRecolor={(color) => handleRecolor(tag.id, color)}
+									onDelete={() => handleDelete(tag.id)}
 								/>
-								<Button
-									type="submit"
-									size="sm"
-									disabled={creating || !newName.trim() || newName.trim().length > TAG_MAX_LENGTH}
-								>
-									{creating ? "Creating..." : "Create"}
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-
-					{/* Tag list */}
-					{!tags || tags.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-							<Tag className="h-12 w-12 mb-4" strokeWidth={1} />
-							<h2 className="text-lg font-semibold text-foreground">No tags yet</h2>
-							<p className="mt-2 text-sm">Create a tag above to get started.</p>
+							))}
 						</div>
-					) : (
-						<Card>
-							<CardContent className="py-2">
-								<div className="divide-y divide-border">
-									{tags.map((tag) => (
-										<TagRow
-											key={tag.id}
-											tag={tag}
-											editing={editingId === tag.id}
-											editName={editingId === tag.id ? editName : ""}
-											onStartEdit={() => {
-												setEditingId(tag.id);
-												setEditName(tag.name);
-											}}
-											onCancelEdit={() => {
-												setEditingId(null);
-												setEditName("");
-											}}
-											onEditNameChange={setEditName}
-											onRename={() => handleRename(tag.id)}
-											onRecolor={(color) => handleRecolor(tag.id, color)}
-											onDelete={() => handleDelete(tag.id)}
-										/>
-									))}
-								</div>
-							</CardContent>
-						</Card>
-					)}
-				</div>
+					</CardContent>
+				</Card>
 			)}
-		</AppShell>
+		</div>
 	);
 }
 

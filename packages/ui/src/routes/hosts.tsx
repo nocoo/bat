@@ -4,7 +4,6 @@ import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { HostCard } from "@/components/host-card";
-import { AppShell } from "@/components/layout";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -118,67 +117,63 @@ export function HostsPage() {
 	// Only show filter bar when there are tags defined
 	const showFilterBar = allTags && allTags.length > 0;
 
-	return (
-		<AppShell breadcrumbs={[{ label: "Hosts" }]}>
-			{isLoading && !hosts ? (
-				<HostsLoading />
-			) : error && !hosts ? (
-				<HostsError message={error.message} />
-			) : !hosts || hosts.length === 0 ? (
-				<HostsEmpty />
-			) : (
-				<div className="space-y-6">
-					<PageHeader
-						title="Hosts"
-						description="Monitored servers and real-time infrastructure status."
-						actions={
-							<select
-								value={sortKey}
-								onChange={(e) => setSortKey(e.target.value as SortKey)}
-								className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
-							>
-								{SORT_OPTIONS.map((opt) => (
-									<option key={opt.value} value={opt.value}>
-										{opt.label}
-									</option>
-								))}
-							</select>
-						}
-						filters={
-							showFilterBar ? (
-								<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
-							) : null
-						}
-					/>
-					<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-						{filteredHosts.map((host, index) => (
-							<div
-								key={host.host_id}
-								className="animate-fade-up"
-								style={{ animationDelay: `${index * 60}ms` }}
-							>
-								<HostCard
-									host={host}
-									tags={hostTagsMap?.[host.host_id]}
-									openPublicPorts={countOpenPublicPorts(alerts, host.host_id)}
-								/>
-							</div>
+	return isLoading && !hosts ? (
+		<HostsLoading />
+	) : error && !hosts ? (
+		<HostsError message={error.message} />
+	) : !hosts || hosts.length === 0 ? (
+		<HostsEmpty />
+	) : (
+		<div className="space-y-6">
+			<PageHeader
+				title="Hosts"
+				description="Monitored servers and real-time infrastructure status."
+				actions={
+					<select
+						value={sortKey}
+						onChange={(e) => setSortKey(e.target.value as SortKey)}
+						className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
+					>
+						{SORT_OPTIONS.map((opt) => (
+							<option key={opt.value} value={opt.value}>
+								{opt.label}
+							</option>
 						))}
+					</select>
+				}
+				filters={
+					showFilterBar ? (
+						<TagFilterBar tags={allTags} selected={selectedTagIds} onToggle={handleToggleTag} />
+					) : null
+				}
+			/>
+			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+				{filteredHosts.map((host, index) => (
+					<div
+						key={host.host_id}
+						className="animate-fade-up"
+						style={{ animationDelay: `${index * 60}ms` }}
+					>
+						<HostCard
+							host={host}
+							tags={hostTagsMap?.[host.host_id]}
+							openPublicPorts={countOpenPublicPorts(alerts, host.host_id)}
+						/>
 					</div>
-					{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
-						<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-							<p className="text-sm">No hosts match the selected tags.</p>
-							<button
-								type="button"
-								onClick={() => setSelectedTagIds([])}
-								className="mt-2 text-sm text-primary hover:underline"
-							>
-								Clear filters
-							</button>
-						</div>
-					)}
+				))}
+			</div>
+			{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
+				<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+					<p className="text-sm">No hosts match the selected tags.</p>
+					<button
+						type="button"
+						onClick={() => setSelectedTagIds([])}
+						className="mt-2 text-sm text-primary hover:underline"
+					>
+						Clear filters
+					</button>
 				</div>
 			)}
-		</AppShell>
+		</div>
 	);
 }

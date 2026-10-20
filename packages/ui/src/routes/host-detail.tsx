@@ -19,7 +19,6 @@ import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
-import { AppShell } from "@/components/layout";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -169,151 +168,142 @@ export function HostDetailPage() {
 	);
 
 	return (
-		<AppShell breadcrumbs={[{ label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? hid }]}>
-			<div className="space-y-6">
-				{/* Header */}
-				<PageHeader
-					title={host?.hostname ?? hid}
-					description={
-						host ? (
-							<span className="inline-flex items-center gap-2 mt-1">
-								<StatusBadge status={host.status} />
-								<span className="text-sm text-basalt-muted-foreground">
-									Real-time metrics, system specifications, and services.
-								</span>
+		<div className="space-y-6">
+			{/* Header */}
+			<PageHeader
+				title={host?.hostname ?? hid}
+				description={
+					host ? (
+						<span className="inline-flex items-center gap-2 mt-1">
+							<StatusBadge status={host.status} />
+							<span className="text-sm text-basalt-muted-foreground">
+								Real-time metrics, system specifications, and services.
 							</span>
-						) : (
-							"Real-time metrics, system specifications, and services."
-						)
-					}
-					actions={<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />}
-				/>
-				{detail && (
-					<DescriptionEditor
-						hid={hid}
-						value={detail.description}
-						onSaved={handleDescriptionSaved}
-					/>
-				)}
+						</span>
+					) : (
+						"Real-time metrics, system specifications, and services."
+					)
+				}
+				actions={<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />}
+			/>
+			{detail && (
+				<DescriptionEditor hid={hid} value={detail.description} onSaved={handleDescriptionSaved} />
+			)}
 
-				{/* Metrics — simplified for now */}
-				{metricsLoading && !metricsResponse ? (
-					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-						<div className="space-y-4">
-							{Array.from({ length: 4 }, (_, i) => (
-								<Card key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
-									<Skeleton className="h-64 w-full" />
-								</Card>
-							))}
-						</div>
-						<div className="space-y-4">
-							<Card className="p-4 md:p-5">
-								<Skeleton className="h-32 w-full" />
+			{/* Metrics — simplified for now */}
+			{metricsLoading && !metricsResponse ? (
+				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+					<div className="space-y-4">
+						{Array.from({ length: 4 }, (_, i) => (
+							<Card key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
+								<Skeleton className="h-64 w-full" />
 							</Card>
-						</div>
+						))}
 					</div>
-				) : metricsResponse ? (
-					<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-						{/* Left column — charts */}
-						<div className="space-y-4">
-							<div className="flex items-baseline justify-between">
-								<h2 className="text-base font-semibold">Metrics</h2>
-								<span className="text-xs text-muted-foreground">
-									Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
-								</span>
-							</div>
-							<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<NetworkChart
-								data={metricsResponse.data}
-								rangeSeconds={rangeSeconds}
-								resolution={metricsResponse.resolution}
-							/>
-							<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<DiskIoChart
-								data={metricsResponse.data}
-								rangeSeconds={rangeSeconds}
-								resolution={metricsResponse.resolution}
-							/>
-							<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
-							<TopProcessesTable topProcessesJson={detail?.top_processes_json ?? null} />
+					<div className="space-y-4">
+						<Card className="p-4 md:p-5">
+							<Skeleton className="h-32 w-full" />
+						</Card>
+					</div>
+				</div>
+			) : metricsResponse ? (
+				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+					{/* Left column — charts */}
+					<div className="space-y-4">
+						<div className="flex items-baseline justify-between">
+							<h2 className="text-base font-semibold">Metrics</h2>
+							<span className="text-xs text-muted-foreground">
+								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
+							</span>
 						</div>
+						<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+						<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+						<NetworkChart
+							data={metricsResponse.data}
+							rangeSeconds={rangeSeconds}
+							resolution={metricsResponse.resolution}
+						/>
+						<PsiChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+						<DiskIoChart
+							data={metricsResponse.data}
+							rangeSeconds={rangeSeconds}
+							resolution={metricsResponse.resolution}
+						/>
+						<TcpChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
+						<TopProcessesTable topProcessesJson={detail?.top_processes_json ?? null} />
+					</div>
 
-						{/* Right column — system info + disks */}
-						<div className="space-y-4 min-w-0">
-							<h2 className="text-base font-semibold">Overview</h2>
-							{host && (
-								<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
-							)}
-							<DiskBars data={metricsResponse.data} />
-							{host && (
-								<Card>
-									<CardHeader>
-										<CardTitle className="flex items-center gap-2 text-base">
-											<Info className="h-4 w-4" />
-											System Info
-										</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="grid gap-3">
-											<InfoRow label="OS" value={host.os} />
-											<InfoRow label="Kernel" value={host.kernel} />
-											<InfoRow label="Architecture" value={host.arch} />
+					{/* Right column — system info + disks */}
+					<div className="space-y-4 min-w-0">
+						<h2 className="text-base font-semibold">Overview</h2>
+						{host && (
+							<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
+						)}
+						<DiskBars data={metricsResponse.data} />
+						{host && (
+							<Card>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2 text-base">
+										<Info className="h-4 w-4" />
+										System Info
+									</CardTitle>
+								</CardHeader>
+								<CardContent>
+									<div className="grid gap-3">
+										<InfoRow label="OS" value={host.os} />
+										<InfoRow label="Kernel" value={host.kernel} />
+										<InfoRow label="Architecture" value={host.arch} />
+										<InfoRow
+											label="CPU"
+											value={formatCpuLabel(
+												host.cpu_model,
+												detail?.cpu_physical,
+												detail?.cpu_logical,
+											)}
+										/>
+										<InfoRow label="Memory" value={formatMemory(detail?.mem_total_bytes ?? null)} />
+										{detail?.swap_total_bytes != null && (
+											<InfoRow label="Swap" value={formatMemory(detail.swap_total_bytes)} />
+										)}
+										{detail?.virtualization && (
 											<InfoRow
-												label="CPU"
-												value={formatCpuLabel(
-													host.cpu_model,
-													detail?.cpu_physical,
-													detail?.cpu_logical,
-												)}
+												label="Virtualization"
+												value={capitalizeVirt(detail.virtualization)}
 											/>
-											<InfoRow
-												label="Memory"
-												value={formatMemory(detail?.mem_total_bytes ?? null)}
-											/>
-											{detail?.swap_total_bytes != null && (
-												<InfoRow label="Swap" value={formatMemory(detail.swap_total_bytes)} />
-											)}
-											{detail?.virtualization && (
-												<InfoRow
-													label="Virtualization"
-													value={capitalizeVirt(detail.virtualization)}
-												/>
-											)}
-											{detail?.boot_mode && (
-												<InfoRow label="Boot Mode" value={detail.boot_mode.toUpperCase()} />
-											)}
-											{detail?.probe_version && (
-												<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
-											)}
-											{detail?.public_ip && <InfoRow label="Public IP" value={detail.public_ip} />}
-											<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
-											<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
-											{detail?.timezone && <InfoRow label="Timezone" value={detail.timezone} />}
-										</div>
-									</CardContent>
-								</Card>
-							)}
-							{host && <HostTagsPanel hostId={host.host_id} />}
-							{host && <MaintenancePanel hostId={host.host_id} />}
-							{host && (
-								<AllowedPortsPanel
-									hostId={host.host_id}
-									hashedHostId={hid}
-									hostAlerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []}
-								/>
-							)}
-							<WebsitesPanel tier2={tier2} />
-							<SoftwarePanel tier2={tier2} />
-						</div>
+										)}
+										{detail?.boot_mode && (
+											<InfoRow label="Boot Mode" value={detail.boot_mode.toUpperCase()} />
+										)}
+										{detail?.probe_version && (
+											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
+										)}
+										{detail?.public_ip && <InfoRow label="Public IP" value={detail.public_ip} />}
+										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
+										<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
+										{detail?.timezone && <InfoRow label="Timezone" value={detail.timezone} />}
+									</div>
+								</CardContent>
+							</Card>
+						)}
+						{host && <HostTagsPanel hostId={host.host_id} />}
+						{host && <MaintenancePanel hostId={host.host_id} />}
+						{host && (
+							<AllowedPortsPanel
+								hostId={host.host_id}
+								hashedHostId={hid}
+								hostAlerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []}
+							/>
+						)}
+						<WebsitesPanel tier2={tier2} />
+						<SoftwarePanel tier2={tier2} />
 					</div>
-				) : (
-					<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-						<AlertTriangle className="h-12 w-12 mb-4" strokeWidth={1} />
-						<p className="text-sm">No metrics data available</p>
-					</div>
-				)}
-			</div>
-		</AppShell>
+				</div>
+			) : (
+				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+					<AlertTriangle className="h-12 w-12 mb-4" strokeWidth={1} />
+					<p className="text-sm">No metrics data available</p>
+				</div>
+			)}
+		</div>
 	);
 }

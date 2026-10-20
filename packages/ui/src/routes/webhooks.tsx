@@ -4,7 +4,6 @@ import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
-import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHosts, useSetup, useWebhooks } from "@/hooks";
@@ -69,93 +68,89 @@ export function WebhooksPage() {
 		[mutate],
 	);
 
-	return (
-		<AppShell breadcrumbs={[{ label: "Settings" }, { label: "Webhooks" }]}>
-			{isLoading && !webhooks ? (
-				<Card>
-					<CardContent className="py-6 space-y-4">
-						{Array.from({ length: 3 }, (_, i) => (
-							<Skeleton key={`wh-skeleton-${i.toString()}`} className="h-12 w-full" />
-						))}
-					</CardContent>
-				</Card>
-			) : error && !webhooks ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-					<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">Failed to load webhooks</h2>
-					<p className="mt-2 text-sm">{error.message}</p>
-				</div>
-			) : (
-				<div className="space-y-4 max-w-4xl" data-bat-dirty={!!selectedHostId}>
-					<PageHeader
-						title="Webhooks"
-						description="Configure webhook tokens for hosts to send events via POST /api/events."
-					/>
+	return isLoading && !webhooks ? (
+		<Card>
+			<CardContent className="py-6 space-y-4">
+				{Array.from({ length: 3 }, (_, i) => (
+					<Skeleton key={`wh-skeleton-${i.toString()}`} className="h-12 w-full" />
+				))}
+			</CardContent>
+		</Card>
+	) : error && !webhooks ? (
+		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
+			<h2 className="text-lg font-semibold text-foreground">Failed to load webhooks</h2>
+			<p className="mt-2 text-sm">{error.message}</p>
+		</div>
+	) : (
+		<div className="space-y-4 max-w-4xl" data-bat-dirty={!!selectedHostId}>
+			<PageHeader
+				title="Webhooks"
+				description="Configure webhook tokens for hosts to send events via POST /api/events."
+			/>
 
-					{/* Action error banner */}
-					{actionError && (
-						<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-							{actionError}
-						</div>
-					)}
-
-					{/* Create new webhook */}
-					<Card>
-						<CardContent className="py-3">
-							<form
-								className="flex items-center gap-2"
-								onSubmit={(e) => {
-									e.preventDefault();
-									handleCreate();
-								}}
-							>
-								<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-								<select
-									value={selectedHostId}
-									onChange={(e) => setSelectedHostId(e.target.value)}
-									className="h-8 text-sm flex-1 min-w-0 rounded-md border border-border bg-background px-3 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									<option value="">Select a host...</option>
-									{availableHosts.map((h) => (
-										<option key={h.host_id} value={h.host_id}>
-											{h.hostname}
-										</option>
-									))}
-								</select>
-								<Button type="submit" size="sm" disabled={creating || !selectedHostId}>
-									{creating ? "Creating..." : "Generate"}
-								</Button>
-							</form>
-						</CardContent>
-					</Card>
-
-					{/* Webhook list */}
-					{!webhooks || webhooks.length === 0 ? (
-						<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-							<Webhook className="h-12 w-12 mb-4" strokeWidth={1} />
-							<h2 className="text-lg font-semibold text-foreground">No webhooks configured</h2>
-							<p className="mt-2 text-sm">Select a host above to generate a webhook token.</p>
-						</div>
-					) : (
-						<Card>
-							<CardContent className="py-2">
-								<div className="divide-y divide-border">
-									{webhooks.map((wh) => (
-										<WebhookConfigRow
-											key={wh.id}
-											config={wh}
-											workerUrl={workerUrl}
-											onRegenerate={handleRegenerate}
-											onDelete={handleDelete}
-										/>
-									))}
-								</div>
-							</CardContent>
-						</Card>
-					)}
+			{/* Action error banner */}
+			{actionError && (
+				<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+					{actionError}
 				</div>
 			)}
-		</AppShell>
+
+			{/* Create new webhook */}
+			<Card>
+				<CardContent className="py-3">
+					<form
+						className="flex items-center gap-2"
+						onSubmit={(e) => {
+							e.preventDefault();
+							handleCreate();
+						}}
+					>
+						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+						<select
+							value={selectedHostId}
+							onChange={(e) => setSelectedHostId(e.target.value)}
+							className="h-8 text-sm flex-1 min-w-0 rounded-md border border-border bg-background px-3 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+						>
+							<option value="">Select a host...</option>
+							{availableHosts.map((h) => (
+								<option key={h.host_id} value={h.host_id}>
+									{h.hostname}
+								</option>
+							))}
+						</select>
+						<Button type="submit" size="sm" disabled={creating || !selectedHostId}>
+							{creating ? "Creating..." : "Generate"}
+						</Button>
+					</form>
+				</CardContent>
+			</Card>
+
+			{/* Webhook list */}
+			{!webhooks || webhooks.length === 0 ? (
+				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+					<Webhook className="h-12 w-12 mb-4" strokeWidth={1} />
+					<h2 className="text-lg font-semibold text-foreground">No webhooks configured</h2>
+					<p className="mt-2 text-sm">Select a host above to generate a webhook token.</p>
+				</div>
+			) : (
+				<Card>
+					<CardContent className="py-2">
+						<div className="divide-y divide-border">
+							{webhooks.map((wh) => (
+								<WebhookConfigRow
+									key={wh.id}
+									config={wh}
+									workerUrl={workerUrl}
+									onRegenerate={handleRegenerate}
+									onDelete={handleDelete}
+								/>
+							))}
+						</div>
+					</CardContent>
+				</Card>
+			)}
+		</div>
 	);
 }
 

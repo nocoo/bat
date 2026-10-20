@@ -12,24 +12,24 @@ import {
 	AppShell as BasaltAppShell,
 } from "@nocoo/basalt/components/app-shell";
 import { Menu } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Breadcrumbs } from "./breadcrumbs";
 import { EnvironmentSwitch } from "./environment-switch";
 import { HeaderTooltip, HexlyLink } from "./header-links";
+import { RouteBreadcrumbs } from "./route-breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { ThemeToggle } from "./theme-toggle";
 
 interface AppShellProps {
 	children: React.ReactNode;
-	breadcrumbs?: { label: string; href?: string }[];
 }
 
-function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
+function AppShellInner({ children }: AppShellProps) {
 	const isMobile = useIsMobile();
+	const menuTrigger = useRef<HTMLButtonElement>(null);
 	const { mobileOpen, setMobileOpen } = useSidebar();
 	const { pathname } = useLocation();
 
@@ -75,6 +75,10 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 				<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
 					<SheetContent
 						side="left"
+						onCloseAutoFocus={(event) => {
+							event.preventDefault();
+							menuTrigger.current?.focus();
+						}}
 						className="w-[260px] max-w-[260px] border-0 bg-basalt-background p-0"
 					>
 						<SheetHeader className="sr-only">
@@ -92,6 +96,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 						{showHamburger && (
 							<HeaderTooltip label="Open navigation menu">
 								<button
+									ref={menuTrigger}
 									type="button"
 									onClick={() => setMobileOpen(true)}
 									aria-label="Open navigation menu"
@@ -101,10 +106,7 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 								</button>
 							</HeaderTooltip>
 						)}
-						<Breadcrumbs
-							items={[{ label: "Home", href: "/" }, ...breadcrumbs]}
-							className="min-w-0"
-						/>
+						<RouteBreadcrumbs />
 					</div>
 					<div className="flex shrink-0 items-center gap-1">
 						<EnvironmentSwitch />
@@ -133,10 +135,10 @@ function AppShellInner({ children, breadcrumbs = [] }: AppShellProps) {
 	);
 }
 
-export function AppShell({ children, breadcrumbs = [] }: AppShellProps) {
+export function AppShell({ children }: AppShellProps) {
 	return (
 		<SidebarProvider>
-			<AppShellInner breadcrumbs={breadcrumbs}>{children}</AppShellInner>
+			<AppShellInner>{children}</AppShellInner>
 		</SidebarProvider>
 	);
 }

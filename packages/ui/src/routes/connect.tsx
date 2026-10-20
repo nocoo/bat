@@ -37,7 +37,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import { AppShell } from "@/components/layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -349,7 +348,7 @@ export function ConnectPage() {
 	);
 	const loadError = servers.error ?? tokens.error;
 	return (
-		<AppShell breadcrumbs={[{ label: "Connect" }]}>
+		<>
 			<div className="mx-auto w-full max-w-6xl space-y-6" data-bat-dirty={creating || !!action}>
 				<div className="flex flex-wrap items-start justify-between gap-4">
 					<PageHeader title="Connect" description="Give your agents a secure connection to Bat." />
@@ -838,6 +837,6 @@ export function ConnectPage() {
 					</form>
 				</DialogContent>
 			</Dialog>
-		</AppShell>
+		</>
 	);
 }
