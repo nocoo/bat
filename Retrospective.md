@@ -150,3 +150,13 @@ The owned test was interrupted, the missing shell patch was applied, and the
 complete build and regression suite were rerun. No daily or production runtime
 was used. Keep dependent patch/build commands fail-fast, and distinguish selector
 failures from lifecycle failures before treating a red test as evidence.
+
+## 2026-10-21 - Dependency verification probes
+
+A temporary browser probe checked focus immediately after drawer dismissal,
+before the asynchronous focus restoration completed. Replacing the immediate
+assertion with Playwright's bounded `toBeFocused` matcher passed against both
+Basalt versions without changing application behavior. An import inventory also
+used Python directory traversal instead of the required `rg`; the inventory was
+rerun with `rg`. Use web-first assertions for asynchronous UI transitions and
+keep repository discovery on the prescribed tools, including temporary helpers.
