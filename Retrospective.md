@@ -167,3 +167,15 @@ reproduced the 24px inset and the consumer now explicitly clears it there. Keep
 responsive boundary checks and review ahead of issue-closing commit references.
 A proposed footer alignment fix was unnecessary: the published collapsed-rail
 CSS already centers it, confirmed after waiting for the rail's final width.
+
+## 2026-10-21 - Demo readiness is more than the HTML response
+
+I opened the local acceptance page after checking only its HTTP 200 response.
+The lazily initialized Demo backend still had a September 28 lock whose owner
+process had exited, so the user encountered an unavailable environment. Recovery
+stopped the owned launcher, verified the absent PID, database ownership markers
+and lack of open database handles, then removed only the stale lock. Restarting
+Demo restored both liveness and Hosts API responses through Caddy; host, tag,
+event and metric row counts were unchanged. Verify actual mode initialization
+and API readiness before handoff, not just the Vite HTML response. Never reset
+persistent Demo data to clear an unverified lock.
