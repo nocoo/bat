@@ -55,6 +55,53 @@ test.describe("Hosts list page", () => {
 		await expect(cards).toHaveCount(2);
 	});
 
+	test("cards stretch to the tallest card in each row but remain content-sized on mobile", async ({
+		page,
+	}) => {
+		const path = "/api/hosts/pw-host-beta/tags";
+		const response = await page.request.get(path);
+		expect(response.ok()).toBe(true);
+		const tags: { id: number }[] = await response.json();
+		try {
+			expect((await page.request.put(path, { data: { tag_ids: [] } })).ok()).toBe(true);
+			await page.goto("/hosts");
+			const cards = page.getByTestId("host-card");
+			await expect(cards).toHaveCount(2);
+			await expect(cards.first().getByText("production", { exact: true })).toBeVisible();
+			for (const width of [1280, 900]) {
+				await page.setViewportSize({ width, height: 900 });
+				await expect
+					.poll(() =>
+						cards.evaluateAll((elements) => {
+							const [first, second] = elements.map((element) => ({
+								card: element.getBoundingClientRect(),
+								footer: element.lastElementChild?.getBoundingClientRect(),
+								link: element.closest("a")?.getBoundingClientRect(),
+							}));
+							return (
+								first &&
+								second &&
+								Math.abs(first.card.top - second.card.top) < 1 &&
+								Math.abs(first.card.height - second.card.height) < 1 &&
+								Math.abs((first.footer?.bottom ?? 0) - (second.footer?.bottom ?? 0)) < 1 &&
+								Math.abs((second.link?.height ?? 0) - second.card.height) < 1
+							);
+						}),
+					)
+					.toBe(true);
+			}
+			await page.setViewportSize({ width: 390, height: 844 });
+			const first = await cards.first().boundingBox();
+			const second = await cards.nth(1).boundingBox();
+			expect(first && second && second.y >= first.y + first.height).toBe(true);
+			expect(first && second && first.height > second.height).toBe(true);
+		} finally {
+			expect(
+				(await page.request.put(path, { data: { tag_ids: tags.map((tag) => tag.id) } })).ok(),
+			).toBe(true);
+		}
+	});
+
 	test("host card shows hostname", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");

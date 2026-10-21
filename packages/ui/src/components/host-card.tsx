@@ -145,9 +145,9 @@ export function HostCard({
 	const openPorts = openPublicPorts ?? 0;
 
 	return (
-		<Link to={`/hosts/${hashHostId(host.host_id)}`}>
+		<Link to={`/hosts/${hashHostId(host.host_id)}`} className="block h-full">
 			<Card
-				className="transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0"
+				className="h-full transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0"
 				data-testid="host-card"
 			>
 				{/* Header */}
@@ -213,7 +213,7 @@ export function HostCard({
 				</div>
 
 				{/* Footer */}
-				<div className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground px-0.5">
+				<div className="mt-auto pt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground px-0.5">
 					{host.probe_version && <span>Probe v{host.probe_version}</span>}
 					{host.probe_version && <span>·</span>}
 					<span>Last seen {formatLastSeen(host.last_seen)}</span>
