@@ -349,13 +349,16 @@ export function ConnectPage() {
 	const loadError = servers.error ?? tokens.error;
 	return (
 		<>
-			<div className="mx-auto w-full max-w-6xl space-y-6" data-bat-dirty={creating || !!action}>
-				<div className="flex flex-wrap items-start justify-between gap-4">
-					<PageHeader title="Connect" description="Give your agents a secure connection to Bat." />
-					<Badge variant="outline" className="gap-2">
-						<Plug className="size-3.5" aria-hidden="true" /> API v1
-					</Badge>
-				</div>
+			<div className="space-y-6" data-bat-dirty={creating || !!action}>
+				<PageHeader
+					title="Connect"
+					description="Give your agents a secure connection to Bat."
+					actions={
+						<Badge variant="outline" className="gap-2">
+							<Plug className="size-3.5" aria-hidden="true" /> API v1
+						</Badge>
+					}
+				/>
 				{(error || loadError) && (
 					<div
 						role="alert"

@@ -45,6 +45,38 @@ async function authorizedServers(page: Page, key: string) {
 }
 
 test.describe("Connect private credential management", () => {
+	test("page aligns with the shared content island on wide and narrow screens", async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width: 1920, height: 1080 });
+		await page.goto("/hosts");
+		const hostsLeft = await page
+			.getByRole("heading", { name: "Hosts", exact: true })
+			.evaluate((element) => element.getBoundingClientRect().left);
+		await page.goto("/connect");
+		const header = page
+			.getByRole("heading", { name: "Connect", exact: true })
+			.locator("xpath=ancestor::header");
+		await expect(header).toBeVisible();
+		const availableWidth = await page.locator("[data-basalt-island]").evaluate((element) => {
+			const style = getComputedStyle(element);
+			return (
+				element.clientWidth -
+				Number.parseFloat(style.paddingLeft) -
+				Number.parseFloat(style.paddingRight)
+			);
+		});
+		const bounds = await header.boundingBox();
+		expect(bounds?.x).toBe(hostsLeft);
+		expect(bounds?.width).toBe(availableWidth);
+		await expect(header.getByText("API v1", { exact: true })).toBeVisible();
+		await page.setViewportSize({ width: 390, height: 844 });
+		await expect(page.getByRole("button", { name: "Create token", exact: true })).toBeVisible();
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true,
+		);
+	});
+
 	test("desktop keyboard flow, multiple servers, repeat reveal, clipboard, blur protection, edit, rotation and revocation", async ({
 		page,
 		context,
