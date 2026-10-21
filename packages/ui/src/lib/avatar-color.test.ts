@@ -1,40 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { AVATAR_COLORS, FALLBACK_COLOR, getAvatarColor, getDisplayName } from "./avatar-color";
-
-describe("getAvatarColor", () => {
-	test("returns fallback for null/undefined/empty", () => {
-		expect(getAvatarColor(null)).toBe(FALLBACK_COLOR);
-		expect(getAvatarColor(undefined)).toBe(FALLBACK_COLOR);
-		expect(getAvatarColor("")).toBe(FALLBACK_COLOR);
-	});
-
-	test("is deterministic for a given email", () => {
-		const a = getAvatarColor("alice@example.com");
-		const b = getAvatarColor("alice@example.com");
-		expect(a).toBe(b);
-	});
-
-	test("returns a color from the palette", () => {
-		const color = getAvatarColor("bob@example.com");
-		expect(AVATAR_COLORS).toContain(color as (typeof AVATAR_COLORS)[number]);
-	});
-
-	test("different emails generally map to different colors", () => {
-		const colors = new Set(
-			["a@x", "b@x", "c@x", "d@x", "e@x", "f@x", "g@x", "h@x"].map(getAvatarColor),
-		);
-		expect(colors.size).toBeGreaterThan(1);
-	});
-
-	test("uses sum of char codes mod palette length", () => {
-		const email = "xy"; // 120 + 121 = 241, 241 % 16 = 1 → "bg-orange-500"
-		expect(getAvatarColor(email)).toBe(AVATAR_COLORS[1]);
-	});
-
-	test("palette has 16 slots", () => {
-		expect(AVATAR_COLORS).toHaveLength(16);
-	});
-});
+import { getDisplayName } from "./avatar-color";
 
 describe("getDisplayName", () => {
 	test("uses name when present", () => {

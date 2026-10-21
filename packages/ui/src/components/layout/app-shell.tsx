@@ -42,18 +42,6 @@ function AppShellInner({ children }: AppShellProps) {
 		setMobileOpen(false);
 	}, [pathname, setMobileOpen]);
 
-	// Prevent body scroll when mobile sidebar is open
-	useEffect(() => {
-		if (mobileOpen) {
-			document.body.style.overflow = "hidden";
-		} else {
-			document.body.style.overflow = "";
-		}
-		return () => {
-			document.body.style.overflow = "";
-		};
-	}, [mobileOpen]);
-
 	// Desktop sidebar: shown by CSS on md+ before JS resolves, then by JS
 	const showDesktopSidebar = resolved ? !isMobile : true;
 	// Mobile drawer: only rendered after JS resolves on mobile

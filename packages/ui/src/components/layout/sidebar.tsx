@@ -4,20 +4,19 @@ import {
 	AvatarImage,
 	Sidebar as BasaltSidebar,
 	Button,
-	Collapsible,
-	CollapsibleTrigger,
+	Separator,
 	SidebarFooter,
+	SidebarGroup,
 	SidebarHeader,
 	SidebarNav,
 	SidebarUser,
 	Tooltip,
 	TooltipContent,
-	TooltipProvider,
 	TooltipTrigger,
 } from "@nocoo/basalt";
+import { EditableNavItem } from "@nocoo/basalt/components/editable-nav-item";
 import {
 	Bell,
-	ChevronUp,
 	Database,
 	Download,
 	PanelLeft,
@@ -27,34 +26,17 @@ import {
 	Tag,
 	Webhook,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment } from "react";
 import { Link, useLocation } from "react-router";
 import { useMe } from "@/hooks";
-import { getAvatarColor, getDisplayName } from "@/lib/avatar-color";
+import { getDisplayName } from "@/lib/avatar-color";
 import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
 import { useSidebar } from "./sidebar-context";
 
-// ── Types ──
-
-interface NavItem {
-	href: string;
-	label: string;
-	icon: React.ElementType;
-}
-
-interface NavGroup {
-	label: string;
-	items: NavItem[];
-	defaultOpen?: boolean;
-}
-
-// ── Navigation config ──
-
-const NAV_GROUPS: NavGroup[] = [
+const NAV_GROUPS = [
 	{
 		label: "Monitoring",
-		defaultOpen: true,
 		items: [
 			{ href: "/hosts", label: "Hosts", icon: Server },
 			{ href: "/alerts", label: "Alerts", icon: Bell },
@@ -64,7 +46,6 @@ const NAV_GROUPS: NavGroup[] = [
 	},
 	{
 		label: "Settings",
-		defaultOpen: true,
 		items: [
 			{ href: "/connect", label: "Connect", icon: Plug },
 			{ href: "/setup", label: "Setup", icon: Download },
@@ -74,229 +55,144 @@ const NAV_GROUPS: NavGroup[] = [
 	},
 ];
 
-// Flat list for collapsed icon-only view and backward compat
-const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
-
-// ── Nav group component (expanded sidebar) ──
-
-function NavGroupSection({
-	group,
-	pathname,
-	onNavigate,
-}: {
-	group: NavGroup;
-	pathname: string;
-	onNavigate: () => void;
-}) {
-	const [open, setOpen] = useState(group.defaultOpen ?? true);
-
-	return (
-		<Collapsible open={open} onOpenChange={setOpen}>
-			{/* Group header */}
-			<CollapsibleTrigger asChild>
-				<button
-					type="button"
-					className="flex w-full items-center justify-between px-3 py-2.5 cursor-pointer text-left"
-				>
-					<span className="text-xs font-medium uppercase tracking-wider text-muted-foreground/70 select-none">
-						{group.label}
-					</span>
-					<ChevronUp
-						className={cn(
-							"h-3.5 w-3.5 text-muted-foreground/50 transition-transform duration-200",
-							!open && "rotate-180",
-						)}
-						strokeWidth={1.5}
-					/>
-				</button>
-			</CollapsibleTrigger>
-
-			{/* Animated group content */}
-			<div
-				className="grid overflow-hidden"
-				style={{
-					gridTemplateRows: open ? "1fr" : "0fr",
-					transition: "grid-template-rows 200ms ease-out",
-				}}
-			>
-				<div className="min-h-0 overflow-hidden">
-					<div className="flex flex-col gap-0.5 px-3">
-						{group.items.map((item) => {
-							const isActive = pathname.startsWith(item.href);
-
-							return (
-								<Link
-									key={item.href}
-									to={item.href}
-									onClick={onNavigate}
-									className={cn(
-										"flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-normal transition-colors",
-										isActive
-											? "bg-accent text-foreground"
-											: "text-muted-foreground hover:bg-accent hover:text-foreground",
-									)}
-								>
-									<item.icon className="h-4 w-4 shrink-0" strokeWidth={1.5} />
-									<span className="flex-1 text-left">{item.label}</span>
-								</Link>
-							);
-						})}
-					</div>
-				</div>
-			</div>
-		</Collapsible>
-	);
-}
-
-// ── Main component ──
-
-interface SidebarProps {
-	mobile?: boolean;
-}
-
-export function Sidebar({ mobile = false }: SidebarProps) {
+export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 	const { pathname } = useLocation();
 	const { collapsed, toggle, setMobileOpen } = useSidebar();
 	const { data: user } = useMe();
-
-	const handleNavigate = () => setMobileOpen(false);
-
-	const {
-		name: userName,
-		initial: userInitial,
-		email: userEmail,
-		avatar: userAvatar,
-	} = getDisplayName(user);
+	const compact = !mobile && collapsed;
+	const { name, initial, email, avatar } = getDisplayName(user);
+	const closeMobile = () => setMobileOpen(false);
+	const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+	const version = (
+		<span className="shrink-0 rounded-basalt-md bg-basalt-secondary px-basalt-space-md py-basalt-space-xs text-basalt-sm leading-basalt-tight font-medium text-basalt-muted-foreground">
+			v{APP_VERSION}
+		</span>
+	);
+	const userAvatar = (
+		<Avatar>
+			{avatar && <AvatarImage src={avatar} alt={name} />}
+			<AvatarFallback>{initial}</AvatarFallback>
+		</Avatar>
+	);
 
 	return (
-		<TooltipProvider delayDuration={0}>
-			<BasaltSidebar
-				aria-label={mobile ? "Main navigation drawer" : "Main navigation"}
-				collapsed={collapsed}
-			>
-				{collapsed ? (
-					/* ── Collapsed (icon-only) view ── */
-					<>
-						{/* Logo */}
-						<SidebarHeader className="justify-start pl-6 pr-3">
-							<img src="/logo-24.png" alt="bat" width={24} height={24} />
-						</SidebarHeader>
-
-						{/* Expand toggle */}
-						<Tooltip>
-							<TooltipTrigger asChild={true}>
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={toggle}
-									aria-label="Expand sidebar"
-									className="mb-2 self-center text-muted-foreground hover:text-foreground"
-								>
-									<PanelLeft className="h-4 w-4" aria-hidden="true" strokeWidth={1.5} />
-								</Button>
-							</TooltipTrigger>
-							<TooltipContent side="right" sideOffset={8}>
-								Expand sidebar
-							</TooltipContent>
-						</Tooltip>
-
-						{/* Navigation — flat icon list (no group headers when collapsed) */}
-						<SidebarNav className="items-center gap-1 pt-1">
-							{NAV_ITEMS.map((item) => {
-								const isActive = pathname.startsWith(item.href);
-
-								return (
-									<Tooltip key={item.href}>
-										<TooltipTrigger asChild={true}>
+		<BasaltSidebar
+			aria-label={mobile ? "Main navigation drawer" : "Main navigation"}
+			collapsed={compact}
+		>
+			<SidebarHeader>
+				<div
+					className={cn(
+						"flex w-full items-center",
+						compact ? "justify-center" : "justify-between pl-basalt-layout-sm",
+					)}
+				>
+					<Link
+						to="/"
+						aria-label="Bat home"
+						onClick={closeMobile}
+						className="flex min-w-0 items-center gap-basalt-space-lg text-basalt-foreground"
+					>
+						<img src="/logo-80.png" alt="bat" width={28} height={28} className="shrink-0" />
+						{!compact && (
+							<>
+								<span className="text-basalt-xl font-semibold">bat</span>
+								{version}
+							</>
+						)}
+					</Link>
+					{!compact && (
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={mobile ? closeMobile : toggle}
+							aria-label={mobile ? "Close navigation menu" : "Collapse sidebar"}
+						>
+							<PanelLeft aria-hidden="true" strokeWidth={1.5} />
+						</Button>
+					)}
+				</div>
+			</SidebarHeader>
+			{compact && (
+				<Tooltip>
+					<TooltipTrigger asChild={true}>
+						<Button
+							variant="ghost"
+							size="icon"
+							onClick={toggle}
+							aria-label="Expand sidebar"
+							className="mb-basalt-space-sm self-center"
+						>
+							<PanelLeft aria-hidden="true" strokeWidth={1.5} />
+						</Button>
+					</TooltipTrigger>
+					<TooltipContent side="right">Expand sidebar</TooltipContent>
+				</Tooltip>
+			)}
+			<SidebarNav>
+				{NAV_GROUPS.map((group, index) => (
+					<Fragment key={group.label}>
+						{index > 0 && <Separator className="mx-basalt-row-x my-basalt-content-gap w-auto" />}
+						{compact ? (
+							group.items.map((item) => (
+								<Tooltip key={item.href}>
+									<TooltipTrigger asChild={true}>
+										<Button
+											asChild={true}
+											variant="ghost"
+											size="icon"
+											className="basalt-nav-item"
+											data-basalt-hover-item=""
+											data-hover-selected={active(item.href)}
+										>
 											<Link
 												to={item.href}
-												onClick={handleNavigate}
-												className={cn(
-													"relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors",
-													isActive
-														? "bg-accent text-foreground"
-														: "text-muted-foreground hover:bg-accent hover:text-foreground",
-												)}
+												onClick={closeMobile}
+												aria-label={item.label}
+												aria-current={active(item.href) ? "page" : undefined}
 											>
-												<item.icon className="h-4 w-4" strokeWidth={1.5} />
+												<item.icon aria-hidden="true" strokeWidth={1.5} />
+												<span className="sr-only">{item.label}</span>
 											</Link>
-										</TooltipTrigger>
-										<TooltipContent side="right" sideOffset={8}>
-											{item.label}
-										</TooltipContent>
-									</Tooltip>
-								);
-							})}
-						</SidebarNav>
-
-						{/* Version badge at bottom */}
-						<SidebarFooter className="flex w-full justify-center px-0 py-3">
-							<span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
-								v{APP_VERSION}
-							</span>
-						</SidebarFooter>
-					</>
-				) : (
-					/* ── Expanded view ── */
-					<>
-						{/* Header: logo + collapse toggle */}
-						<SidebarHeader>
-							<div className="flex w-full items-center justify-between">
-								<div className="flex items-center gap-3">
-									<img src="/logo-24.png" alt="bat" width={24} height={24} />
-									<span className="text-lg font-bold tracking-tighter">bat</span>
-									<span className="rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground leading-none">
-										v{APP_VERSION}
-									</span>
-								</div>
-								<Button
-									variant="ghost"
-									size="icon"
-									onClick={toggle}
-									aria-label="Collapse sidebar"
-									className="h-7 w-7 text-muted-foreground hover:text-foreground"
-								>
-									<PanelLeft className="h-4 w-4" aria-hidden="true" strokeWidth={1.5} />
-								</Button>
-							</div>
-						</SidebarHeader>
-
-						{/* Navigation — grouped */}
-						<SidebarNav className="pt-1">
-							<div className="flex flex-col gap-3 px-3">
-								{NAV_GROUPS.map((group) => (
-									<NavGroupSection
-										key={group.label}
-										group={group}
-										pathname={pathname}
-										onNavigate={handleNavigate}
+										</Button>
+									</TooltipTrigger>
+									<TooltipContent side="right">{item.label}</TooltipContent>
+								</Tooltip>
+							))
+						) : (
+							<SidebarGroup label={group.label}>
+								{group.items.map((item) => (
+									<EditableNavItem
+										key={item.href}
+										label={item.label}
+										href={item.href}
+										selected={active(item.href)}
+										onSelect={closeMobile}
+										icon={<item.icon strokeWidth={1.5} />}
 									/>
 								))}
-							</div>
-						</SidebarNav>
-
-						{/* Footer — user info */}
-						<SidebarFooter className="border-t border-border">
-							<SidebarUser
-								name={userName}
-								email={userEmail}
-								avatar={
-									<Avatar className="h-9 w-9 shrink-0">
-										{userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
-										<AvatarFallback className={cn("text-xs text-white", getAvatarColor(userEmail))}>
-											{userInitial}
-										</AvatarFallback>
-									</Avatar>
-								}
-							/>
-						</SidebarFooter>
+							</SidebarGroup>
+						)}
+					</Fragment>
+				))}
+			</SidebarNav>
+			<SidebarFooter>
+				{compact ? (
+					<>
+						<Tooltip>
+							<TooltipTrigger asChild={true}>
+								<span role="img" aria-label={name}>
+									{userAvatar}
+								</span>
+							</TooltipTrigger>
+							<TooltipContent side="right">{name}</TooltipContent>
+						</Tooltip>
+						{version}
 					</>
+				) : (
+					<SidebarUser name={name} email={email} avatar={userAvatar} />
 				)}
-			</BasaltSidebar>
-		</TooltipProvider>
+			</SidebarFooter>
+		</BasaltSidebar>
 	);
 }
-
-export type { NavGroup, NavItem };
-// Export for testing
-export { NAV_GROUPS, NAV_ITEMS };

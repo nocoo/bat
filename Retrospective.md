@@ -179,3 +179,13 @@ Demo restored both liveness and Hosts API responses through Caddy; host, tag,
 event and metric row counts were unchanged. Verify actual mode initialization
 and API readiness before handoff, not just the Vite HTML response. Never reset
 persistent Demo data to clear an unverified lock.
+
+## 2026-10-22 - Native-link browser evidence
+
+The new sidebar regression initially waited for the originating page's `popup`
+event after a modified click. Chromium opened a separate background tab without
+that event, so the check timed out despite preserving the source route. Waiting
+for the browser context's new-page event verified both the destination tab and
+unchanged source page without changing application navigation. Use the event
+that represents the browser action, rather than replacing native links to fit a
+test assumption.

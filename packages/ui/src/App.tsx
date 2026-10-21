@@ -1,5 +1,6 @@
 import { LinkProvider, ThemeProvider, TooltipProvider } from "@nocoo/basalt";
 import { AccentProvider } from "@nocoo/basalt/providers/accent";
+import type { ComponentPropsWithRef } from "react";
 import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router";
 import { SWRConfig } from "swr";
 import { AppShell } from "./components/layout";
@@ -17,30 +18,20 @@ import {
 
 function AppLink({
 	href,
-	className,
-	children,
-}: {
+	...props
+}: ComponentPropsWithRef<"a"> & {
 	href: string;
-	className?: string;
-	children?: React.ReactNode;
 }) {
 	if (
 		href.startsWith("http://") ||
 		href.startsWith("https://") ||
 		href.startsWith("mailto:") ||
-		href.startsWith("tel:")
+		href.startsWith("tel:") ||
+		href.startsWith("//")
 	) {
-		return (
-			<a href={href} className={className}>
-				{children}
-			</a>
-		);
+		return <a href={href} {...props} />;
 	}
-	return (
-		<Link to={href} className={className}>
-			{children}
-		</Link>
-	);
+	return <Link to={href} {...props} />;
 }
 
 export function App() {
