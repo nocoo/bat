@@ -1,4 +1,5 @@
 import {
+	Button,
 	ContentIsland,
 	Sheet,
 	SheetContent,
@@ -6,6 +7,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@nocoo/basalt";
+import { AppHeader } from "@nocoo/basalt/components/app-header";
 import {
 	AppMain,
 	AppSkipLink,
@@ -18,7 +20,7 @@ import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EnvironmentSwitch } from "./environment-switch";
 import { HeaderTooltip, HexlyLink } from "./header-links";
-import { RouteBreadcrumbs } from "./route-breadcrumbs";
+import { useRouteBreadcrumbs } from "./route-breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { ThemeToggle } from "./theme-toggle";
@@ -29,6 +31,7 @@ interface AppShellProps {
 
 function AppShellInner({ children }: AppShellProps) {
 	const isMobile = useIsMobile();
+	const breadcrumbs = useRouteBreadcrumbs();
 	const menuTrigger = useRef<HTMLButtonElement>(null);
 	const { mobileOpen, setMobileOpen } = useSidebar();
 	const { pathname } = useLocation();
@@ -79,40 +82,44 @@ function AppShellInner({ children }: AppShellProps) {
 			)}
 
 			<AppMain>
-				<header className="flex h-14 shrink-0 items-center justify-between gap-3 px-4 md:px-6">
-					<div className="flex min-w-0 flex-1 items-center gap-3">
-						{showHamburger && (
+				<AppHeader
+					breadcrumbs={breadcrumbs}
+					leading={
+						showHamburger ? (
 							<HeaderTooltip label="Open navigation menu">
-								<button
+								<Button
 									ref={menuTrigger}
-									type="button"
+									variant="ghost"
+									size="icon"
 									onClick={() => setMobileOpen(true)}
 									aria-label="Open navigation menu"
-									className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors ${resolved ? "" : "md:hidden"}`}
+									className={resolved ? undefined : "md:hidden"}
 								>
-									<Menu className="h-5 w-5" aria-hidden="true" strokeWidth={1.5} />
-								</button>
+									<Menu className="size-4" aria-hidden="true" strokeWidth={1.5} />
+								</Button>
 							</HeaderTooltip>
-						)}
-						<RouteBreadcrumbs />
-					</div>
-					<div className="flex shrink-0 items-center gap-1">
-						<EnvironmentSwitch />
-						<HeaderTooltip label="GitHub repository">
-							<a
-								href="https://github.com/nocoo/bat"
-								target="_blank"
-								rel="noopener noreferrer"
-								aria-label="GitHub repository"
-								className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-							>
-								<Github className="h-[18px] w-[18px]" aria-hidden="true" strokeWidth={1.5} />
-							</a>
-						</HeaderTooltip>
-						<HexlyLink />
-						<ThemeToggle aria-label="Toggle theme" />
-					</div>
-				</header>
+						) : undefined
+					}
+					actions={
+						<>
+							<EnvironmentSwitch />
+							<HeaderTooltip label="GitHub repository">
+								<Button asChild variant="ghost" size="icon">
+									<a
+										href="https://github.com/nocoo/bat"
+										target="_blank"
+										rel="noopener noreferrer"
+										aria-label="GitHub repository"
+									>
+										<Github className="size-4" aria-hidden="true" strokeWidth={1.5} />
+									</a>
+								</Button>
+							</HeaderTooltip>
+							<HexlyLink />
+							<ThemeToggle aria-label="Toggle theme" />
+						</>
+					}
+				/>
 
 				{/* Floating island content area */}
 				<div className="flex min-h-0 flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">

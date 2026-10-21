@@ -198,3 +198,30 @@ although the page still passed its overall overflow check. Screenshot inspection
 caught the regression. The shared status badge now preserves its intrinsic width
 and single-line label; a browser regression measures the rendered text lines.
 Check inline labels as well as outer geometry when adding navigation gutters.
+
+
+## 2026-10-22 - Migrate control contracts, not only element names
+
+The first Select migration tests still matched the library's hidden native
+options, sent keyboard commands before Radix restored focus, and selected a
+webhook cleanup row by list order. The checks failed before cleanup. Tests now
+use accessible roles, await focused options, and clean up the exact host row.
+The Connect example toggle also changed from a button to a radio; its regression
+must follow the new semantic contract without dropping the permission checks.
+
+A CSS rewrite searched for the first `/*` and matched Tailwind's `/**/*` source
+glob, corrupting the stylesheet header. Formatting caught it before commit.
+Keep import/source directives intact, use anchored sections for scripted edits,
+and scan direct CSS-variable references as well as utility classes when removing
+a token system. Typecheck, full browser tests and theme captures follow the rewrite.
+
+
+## 2026-10-22 - Wait for populated details before visual acceptance
+
+The initial detail capture waited for its heading, which precedes metrics and
+process data. Its mobile screenshot therefore showed skeletons and missed the
+wide process table's grid min-content overflow. Independent review caught the
+weak capture. The chart grid column now has `min-w-0`, keeping scrolling inside
+the standard Table. A populated two-process browser fixture checks mobile width,
+sorting and filtering; visual checks wait for rows, chart and editor content
+before testing overflow and capture the scrolled editors and active tooltip.

@@ -33,10 +33,10 @@ const proc = (over: Partial<TopProcessEntry>): TopProcessEntry => ({
 describe("stateColor", () => {
 	test.each([
 		["R", "text-emerald-500"],
-		["D", "text-warning"],
-		["Z", "text-destructive"],
-		["S", "text-muted-foreground"],
-		["?", "text-muted-foreground"],
+		["D", "text-basalt-warning"],
+		["Z", "text-basalt-destructive"],
+		["S", "text-basalt-muted-foreground"],
+		["?", "text-basalt-muted-foreground"],
 	])("state %p → %p", (s, expected) => {
 		expect(stateColor(s)).toBe(expected);
 	});
@@ -45,21 +45,21 @@ describe("stateColor", () => {
 describe("cpuColor", () => {
 	test("null → ''", () => expect(cpuColor(null)).toBe(""));
 	test("low → ''", () => expect(cpuColor(10)).toBe(""));
-	test("> 50 → warning", () => expect(cpuColor(60)).toBe("text-warning"));
-	test("> 80 → destructive", () => expect(cpuColor(90)).toBe("text-destructive"));
+	test("> 50 → warning", () => expect(cpuColor(60)).toBe("text-basalt-warning"));
+	test("> 80 → destructive", () => expect(cpuColor(90)).toBe("text-basalt-destructive"));
 	test("=50 still '' (boundary)", () => expect(cpuColor(50)).toBe(""));
 });
 
 describe("memPctColor", () => {
 	test("low → ''", () => expect(memPctColor(5)).toBe(""));
-	test("> 15 → warning", () => expect(memPctColor(20)).toBe("text-warning"));
-	test("> 30 → destructive", () => expect(memPctColor(40)).toBe("text-destructive"));
+	test("> 15 → warning", () => expect(memPctColor(20)).toBe("text-basalt-warning"));
+	test("> 30 → destructive", () => expect(memPctColor(40)).toBe("text-basalt-destructive"));
 });
 
 describe("threadColor", () => {
 	test("low → ''", () => expect(threadColor(10)).toBe(""));
-	test("> 50 → warning", () => expect(threadColor(75)).toBe("text-warning"));
-	test("> 100 → destructive", () => expect(threadColor(200)).toBe("text-destructive"));
+	test("> 50 → warning", () => expect(threadColor(75)).toBe("text-basalt-warning"));
+	test("> 100 → destructive", () => expect(threadColor(200)).toBe("text-basalt-destructive"));
 });
 
 describe("sortProcesses", () => {

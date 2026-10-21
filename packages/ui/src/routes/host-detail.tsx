@@ -1,6 +1,7 @@
 import { hashHostId } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
 import { InlineEditable } from "@nocoo/basalt/components/inline-editable";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -22,7 +23,6 @@ import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
 import { StatusBadge } from "@/components/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
 import { formatMemory, formatUptime } from "@/lib/host-card-format";
@@ -39,8 +39,8 @@ const TIME_RANGES = [
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
 	return (
-		<div className="flex justify-between text-sm">
-			<span className="text-muted-foreground">{label}</span>
+		<div className="flex justify-between text-basalt-base">
+			<span className="text-basalt-muted-foreground">{label}</span>
 			<span className="font-mono tabular-nums">{value ?? "—"}</span>
 		</div>
 	);
@@ -120,7 +120,7 @@ export function HostDetailPage() {
 						host ? (
 							<span className="inline-flex items-center gap-2 mt-1">
 								<StatusBadge status={host.status} />
-								<span className="text-sm text-basalt-muted-foreground">
+								<span className="text-basalt-base text-basalt-muted-foreground">
 									Real-time metrics, system specifications, and services.
 								</span>
 							</span>
@@ -148,24 +148,24 @@ export function HostDetailPage() {
 				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
 					<div className="space-y-4">
 						{Array.from({ length: 4 }, (_, i) => (
-							<Card key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
+							<LayerCard key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
 								<Skeleton className="h-64 w-full" />
-							</Card>
+							</LayerCard>
 						))}
 					</div>
 					<div className="space-y-4">
-						<Card className="p-4 md:p-5">
+						<LayerCard className="p-4 md:p-5">
 							<Skeleton className="h-32 w-full" />
-						</Card>
+						</LayerCard>
 					</div>
 				</div>
 			) : metricsResponse ? (
 				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
 					{/* Left column — charts */}
-					<div className="space-y-4">
+					<div className="min-w-0 space-y-4">
 						<div className="flex items-baseline justify-between">
-							<h2 className="text-base font-semibold">Metrics</h2>
-							<span className="text-xs text-muted-foreground">
+							<h2 className="text-basalt-base font-semibold">Metrics</h2>
+							<span className="text-basalt-sm text-basalt-muted-foreground">
 								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
 							</span>
 						</div>
@@ -188,20 +188,20 @@ export function HostDetailPage() {
 
 					{/* Right column — system info + disks */}
 					<div className="space-y-4 min-w-0">
-						<h2 className="text-base font-semibold">Overview</h2>
+						<h2 className="text-basalt-base font-semibold">Overview</h2>
 						{host && (
 							<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
 						)}
 						<DiskBars data={metricsResponse.data} />
 						{host && (
-							<Card>
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2 text-base">
+							<LayerCard>
+								<LayerCard.Header>
+									<h2 className="flex items-center gap-2">
 										<Info className="h-4 w-4" />
 										System Info
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
+									</h2>
+								</LayerCard.Header>
+								<LayerCard.Body>
 									<div className="grid gap-3">
 										<InfoRow label="OS" value={host.os} />
 										<InfoRow label="Kernel" value={host.kernel} />
@@ -235,8 +235,8 @@ export function HostDetailPage() {
 										<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
 										{detail?.timezone && <InfoRow label="Timezone" value={detail.timezone} />}
 									</div>
-								</CardContent>
-							</Card>
+								</LayerCard.Body>
+							</LayerCard>
 						)}
 						{host && <HostTagsPanel hostId={host.host_id} />}
 						{host && <MaintenancePanel hostId={host.host_id} />}
@@ -252,9 +252,9 @@ export function HostDetailPage() {
 					</div>
 				</div>
 			) : (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+				<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 					<AlertTriangle className="h-12 w-12 mb-4" strokeWidth={1} />
-					<p className="text-sm">No metrics data available</p>
+					<p className="text-basalt-base">No metrics data available</p>
 				</div>
 			)}
 		</div>

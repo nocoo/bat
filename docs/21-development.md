@@ -100,3 +100,21 @@ Playwright runs conflicting mutations serially. Settings tests use the real API.
 生产发布由 [.github/workflows/release.yml](../.github/workflows/release.yml) 执行：main CI 成功后检出对应提交，构建 SPA，先应用 D1 迁移，再部署 Worker 并核对版本。不要在笔记本上手动执行 `wrangler deploy` 或 `bun run deploy` 与 CD 竞争。
 
 版本发布入口是 `bun run release`，会同步版本并创建 tag；只有 tag push 才构建并上传探针到 R2。普通 main 文档提交会走 Worker CD，不会更新探针二进制或 VPS。R2 分发和主机上的探针升级是两个步骤，后者仍需维护者执行。
+
+
+## Dashboard controls
+
+The dashboard uses the installed Basalt 3.2.1 control and surface contract.
+Use component size/variant props, `LayerCard` slots and `AppHeader`; do not copy
+control CSS or restore the removed card/breadcrumb wrappers. Body/control text
+uses `text-basalt-base`, supporting text uses `text-basalt-sm`, and fonts come
+from the package tokens. Native time/number behavior is retained through `Input`.
+
+Bat owns metric formatting, chart geometry and persisted ten-color tag indices.
+The `--bat-chart-*` palette therefore remains separate from Basalt control accents.
+Tags use a standard Badge with hue-preserving readable ink and a standard Select
+with decorative swatches; do not remap stored indices to TagColorPicker names.
+Host tag creation is an explicit MultiSelect option, never a blur side effect.
+Connect's reveal/challenge/expiry safeguards remain application-owned; a generic
+sensitive-input toggle must not bypass them. Its browser tests keep secret
+screenshots, video and traces disabled.

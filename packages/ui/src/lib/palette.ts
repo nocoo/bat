@@ -2,7 +2,7 @@
  * Chart + badge color palette — single source of truth for chart line/area
  * colors and tag/badge soft-tinted backgrounds.
  *
- * All colors are CSS custom properties (chart-1 .. chart-10) so they can be
+ * All colors are CSS custom properties (bat-chart-1 .. bat-chart-10) so they can be
  * themed via index.css.
  */
 
@@ -12,33 +12,33 @@ const v = (token: string) => `hsl(var(--${token}))`;
 
 /** Named chart colors, used by recharts series. */
 export const chart = {
-	pink: v("chart-1"),
-	sky: v("chart-2"),
-	teal: v("chart-3"),
-	green: v("chart-4"),
-	lime: v("chart-5"),
-	amber: v("chart-6"),
-	purple: v("chart-7"),
-	orange: v("chart-8"),
-	indigo: v("chart-9"),
-	red: v("chart-10"),
+	pink: v("bat-chart-1"),
+	sky: v("bat-chart-2"),
+	teal: v("bat-chart-3"),
+	green: v("bat-chart-4"),
+	lime: v("bat-chart-5"),
+	amber: v("bat-chart-6"),
+	purple: v("bat-chart-7"),
+	orange: v("bat-chart-8"),
+	indigo: v("bat-chart-9"),
+	red: v("bat-chart-10"),
 } as const;
 
-export const chartAxis = v("chart-axis");
-export const chartMuted = v("chart-muted");
+export const chartAxis = v("basalt-chart-axis");
+export const chartMuted = v("basalt-chart-muted");
 
 /** Ten tokens used for badges, tag dots, and the tag color picker. */
 const BADGE_TOKENS = [
-	"chart-1", // 0 pink 340°
-	"chart-2", // 1 sky 200°
-	"chart-3", // 2 teal 186°
-	"chart-4", // 3 green 166°
-	"chart-5", // 4 lime 142°
-	"chart-6", // 5 amber 84°
-	"chart-7", // 6 purple 270°
-	"chart-8", // 7 orange 30°
-	"chart-9", // 8 indigo 220°
-	"chart-10", // 9 red 14°
+	"bat-chart-1", // 0 pink 340°
+	"bat-chart-2", // 1 sky 200°
+	"bat-chart-3", // 2 teal 186°
+	"bat-chart-4", // 3 green 166°
+	"bat-chart-5", // 4 lime 142°
+	"bat-chart-6", // 5 amber 84°
+	"bat-chart-7", // 6 purple 270°
+	"bat-chart-8", // 7 orange 30°
+	"bat-chart-9", // 8 indigo 220°
+	"bat-chart-10", // 9 red 14°
 ] as const;
 
 const PALETTE_LEN = BADGE_TOKENS.length;
@@ -64,7 +64,7 @@ interface BadgeStyle extends CSSProperties {
 }
 const styleFor = (token: string): BadgeStyle => ({
 	backgroundColor: `hsl(var(--${token}) / 0.12)`,
-	color: `hsl(var(--${token}))`,
+	color: `color-mix(in srgb, hsl(var(--${token})) 60%, var(--bat-tag-ink))`,
 });
 
 /** Soft/tinted badge style derived from the text content (deterministic). */

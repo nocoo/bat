@@ -1,10 +1,10 @@
 import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
 import { SegmentControl } from "@nocoo/basalt";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Check, Database } from "lucide-react";
 import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings } from "@/hooks";
 
@@ -44,17 +44,19 @@ export function DataRetentionPage() {
 	);
 
 	return isLoading && !settings ? (
-		<Card>
-			<CardContent className="py-6 space-y-4">
+		<LayerCard>
+			<LayerCard.Body className="py-6 space-y-4">
 				<Skeleton className="h-8 w-48" />
 				<Skeleton className="h-20 w-full" />
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	) : error && !settings ? (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">Failed to load settings</h2>
-			<p className="mt-2 text-sm">{error.message}</p>
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">
+				Failed to load settings
+			</h2>
+			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
 		<div className="space-y-4 max-w-4xl">
@@ -65,18 +67,21 @@ export function DataRetentionPage() {
 
 			{/* Action error banner */}
 			{actionError && (
-				<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				<div className="rounded-md border border-basalt-destructive/50 bg-basalt-destructive/10 px-4 py-3 text-basalt-base text-basalt-destructive">
 					{actionError}
 				</div>
 			)}
 
-			<Card>
-				<CardContent className="py-5">
+			<LayerCard>
+				<LayerCard.Body>
 					<div className="flex items-start gap-3 mb-4">
-						<Database className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" strokeWidth={1.5} />
+						<Database
+							className="h-5 w-5 text-basalt-muted-foreground mt-0.5 shrink-0"
+							strokeWidth={1.5}
+						/>
 						<div>
-							<p className="text-sm font-medium">Retention Window</p>
-							<p className="text-xs text-muted-foreground mt-0.5">
+							<p className="text-basalt-base font-medium">Retention Window</p>
+							<p className="text-basalt-sm text-basalt-muted-foreground mt-0.5">
 								Data older than this period will be permanently deleted.
 							</p>
 						</div>
@@ -94,16 +99,16 @@ export function DataRetentionPage() {
 						}))}
 					/>
 					<div className="mt-3 h-5">
-						{saving && <p className="text-xs text-muted-foreground">Saving...</p>}
+						{saving && <p className="text-basalt-sm text-basalt-muted-foreground">Saving...</p>}
 						{saved && (
-							<p className="text-xs text-success flex items-center gap-1">
+							<p className="text-basalt-sm text-basalt-success flex items-center gap-1">
 								<Check className="h-3 w-3" strokeWidth={2} />
 								Saved
 							</p>
 						)}
 					</div>
-				</CardContent>
-			</Card>
+				</LayerCard.Body>
+			</LayerCard>
 		</div>
 	);
 }

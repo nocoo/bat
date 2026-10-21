@@ -143,21 +143,21 @@ describe("buildSubtitle", () => {
 
 describe("getBarColor / getValueColor / statusDotColor", () => {
 	test("bar color thresholds", () => {
-		expect(getBarColor(20)).toBe("bg-success");
-		expect(getBarColor(60)).toBe("bg-warning");
-		expect(getBarColor(80)).toBe("bg-destructive");
+		expect(getBarColor(20)).toBe("bg-basalt-success");
+		expect(getBarColor(60)).toBe("bg-basalt-warning");
+		expect(getBarColor(80)).toBe("bg-basalt-destructive");
 	});
 	test("value color thresholds", () => {
-		expect(getValueColor(20)).toBe("text-success");
-		expect(getValueColor(60)).toBe("text-warning");
-		expect(getValueColor(95)).toBe("text-destructive");
+		expect(getValueColor(20)).toBe("text-basalt-success");
+		expect(getValueColor(60)).toBe("text-basalt-warning");
+		expect(getValueColor(95)).toBe("text-basalt-destructive");
 	});
 	test("status dot color mapping", () => {
-		expect(statusDotColor("healthy")).toBe("bg-success");
-		expect(statusDotColor("warning")).toBe("bg-warning");
-		expect(statusDotColor("critical")).toBe("bg-destructive");
-		expect(statusDotColor("unknown")).toBe("bg-muted-foreground");
-		expect(statusDotColor("offline")).toBe("bg-muted-foreground");
+		expect(statusDotColor("healthy")).toBe("bg-basalt-success");
+		expect(statusDotColor("warning")).toBe("bg-basalt-warning");
+		expect(statusDotColor("critical")).toBe("bg-basalt-destructive");
+		expect(statusDotColor("unknown")).toBe("bg-basalt-muted-foreground");
+		expect(statusDotColor("offline")).toBe("bg-basalt-muted-foreground");
 	});
 });
 

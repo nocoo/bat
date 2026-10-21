@@ -5,11 +5,11 @@ import {
 	CollapsibleContent,
 	CollapsibleTrigger,
 } from "@nocoo/basalt/components/collapsible";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Check, Plus, Radio, Shield, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { deleteAPI, postAPI } from "@/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAllowedPorts, useHostTier2 } from "@/hooks";
 import { categorizeListening, formatProcess } from "@/lib/listening-ports";
 
@@ -131,20 +131,20 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 			: [];
 
 	return (
-		<Card className="overflow-visible">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-base">
+		<LayerCard className="overflow-visible">
+			<LayerCard.Header>
+				<h2 className="flex items-center gap-2">
 					<Shield className="h-4 w-4" />
 					Ports
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
+				</h2>
+			</LayerCard.Header>
+			<LayerCard.Body>
 				<div className="space-y-4">
 					{(listening.publicUnallowed.length > 0 ||
 						listening.publicAllowed.length > 0 ||
 						listening.local.length > 0) && (
 						<div className="space-y-2">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+							<p className="text-basalt-sm font-medium text-basalt-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
 								<Radio className="h-3 w-3" />
 								Listening
 							</p>
@@ -153,15 +153,15 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 									{listening.publicUnallowed.map((p) => (
 										<div
 											key={`pu-${p.port}-${p.bind}-${p.protocol}`}
-											className="flex flex-wrap items-center gap-2 text-sm"
+											className="flex flex-wrap items-center gap-2 text-basalt-base"
 										>
 											<span className="font-mono font-medium text-amber-500 w-12 shrink-0">
 												{p.port}
 											</span>
-											<span className="text-xs text-muted-foreground font-mono shrink-0">
+											<span className="text-basalt-sm text-basalt-muted-foreground font-mono shrink-0">
 												{p.bind} {p.protocol}
 											</span>
-											<span className="text-xs text-muted-foreground truncate flex-1">
+											<span className="text-basalt-sm text-basalt-muted-foreground truncate flex-1">
 												{formatProcess(p.process, p.pid)}
 											</span>
 											{quickAllowPort === p.port ? (
@@ -232,14 +232,16 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 									{listening.publicAllowed.map((p) => (
 										<div
 											key={`pa-${p.port}-${p.bind}-${p.protocol}`}
-											className="flex items-center gap-2 text-sm text-muted-foreground"
+											className="flex items-center gap-2 text-basalt-base text-basalt-muted-foreground"
 										>
 											<Check className="h-3 w-3 text-emerald-500 shrink-0" />
 											<span className="font-mono w-10 shrink-0">{p.port}</span>
-											<span className="text-xs font-mono shrink-0">
+											<span className="text-basalt-sm font-mono shrink-0">
 												{p.bind} {p.protocol}
 											</span>
-											<span className="text-xs truncate">{formatProcess(p.process, p.pid)}</span>
+											<span className="text-basalt-sm truncate">
+												{formatProcess(p.process, p.pid)}
+											</span>
 										</div>
 									))}
 								</div>
@@ -252,7 +254,7 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 											{listening.local.map((p) => (
 												<div
 													key={`lo-${p.port}-${p.bind}-${p.protocol}`}
-													className="flex items-center gap-2 text-xs text-muted-foreground"
+													className="flex items-center gap-2 text-basalt-sm text-basalt-muted-foreground"
 												>
 													<span className="font-mono w-10 shrink-0">{p.port}</span>
 													<span className="font-mono shrink-0">
@@ -270,12 +272,12 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 
 					{alertingFallback.length > 0 && (
 						<div className="space-y-1.5">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+							<p className="text-basalt-sm font-medium text-basalt-muted-foreground uppercase tracking-wider">
 								Unexpected Ports
 							</p>
 							{alertingFallback.map((port) => (
 								<div key={port}>
-									<div className="flex flex-wrap items-center gap-2 text-sm">
+									<div className="flex flex-wrap items-center gap-2 text-basalt-base">
 										<span className="font-mono font-medium text-amber-500">{port}</span>
 										{quickAllowPort === port ? (
 											<div className="flex basis-full items-center gap-2 sm:basis-auto sm:flex-1">
@@ -344,23 +346,25 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 
 					{allowedPorts && allowedPorts.length > 0 && (
 						<div className="space-y-2">
-							<p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+							<p className="text-basalt-sm font-medium text-basalt-muted-foreground uppercase tracking-wider">
 								Allowlist
 							</p>
 							<div className="grid gap-1.5">
 								{allowedPorts.map((entry) => (
 									<div
 										key={entry.port}
-										className="flex items-center justify-between gap-2 rounded-md bg-secondary/50 px-2.5 py-1.5 text-sm"
+										className="flex items-center justify-between gap-2 rounded-md bg-basalt-secondary/50 px-2.5 py-1.5 text-basalt-base"
 									>
 										<div className="flex items-center gap-2 min-w-0">
 											<span className="font-mono font-medium shrink-0">{entry.port}</span>
 											{entry.reason && (
-												<span className="text-muted-foreground truncate">{entry.reason}</span>
+												<span className="text-basalt-muted-foreground truncate">
+													{entry.reason}
+												</span>
 											)}
 										</div>
 										<div className="flex items-center gap-2 shrink-0">
-											<span className="text-xs text-muted-foreground">
+											<span className="text-basalt-sm text-basalt-muted-foreground">
 												{relativeTime(entry.created_at)}
 											</span>
 											<Button
@@ -413,7 +417,7 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 						</Button>
 					</div>
 				</div>
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	);
 }

@@ -1,10 +1,10 @@
 import type { HostOverviewItem, HostTag, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Unlock } from "lucide-react";
 import { Link } from "react-router";
 import { StatusBadge } from "@/components/status-badge";
 import { TagChip } from "@/components/tag-chip";
-import { Card } from "@/components/ui/card";
 import {
 	buildSubtitle,
 	formatDiskUsage,
@@ -32,11 +32,13 @@ function ResourceBar({
 }) {
 	const pct = value ?? 0;
 	const hasValue = value !== null;
-	const valueColorClass = hasValue ? getValueColor(pct) : "text-muted-foreground";
+	const valueColorClass = hasValue ? getValueColor(pct) : "text-basalt-muted-foreground";
 	return (
 		<div className="flex items-center gap-2">
-			<span className="w-8 text-[11px] font-medium text-muted-foreground shrink-0">{label}</span>
-			<div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+			<span className="w-8 text-basalt-sm font-medium text-basalt-muted-foreground shrink-0">
+				{label}
+			</span>
+			<div className="flex-1 h-1.5 rounded-full bg-basalt-muted overflow-hidden">
 				{hasValue && (
 					<div
 						className={`h-full rounded-full transition-all ${getBarColor(pct)}`}
@@ -45,12 +47,14 @@ function ResourceBar({
 				)}
 			</div>
 			<span
-				className={`w-8 text-right text-[11px] font-display font-semibold tabular-nums ${valueColorClass}`}
+				className={`w-8 text-right text-basalt-sm font-display font-semibold tabular-nums ${valueColorClass}`}
 			>
 				{hasValue ? `${Math.round(pct)}%` : "—"}
 			</span>
 			{suffix && (
-				<span className="text-[11px] text-muted-foreground truncate max-w-[80px]">{suffix}</span>
+				<span className="text-basalt-sm text-basalt-muted-foreground truncate max-w-[80px]">
+					{suffix}
+				</span>
 			)}
 		</div>
 	);
@@ -86,7 +90,7 @@ function SparklineChart({
 				y1={height - 1}
 				x2="100"
 				y2={height - 1}
-				stroke="hsl(var(--muted-foreground))"
+				stroke="hsl(var(--basalt-muted-foreground))"
 				strokeWidth="0.6"
 				vectorEffect="non-scaling-stroke"
 				opacity={0.25}
@@ -95,7 +99,7 @@ function SparklineChart({
 				<polyline
 					points={toPolyline(net, net.length, height)}
 					fill="none"
-					stroke="hsl(var(--chart-2))"
+					stroke="hsl(var(--bat-chart-2))"
 					strokeWidth="1.2"
 					strokeLinejoin="round"
 					vectorEffect="non-scaling-stroke"
@@ -106,7 +110,7 @@ function SparklineChart({
 				<polyline
 					points={toPolyline(mem, mem.length, height)}
 					fill="none"
-					stroke="hsl(var(--success))"
+					stroke="hsl(var(--basalt-success))"
 					strokeWidth="1.2"
 					strokeLinejoin="round"
 					vectorEffect="non-scaling-stroke"
@@ -117,7 +121,7 @@ function SparklineChart({
 				<polyline
 					points={toPolyline(cpu, cpu.length, height)}
 					fill="none"
-					stroke="hsl(var(--destructive))"
+					stroke="hsl(var(--basalt-destructive))"
 					strokeWidth="1.2"
 					strokeLinejoin="round"
 					vectorEffect="non-scaling-stroke"
@@ -146,20 +150,21 @@ export function HostCard({
 
 	return (
 		<Link to={`/hosts/${hashHostId(host.host_id)}`} className="block h-full">
-			<Card
-				className="h-full transition-colors cursor-pointer hover:bg-accent/50 !py-3 !px-3 !gap-0"
+			<LayerCard
+				padding="sm"
+				className="flex h-full flex-col transition-colors hover:bg-basalt-hover"
 				data-testid="host-card"
 			>
 				{/* Header */}
 				<div className="flex items-center justify-between px-0.5">
 					<div className="flex items-center gap-1.5 min-w-0">
 						<span className={`h-2 w-2 shrink-0 rounded-full ${statusDotColor(host.status)}`} />
-						<span className="text-sm font-semibold truncate">{host.hostname}</span>
+						<span className="text-basalt-base font-semibold truncate">{host.hostname}</span>
 					</div>
 					<div className="flex items-center gap-1.5 shrink-0">
 						{openPorts > 0 && (
 							<span
-								className="flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+								className="flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-basalt-sm font-medium text-amber-600 dark:text-amber-400"
 								title={`${openPorts} public port${openPorts === 1 ? "" : "s"} not on allowlist`}
 							>
 								<Unlock className="h-2.5 w-2.5" />
@@ -170,7 +175,9 @@ export function HostCard({
 					</div>
 				</div>
 				{subtitle && (
-					<p className="text-[11px] text-muted-foreground truncate mt-0.5 px-0.5">{subtitle}</p>
+					<p className="text-basalt-sm text-basalt-muted-foreground truncate mt-0.5 px-0.5">
+						{subtitle}
+					</p>
 				)}
 
 				{/* Tags */}
@@ -213,14 +220,14 @@ export function HostCard({
 				</div>
 
 				{/* Footer */}
-				<div className="mt-auto pt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground px-0.5">
+				<div className="mt-auto pt-2.5 flex items-center gap-1.5 text-basalt-sm text-basalt-muted-foreground px-0.5">
 					{host.probe_version && <span>Probe v{host.probe_version}</span>}
 					{host.probe_version && <span>·</span>}
 					<span>Last seen {formatLastSeen(host.last_seen)}</span>
 					<span>·</span>
 					<span>Up {formatUptime(host.uptime_seconds)}</span>
 				</div>
-			</Card>
+			</LayerCard>
 		</Link>
 	);
 }

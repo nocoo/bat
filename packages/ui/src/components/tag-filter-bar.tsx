@@ -15,7 +15,7 @@ export function TagFilterBar({ tags, selected, onToggle }: TagFilterBarProps) {
 
 	return (
 		<div className="flex items-center gap-1.5 flex-wrap" data-testid="tag-filter-bar">
-			<span className="text-xs text-muted-foreground mr-0.5">Filter</span>
+			<span className="text-basalt-sm text-basalt-muted-foreground mr-0.5">Filter</span>
 			{tags.map((tag) => (
 				<Button
 					key={tag.id}

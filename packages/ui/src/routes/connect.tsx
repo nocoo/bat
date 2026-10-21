@@ -8,6 +8,7 @@ import {
 import {
 	Badge,
 	Button,
+	Checkbox,
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -16,8 +17,12 @@ import {
 	DialogTitle,
 	Input,
 	Label,
+	SegmentControl,
 } from "@nocoo/basalt";
+import { CodeBlock } from "@nocoo/basalt/components/code";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
+import { Radio } from "@nocoo/basalt/components/radio";
 import {
 	ArrowUpRight,
 	Check,
@@ -37,7 +42,6 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	connectDate,
@@ -85,44 +89,37 @@ function ServerSelection({
 			.map((id) => ({ id, name: "Unavailable server (remove this authorization)" })),
 	];
 	return (
-		<fieldset className="space-y-2" disabled={disabled}>
-			<legend className="mb-2 text-sm font-medium">Authorized servers</legend>
-			<p className="text-xs leading-relaxed text-muted-foreground">
+		<Checkbox.Group
+			value={serverIds}
+			onValueChange={(ids) => onChange(ids.sort())}
+			disabled={disabled}
+		>
+			<Checkbox.Legend>Authorized servers</Checkbox.Legend>
+			<p className="text-basalt-sm leading-relaxed text-basalt-muted-foreground">
 				Select the servers this key can access. No selection means no server access. Each server can
 				be authorized for multiple keys.
 			</p>
-			<div className="max-h-44 space-y-2 overflow-y-auto rounded-lg border border-border p-2">
+			<div className="max-h-44 space-y-3 overflow-y-auto p-1">
 				{options.map((server) => (
-					<label
-						key={server.id}
-						className="flex cursor-pointer items-start gap-3 rounded-md p-2 hover:bg-accent"
-					>
-						<input
-							type="checkbox"
-							className="mt-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring"
-							checked={serverIds.includes(server.id)}
-							onChange={(event) =>
-								onChange(
-									event.target.checked
-										? [...new Set([...serverIds, server.id])].sort()
-										: serverIds.filter((id) => id !== server.id),
-								)
-							}
-						/>
+					<Checkbox.Item key={server.id} value={server.id}>
 						<span className="min-w-0 break-all">
-							<span className="block text-sm font-medium">{server.name}</span>
-							<span className="block font-mono text-xs text-muted-foreground">{server.id}</span>
+							<span className="block text-basalt-base font-medium">{server.name}</span>
+							<span className="block font-mono text-basalt-sm text-basalt-muted-foreground">
+								{server.id}
+							</span>
 						</span>
-					</label>
+					</Checkbox.Item>
 				))}
 				{!options.length && (
-					<p className="p-2 text-sm text-muted-foreground">No servers available to authorize.</p>
+					<p className="p-2 text-basalt-base text-basalt-muted-foreground">
+						No servers available to authorize.
+					</p>
 				)}
 			</div>
-			<p className="text-xs text-muted-foreground">
+			<p className="text-basalt-sm text-basalt-muted-foreground">
 				{serverIds.length ? `${serverIds.length} selected` : "No server access"}
 			</p>
-		</fieldset>
+		</Checkbox.Group>
 	);
 }
 
@@ -299,26 +296,24 @@ export function ConnectPage() {
 				onChange={setServerIds}
 				disabled={busy}
 			/>
-			<fieldset className="space-y-2" disabled={busy}>
-				<legend className="mb-2 text-sm font-medium">Permissions</legend>
+			<Radio.Group
+				value={scope}
+				onValueChange={(value) => setScope(value as ConnectScope)}
+				disabled={busy}
+			>
+				<Radio.Legend>Permissions</Radio.Legend>
 				{(["read", "write"] as const).map((choice) => (
 					<label
 						key={choice}
-						className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 ${scope === choice ? "border-primary bg-accent" : "border-border"}`}
+						htmlFor={`connect-scope-${choice}`}
+						className="flex items-center gap-2"
 					>
-						<input
-							className="mt-1 accent-primary focus-visible:outline-2 focus-visible:outline-ring"
-							type="radio"
-							name="connect-scope"
-							value={choice}
-							checked={scope === choice}
-							onChange={() => setScope(choice)}
-						/>
+						<Radio.Item id={`connect-scope-${choice}`} value={choice} />
 						<span>
-							<span className="block text-sm font-medium">
+							<span className="block text-basalt-base font-medium">
 								{choice === "read" ? "Read only" : "Read + write"}
 							</span>
-							<span className="mt-0.5 block text-xs text-muted-foreground">
+							<span className="mt-0.5 block text-basalt-sm text-basalt-muted-foreground">
 								{choice === "read"
 									? "Read server data and discover available operations."
 									: "Also create, update, delete and perform server actions."}
@@ -326,11 +321,13 @@ export function ConnectPage() {
 						</span>
 					</label>
 				))}
-			</fieldset>
+			</Radio.Group>
 			<div className="space-y-2">
 				<Label htmlFor="token-expiry">
 					Expiry{" "}
-					<span className="font-normal text-muted-foreground">(optional, your local time)</span>
+					<span className="font-normal text-basalt-muted-foreground">
+						(optional, your local time)
+					</span>
 				</Label>
 				<Input
 					id="token-expiry"
@@ -340,7 +337,7 @@ export function ConnectPage() {
 					value={expiry}
 					onChange={(event) => setExpiry(event.target.value)}
 				/>
-				<p className="text-xs leading-relaxed text-muted-foreground">
+				<p className="text-basalt-sm leading-relaxed text-basalt-muted-foreground">
 					Leave blank for no expiry. This grants ongoing access until you revoke the token.
 				</p>
 			</div>
@@ -362,7 +359,7 @@ export function ConnectPage() {
 				{(error || loadError) && (
 					<div
 						role="alert"
-						className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive"
+						className="rounded-lg border border-basalt-destructive/30 bg-basalt-destructive/10 p-4 text-basalt-base text-basalt-destructive"
 					>
 						{error || loadError?.message}
 					</div>
@@ -370,32 +367,36 @@ export function ConnectPage() {
 				<div
 					role="status"
 					aria-live="polite"
-					className={notice ? "flex items-center gap-2 text-sm text-foreground" : "sr-only"}
+					className={
+						notice ? "flex items-center gap-2 text-basalt-base text-basalt-foreground" : "sr-only"
+					}
 				>
-					{notice && <Check className="size-4 text-success" aria-hidden="true" />}
+					{notice && <Check className="size-4 text-basalt-success" aria-hidden="true" />}
 					{notice}
 				</div>
-				<Card>
-					<CardContent className="py-2">
+				<LayerCard>
+					<LayerCard.Body>
 						<div className="flex items-start gap-4">
-							<div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-accent text-primary">
+							<div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-basalt-accent text-basalt-primary">
 								<ShieldCheck className="size-5" aria-hidden="true" />
 							</div>
 							<div>
-								<h2 className="text-sm font-semibold">One key. Your authorized servers.</h2>
-								<p className="mt-1 max-w-lg text-sm text-muted-foreground">
+								<h2 className="text-basalt-base font-semibold">
+									One key. Your authorized servers.
+								</h2>
+								<p className="mt-1 max-w-lg text-basalt-base text-basalt-muted-foreground">
 									Choose which servers each key can access. Multiple keys can access the same
 									server, each with its own read or write permission.
 								</p>
 							</div>
 						</div>
-					</CardContent>
-				</Card>
+					</LayerCard.Body>
+				</LayerCard>
 				<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
 					<section aria-labelledby="tokens-heading" className="min-w-0 space-y-4">
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<div className="flex items-center gap-2">
-								<h2 id="tokens-heading" className="text-lg font-semibold tracking-tight">
+								<h2 id="tokens-heading" className="text-basalt-lg font-semibold tracking-tight">
 									Access tokens
 								</h2>
 								<Badge variant="secondary">{active} active</Badge>
@@ -418,34 +419,34 @@ export function ConnectPage() {
 							</Button>
 						</div>
 						{tokens.isLoading || servers.isLoading ? (
-							<Card>
-								<CardContent className="space-y-4">
+							<LayerCard>
+								<LayerCard.Body className="space-y-4">
 									<Skeleton className="h-6 w-40" />
 									<Skeleton className="h-16 w-full" />
 									<Skeleton className="h-6 w-56" />
-								</CardContent>
-							</Card>
+								</LayerCard.Body>
+							</LayerCard>
 						) : !tokens.data?.data.length ? (
-							<Card>
-								<CardContent className="flex flex-col items-center py-12 text-center">
+							<LayerCard>
+								<LayerCard.Body className="flex flex-col items-center py-12 text-center">
 									<KeyRound
-										className="mb-4 size-8 text-muted-foreground"
+										className="mb-4 size-8 text-basalt-muted-foreground"
 										strokeWidth={1.5}
 										aria-hidden="true"
 									/>
 									<h3 className="font-medium">Your next connection starts here</h3>
-									<p className="mt-2 max-w-xs text-sm text-muted-foreground">
+									<p className="mt-2 max-w-xs text-basalt-base text-basalt-muted-foreground">
 										Create a token for an agent, script or integration. Select its authorized
 										servers and start with read access.
 									</p>
-								</CardContent>
-							</Card>
+								</LayerCard.Body>
+							</LayerCard>
 						) : (
 							tokens.data.data.map((token) => {
 								const status = connectTokenStatus(token);
 								return (
-									<Card key={token.id}>
-										<CardContent className="space-y-4" data-testid="connect-token-row">
+									<LayerCard key={token.id}>
+										<LayerCard.Body className="space-y-4" data-testid="connect-token-row">
 											<div className="flex flex-wrap items-start justify-between gap-3">
 												<div className="min-w-0">
 													<div className="flex flex-wrap items-center gap-2">
@@ -455,7 +456,7 @@ export function ConnectPage() {
 														</Badge>
 														{status !== "Active" && <Badge variant="outline">{status}</Badge>}
 													</div>
-													<p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+													<p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-basalt-sm text-basalt-muted-foreground">
 														<span className="font-mono">{token.prefix}</span>
 													</p>
 												</div>
@@ -469,8 +470,8 @@ export function ConnectPage() {
 													<Pencil className="size-3.5" aria-hidden="true" />
 												</Button>
 											</div>
-											<div className="space-y-2 text-xs">
-												<p className="text-muted-foreground">
+											<div className="space-y-2 text-basalt-sm">
+												<p className="text-basalt-muted-foreground">
 													Authorized servers ({token.serverIds.length})
 												</p>
 												{token.serverIds.length ? (
@@ -481,10 +482,10 @@ export function ConnectPage() {
 														{token.serverIds.map((id) => (
 															<li
 																key={id}
-																className="min-w-0 break-all rounded-md border border-border px-2 py-1"
+																className="min-w-0 break-all rounded-md border border-basalt-border px-2 py-1"
 															>
 																<span className="block">{serverNames([id])}</span>
-																<span className="font-mono text-muted-foreground">{id}</span>
+																<span className="font-mono text-basalt-muted-foreground">{id}</span>
 															</li>
 														))}
 													</ul>
@@ -492,17 +493,17 @@ export function ConnectPage() {
 													<p>No server access</p>
 												)}
 											</div>
-											<dl className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+											<dl className="grid grid-cols-1 gap-3 text-basalt-sm sm:grid-cols-3">
 												<div>
-													<dt className="text-muted-foreground">Created</dt>
+													<dt className="text-basalt-muted-foreground">Created</dt>
 													<dd className="mt-1">{connectDate(token.createdAt)}</dd>
 												</div>
 												<div>
-													<dt className="text-muted-foreground">Last used</dt>
+													<dt className="text-basalt-muted-foreground">Last used</dt>
 													<dd className="mt-1">{connectDate(token.lastUsedAt)}</dd>
 												</div>
 												<div>
-													<dt className="text-muted-foreground">Expires</dt>
+													<dt className="text-basalt-muted-foreground">Expires</dt>
 													<dd className="mt-1 flex items-center gap-1.5">
 														{token.expiresAt ? (
 															connectDate(token.expiresAt)
@@ -516,7 +517,7 @@ export function ConnectPage() {
 											</dl>
 											{secret?.id === token.id && (
 												<div
-													className="space-y-2 rounded-lg border border-border bg-secondary p-3"
+													className="space-y-2 rounded-lg border border-basalt-border bg-basalt-secondary p-3"
 													data-private="true"
 												>
 													<Label htmlFor={`key-${token.id}`}>Bearer key</Label>
@@ -525,7 +526,7 @@ export function ConnectPage() {
 															id={`key-${token.id}`}
 															readOnly
 															value={secret.value}
-															className="min-w-0 font-mono text-xs"
+															className="min-w-0 font-mono"
 															autoComplete="off"
 															spellCheck={false}
 															passwordManagerIgnore
@@ -547,12 +548,12 @@ export function ConnectPage() {
 															<EyeOff className="size-4" aria-hidden="true" />
 														</Button>
 													</div>
-													<p className="text-xs text-muted-foreground">
+													<p className="text-basalt-sm text-basalt-muted-foreground">
 														Visible briefly. Your clipboard keeps its copy until you clear it.
 													</p>
 												</div>
 											)}
-											<div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
+											<div className="flex flex-wrap items-center gap-2 border-t border-basalt-border pt-3">
 												<Button
 													size="sm"
 													variant="outline"
@@ -574,7 +575,7 @@ export function ConnectPage() {
 												<Button
 													size="sm"
 													variant="ghost"
-													className="ml-auto text-destructive"
+													className="ml-auto"
 													aria-label={`Revoke ${token.name}`}
 													disabled={busy || status === "Revoked"}
 													onClick={() => openAction(token, "revoke")}
@@ -582,17 +583,17 @@ export function ConnectPage() {
 													<Trash2 className="size-3.5" aria-hidden="true" /> Revoke
 												</Button>
 											</div>
-										</CardContent>
-									</Card>
+										</LayerCard.Body>
+									</LayerCard>
 								);
 							})
 						)}
 					</section>
 					<aside className="min-w-0 space-y-4" aria-label="Connection guide">
-						<Card>
-							<CardContent className="space-y-4">
+						<LayerCard>
+							<LayerCard.Body className="space-y-4">
 								<div className="flex items-center gap-2">
-									<Terminal className="size-4 text-muted-foreground" aria-hidden="true" />
+									<Terminal className="size-4 text-basalt-muted-foreground" aria-hidden="true" />
 									<h2 className="font-semibold">Make the connection</h2>
 								</div>
 								<div className="space-y-2">
@@ -602,7 +603,7 @@ export function ConnectPage() {
 											id="connect-base"
 											value={baseUrl}
 											readOnly
-											className="min-w-0 font-mono text-xs"
+											className="min-w-0 font-mono"
 										/>
 										<Button
 											variant="outline"
@@ -614,43 +615,25 @@ export function ConnectPage() {
 										</Button>
 									</div>
 								</div>
-								<fieldset className="flex flex-wrap items-center gap-2">
-									<legend className="sr-only">Example format</legend>
-									<Button
-										size="sm"
-										variant={example === "curl" ? "secondary" : "ghost"}
-										aria-pressed={example === "curl"}
-										onClick={() => setExample("curl")}
-									>
-										curl
-									</Button>
-									<Button
-										size="sm"
-										variant={example === "agent" ? "secondary" : "ghost"}
-										aria-pressed={example === "agent"}
-										onClick={() => setExample("agent")}
-									>
-										Agent instructions
-									</Button>
-									<Button
-										className="ml-auto"
-										size="icon"
-										variant="ghost"
-										aria-label="Copy example"
-										onClick={() => copy(examples[example], "Example")}
-									>
-										<Copy className="size-3.5" aria-hidden="true" />
-									</Button>
-								</fieldset>
-								<pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg border border-border bg-secondary p-4 font-mono text-xs leading-relaxed">
+								<SegmentControl
+									legend="Example format"
+									className="[&>legend]:sr-only"
+									value={example}
+									onValueChange={(value) => setExample(value as "curl" | "agent")}
+									options={[
+										{ value: "curl", label: "curl" },
+										{ value: "agent", label: "Agent instructions" },
+									]}
+								/>
+								<CodeBlock title={example === "curl" ? "curl example" : "Agent instructions"}>
 									{examples[example]}
-								</pre>
-								<p className="text-xs leading-relaxed text-muted-foreground">
+								</CodeBlock>
+								<p className="text-basalt-sm leading-relaxed text-basalt-muted-foreground">
 									Discover available operations at <code>/capabilities</code>. The machine-readable
 									contract is at <code>/openapi.json</code>. Both require your Bearer token.
 								</p>
 								<a
-									className="inline-flex items-center gap-1.5 text-sm font-medium underline-offset-4 hover:underline"
+									className="inline-flex items-center gap-1.5 text-basalt-base font-medium underline-offset-4 hover:underline"
 									href="https://github.com/nocoo/bat/blob/main/docs/22-connect.md"
 									target="_blank"
 									rel="noreferrer"
@@ -658,25 +641,25 @@ export function ConnectPage() {
 									API guide
 									<ArrowUpRight className="size-3.5" aria-hidden="true" />
 								</a>
-							</CardContent>
-						</Card>
-						<Card>
-							<CardContent className="space-y-3">
+							</LayerCard.Body>
+						</LayerCard>
+						<LayerCard>
+							<LayerCard.Body className="space-y-3">
 								<div className="flex items-center gap-2">
-									<LockKeyhole className="size-4 text-muted-foreground" aria-hidden="true" />
-									<h2 className="text-sm font-semibold">Keep access intentional</h2>
+									<LockKeyhole className="size-4 text-basalt-muted-foreground" aria-hidden="true" />
+									<h2 className="text-basalt-base font-semibold">Keep access intentional</h2>
 								</div>
-								<p className="text-sm leading-relaxed text-muted-foreground">
+								<p className="text-basalt-base leading-relaxed text-basalt-muted-foreground">
 									Tokens never expire by default. Anyone holding a key retains its access until you
 									revoke it. Set an expiry for temporary work.
 								</p>
-								<p className="text-sm leading-relaxed text-muted-foreground">
+								<p className="text-basalt-base leading-relaxed text-basalt-muted-foreground">
 									Use one token per integration, keep it in a secret store, and prefer read access.
 									Reveals and changes are audited. Rotation invalidates the previous key
 									immediately.
 								</p>
-							</CardContent>
-						</Card>
+							</LayerCard.Body>
+						</LayerCard>
 					</aside>
 				</div>
 			</div>
@@ -722,7 +705,7 @@ export function ConnectPage() {
 						</div>
 						{accessControls}
 						{error && (
-							<p role="alert" className="text-sm text-destructive">
+							<p role="alert" className="text-basalt-base text-basalt-destructive">
 								{error}
 							</p>
 						)}
@@ -773,12 +756,12 @@ export function ConnectPage() {
 						</DialogHeader>
 						{action && (
 							<>
-								<div className="break-words rounded-lg border border-border bg-secondary px-3 py-2 text-sm">
+								<div className="break-words rounded-lg border border-basalt-border bg-basalt-secondary px-3 py-2 text-basalt-base">
 									<span className="font-medium">{action.token.name}</span>
-									<span className="ml-2 text-muted-foreground">
+									<span className="ml-2 text-basalt-muted-foreground">
 										· {action.token.scope === "write" ? "Read + write" : "Read only"}
 									</span>
-									<p className="mt-1 text-xs text-muted-foreground">
+									<p className="mt-1 text-basalt-sm text-basalt-muted-foreground">
 										{serverNames(action.token.serverIds)}
 									</p>
 								</div>
@@ -801,7 +784,7 @@ export function ConnectPage() {
 							</>
 						)}
 						{error && (
-							<p role="alert" className="text-sm text-destructive">
+							<p role="alert" className="text-basalt-base text-basalt-destructive">
 								{error}
 							</p>
 						)}

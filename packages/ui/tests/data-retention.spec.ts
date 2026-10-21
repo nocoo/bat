@@ -8,7 +8,7 @@ test.describe("Data Retention page", () => {
 		await page.goto("/settings/data");
 		await page.waitForLoadState("domcontentloaded");
 
-		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
 		await expect(breadcrumb.getByText("Settings")).toBeVisible({ timeout: 15_000 });
 		await expect(breadcrumb.getByText("Data Retention")).toBeVisible();
 	});

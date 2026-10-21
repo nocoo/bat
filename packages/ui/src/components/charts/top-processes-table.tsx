@@ -87,14 +87,16 @@ export function TopProcessesTable({
 	if (processes.length === 0) {
 		const isHourly = resolution === "hourly";
 		return (
-			<LayerCard className="p-4 md:p-5" padding="none">
-				<div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm gap-1">
+			<LayerCard>
+				<div className="flex flex-col items-center justify-center h-32 text-basalt-muted-foreground text-basalt-base gap-1">
 					<span>
 						{isHourly
 							? "Process snapshots are not available in aggregated views"
 							: "No process data"}
 					</span>
-					{isHourly && <span className="text-xs">Switch to 1h or 6h to see live process data</span>}
+					{isHourly && (
+						<span className="text-basalt-sm">Switch to 1h or 6h to see live process data</span>
+					)}
 				</div>
 			</LayerCard>
 		);
@@ -103,12 +105,14 @@ export function TopProcessesTable({
 	const thBase = "text-right";
 
 	return (
-		<LayerCard className="p-4 md:p-5" padding="none">
+		<LayerCard>
 			<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-				<div className="flex items-center gap-2 text-base font-semibold">
+				<div className="flex items-center gap-2 text-basalt-base font-medium">
 					<Activity className="h-4 w-4" />
 					Top Processes
-					<span className="text-xs font-normal text-muted-foreground">({processes.length})</span>
+					<span className="text-basalt-sm font-normal text-basalt-muted-foreground">
+						({processes.length})
+					</span>
 				</div>
 				<Input
 					type="text"
@@ -189,13 +193,13 @@ export function TopProcessesTable({
 					<TableBody>
 						{sorted.map((p) => (
 							<TableRow key={p.pid}>
-								<TableCell className="font-mono tabular-nums text-muted-foreground">
+								<TableCell className="font-mono tabular-nums text-basalt-muted-foreground">
 									{p.pid}
 								</TableCell>
 								<TableCell className="truncate max-w-[120px]" title={p.cmd}>
 									{p.name}
 								</TableCell>
-								<TableCell className="truncate max-w-[80px] text-muted-foreground">
+								<TableCell className="truncate max-w-[80px] text-basalt-muted-foreground">
 									{p.user}
 								</TableCell>
 								<TableCell className={`text-center font-mono font-semibold ${stateColor(p.state)}`}>
@@ -217,13 +221,13 @@ export function TopProcessesTable({
 								>
 									{p.num_threads}
 								</TableCell>
-								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
+								<TableCell className="text-right font-mono tabular-nums text-basalt-muted-foreground">
 									{p.io_read_rate != null ? formatBytesRate(p.io_read_rate) : "—"}
 								</TableCell>
-								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
+								<TableCell className="text-right font-mono tabular-nums text-basalt-muted-foreground">
 									{p.io_write_rate != null ? formatBytesRate(p.io_write_rate) : "—"}
 								</TableCell>
-								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
+								<TableCell className="text-right font-mono tabular-nums text-basalt-muted-foreground">
 									{formatUptime(p.uptime)}
 								</TableCell>
 							</TableRow>

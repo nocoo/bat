@@ -15,13 +15,13 @@ const a = (severity: AlertItem["severity"], triggered_at: number, rule_id = "r")
 
 describe("severityColorClass", () => {
 	test("critical → destructive", () => {
-		expect(severityColorClass("critical")).toBe("text-destructive");
+		expect(severityColorClass("critical")).toBe("text-basalt-destructive");
 	});
 	test("warning → warning", () => {
-		expect(severityColorClass("warning")).toBe("text-warning");
+		expect(severityColorClass("warning")).toBe("text-basalt-warning");
 	});
 	test("info → muted", () => {
-		expect(severityColorClass("info")).toBe("text-muted-foreground");
+		expect(severityColorClass("info")).toBe("text-basalt-muted-foreground");
 	});
 });
 

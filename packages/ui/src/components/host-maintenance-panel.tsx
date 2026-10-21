@@ -1,9 +1,9 @@
 import { Button, Field, Input } from "@nocoo/basalt";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { deleteAPI, putAPI } from "@/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHostMaintenance } from "@/hooks";
 import {
 	currentTzOffsetMinutes,
@@ -91,16 +91,16 @@ export function MaintenancePanel({ hostId }: MaintenancePanelProps) {
 	};
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-base">
+		<LayerCard>
+			<LayerCard.Header>
+				<h2 className="flex items-center gap-2">
 					<Wrench className="h-4 w-4" />
 					Maintenance Window
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
+				</h2>
+			</LayerCard.Header>
+			<LayerCard.Body>
 				<div className="space-y-3">
-					<p className="text-xs text-muted-foreground">
+					<p className="text-basalt-sm text-basalt-muted-foreground">
 						Daily window during which alerts are suppressed. Times below are local; the backend
 						stores UTC.
 					</p>
@@ -131,7 +131,7 @@ export function MaintenancePanel({ hostId }: MaintenancePanelProps) {
 						disabled={busy}
 						maxLength={200}
 					/>
-					{error && <p className="text-xs text-destructive">{error}</p>}
+					{error && <p className="text-basalt-sm text-basalt-destructive">{error}</p>}
 					<div className="flex items-center gap-2">
 						<Button type="button" onClick={handleSave} disabled={busy || !dirty || !start || !end}>
 							{window ? "Update" : "Save"}
@@ -143,7 +143,7 @@ export function MaintenancePanel({ hostId }: MaintenancePanelProps) {
 						)}
 					</div>
 				</div>
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	);
 }

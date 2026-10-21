@@ -36,18 +36,14 @@ export function useMaintenanceAreas(
 
 /** Card wrapper used by every chart (consistent padding + radius). */
 export function ChartCard({ children }: { children: ReactNode }) {
-	return (
-		<LayerCard className="p-4 md:p-5" padding="none">
-			{children}
-		</LayerCard>
-	);
+	return <LayerCard>{children}</LayerCard>;
 }
 
 /** "No X data" placeholder rendered inside a {@link ChartCard}. */
 export function ChartEmptyState({ message }: { message: string }) {
 	return (
 		<ChartCard>
-			<div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+			<div className="flex items-center justify-center h-64 text-basalt-muted-foreground text-basalt-base">
 				{message}
 			</div>
 		</ChartCard>
@@ -78,14 +74,17 @@ export function ChartHeader({
 	const hasLegend = (series && series.length > 0) || extraLegend !== undefined;
 	return (
 		<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-			<div className="flex items-center gap-2 text-base font-semibold">
+			<div className="flex items-center gap-2 text-basalt-base font-medium">
 				<Icon className="h-4 w-4" />
 				{title}
 			</div>
 			{hasLegend && (
 				<div className="flex flex-wrap items-center gap-x-3 gap-y-1">
 					{series?.map((s) => (
-						<span key={s.key} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+						<span
+							key={s.key}
+							className="flex items-center gap-1.5 text-basalt-sm text-basalt-muted-foreground"
+						>
 							<span
 								className="inline-block h-2 w-2 rounded-full"
 								style={{ backgroundColor: s.color }}

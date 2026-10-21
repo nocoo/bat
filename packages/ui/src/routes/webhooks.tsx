@@ -1,6 +1,7 @@
 import type { WebhookConfig } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
 import { CodeBlock } from "@nocoo/basalt/components/code";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import {
 	Select,
@@ -12,7 +13,6 @@ import {
 import { AlertTriangle, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useHosts, useSetup, useWebhooks } from "@/hooks";
 import {
@@ -77,18 +77,20 @@ export function WebhooksPage() {
 	);
 
 	return isLoading && !webhooks ? (
-		<Card>
-			<CardContent className="py-6 space-y-4">
+		<LayerCard>
+			<LayerCard.Body className="py-6 space-y-4">
 				{Array.from({ length: 3 }, (_, i) => (
 					<Skeleton key={`wh-skeleton-${i.toString()}`} className="h-12 w-full" />
 				))}
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	) : error && !webhooks ? (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">Failed to load webhooks</h2>
-			<p className="mt-2 text-sm">{error.message}</p>
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">
+				Failed to load webhooks
+			</h2>
+			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
 		<div className="space-y-4 max-w-4xl" data-bat-dirty={!!selectedHostId}>
@@ -99,14 +101,14 @@ export function WebhooksPage() {
 
 			{/* Action error banner */}
 			{actionError && (
-				<div className="rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+				<div className="rounded-md border border-basalt-destructive/50 bg-basalt-destructive/10 px-4 py-3 text-basalt-base text-basalt-destructive">
 					{actionError}
 				</div>
 			)}
 
 			{/* Create new webhook */}
-			<Card>
-				<CardContent className="py-3">
+			<LayerCard>
+				<LayerCard.Body>
 					<form
 						className="flex items-center gap-2"
 						onSubmit={(e) => {
@@ -114,7 +116,7 @@ export function WebhooksPage() {
 							handleCreate();
 						}}
 					>
-						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+						<Plus className="h-4 w-4 text-basalt-muted-foreground shrink-0" strokeWidth={1.5} />
 						<Select value={selectedHostId} onValueChange={setSelectedHostId} disabled={creating}>
 							<SelectTrigger aria-label="Webhook host" className="flex-1 min-w-0">
 								<SelectValue placeholder="Select a host..." />
@@ -131,20 +133,22 @@ export function WebhooksPage() {
 							{creating ? "Creating..." : "Generate"}
 						</Button>
 					</form>
-				</CardContent>
-			</Card>
+				</LayerCard.Body>
+			</LayerCard>
 
 			{/* Webhook list */}
 			{!webhooks || webhooks.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+				<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 					<Webhook className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">No webhooks configured</h2>
-					<p className="mt-2 text-sm">Select a host above to generate a webhook token.</p>
+					<h2 className="text-basalt-lg font-semibold text-basalt-foreground">
+						No webhooks configured
+					</h2>
+					<p className="mt-2 text-basalt-base">Select a host above to generate a webhook token.</p>
 				</div>
 			) : (
-				<Card>
-					<CardContent className="py-2">
-						<div className="divide-y divide-border">
+				<LayerCard>
+					<LayerCard.Body>
+						<div className="divide-y divide-basalt-border">
 							{webhooks.map((wh) => (
 								<WebhookConfigRow
 									key={wh.id}
@@ -155,8 +159,8 @@ export function WebhooksPage() {
 								/>
 							))}
 						</div>
-					</CardContent>
-				</Card>
+					</LayerCard.Body>
+				</LayerCard>
 			)}
 		</div>
 	);

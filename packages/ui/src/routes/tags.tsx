@@ -1,12 +1,18 @@
-import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
+import { TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
 import { Badge, Button, Input } from "@nocoo/basalt";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { Radio } from "@nocoo/basalt/components/radio";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nocoo/basalt/components/select";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
 import { TagChip } from "@/components/tag-chip";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks";
 import { getSwatchColor } from "@/lib/palette";
@@ -79,18 +85,18 @@ export function TagsPage() {
 	);
 
 	return isLoading && !tags ? (
-		<Card>
-			<CardContent className="py-6 space-y-4">
+		<LayerCard>
+			<LayerCard.Body className="py-6 space-y-4">
 				{Array.from({ length: 5 }, (_, i) => (
 					<Skeleton key={`tag-skeleton-${i.toString()}`} className="h-8 w-full" />
 				))}
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	) : error && !tags ? (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">Failed to load tags</h2>
-			<p className="mt-2 text-sm">{error.message}</p>
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">Failed to load tags</h2>
+			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
 		<div className="space-y-4" data-bat-dirty={!!newName || editingId !== null}>
@@ -100,8 +106,8 @@ export function TagsPage() {
 			/>
 
 			{/* Create new tag */}
-			<Card>
-				<CardContent className="py-3">
+			<LayerCard>
+				<LayerCard.Body>
 					<form
 						className="flex items-center gap-2"
 						onSubmit={(e) => {
@@ -109,7 +115,7 @@ export function TagsPage() {
 							handleCreate();
 						}}
 					>
-						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
+						<Plus className="h-4 w-4 text-basalt-muted-foreground shrink-0" strokeWidth={1.5} />
 						<Input
 							aria-label="New tag name"
 							placeholder="New tag name…"
@@ -127,20 +133,20 @@ export function TagsPage() {
 							{creating ? "Creating..." : "Create"}
 						</Button>
 					</form>
-				</CardContent>
-			</Card>
+				</LayerCard.Body>
+			</LayerCard>
 
 			{/* Tag list */}
 			{!tags || tags.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+				<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 					<Tag className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-lg font-semibold text-foreground">No tags yet</h2>
-					<p className="mt-2 text-sm">Create a tag above to get started.</p>
+					<h2 className="text-basalt-lg font-semibold text-basalt-foreground">No tags yet</h2>
+					<p className="mt-2 text-basalt-base">Create a tag above to get started.</p>
 				</div>
 			) : (
-				<Card>
-					<CardContent className="py-2">
-						<div className="divide-y divide-border">
+				<LayerCard>
+					<LayerCard.Body>
+						<div className="divide-y divide-basalt-border">
 							{tags.map((tag) => (
 								<TagRow
 									key={tag.id}
@@ -162,8 +168,8 @@ export function TagsPage() {
 								/>
 							))}
 						</div>
-					</CardContent>
-				</Card>
+					</LayerCard.Body>
+				</LayerCard>
 			)}
 		</div>
 	);
@@ -234,31 +240,36 @@ function TagRow({
 				)}
 			</div>
 
-			<Radio.Group
-				aria-label={`Color for ${tag.name}`}
-				value={String(tag.color)}
-				onValueChange={(value) => onRecolor(Number(value))}
-				className="flex flex-wrap gap-2"
-			>
-				{Array.from({ length: TAG_COLOR_COUNT }, (_, i) => (
-					<label
-						key={`color-${i.toString()}`}
-						htmlFor={`tag-${tag.id}-color-${i}`}
-						className="flex items-center gap-1"
-					>
-						<Radio.Item
-							id={`tag-${tag.id}-color-${i}`}
-							value={String(i)}
-							aria-label={`Color ${i}`}
-						/>
-						<span
-							aria-hidden="true"
-							className="size-3 rounded-full"
-							style={{ backgroundColor: getSwatchColor(i) }}
-						/>
-					</label>
-				))}
-			</Radio.Group>
+			<Select value={String(tag.color)} onValueChange={(value) => onRecolor(Number(value))}>
+				<SelectTrigger size="sm" aria-label={`Color for ${tag.name}`} className="w-32">
+					<SelectValue />
+				</SelectTrigger>
+				<SelectContent>
+					{[
+						"Pink",
+						"Sky",
+						"Teal",
+						"Green",
+						"Lime",
+						"Chartreuse",
+						"Violet",
+						"Orange",
+						"Blue",
+						"Red",
+					].map((name, index) => (
+						<SelectItem key={name} value={String(index)}>
+							<span className="flex items-center gap-2">
+								<span
+									aria-hidden="true"
+									className="size-3 rounded-full"
+									style={{ backgroundColor: getSwatchColor(index) }}
+								/>
+								{name}
+							</span>
+						</SelectItem>
+					))}
+				</SelectContent>
+			</Select>
 
 			{/* Host count */}
 			<Badge variant="secondary" className="tabular-nums">

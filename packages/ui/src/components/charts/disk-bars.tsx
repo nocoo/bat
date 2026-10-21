@@ -9,8 +9,8 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 
 	if (disks.length === 0) {
 		return (
-			<LayerCard className="p-4 md:p-5" padding="none">
-				<div className="flex items-center justify-center h-32 text-muted-foreground text-sm">
+			<LayerCard>
+				<div className="flex items-center justify-center h-32 text-basalt-muted-foreground text-basalt-base">
 					No disk data
 				</div>
 			</LayerCard>
@@ -18,30 +18,30 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	}
 
 	return (
-		<LayerCard className="p-4 md:p-5" padding="none">
-			<div className="mb-3 flex items-center gap-2 text-base font-semibold">
+		<LayerCard>
+			<div className="mb-3 flex items-center gap-2 text-basalt-base font-medium">
 				<HardDrive className="h-4 w-4" />
 				Disk Usage
 			</div>
 			<div className="space-y-3">
 				{disks.map((disk) => (
 					<div key={disk.mount} className="space-y-1">
-						<div className="flex items-center justify-between gap-3 text-sm">
+						<div className="flex items-center justify-between gap-3 text-basalt-base">
 							<span className="font-mono truncate min-w-0" title={disk.mount}>
 								{disk.mount}
 							</span>
-							<span className="text-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
+							<span className="text-basalt-muted-foreground tabular-nums shrink-0 whitespace-nowrap">
 								{disk.used_pct.toFixed(1)}% — {formatBytes(disk.avail_bytes)} free
 							</span>
 						</div>
-						<div className="h-2 w-full rounded-full bg-muted">
+						<div className="h-2 w-full rounded-full bg-basalt-muted">
 							<div
 								className={`h-full rounded-full transition-all ${
 									disk.used_pct > 90
-										? "bg-destructive"
+										? "bg-basalt-destructive"
 										: disk.used_pct > 80
-											? "bg-warning"
-											: "bg-primary"
+											? "bg-basalt-warning"
+											: "bg-basalt-primary"
 								}`}
 								style={{ width: `${Math.min(disk.used_pct, 100)}%` }}
 							/>

@@ -140,37 +140,37 @@ export function buildSubtitle(host: HostOverviewItem): string | null {
 /** Tailwind bg class for a 0–100 resource value (success / warning / destructive). */
 export function getBarColor(value: number): string {
 	if (value >= 80) {
-		return "bg-destructive";
+		return "bg-basalt-destructive";
 	}
 	if (value >= 60) {
-		return "bg-warning";
+		return "bg-basalt-warning";
 	}
-	return "bg-success";
+	return "bg-basalt-success";
 }
 
 /** Tailwind text class matching {@link getBarColor}. */
 export function getValueColor(value: number): string {
 	if (value >= 80) {
-		return "text-destructive";
+		return "text-basalt-destructive";
 	}
 	if (value >= 60) {
-		return "text-warning";
+		return "text-basalt-warning";
 	}
-	return "text-success";
+	return "text-basalt-success";
 }
 
 /** Tailwind bg class for the status dot. */
 export function statusDotColor(status: string): string {
 	if (status === "healthy") {
-		return "bg-success";
+		return "bg-basalt-success";
 	}
 	if (status === "warning") {
-		return "bg-warning";
+		return "bg-basalt-warning";
 	}
 	if (status === "critical") {
-		return "bg-destructive";
+		return "bg-basalt-destructive";
 	}
-	return "bg-muted-foreground";
+	return "bg-basalt-muted-foreground";
 }
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,26 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Tags page", () => {
+	test("standard color select preserves the stored palette index", async ({ page }) => {
+		const response = await page.request.post("/api/tags", { data: { name: "pw-color-check" } });
+		expect(response.ok()).toBe(true);
+		const tag = await response.json();
+		try {
+			await page.goto("/tags");
+			const color = page.getByRole("combobox", { name: "Color for pw-color-check" });
+			await color.click();
+			await expect(page.getByRole("option")).toHaveCount(10);
+			await page.getByRole("option", { name: "Orange", exact: true }).click();
+			await expect(color).toHaveText("Orange");
+			await page.reload();
+			await expect(color).toHaveText("Orange");
+			const tags = await (await page.request.get("/api/tags")).json();
+			expect(tags.find((item: { id: number }) => item.id === tag.id).color).toBe(7);
+		} finally {
+			expect((await page.request.delete(`/api/tags/${tag.id}`)).ok()).toBe(true);
+		}
+	});
+
 	test("page loads with create tag input", async ({ page }) => {
 		await page.goto("/tags");
 		await page.waitForLoadState("domcontentloaded");

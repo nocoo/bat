@@ -1,5 +1,6 @@
 import { type EventItem, hashHostId } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import {
 	Table,
@@ -12,7 +13,6 @@ import {
 import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EVENTS_PAGE_SIZE, useEvents, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
@@ -39,16 +39,16 @@ function EventTable({ events }: { events: EventItem[] }) {
 							<TableCell>
 								<Link
 									to={`/hosts/${hashHostId(event.host_id)}`}
-									className="text-primary hover:underline"
+									className="text-basalt-primary hover:underline"
 								>
 									{host?.hostname ?? event.hostname ?? event.host_id.slice(0, 8)}
 								</Link>
 							</TableCell>
-							<TableCell className="text-sm">{event.title}</TableCell>
-							<TableCell className="font-mono text-xs max-w-xs truncate">
+							<TableCell className="text-basalt-base">{event.title}</TableCell>
+							<TableCell className="font-mono text-basalt-sm max-w-xs truncate">
 								{event.tags.length > 0 ? event.tags.join(", ") : "—"}
 							</TableCell>
-							<TableCell className="text-muted-foreground text-sm">
+							<TableCell className="text-basalt-muted-foreground text-basalt-base">
 								{formatTimestamp(event.created_at)}
 							</TableCell>
 						</TableRow>
@@ -68,18 +68,18 @@ export function EventsPage() {
 	const totalPages = Math.ceil(total / EVENTS_PAGE_SIZE);
 
 	return isLoading && !data ? (
-		<Card>
-			<CardContent className="py-6 space-y-4">
+		<LayerCard>
+			<LayerCard.Body className="py-6 space-y-4">
 				{Array.from({ length: 5 }, (_, i) => (
 					<Skeleton key={`event-skeleton-${i.toString()}`} className="h-8 w-full" />
 				))}
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	) : error && !data ? (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">Failed to load events</h2>
-			<p className="mt-2 text-sm">{error.message}</p>
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">Failed to load events</h2>
+			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : !events || events.length === 0 ? (
 		<div className="space-y-4">
@@ -87,10 +87,12 @@ export function EventsPage() {
 				title="Events"
 				description="Audit timeline of webhook triggers, deployments, and host events."
 			/>
-			<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+			<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 				<ScrollText className="h-12 w-12 mb-4" strokeWidth={1} />
-				<h2 className="text-lg font-semibold text-foreground">No events yet</h2>
-				<p className="mt-2 text-sm">Events will appear here when hosts send webhook payloads.</p>
+				<h2 className="text-basalt-lg font-semibold text-basalt-foreground">No events yet</h2>
+				<p className="mt-2 text-basalt-base">
+					Events will appear here when hosts send webhook payloads.
+				</p>
 			</div>
 		</div>
 	) : (
@@ -99,16 +101,16 @@ export function EventsPage() {
 				title="Events"
 				description="Audit timeline of webhook triggers, deployments, and host events."
 			/>
-			<Card>
-				<CardContent className="py-2 overflow-x-auto">
+			<LayerCard>
+				<LayerCard.Body className="py-2 overflow-x-auto">
 					<EventTable events={events} />
-				</CardContent>
-			</Card>
+				</LayerCard.Body>
+			</LayerCard>
 
 			{/* Pagination */}
 			{totalPages > 1 && (
 				<div className="flex items-center justify-between">
-					<p className="text-sm text-muted-foreground">
+					<p className="text-basalt-base text-basalt-muted-foreground">
 						{total} events · Page {page} of {totalPages}
 					</p>
 					<div className="flex items-center gap-2">

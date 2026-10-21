@@ -26,12 +26,13 @@ export function EnvironmentSwitch() {
 	return (
 		<div className="flex items-center gap-2">
 			{error && (
-				<span role="alert" className="text-xs text-destructive">
+				<span role="alert" className="text-basalt-sm text-basalt-destructive">
 					{error}
 				</span>
 			)}
 			<SegmentControl
-				legend={<span className="sr-only">Environment</span>}
+				legend="Environment"
+				className="[&>legend]:sr-only"
 				value={environment.mode}
 				onValueChange={switchMode}
 				disabled={busy || environment.locked}

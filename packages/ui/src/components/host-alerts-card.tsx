@@ -1,6 +1,6 @@
 import type { AlertItem } from "@bat/shared";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Bell } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRelativeTime, severityColorClass, sortAlertsBySeverity } from "@/lib/alerts-format";
 
 interface HostAlertsCardProps {
@@ -16,39 +16,41 @@ export function HostAlertsCard({ alerts, nowSeconds }: HostAlertsCardProps) {
 	const sorted = sortAlertsBySeverity(alerts);
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-base">
+		<LayerCard>
+			<LayerCard.Header>
+				<h2 className="flex items-center gap-2">
 					<Bell className="h-4 w-4" />
 					Active Alerts
-					<span className="text-xs font-normal text-muted-foreground">({sorted.length})</span>
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
+					<span className="text-basalt-sm font-normal text-basalt-muted-foreground">
+						({sorted.length})
+					</span>
+				</h2>
+			</LayerCard.Header>
+			<LayerCard.Body>
 				<ul className="space-y-2">
 					{sorted.map((alert) => (
 						<li
 							key={`${alert.rule_id}-${alert.triggered_at}`}
-							className="flex items-start gap-2 text-sm min-w-0"
+							className="flex items-start gap-2 text-basalt-base min-w-0"
 						>
 							<span
-								className={`text-xs font-medium uppercase shrink-0 w-16 ${severityColorClass(alert.severity)}`}
+								className={`text-basalt-sm font-medium uppercase shrink-0 w-16 ${severityColorClass(alert.severity)}`}
 							>
 								{alert.severity}
 							</span>
 							<div className="flex-1 min-w-0">
-								<div className="font-mono text-xs text-muted-foreground truncate">
+								<div className="font-mono text-basalt-sm text-basalt-muted-foreground truncate">
 									{alert.rule_id}
 								</div>
 								{alert.message && <div className="truncate">{alert.message}</div>}
 							</div>
-							<span className="text-xs text-muted-foreground shrink-0 tabular-nums">
+							<span className="text-basalt-sm text-basalt-muted-foreground shrink-0 tabular-nums">
 								{formatRelativeTime(alert.triggered_at, now)}
 							</span>
 						</li>
 					))}
 				</ul>
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	);
 }

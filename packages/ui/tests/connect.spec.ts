@@ -183,7 +183,7 @@ test.describe("Connect private credential management", () => {
 		await expect(row.getByText("Read + write", { exact: true })).toBeVisible();
 		await expect(row.getByText("pw-host-beta", { exact: true })).toBeVisible();
 		await expect(row).toContainText("2099");
-		await page.getByRole("button", { name: "Agent instructions", exact: true }).click();
+		await page.getByRole("radio", { name: "Agent instructions", exact: true }).click();
 		await expect(page.locator("pre")).toContainText("If-Match");
 		await expect(page.locator("pre")).toContainText("GET /servers");
 		await expect(page.locator("pre")).toContainText("SERVER_ID");

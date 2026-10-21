@@ -13,21 +13,27 @@ test("navigation preserves shell nodes and collapsed state", async ({ page }) =>
 	});
 	for (const label of ["Events", "Tags", "Setup", "Hosts"]) {
 		await page.locator(`aside a[href="/${label.toLowerCase()}"]`).click();
-		await expect(page.getByLabel("Breadcrumb navigation")).toContainText(label);
+		await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
+			label,
+		);
 		await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 		for (const node of [shell, header, sidebar]) {
 			expect(await node?.evaluate((element) => element.isConnected)).toBe(true);
 		}
 	}
 	await page.getByText("alpha.test.local").click();
-	await expect(page.getByLabel("Breadcrumb navigation")).toContainText("alpha.test.local");
+	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
+		"alpha.test.local",
+	);
 	await page
-		.getByLabel("Breadcrumb navigation")
+		.getByRole("navigation", { name: "Breadcrumb", exact: true })
 		.getByRole("link", { name: "Hosts", exact: true })
 		.click();
 	await expect(page).toHaveURL("/hosts");
 	await page.goBack();
-	await expect(page.getByLabel("Breadcrumb navigation")).toContainText("alpha.test.local");
+	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
+		"alpha.test.local",
+	);
 	await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 	for (const node of [shell, header, sidebar]) {
 		expect(await node?.evaluate((element) => element.isConnected)).toBe(true);

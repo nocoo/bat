@@ -13,13 +13,13 @@ describe("chart palette", () => {
 	test("contains all 10 named chart tokens", () => {
 		expect(Object.keys(chart)).toHaveLength(10);
 		for (const value of Object.values(chart)) {
-			expect(value).toMatch(/^hsl\(var\(--chart-\d+\)\)$/);
+			expect(value).toMatch(/^hsl\(var\(--bat-chart-\d+\)\)$/);
 		}
 	});
 
 	test("axis and muted are CSS vars", () => {
-		expect(chartAxis).toBe("hsl(var(--chart-axis))");
-		expect(chartMuted).toBe("hsl(var(--chart-muted))");
+		expect(chartAxis).toBe("hsl(var(--basalt-chart-axis))");
+		expect(chartMuted).toBe("hsl(var(--basalt-chart-muted))");
 	});
 });
 
@@ -42,8 +42,10 @@ describe("getBadgeStyleByIndex", () => {
 
 	test("returns the soft-tinted color shape", () => {
 		const s = getBadgeStyleByIndex(0);
-		expect(s.backgroundColor).toMatch(/^hsl\(var\(--chart-\d+\) \/ 0\.12\)$/);
-		expect(s.color).toMatch(/^hsl\(var\(--chart-\d+\)\)$/);
+		expect(s.backgroundColor).toMatch(/^hsl\(var\(--bat-chart-\d+\) \/ 0\.12\)$/);
+		expect(s.color).toMatch(
+			/^color-mix\(in srgb, hsl\(var\(--bat-chart-\d+\)\) 60%, var\(--bat-tag-ink\)\)$/,
+		);
 	});
 });
 
@@ -55,21 +57,21 @@ describe("getBadgeStyle (hash-based)", () => {
 
 	test("empty string still returns valid shape", () => {
 		const s = getBadgeStyle("");
-		expect(s.backgroundColor).toContain("hsl(var(--chart-");
-		expect(s.color).toContain("hsl(var(--chart-");
+		expect(s.backgroundColor).toContain("hsl(var(--bat-chart-");
+		expect(s.color).toContain("hsl(var(--bat-chart-");
 	});
 
 	test("different inputs may map to different colors but always to a valid token", () => {
 		for (const text of ["a", "b", "host-1", "production", "中文"]) {
 			const s = getBadgeStyle(text);
-			expect(s.backgroundColor).toMatch(/--chart-\d+\) \/ 0\.12/);
+			expect(s.backgroundColor).toMatch(/--bat-chart-\d+\) \/ 0\.12/);
 		}
 	});
 });
 
 describe("getSwatchColor", () => {
 	test("returns a solid hsl with no alpha", () => {
-		expect(getSwatchColor(0)).toMatch(/^hsl\(var\(--chart-\d+\)\)$/);
+		expect(getSwatchColor(0)).toMatch(/^hsl\(var\(--bat-chart-\d+\)\)$/);
 	});
 
 	test("wraps around for out-of-range indices", () => {

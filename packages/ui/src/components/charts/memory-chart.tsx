@@ -44,7 +44,7 @@ export function MemoryChart({
 				title="Memory"
 				series={[{ key: "used_pct", label: "Memory Used", color: chart.green }]}
 				extraLegend={
-					<span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+					<span className="flex items-center gap-1.5 text-basalt-sm text-basalt-muted-foreground">
 						<span
 							className="inline-block h-2 w-2 rounded-[1px] border border-current opacity-50"
 							style={{ borderColor: chart.teal }}

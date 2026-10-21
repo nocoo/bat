@@ -1,7 +1,7 @@
 import { hashHostId } from "@bat/shared";
+import type { BreadcrumbItem } from "@nocoo/basalt/components/breadcrumbs";
 import { useLocation, useMatch } from "react-router";
 import { useHosts } from "@/hooks";
-import { type BreadcrumbItem, Breadcrumbs } from "./breadcrumbs";
 
 const home = { label: "Home", href: "/" };
 const routes: Record<string, BreadcrumbItem[]> = {
@@ -15,23 +15,13 @@ const routes: Record<string, BreadcrumbItem[]> = {
 	"/connect": [{ label: "Connect" }],
 };
 
-function HostBreadcrumbs({ id }: { id: string }) {
-	const { data: hosts } = useHosts();
-	const host = hosts?.find((candidate) => hashHostId(candidate.host_id) === id);
-	return (
-		<Breadcrumbs
-			items={[home, { label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? id }]}
-			className="min-w-0"
-		/>
-	);
-}
-
-export function RouteBreadcrumbs() {
+export function useRouteBreadcrumbs(): BreadcrumbItem[] {
 	const { pathname } = useLocation();
 	const match = useMatch("/hosts/:id");
-	return match?.params.id ? (
-		<HostBreadcrumbs id={match.params.id} />
-	) : (
-		<Breadcrumbs items={[home, ...(routes[pathname] ?? [])]} className="min-w-0" />
-	);
+	const { data: hosts } = useHosts();
+	const id = match?.params.id;
+	const host = hosts?.find((candidate) => hashHostId(candidate.host_id) === id);
+	return id
+		? [home, { label: "Hosts", href: "/hosts" }, { label: host?.hostname ?? id }]
+		: [home, ...(routes[pathname] ?? [])];
 }

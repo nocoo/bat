@@ -1,10 +1,10 @@
 import { type HostTag, MAX_TAGS_PER_HOST, type TagItem } from "@bat/shared";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { MultiSelect } from "@nocoo/basalt/components/multi-select";
 import { Tags } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { deleteAPI, postAPI } from "@/api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHostTagsFor, useTags } from "@/hooks";
 import { createTagAffordance, suggestTags } from "@/lib/host-tags";
 
@@ -100,19 +100,19 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	);
 
 	return (
-		<Card className="overflow-visible">
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2 text-base">
+		<LayerCard className="overflow-visible">
+			<LayerCard.Header>
+				<h2 className="flex items-center gap-2">
 					<Tags className="h-4 w-4" />
 					Tags
 					{atLimit && (
-						<span className="text-xs font-normal text-muted-foreground">
+						<span className="text-basalt-sm font-normal text-basalt-muted-foreground">
 							(max {MAX_TAGS_PER_HOST})
 						</span>
 					)}
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
+				</h2>
+			</LayerCard.Header>
+			<LayerCard.Body>
 				<MultiSelect
 					label="Host tags"
 					placeholder="Add tags"
@@ -154,11 +154,11 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 					}}
 				/>
 				{error && (
-					<p role="alert" className="mt-2 text-sm text-destructive">
+					<p role="alert" className="mt-2 text-basalt-base text-basalt-destructive">
 						{error}
 					</p>
 				)}
-			</CardContent>
-		</Card>
+			</LayerCard.Body>
+		</LayerCard>
 	);
 }

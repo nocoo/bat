@@ -6,6 +6,7 @@ test.describe("Hosts list page", () => {
 		const sort = page.getByRole("combobox", { name: "Sort hosts" });
 		const cards = page.getByTestId("host-card");
 		await expect(cards).toHaveCount(2);
+		await expect(sort).toHaveCSS("font-size", "14px");
 		await expect(cards.first()).toContainText("alpha.test.local");
 		await sort.click();
 		await expect(page.getByRole("option")).toHaveCount(5);
@@ -20,6 +21,19 @@ test.describe("Hosts list page", () => {
 		await expect(sort).toHaveText("Name A→Z");
 		await expect(sort).toBeFocused();
 		await expect(cards.first()).toContainText("alpha.test.local");
+	});
+
+	test("tag filter announces selection and works with Space", async ({ page }) => {
+		await page.goto("/hosts");
+		const filters = page.getByTestId("tag-filter-bar");
+		const staging = filters.getByRole("button", { name: "staging", exact: true });
+		await staging.focus();
+		await staging.press("Space");
+		await expect(staging).toHaveAttribute("aria-pressed", "true");
+		await expect(page.getByTestId("host-card")).toHaveCount(1);
+		await filters.getByRole("button", { name: "Clear", exact: true }).click();
+		await expect(staging).toHaveAttribute("aria-pressed", "false");
+		await expect(page.getByTestId("host-card")).toHaveCount(2);
 	});
 
 	test("page loads and displays sidebar navigation", async ({ page }) => {

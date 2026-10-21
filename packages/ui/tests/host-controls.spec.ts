@@ -3,10 +3,65 @@ import { expect, test } from "@playwright/test";
 const host = "/api/hosts/pw-host-alpha";
 const detail = "/hosts/f0d3fd30";
 
+test("populated process table stays within mobile layout and preserves sorting", async ({
+	page,
+}) => {
+	const process = {
+		pid: 1,
+		name: "small",
+		cmd: "small --foreground",
+		user: "root",
+		state: "S",
+		cpu_pct: 10,
+		mem_rss: 1024,
+		mem_pct: 1,
+		mem_virt: 2048,
+		num_threads: 2,
+		uptime: 60,
+		io_read_rate: 0,
+		io_write_rate: 0,
+	};
+	await page.route("**/api/hosts/f0d3fd30", async (route) => {
+		const response = await route.fetch();
+		const data = await response.json();
+		await route.fulfill({
+			response,
+			json: {
+				...data,
+				top_processes_json: JSON.stringify([
+					process,
+					{ ...process, pid: 2, name: "large", cpu_pct: 20, mem_rss: 2048 },
+				]),
+			},
+		});
+	});
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto(detail);
+	const table = page.getByRole("table");
+	await expect(table.getByRole("row")).toHaveCount(3);
+	await expect
+		.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+		.toBe(true);
+	const memory = table.getByRole("columnheader", { name: /Memory/ });
+	await memory.getByRole("button").click();
+	await expect(memory).toHaveAttribute("aria-sort", "descending");
+	await expect(table.getByRole("row").nth(1)).toContainText("large");
+	await memory.getByRole("button").click();
+	await expect(memory).toHaveAttribute("aria-sort", "ascending");
+	await expect(table.getByRole("row").nth(1)).toContainText("small");
+	await page.getByRole("textbox", { name: "Filter processes" }).fill("large");
+	await expect(table.getByRole("row")).toHaveCount(2);
+	await expect(table.getByRole("row").nth(1)).toContainText("large");
+});
+
 test("description editor validates, cancels and persists without duplicate saves", async ({
 	page,
 }) => {
 	const initial = await (await page.request.get(host)).json();
+	let saves = 0;
+	page.on("request", (request) => {
+		if (request.url().endsWith("/description") && request.method() === "PATCH") saves++;
+	});
 	try {
 		await page.goto(detail);
 		const editor = page.getByRole("group", { name: "Host description", exact: true });
@@ -30,6 +85,7 @@ test("description editor validates, cancels and persists without duplicate saves
 		);
 		await page.reload();
 		await expect(editor).toContainText("Standard editor test");
+		expect(saves).toBe(1);
 	} finally {
 		expect(
 			(

@@ -15,7 +15,7 @@ test.describe("Host detail page", () => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
 		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
 
 		const hostsLink = breadcrumb.getByRole("link", { name: "Hosts" });
@@ -26,7 +26,7 @@ test.describe("Host detail page", () => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
 		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
 		await breadcrumb.getByRole("link", { name: "Hosts" }).click();
 		await expect(page).toHaveURL("/hosts");
@@ -168,7 +168,7 @@ test.describe("Host detail page", () => {
 			timeout: 15_000,
 		});
 
-		const breadcrumb = page.getByLabel("Breadcrumb navigation");
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
 		await breadcrumb.getByRole("link", { name: "Hosts" }).click();
 		await expect(page).toHaveURL("/hosts");
 	});

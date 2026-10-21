@@ -1,5 +1,6 @@
 import type { HostOverviewItem } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import {
 	Select,
@@ -13,7 +14,6 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { HostCard } from "@/components/host-card";
 import { TagFilterBar } from "@/components/tag-filter-bar";
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
@@ -51,14 +51,14 @@ function HostsLoading() {
 	return (
 		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
 			{Array.from({ length: 6 }, (_, i) => (
-				<Card key={`skeleton-${i.toString()}`}>
-					<CardContent className="space-y-4 py-6">
+				<LayerCard key={`skeleton-${i.toString()}`}>
+					<LayerCard.Body className="space-y-4 py-6">
 						<Skeleton className="h-5 w-32" />
 						<Skeleton className="h-4 w-full" />
 						<Skeleton className="h-4 w-full" />
 						<Skeleton className="h-4 w-3/4" />
-					</CardContent>
-				</Card>
+					</LayerCard.Body>
+				</LayerCard>
 			))}
 		</div>
 	);
@@ -66,20 +66,20 @@ function HostsLoading() {
 
 function HostsError({ message }: { message: string }) {
 	return (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-destructive" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">Failed to load hosts</h2>
-			<p className="mt-2 text-sm">{message}</p>
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">Failed to load hosts</h2>
+			<p className="mt-2 text-basalt-base">{message}</p>
 		</div>
 	);
 }
 
 function HostsEmpty() {
 	return (
-		<div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 			<Server className="h-12 w-12 mb-4" strokeWidth={1} />
-			<h2 className="text-lg font-semibold text-foreground">No hosts registered</h2>
-			<p className="mt-2 text-sm">Deploy a probe to start monitoring your servers.</p>
+			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">No hosts registered</h2>
+			<p className="mt-2 text-basalt-base">Deploy a probe to start monitoring your servers.</p>
 			<Button asChild className="mt-4">
 				<Link to="/setup">Setup Guide</Link>
 			</Button>
@@ -169,8 +169,8 @@ export function HostsPage() {
 				))}
 			</div>
 			{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
-				<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-					<p className="text-sm">No hosts match the selected tags.</p>
+				<div className="flex flex-col items-center justify-center py-12 text-basalt-muted-foreground">
+					<p className="text-basalt-base">No hosts match the selected tags.</p>
 					<Button variant="link" onClick={() => setSelectedTagIds([])} className="mt-2">
 						Clear filters
 					</Button>
