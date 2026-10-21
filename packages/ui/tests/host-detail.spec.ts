@@ -67,10 +67,19 @@ test.describe("Host detail page", () => {
 	});
 
 	test("shows status badge", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		await expect(page.locator('[data-testid="status-badge"]')).toBeVisible({ timeout: 15_000 });
+		const badge = page.getByTestId("status-badge");
+		await expect(badge).toBeVisible({ timeout: 15_000 });
+		expect(
+			await badge.evaluate((element) => {
+				const range = document.createRange();
+				range.selectNodeContents(element);
+				return range.getClientRects().length;
+			}),
+		).toBe(1);
 	});
 
 	test("time range picker has all duration options", async ({ page }) => {

@@ -189,3 +189,12 @@ for the browser context's new-page event verified both the destination tab and
 unchanged source page without changing application navigation. Use the event
 that represents the browser action, rather than replacing native links to fit a
 test assumption.
+
+## 2026-10-22 - Preserve short labels in responsive headers
+
+Adding the detail-page back control reduced the subtitle's available width.
+The status badge then shrank and split `Critical` across two lines on mobile,
+although the page still passed its overall overflow check. Screenshot inspection
+caught the regression. The shared status badge now preserves its intrinsic width
+and single-line label; a browser regression measures the rendered text lines.
+Check inline labels as well as outer geometry when adding navigation gutters.

@@ -1,5 +1,6 @@
 import type { HostStatus } from "@bat/shared";
 import { Badge } from "@nocoo/basalt";
+import { cn } from "@/lib/utils";
 
 const STATUS_CONFIG: Record<
 	HostStatus,
@@ -20,11 +21,12 @@ export function StatusBadge({ status }: { status: HostStatus }) {
 	return (
 		<Badge
 			variant={config.variant}
-			className={
+			className={cn(
+				"shrink-0 whitespace-nowrap",
 				status === "maintenance"
 					? "!bg-purple !text-purple-foreground dark:!bg-purple dark:!text-purple-foreground font-medium"
-					: undefined
-			}
+					: undefined,
+			)}
 			data-testid="status-badge"
 		>
 			{config.label}
