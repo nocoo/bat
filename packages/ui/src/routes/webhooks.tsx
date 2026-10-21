@@ -1,7 +1,15 @@
 import type { WebhookConfig } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
+import { CodeBlock } from "@nocoo/basalt/components/code";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, Copy, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nocoo/basalt/components/select";
+import { AlertTriangle, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
 import { Card, CardContent } from "@/components/ui/card";
@@ -107,19 +115,19 @@ export function WebhooksPage() {
 						}}
 					>
 						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-						<select
-							value={selectedHostId}
-							onChange={(e) => setSelectedHostId(e.target.value)}
-							className="h-8 text-sm flex-1 min-w-0 rounded-md border border-border bg-background px-3 ring-offset-background hover:border-foreground/20 disabled:hover:border-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-						>
-							<option value="">Select a host...</option>
-							{availableHosts.map((h) => (
-								<option key={h.host_id} value={h.host_id}>
-									{h.hostname}
-								</option>
-							))}
-						</select>
-						<Button type="submit" size="sm" disabled={creating || !selectedHostId}>
+						<Select value={selectedHostId} onValueChange={setSelectedHostId} disabled={creating}>
+							<SelectTrigger aria-label="Webhook host" className="flex-1 min-w-0">
+								<SelectValue placeholder="Select a host..." />
+							</SelectTrigger>
+							<SelectContent>
+								{availableHosts.map((h) => (
+									<SelectItem key={h.host_id} value={h.host_id}>
+										{h.hostname}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+						<Button type="submit" disabled={creating || !selectedHostId}>
 							{creating ? "Creating..." : "Generate"}
 						</Button>
 					</form>
@@ -164,53 +172,35 @@ interface WebhookConfigRowProps {
 function WebhookConfigRow({ config, workerUrl, onRegenerate, onDelete }: WebhookConfigRowProps) {
 	const { data: hosts } = useHosts();
 	const displayName = displayWebhookHostname(hosts, config.host_id);
-	const [copied, setCopied] = useState(false);
 
 	const curlCommand = buildCurlCommand(workerUrl, config.token);
 
-	const handleCopy = useCallback(async () => {
-		await navigator.clipboard.writeText(curlCommand);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	}, [curlCommand]);
-
 	return (
-		<div className="py-3 px-1">
+		<div className="py-3 px-1" data-testid="webhook-row">
 			<div className="flex items-center justify-between mb-2">
 				<span className="font-medium">{displayName}</span>
 				<div className="flex items-center gap-1">
-					<button
+					<Button
 						type="button"
 						onClick={() => onRegenerate(config.id)}
-						className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+						variant="ghost"
+						size="icon"
 						aria-label="Regenerate token"
 					>
 						<RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
-					</button>
-					<button
+					</Button>
+					<Button
 						type="button"
 						onClick={() => onDelete(config.id)}
-						className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+						variant="ghost"
+						size="icon"
 						aria-label="Delete webhook"
 					>
 						<Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-					</button>
+					</Button>
 				</div>
 			</div>
-			<div className="relative">
-				<pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto whitespace-pre-wrap">
-					{curlCommand}
-				</pre>
-				<button
-					type="button"
-					onClick={handleCopy}
-					className="absolute top-2 right-2 h-6 w-6 flex items-center justify-center rounded bg-background/80 text-muted-foreground hover:text-foreground transition-colors"
-					aria-label="Copy to clipboard"
-				>
-					<Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
-				</button>
-				{copied && <span className="absolute top-2 right-10 text-xs text-success">Copied!</span>}
-			</div>
+			<CodeBlock title="Webhook command">{curlCommand}</CodeBlock>
 		</div>
 	);
 }

@@ -1,5 +1,13 @@
 import type { HostOverviewItem } from "@bat/shared";
+import { Button } from "@nocoo/basalt";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@nocoo/basalt/components/select";
 import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
@@ -72,12 +80,9 @@ function HostsEmpty() {
 			<Server className="h-12 w-12 mb-4" strokeWidth={1} />
 			<h2 className="text-lg font-semibold text-foreground">No hosts registered</h2>
 			<p className="mt-2 text-sm">Deploy a probe to start monitoring your servers.</p>
-			<Link
-				to="/setup"
-				className="mt-4 inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-			>
-				Setup Guide
-			</Link>
+			<Button asChild className="mt-4">
+				<Link to="/setup">Setup Guide</Link>
+			</Button>
 		</div>
 	);
 }
@@ -129,17 +134,18 @@ export function HostsPage() {
 				title="Hosts"
 				description="Monitored servers and real-time infrastructure status."
 				actions={
-					<select
-						value={sortKey}
-						onChange={(e) => setSortKey(e.target.value as SortKey)}
-						className="rounded-md border border-border bg-secondary px-2 py-1 text-xs text-foreground"
-					>
-						{SORT_OPTIONS.map((opt) => (
-							<option key={opt.value} value={opt.value}>
-								{opt.label}
-							</option>
-						))}
-					</select>
+					<Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
+						<SelectTrigger aria-label="Sort hosts">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{SORT_OPTIONS.map((opt) => (
+								<SelectItem key={opt.value} value={opt.value}>
+									{opt.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
 				}
 				filters={
 					showFilterBar ? (
@@ -165,13 +171,9 @@ export function HostsPage() {
 			{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
 				<div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
 					<p className="text-sm">No hosts match the selected tags.</p>
-					<button
-						type="button"
-						onClick={() => setSelectedTagIds([])}
-						className="mt-2 text-sm text-primary hover:underline"
-					>
+					<Button variant="link" onClick={() => setSelectedTagIds([])} className="mt-2">
 						Clear filters
-					</button>
+					</Button>
 				</div>
 			)}
 		</div>

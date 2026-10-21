@@ -53,7 +53,7 @@ test.describe("Setup page", () => {
 		await page.waitForLoadState("domcontentloaded");
 
 		// Should have copy buttons (aria-label="Copy to clipboard")
-		const copyButtons = page.getByRole("button", { name: "Copy to clipboard" });
+		const copyButtons = page.getByRole("button", { name: "Copy code" });
 		await expect(copyButtons.first()).toBeVisible({ timeout: 15_000 });
 	});
 

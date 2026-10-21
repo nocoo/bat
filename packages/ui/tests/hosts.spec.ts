@@ -1,6 +1,27 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Hosts list page", () => {
+	test("standard sort select supports pointer and keyboard selection", async ({ page }) => {
+		await page.goto("/hosts");
+		const sort = page.getByRole("combobox", { name: "Sort hosts" });
+		const cards = page.getByTestId("host-card");
+		await expect(cards).toHaveCount(2);
+		await expect(cards.first()).toContainText("alpha.test.local");
+		await sort.click();
+		await expect(page.getByRole("option")).toHaveCount(5);
+		await page.getByRole("option", { name: "Name Z→A" }).click();
+		await expect(cards.first()).toContainText("beta.test.local");
+		await sort.focus();
+		await page.keyboard.press("Enter");
+		await expect(page.getByRole("option", { name: "Name Z→A" })).toBeFocused();
+		await page.keyboard.press("Home");
+		await expect(page.getByRole("option", { name: "Name A→Z" })).toBeFocused();
+		await page.keyboard.press("Enter");
+		await expect(sort).toHaveText("Name A→Z");
+		await expect(sort).toBeFocused();
+		await expect(cards.first()).toContainText("alpha.test.local");
+	});
+
 	test("page loads and displays sidebar navigation", async ({ page }) => {
 		await page.goto("/");
 		await page.waitForLoadState("domcontentloaded");

@@ -1,4 +1,5 @@
 import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
+import { SegmentControl } from "@nocoo/basalt";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Check, Database } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -81,38 +82,17 @@ export function DataRetentionPage() {
 						</div>
 					</div>
 
-					<fieldset className="flex gap-2" aria-label="Retention window">
-						<legend className="sr-only">Retention window</legend>
-						{RETENTION_OPTIONS.map((days) => {
-							const isSelected = settings?.retention_days === days;
-							const id = `retention-${days}`;
-							return (
-								<label
-									key={days}
-									htmlFor={id}
-									className={`relative h-9 px-4 text-sm font-medium rounded-md border transition-colors flex items-center cursor-pointer ${
-										saving ? "opacity-50 pointer-events-none" : ""
-									} ${
-										isSelected
-											? "border-primary bg-primary text-primary-foreground"
-											: "border-border bg-background text-foreground hover:bg-accent"
-									}`}
-								>
-									<input
-										type="radio"
-										id={id}
-										name="retention_days"
-										value={days}
-										checked={isSelected}
-										disabled={saving}
-										onChange={() => handleChange(days)}
-										className="sr-only"
-									/>
-									{retentionLabel(days)}
-								</label>
-							);
-						})}
-					</fieldset>
+					<SegmentControl
+						legend="Retention window"
+						className="[&>legend]:sr-only"
+						value={String(settings?.retention_days ?? "")}
+						onValueChange={(value) => handleChange(Number(value) as RetentionDays)}
+						disabled={saving}
+						options={RETENTION_OPTIONS.map((days) => ({
+							value: String(days),
+							label: retentionLabel(days),
+						}))}
+					/>
 					<div className="mt-3 h-5">
 						{saving && <p className="text-xs text-muted-foreground">Saving...</p>}
 						{saved && (

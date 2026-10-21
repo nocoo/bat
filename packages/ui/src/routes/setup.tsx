@@ -1,40 +1,17 @@
+import { Code, CodeBlock } from "@nocoo/basalt/components/code";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nocoo/basalt/components/collapsible";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, ChevronRight, Copy, Terminal } from "lucide-react";
-import { useCallback, useState } from "react";
+import { AlertTriangle, Terminal } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSetup } from "@/hooks";
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
-	const [copied, setCopied] = useState(false);
-
-	const handleCopy = useCallback(async () => {
-		await navigator.clipboard.writeText(code);
-		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
-	}, [code]);
-
-	return (
-		<div className="relative">
-			<pre className="text-xs bg-muted rounded-md p-3 overflow-x-auto whitespace-pre-wrap">
-				<code className={`language-${language}`}>{code}</code>
-			</pre>
-			<button
-				type="button"
-				onClick={handleCopy}
-				className="absolute top-2 right-2 h-6 w-6 flex items-center justify-center rounded bg-background/80 text-muted-foreground hover:text-foreground transition-colors"
-				aria-label="Copy to clipboard"
-			>
-				<Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
-			</button>
-			{copied && <span className="absolute top-2 right-10 text-xs text-success">Copied!</span>}
-		</div>
-	);
-}
-
 export function SetupPage() {
 	const { data: config, error, isLoading } = useSetup();
-	const [uninstallOpen, setUninstallOpen] = useState(false);
 
 	// Worker URL from API, with fallback for loading state
 	const workerUrl = config?.worker_url ?? "https://bat-ingest.worker.hexly.ai";
@@ -95,8 +72,7 @@ export function SetupPage() {
 				<CardContent>
 					<p className="text-sm text-muted-foreground mb-3">
 						Go to Cloudflare Dashboard → Workers &amp; Pages → bat → Settings → Variables, and copy
-						the value of <code className="text-xs bg-muted px-1 py-0.5 rounded">BAT_WRITE_KEY</code>
-						.
+						the value of <Code>BAT_WRITE_KEY</Code>.
 					</p>
 				</CardContent>
 			</Card>
@@ -108,10 +84,9 @@ export function SetupPage() {
 				</CardHeader>
 				<CardContent>
 					<p className="text-sm text-muted-foreground mb-3">
-						Replace <code className="text-xs bg-muted px-1 py-0.5 rounded">YOUR_WRITE_KEY</code>{" "}
-						with your actual key, then run on your server:
+						Replace <Code>YOUR_WRITE_KEY</Code> with your actual key, then run on your server:
 					</p>
-					<CodeBlock code={installCmd} language="bash" />
+					<CodeBlock title="Install command">{installCmd}</CodeBlock>
 				</CardContent>
 			</Card>
 
@@ -124,36 +99,23 @@ export function SetupPage() {
 					<p className="text-sm text-muted-foreground mb-3">
 						Check that the probe service is running.
 					</p>
-					<CodeBlock code="systemctl status bat-probe" language="bash" />
+					<CodeBlock title="Service status">systemctl status bat-probe</CodeBlock>
 				</CardContent>
 			</Card>
 
-			{/* Uninstall (collapsible) */}
 			<Card>
-				<button
-					type="button"
-					onClick={() => setUninstallOpen(!uninstallOpen)}
-					className="w-full cursor-pointer select-none hover:bg-accent/50 transition-colors rounded-t-card"
-				>
-					<CardHeader>
-						<CardTitle className="text-base flex items-center gap-2">
-							<ChevronRight
-								className={`h-4 w-4 transition-transform ${uninstallOpen ? "rotate-90" : ""}`}
-							/>
-							Uninstall
-						</CardTitle>
-					</CardHeader>
-				</button>
-				{uninstallOpen && (
-					<CardContent>
-						<p className="text-sm text-muted-foreground mb-3">
-							Stops the service and removes the binary. Config at{" "}
-							<code className="text-xs bg-muted px-1 py-0.5 rounded">/etc/bat/config.toml</code> is
-							preserved.
-						</p>
-						<CodeBlock code={uninstallCmd} language="bash" />
-					</CardContent>
-				)}
+				<CardContent>
+					<Collapsible>
+						<CollapsibleTrigger>Uninstall</CollapsibleTrigger>
+						<CollapsibleContent unstyled>
+							<p className="text-sm text-muted-foreground my-3">
+								Stops the service and removes the binary. Config at{" "}
+								<Code>/etc/bat/config.toml</Code> is preserved.
+							</p>
+							<CodeBlock title="Uninstall command">{uninstallCmd}</CodeBlock>
+						</CollapsibleContent>
+					</Collapsible>
+				</CardContent>
 			</Card>
 		</div>
 	);

@@ -24,11 +24,10 @@ test.describe("Webhooks page", () => {
 		await page.goto("/settings/webhooks");
 		await page.waitForLoadState("domcontentloaded");
 
-		const select = page.locator("select");
+		const select = page.getByRole("combobox", { name: "Webhook host" });
 		await expect(select).toBeVisible({ timeout: 15_000 });
 
-		const placeholderOption = page.locator('option[value=""]');
-		await expect(placeholderOption).toHaveText("Select a host...");
+		await expect(select).toHaveText("Select a host...");
 	});
 
 	test("Generate button is disabled without host selection", async ({ page }) => {
@@ -66,7 +65,7 @@ test.describe("Webhooks page", () => {
 
 		await expect(page.getByText("alpha.test.local")).toBeVisible({ timeout: 15_000 });
 
-		const copyButton = page.getByRole("button", { name: "Copy to clipboard" });
+		const copyButton = page.getByRole("button", { name: "Copy code" });
 		await expect(copyButton.first()).toBeVisible();
 	});
 
@@ -97,8 +96,9 @@ test.describe("Webhooks page", () => {
 		await expect(page.getByText("alpha.test.local")).toBeVisible({ timeout: 15_000 });
 
 		// alpha already has a webhook, so dropdown should only have beta
-		const select = page.locator("select");
-		const options = select.locator("option:not([value=''])");
+		const select = page.getByRole("combobox", { name: "Webhook host" });
+		await select.click();
+		const options = page.getByRole("option");
 		await expect(options).toHaveCount(1);
 		await expect(options.first()).toContainText("beta.test.local");
 	});
@@ -110,8 +110,9 @@ test.describe("Webhooks page", () => {
 		await expect(page.getByText("alpha.test.local")).toBeVisible({ timeout: 15_000 });
 
 		// Select beta from dropdown
-		const select = page.locator("select");
-		await select.selectOption({ label: "beta.test.local" });
+		const select = page.getByRole("combobox", { name: "Webhook host" });
+		await select.click();
+		await page.getByRole("option", { name: "beta.test.local" }).click();
 
 		// Generate button should be enabled now
 		const generateButton = page.locator('button[type="submit"]');
@@ -119,10 +120,12 @@ test.describe("Webhooks page", () => {
 		await generateButton.click();
 
 		// Should now show both webhooks
-		await expect(page.getByText("beta.test.local")).toBeVisible({ timeout: 10_000 });
+		const beta = page.getByTestId("webhook-row").filter({ hasText: "beta.test.local" });
+		await expect(beta).toBeVisible({ timeout: 10_000 });
+		await expect(select).toHaveText("Select a host...");
 
 		// Clean up — delete beta webhook
-		const deleteButtons = page.getByRole("button", { name: "Delete webhook" });
-		await deleteButtons.last().click();
+		await beta.getByRole("button", { name: "Delete webhook" }).click();
+		await expect(beta).not.toBeVisible();
 	});
 });
