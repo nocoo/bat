@@ -79,7 +79,7 @@ function AppShellInner({ children }: AppShellProps) {
 							event.preventDefault();
 							menuTrigger.current?.focus();
 						}}
-						className="w-[260px] max-w-[260px] border-0 bg-basalt-background p-0"
+						className="w-[260px] max-w-[260px] border-0 bg-basalt-background p-0 sm:p-0"
 					>
 						<SheetHeader className="sr-only">
 							<SheetTitle>Navigation Menu</SheetTitle>

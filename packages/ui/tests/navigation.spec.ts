@@ -52,3 +52,42 @@ test("mobile navigation closes the drawer and restores focus without replacing t
 	expect(await header?.evaluate((element) => element.isConnected)).toBe(true);
 	await expect(menu).toBeFocused();
 });
+
+test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) => {
+	await page.setViewportSize({ width: 700, height: 900 });
+	await page.goto("/hosts");
+	await page.getByRole("button", { name: "Open navigation menu" }).click();
+	const drawer = page.getByRole("dialog");
+	await expect(drawer).toBeVisible();
+	await expect(drawer).toHaveCSS("padding-left", "0px");
+	await expect(drawer).toHaveCSS("padding-right", "0px");
+	expect(
+		await drawer.evaluate((element) => {
+			const panel = element.getBoundingClientRect();
+			const sidebar = element.querySelector("aside")?.getBoundingClientRect();
+			return sidebar && sidebar.left >= panel.left - 1 && sidebar.right <= panel.right + 1;
+		}),
+	).toBe(true);
+});
+
+test("collapsed sidebar keeps its version badge compact and centered", async ({ page }) => {
+	await page.goto("/hosts");
+	await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+	const sidebar = page.locator("aside");
+	await expect(sidebar).toHaveCSS("width", "68px");
+	const badge = sidebar.getByText(/^v\d+\.\d+\.\d+$/);
+	await expect(badge).toBeVisible();
+	await expect
+		.poll(() =>
+			badge.evaluate((element) => {
+				const badgeBounds = element.getBoundingClientRect();
+				const sidebar = element.closest("aside")?.getBoundingClientRect();
+				return (
+					sidebar &&
+					badgeBounds.width < sidebar.width * 0.8 &&
+					Math.abs(badgeBounds.left + badgeBounds.width / 2 - sidebar.left - sidebar.width / 2) < 1
+				);
+			}),
+		)
+		.toBe(true);
+});

@@ -160,3 +160,10 @@ Basalt versions without changing application behavior. An import inventory also
 used Python directory traversal instead of the required `rg`; the inventory was
 rerun with `rg`. Use web-first assertions for asynchronous UI transitions and
 keep repository discovery on the prescribed tools, including temporary helpers.
+
+The initial 390px browser check missed a new Sheet padding rule at the 640px
+breakpoint. Review arrived after the package commit; a 700px regression test
+reproduced the 24px inset and the consumer now explicitly clears it there. Keep
+responsive boundary checks and review ahead of issue-closing commit references.
+A proposed footer alignment fix was unnecessary: the published collapsed-rail
+CSS already centers it, confirmed after waiting for the rail's final width.
