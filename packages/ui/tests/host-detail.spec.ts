@@ -41,6 +41,31 @@ test.describe("Host detail page", () => {
 		});
 	});
 
+	test("back control sits left of the title and subtitle and returns to Hosts", async ({
+		page,
+	}) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		const title = page.getByRole("heading", { name: "alpha.test.local", exact: true });
+		const back = page.getByRole("link", { name: "Back to hosts", exact: true });
+		await expect(title).toBeVisible();
+		await expect(back).toHaveAttribute("href", "/hosts");
+		for (const width of [1280, 390]) {
+			await page.setViewportSize({ width, height: 900 });
+			const button = await back.boundingBox();
+			const heading = await title.boundingBox();
+			const subtitle = await page
+				.getByText("Real-time metrics, system specifications, and services.", { exact: true })
+				.boundingBox();
+			expect(button && heading && button.x + button.width < heading.x).toBe(true);
+			expect(button && subtitle && button.x + button.width < subtitle.x).toBe(true);
+			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+				true,
+			);
+		}
+		await back.click();
+		await expect(page).toHaveURL("/hosts");
+	});
+
 	test("shows status badge", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
@@ -50,22 +75,39 @@ test.describe("Host detail page", () => {
 
 	test("time range picker has all duration options", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		await expect(page.getByRole("button", { name: "1h" })).toBeVisible({ timeout: 15_000 });
-		await expect(page.getByRole("button", { name: "6h" })).toBeVisible();
-		await expect(page.getByRole("button", { name: "24h" })).toBeVisible();
-		await expect(page.getByRole("button", { name: "7d" })).toBeVisible();
+		const picker = page.getByRole("radiogroup", { name: "Time range", exact: true });
+		await expect(picker).toBeVisible();
+		for (const name of ["1h", "6h", "24h", "7d", "30d", "90d"]) {
+			await expect(picker.getByRole("radio", { name, exact: true })).toBeVisible();
+		}
+		await expect(picker.getByRole("radio", { name: "1h", exact: true })).toBeChecked();
+		await expect(page.locator("legend").filter({ hasText: "Time range" })).toHaveCSS(
+			"position",
+			"absolute",
+		);
 	});
 
-	test("clicking time range button changes selection", async ({ page }) => {
+	test("time range segment changes the metrics request and supports keyboard selection", async ({
+		page,
+	}) => {
 		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		const sixHourButton = page.getByRole("button", { name: "6h" });
-		await expect(sixHourButton).toBeVisible({ timeout: 15_000 });
-		await sixHourButton.click();
-		await expect(sixHourButton).toBeVisible();
+		const picker = page.getByRole("radiogroup", { name: "Time range", exact: true });
+		const sixHours = picker.getByRole("radio", { name: "6h", exact: true });
+		const response = page.waitForResponse((result) => {
+			const url = new URL(result.url());
+			return (
+				url.pathname.endsWith(`/api/hosts/${alphaHid}/metrics`) &&
+				Number(url.searchParams.get("to")) - Number(url.searchParams.get("from")) === 21600
+			);
+		});
+		await sixHours.click();
+		expect((await response).ok()).toBe(true);
+		await expect(sixHours).toBeChecked();
+		await expect(picker.getByRole("radio", { name: "1h", exact: true })).not.toBeChecked();
+		const day = picker.getByRole("radio", { name: "24h", exact: true });
+		await day.focus();
+		await day.press("Space");
+		await expect(day).toBeChecked();
 	});
 
 	test("system info card shows OS and architecture", async ({ page }) => {

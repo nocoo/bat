@@ -1,8 +1,9 @@
 import { hashHostId } from "@bat/shared";
+import { Button, SegmentControl } from "@nocoo/basalt";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { patchAPI } from "@/api";
 import {
 	CpuChart,
@@ -34,33 +35,6 @@ const TIME_RANGES = [
 	{ label: "30d", seconds: 2592000 },
 	{ label: "90d", seconds: 7776000 },
 ] as const;
-
-function TimeRangePicker({
-	selected,
-	onSelect,
-}: {
-	selected: number;
-	onSelect: (seconds: number) => void;
-}) {
-	return (
-		<div className="flex items-center gap-1 rounded-lg bg-secondary p-1">
-			{TIME_RANGES.map((range) => (
-				<button
-					key={range.label}
-					type="button"
-					onClick={() => onSelect(range.seconds)}
-					className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-						selected === range.seconds
-							? "bg-card text-foreground shadow-sm"
-							: "text-muted-foreground hover:text-foreground"
-					}`}
-				>
-					{range.label}
-				</button>
-			))}
-		</div>
-	);
-}
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
 	return (
@@ -170,22 +144,37 @@ export function HostDetailPage() {
 	return (
 		<div className="space-y-6">
 			{/* Header */}
-			<PageHeader
-				title={host?.hostname ?? hid}
-				description={
-					host ? (
-						<span className="inline-flex items-center gap-2 mt-1">
-							<StatusBadge status={host.status} />
-							<span className="text-sm text-basalt-muted-foreground">
-								Real-time metrics, system specifications, and services.
+			<div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-basalt-layout-sm">
+				<Button asChild={true} variant="ghost" size="icon">
+					<Link to="/hosts" aria-label="Back to hosts">
+						<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
+					</Link>
+				</Button>
+				<PageHeader
+					title={host?.hostname ?? hid}
+					description={
+						host ? (
+							<span className="inline-flex items-center gap-2 mt-1">
+								<StatusBadge status={host.status} />
+								<span className="text-sm text-basalt-muted-foreground">
+									Real-time metrics, system specifications, and services.
+								</span>
 							</span>
-						</span>
-					) : (
-						"Real-time metrics, system specifications, and services."
-					)
-				}
-				actions={<TimeRangePicker selected={rangeSeconds} onSelect={setRangeSeconds} />}
-			/>
+						) : (
+							"Real-time metrics, system specifications, and services."
+						)
+					}
+					actions={
+						<SegmentControl
+							legend="Time range"
+							className="[&>legend]:sr-only"
+							value={String(rangeSeconds)}
+							onValueChange={(value) => setRangeSeconds(Number(value))}
+							options={TIME_RANGES.map(({ label, seconds }) => ({ label, value: String(seconds) }))}
+						/>
+					}
+				/>
+			</div>
 			{detail && (
 				<DescriptionEditor hid={hid} value={detail.description} onSaved={handleDescriptionSaved} />
 			)}
