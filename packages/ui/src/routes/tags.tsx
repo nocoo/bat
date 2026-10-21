@@ -1,6 +1,7 @@
 import { TAG_COLOR_COUNT, TAG_MAX_LENGTH, type TagItem } from "@bat/shared";
 import { Badge, Button, Input } from "@nocoo/basalt";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
+import { Radio } from "@nocoo/basalt/components/radio";
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
@@ -110,6 +111,7 @@ export function TagsPage() {
 					>
 						<Plus className="h-4 w-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
 						<Input
+							aria-label="New tag name"
 							placeholder="New tag name…"
 							value={newName}
 							onChange={(e) => setNewName(e.target.value)}
@@ -193,9 +195,9 @@ function TagRow({
 	onDelete,
 }: TagRowProps) {
 	return (
-		<div className="flex items-center gap-3 py-2.5 px-1">
+		<div className="flex flex-wrap items-center gap-3 py-2.5 px-1">
 			{/* Tag chip / inline edit */}
-			<div className="flex-1 min-w-0">
+			<div className="flex-1 min-w-40">
 				{editing ? (
 					<form
 						className="flex items-center gap-2"
@@ -205,68 +207,74 @@ function TagRow({
 						}}
 					>
 						<Input
+							aria-label="Tag name"
 							value={editName}
 							onChange={(e) => onEditNameChange(e.target.value)}
 							size="sm"
-							className="w-40"
+							className="flex-1 min-w-0"
 							maxLength={32}
 						/>
-						<Button type="submit" size="sm" variant="ghost" className="h-7 text-xs">
+						<Button type="submit" size="sm" variant="ghost">
 							Save
 						</Button>
-						<Button
-							type="button"
-							size="sm"
-							variant="ghost"
-							className="h-7 text-xs"
-							onClick={onCancelEdit}
-						>
+						<Button type="button" size="sm" variant="ghost" onClick={onCancelEdit}>
 							Cancel
 						</Button>
 					</form>
 				) : (
-					<button
+					<Button
 						type="button"
 						onClick={onStartEdit}
-						className="hover:opacity-80 transition-opacity"
+						variant="ghost"
+						size="sm"
+						aria-label={`Rename tag ${tag.name}`}
 					>
-						<TagChip name={tag.name} color={tag.color} size="md" />
-					</button>
+						<TagChip name={tag.name} color={tag.color} />
+					</Button>
 				)}
 			</div>
 
-			{/* Color swatches */}
-			<div className="flex items-center gap-1">
+			<Radio.Group
+				aria-label={`Color for ${tag.name}`}
+				value={String(tag.color)}
+				onValueChange={(value) => onRecolor(Number(value))}
+				className="flex flex-wrap gap-2"
+			>
 				{Array.from({ length: TAG_COLOR_COUNT }, (_, i) => (
-					<button
+					<label
 						key={`color-${i.toString()}`}
-						type="button"
-						onClick={() => onRecolor(i)}
-						className={`h-4 w-4 rounded-full transition-all ${
-							tag.color === i
-								? "ring-2 ring-offset-1 ring-foreground scale-110"
-								: "opacity-60 hover:opacity-100"
-						}`}
-						style={{ backgroundColor: getSwatchColor(i) }}
-						aria-label={`Color ${i}`}
-					/>
+						htmlFor={`tag-${tag.id}-color-${i}`}
+						className="flex items-center gap-1"
+					>
+						<Radio.Item
+							id={`tag-${tag.id}-color-${i}`}
+							value={String(i)}
+							aria-label={`Color ${i}`}
+						/>
+						<span
+							aria-hidden="true"
+							className="size-3 rounded-full"
+							style={{ backgroundColor: getSwatchColor(i) }}
+						/>
+					</label>
 				))}
-			</div>
+			</Radio.Group>
 
 			{/* Host count */}
-			<Badge variant="secondary" className="text-xs px-2 py-0.5 font-normal tabular-nums">
+			<Badge variant="secondary" className="tabular-nums">
 				{tag.host_count} {tag.host_count === 1 ? "host" : "hosts"}
 			</Badge>
 
 			{/* Delete */}
-			<button
+			<Button
 				type="button"
 				onClick={onDelete}
-				className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+				variant="ghost"
+				size="icon"
 				aria-label={`Delete tag ${tag.name}`}
 			>
 				<Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-			</button>
+			</Button>
 		</div>
 	);
 }

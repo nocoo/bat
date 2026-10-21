@@ -1,8 +1,9 @@
 import { hashHostId } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
+import { InlineEditable } from "@nocoo/basalt/components/inline-editable";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { patchAPI } from "@/api";
 import {
@@ -45,8 +46,6 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 	);
 }
 
-/** Format CPU label — "AMD EPYC 7763 (4 cores, 8 threads)" */
-
 function DescriptionEditor({
 	hid,
 	value,
@@ -54,63 +53,28 @@ function DescriptionEditor({
 }: {
 	hid: string;
 	value: string | null;
-	onSaved: (v: string | null) => void;
+	onSaved: (value: string | null) => void;
 }) {
 	const [editing, setEditing] = useState(false);
-	const [draft, setDraft] = useState(value ?? "");
-	const inputRef = useRef<HTMLInputElement>(null);
-
-	const startEdit = useCallback(() => {
-		setDraft(value ?? "");
-		setEditing(true);
-		setTimeout(() => inputRef.current?.focus(), 0);
-	}, [value]);
-
-	const save = useCallback(async () => {
-		const trimmed = draft.trim();
-		const desc = trimmed || null;
-		await patchAPI(`/api/hosts/${hid}/description`, { description: desc });
-		onSaved(desc);
-		setEditing(false);
-	}, [draft, hid, onSaved]);
-
-	const cancel = useCallback(() => {
-		setEditing(false);
-		setDraft(value ?? "");
-	}, [value]);
-
-	if (editing) {
-		return (
-			<input
-				data-bat-dirty={draft !== (value ?? "")}
-				ref={inputRef}
-				type="text"
-				maxLength={200}
-				value={draft}
-				onChange={(e) => setDraft(e.target.value)}
-				onKeyDown={(e) => {
-					if (e.key === "Enter") {
-						save();
-					}
-					if (e.key === "Escape") {
-						cancel();
-					}
-				}}
-				onBlur={save}
-				className="w-full rounded border border-border bg-secondary px-2 py-0.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-primary"
-				placeholder="Add description..."
-			/>
-		);
-	}
-
 	return (
-		<button
-			type="button"
-			onClick={startEdit}
-			className="text-sm text-muted-foreground hover:text-foreground transition-colors text-left"
-		>
-			{value || "Add description..."}
-		</button>
+		<div data-bat-dirty={editing}>
+			<InlineEditable
+				label="Host description"
+				value={value ?? ""}
+				editing={editing}
+				onEditingChange={setEditing}
+				required={false}
+				placeholder="Add description..."
+				validate={(draft) =>
+					draft.length > 200 ? "Description must be 200 characters or fewer." : undefined
+				}
+				onSave={async (draft) => {
+					const description = draft || null;
+					await patchAPI(`/api/hosts/${hid}/description`, { description });
+					onSaved(description);
+				}}
+			/>
+		</div>
 	);
 }
 

@@ -1,3 +1,4 @@
+import { Button, Field, Input } from "@nocoo/basalt";
 import { Wrench } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
@@ -104,65 +105,41 @@ export function MaintenancePanel({ hostId }: MaintenancePanelProps) {
 						stores UTC.
 					</p>
 					<div className="grid grid-cols-2 gap-2">
-						<label className="space-y-1">
-							<span className="text-xs font-medium text-muted-foreground">Start</span>
-							<input
+						<Field label="Start" hint={start ? describeLocalAsUtc(start, tzOffset) : undefined}>
+							<Input
 								type="time"
 								value={start}
 								onChange={(e) => setStart(e.target.value)}
 								disabled={busy}
-								className="h-8 w-full rounded-md border border-border bg-secondary hover:border-foreground/20 px-2 text-sm font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 							/>
-							{start && (
-								<span className="block text-[10px] text-muted-foreground font-mono">
-									{describeLocalAsUtc(start, tzOffset)}
-								</span>
-							)}
-						</label>
-						<label className="space-y-1">
-							<span className="text-xs font-medium text-muted-foreground">End</span>
-							<input
+						</Field>
+						<Field label="End" hint={end ? describeLocalAsUtc(end, tzOffset) : undefined}>
+							<Input
 								type="time"
 								value={end}
 								onChange={(e) => setEnd(e.target.value)}
 								disabled={busy}
-								className="h-8 w-full rounded-md border border-border bg-secondary hover:border-foreground/20 px-2 text-sm font-mono ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 							/>
-							{end && (
-								<span className="block text-[10px] text-muted-foreground font-mono">
-									{describeLocalAsUtc(end, tzOffset)}
-								</span>
-							)}
-						</label>
+						</Field>
 					</div>
-					<input
+					<Input
 						type="text"
+						aria-label="Maintenance reason"
 						placeholder="Reason (optional)"
 						value={reason}
 						onChange={(e) => setReason(e.target.value)}
 						disabled={busy}
 						maxLength={200}
-						className="h-8 w-full rounded-md border border-border bg-secondary hover:border-foreground/20 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
 					/>
 					{error && <p className="text-xs text-destructive">{error}</p>}
 					<div className="flex items-center gap-2">
-						<button
-							type="button"
-							onClick={handleSave}
-							disabled={busy || !dirty || !start || !end}
-							className="h-8 rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-						>
+						<Button type="button" onClick={handleSave} disabled={busy || !dirty || !start || !end}>
 							{window ? "Update" : "Save"}
-						</button>
+						</Button>
 						{window && (
-							<button
-								type="button"
-								onClick={handleClear}
-								disabled={busy}
-								className="h-8 rounded-md border border-border px-3 text-sm hover:bg-secondary disabled:opacity-50 transition-colors"
-							>
+							<Button type="button" variant="outline" onClick={handleClear} disabled={busy}>
 								Clear
-							</button>
+							</Button>
 						)}
 					</div>
 				</div>

@@ -1,5 +1,14 @@
 import type { MetricsResolution } from "@bat/shared";
-import { LayerCard } from "@nocoo/basalt";
+import { Input, LayerCard } from "@nocoo/basalt";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+	TableSortableHeader,
+} from "@nocoo/basalt/components/table";
 import { Activity } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -36,18 +45,17 @@ function SortTh({
 	onSort: (key: SortKey) => void;
 	className: string;
 }) {
-	const indicator = sortKey === activeSortKey ? (sortDir === "desc" ? " ↓" : " ↑") : "";
+	const sorted = sortKey === activeSortKey ? sortDir : undefined;
 	return (
-		<th className={className}>
-			<button
-				type="button"
-				className="w-full text-inherit cursor-pointer select-none hover:text-foreground text-right"
-				onClick={() => onSort(sortKey)}
-			>
+		<TableHead
+			className={className}
+			textAlign="end"
+			aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : "none"}
+		>
+			<TableSortableHeader sorted={sorted} textAlign="end" onClick={() => onSort(sortKey)}>
 				{label}
-				{indicator}
-			</button>
-		</th>
+			</TableSortableHeader>
+		</TableHead>
 	);
 }
 
@@ -92,7 +100,7 @@ export function TopProcessesTable({
 		);
 	}
 
-	const thBase = "px-2 py-1.5 text-right font-medium";
+	const thBase = "text-right";
 
 	return (
 		<LayerCard className="p-4 md:p-5" padding="none">
@@ -102,23 +110,24 @@ export function TopProcessesTable({
 					Top Processes
 					<span className="text-xs font-normal text-muted-foreground">({processes.length})</span>
 				</div>
-				<input
+				<Input
 					type="text"
 					placeholder="Filter by name, cmd, user…"
 					value={search}
 					onChange={(e) => setSearch(e.target.value)}
-					className="h-7 w-48 rounded border border-border bg-background px-2 text-xs hover:border-foreground/20 disabled:hover:border-transparent focus:outline-none focus:ring-1 focus:ring-ring"
+					className="w-64 max-w-full"
+					aria-label="Filter processes"
 				/>
 			</div>
 
 			<div className="overflow-x-auto">
-				<table className="w-full text-xs">
-					<thead>
-						<tr className="border-b border-border text-muted-foreground">
-							<th className="px-2 py-1.5 text-left font-medium w-[60px]">PID</th>
-							<th className="px-2 py-1.5 text-left font-medium w-[120px]">Name</th>
-							<th className="px-2 py-1.5 text-left font-medium w-[80px]">User</th>
-							<th className="px-2 py-1.5 text-center font-medium w-[50px]">State</th>
+				<Table>
+					<TableHeader>
+						<TableRow>
+							<TableHead className="text-left font-medium w-[60px]">PID</TableHead>
+							<TableHead className="text-left font-medium w-[120px]">Name</TableHead>
+							<TableHead className="text-left font-medium w-[80px]">User</TableHead>
+							<TableHead className="text-center font-medium w-[50px]">State</TableHead>
 							<SortTh
 								label="CPU%"
 								sortKey="cpu_pct"
@@ -175,52 +184,52 @@ export function TopProcessesTable({
 								onSort={handleSort}
 								className={`${thBase} w-[80px]`}
 							/>
-						</tr>
-					</thead>
-					<tbody>
+						</TableRow>
+					</TableHeader>
+					<TableBody>
 						{sorted.map((p) => (
-							<tr key={p.pid} className="border-b border-border/50 hover:bg-background/50">
-								<td className="px-2 py-1 font-mono tabular-nums text-muted-foreground">{p.pid}</td>
-								<td className="px-2 py-1 truncate max-w-[120px]" title={p.cmd}>
+							<TableRow key={p.pid}>
+								<TableCell className="font-mono tabular-nums text-muted-foreground">
+									{p.pid}
+								</TableCell>
+								<TableCell className="truncate max-w-[120px]" title={p.cmd}>
 									{p.name}
-								</td>
-								<td className="px-2 py-1 truncate max-w-[80px] text-muted-foreground">{p.user}</td>
-								<td
-									className={`px-2 py-1 text-center font-mono font-semibold ${stateColor(p.state)}`}
-								>
+								</TableCell>
+								<TableCell className="truncate max-w-[80px] text-muted-foreground">
+									{p.user}
+								</TableCell>
+								<TableCell className={`text-center font-mono font-semibold ${stateColor(p.state)}`}>
 									{p.state}
-								</td>
-								<td
-									className={`px-2 py-1 text-right font-mono tabular-nums ${cpuColor(p.cpu_pct)}`}
-								>
+								</TableCell>
+								<TableCell className={`text-right font-mono tabular-nums ${cpuColor(p.cpu_pct)}`}>
 									{p.cpu_pct != null ? p.cpu_pct.toFixed(1) : "—"}
-								</td>
-								<td className="px-2 py-1 text-right font-mono tabular-nums">
+								</TableCell>
+								<TableCell className="text-right font-mono tabular-nums">
 									{formatBytes(p.mem_rss)}
-								</td>
-								<td
-									className={`px-2 py-1 text-right font-mono tabular-nums ${memPctColor(p.mem_pct)}`}
+								</TableCell>
+								<TableCell
+									className={`text-right font-mono tabular-nums ${memPctColor(p.mem_pct)}`}
 								>
 									{p.mem_pct.toFixed(1)}
-								</td>
-								<td
-									className={`px-2 py-1 text-right font-mono tabular-nums ${threadColor(p.num_threads)}`}
+								</TableCell>
+								<TableCell
+									className={`text-right font-mono tabular-nums ${threadColor(p.num_threads)}`}
 								>
 									{p.num_threads}
-								</td>
-								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
+								</TableCell>
+								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
 									{p.io_read_rate != null ? formatBytesRate(p.io_read_rate) : "—"}
-								</td>
-								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
+								</TableCell>
+								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
 									{p.io_write_rate != null ? formatBytesRate(p.io_write_rate) : "—"}
-								</td>
-								<td className="px-2 py-1 text-right font-mono tabular-nums text-muted-foreground">
+								</TableCell>
+								<TableCell className="text-right font-mono tabular-nums text-muted-foreground">
 									{formatUptime(p.uptime)}
-								</td>
-							</tr>
+								</TableCell>
+							</TableRow>
 						))}
-					</tbody>
-				</table>
+					</TableBody>
+				</Table>
 			</div>
 		</LayerCard>
 	);

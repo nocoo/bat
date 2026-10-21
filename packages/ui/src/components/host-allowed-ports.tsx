@@ -1,4 +1,10 @@
 import type { AlertItem, AllowedPort } from "@bat/shared";
+import { Button, Input } from "@nocoo/basalt";
+import {
+	Collapsible,
+	CollapsibleContent,
+	CollapsibleTrigger,
+} from "@nocoo/basalt/components/collapsible";
 import { Check, Plus, Radio, Shield, X } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
@@ -147,7 +153,7 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 									{listening.publicUnallowed.map((p) => (
 										<div
 											key={`pu-${p.port}-${p.bind}-${p.protocol}`}
-											className="flex items-center gap-2 text-sm"
+											className="flex flex-wrap items-center gap-2 text-sm"
 										>
 											<span className="font-mono font-medium text-amber-500 w-12 shrink-0">
 												{p.port}
@@ -159,9 +165,10 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 												{formatProcess(p.process, p.pid)}
 											</span>
 											{quickAllowPort === p.port ? (
-												<div className="flex items-center gap-1.5 flex-1">
-													<input
+												<div className="flex basis-full items-center gap-2 sm:basis-auto sm:flex-1">
+													<Input
 														type="text"
+														aria-label="Allow port reason"
 														placeholder="Reason (optional)…"
 														value={quickAllowReason}
 														onChange={(e) => setQuickAllowReason(e.target.value)}
@@ -176,40 +183,45 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 															}
 														}}
 														disabled={adding}
-														className="h-6 flex-1 rounded border border-border bg-secondary hover:border-foreground/20 px-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+														size="sm"
+														className="flex-1 min-w-0"
 														maxLength={200}
 													/>
-													<button
+													<Button
 														type="button"
 														onClick={() => handleQuickAllow(p.port)}
 														disabled={adding}
-														className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+														size="sm"
 													>
 														Allow
-													</button>
-													<button
+													</Button>
+													<Button
 														type="button"
 														onClick={() => {
 															setQuickAllowPort(null);
 															setQuickAllowReason("");
 														}}
-														className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+														size="icon"
+														variant="ghost"
+														aria-label="Cancel allow port"
+														disabled={adding}
 													>
 														<X className="h-3 w-3" />
-													</button>
+													</Button>
 												</div>
 											) : (
-												<button
+												<Button
 													type="button"
 													onClick={() => {
 														setQuickAllowPort(p.port);
 														setQuickAllowReason("");
 													}}
-													className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+													size="sm"
+													variant="ghost"
 												>
 													<Plus className="h-3 w-3" />
 													Allow
-												</button>
+												</Button>
 											)}
 										</div>
 									))}
@@ -233,25 +245,25 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 								</div>
 							)}
 							{listening.local.length > 0 && (
-								<details className="group">
-									<summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground select-none">
-										Local-only ({listening.local.length})
-									</summary>
-									<div className="mt-1.5 grid gap-1 pl-4">
-										{listening.local.map((p) => (
-											<div
-												key={`lo-${p.port}-${p.bind}-${p.protocol}`}
-												className="flex items-center gap-2 text-xs text-muted-foreground"
-											>
-												<span className="font-mono w-10 shrink-0">{p.port}</span>
-												<span className="font-mono shrink-0">
-													{p.bind} {p.protocol}
-												</span>
-												<span className="truncate">{formatProcess(p.process, p.pid)}</span>
-											</div>
-										))}
-									</div>
-								</details>
+								<Collapsible>
+									<CollapsibleTrigger>Local-only ({listening.local.length})</CollapsibleTrigger>
+									<CollapsibleContent unstyled>
+										<div className="mt-1.5 grid gap-1 pl-4">
+											{listening.local.map((p) => (
+												<div
+													key={`lo-${p.port}-${p.bind}-${p.protocol}`}
+													className="flex items-center gap-2 text-xs text-muted-foreground"
+												>
+													<span className="font-mono w-10 shrink-0">{p.port}</span>
+													<span className="font-mono shrink-0">
+														{p.bind} {p.protocol}
+													</span>
+													<span className="truncate">{formatProcess(p.process, p.pid)}</span>
+												</div>
+											))}
+										</div>
+									</CollapsibleContent>
+								</Collapsible>
 							)}
 						</div>
 					)}
@@ -263,12 +275,13 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 							</p>
 							{alertingFallback.map((port) => (
 								<div key={port}>
-									<div className="flex items-center gap-2 text-sm">
+									<div className="flex flex-wrap items-center gap-2 text-sm">
 										<span className="font-mono font-medium text-amber-500">{port}</span>
 										{quickAllowPort === port ? (
-											<div className="flex items-center gap-1.5 flex-1">
-												<input
+											<div className="flex basis-full items-center gap-2 sm:basis-auto sm:flex-1">
+												<Input
 													type="text"
+													aria-label="Allow port reason"
 													placeholder="Reason (optional)…"
 													value={quickAllowReason}
 													onChange={(e) => setQuickAllowReason(e.target.value)}
@@ -283,40 +296,45 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 														}
 													}}
 													disabled={adding}
-													className="h-6 flex-1 rounded border border-border bg-secondary hover:border-foreground/20 px-2 text-xs ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+													size="sm"
+													className="flex-1 min-w-0"
 													maxLength={200}
 												/>
-												<button
+												<Button
 													type="button"
 													onClick={() => handleQuickAllow(port)}
 													disabled={adding}
-													className="rounded bg-primary px-2 py-0.5 text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+													size="sm"
 												>
 													Allow
-												</button>
-												<button
+												</Button>
+												<Button
 													type="button"
 													onClick={() => {
 														setQuickAllowPort(null);
 														setQuickAllowReason("");
 													}}
-													className="rounded p-0.5 text-muted-foreground hover:text-foreground transition-colors"
+													size="icon"
+													variant="ghost"
+													aria-label="Cancel allow port"
+													disabled={adding}
 												>
 													<X className="h-3 w-3" />
-												</button>
+												</Button>
 											</div>
 										) : (
-											<button
+											<Button
 												type="button"
 												onClick={() => {
 													setQuickAllowPort(port);
 													setQuickAllowReason("");
 												}}
-												className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+												size="sm"
+												variant="ghost"
 											>
 												<Plus className="h-3 w-3" />
 												Allow
-											</button>
+											</Button>
 										)}
 									</div>
 								</div>
@@ -345,14 +363,16 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 											<span className="text-xs text-muted-foreground">
 												{relativeTime(entry.created_at)}
 											</span>
-											<button
+											<Button
 												type="button"
 												onClick={() => removePort(entry.port)}
-												className="rounded p-0.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+												size="icon"
+												variant="ghost"
+												aria-label={`Remove port ${entry.port} from allowlist`}
 												title="Remove from allowlist"
 											>
 												<X className="h-3.5 w-3.5" />
-											</button>
+											</Button>
 										</div>
 									</div>
 								))}
@@ -361,17 +381,18 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 					)}
 
 					<div className="flex items-center gap-2">
-						<input
+						<Input
 							type="number"
 							placeholder="Port"
 							value={portInput}
 							onChange={(e) => setPortInput(e.target.value)}
 							disabled={adding}
-							className="h-8 w-20 rounded-md border border-border bg-secondary hover:border-foreground/20 px-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+							className="w-24 font-mono"
+							aria-label="Port"
 							min={1}
 							max={65535}
 						/>
-						<input
+						<Input
 							type="text"
 							placeholder="Reason…"
 							value={reasonInput}
@@ -383,17 +404,13 @@ export function AllowedPortsPanel({ hostId, hashedHostId, hostAlerts }: AllowedP
 								}
 							}}
 							disabled={adding}
-							className="h-8 flex-1 rounded-md border border-border bg-secondary hover:border-foreground/20 px-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+							className="flex-1 min-w-0"
+							aria-label="Port reason"
 							maxLength={200}
 						/>
-						<button
-							type="button"
-							onClick={handleManualAdd}
-							disabled={adding || !portInput.trim()}
-							className="h-8 rounded-md bg-primary px-3 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
-						>
+						<Button type="button" onClick={handleManualAdd} disabled={adding || !portInput.trim()}>
 							Add
-						</button>
+						</Button>
 					</div>
 				</div>
 			</CardContent>

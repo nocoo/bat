@@ -177,7 +177,7 @@ export function HostCard({
 				{tags && tags.length > 0 && (
 					<div className="flex items-center gap-1 flex-wrap mt-1.5 px-0.5">
 						{tags.map((tag) => (
-							<TagChip key={tag.id} name={tag.name} color={tag.color} size="sm" />
+							<TagChip key={tag.id} name={tag.name} color={tag.color} />
 						))}
 					</div>
 				)}
