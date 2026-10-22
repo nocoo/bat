@@ -69,7 +69,7 @@ Environment design, fixture matrix, and capture limitations: [local environments
 | pre-commit | Working-tree coverage/types/staged lint/secrets/route/page gates; conditional Rust lint | Unified L1 on an index snapshot, <30s |
 | pre-push | Local Worker L2 and G2 in parallel | Test commits named by stdin push refs, <3min |
 
-Install restores Husky. Hooks must stay check-only; never use `--no-verify` on commits or branch pushes. CI pins shared workflows at `ad43150de3a2be2fa464b5cd2f921dc4fa9f8f0f`.
+Install restores Husky. Hooks must stay check-only; never use `--no-verify` on commits or branch pushes. CI pins shared workflows at `ac635753a869cb85fad1f52aae4ccbd6119f3cae`.
 
 ## Resources and isolation
 
