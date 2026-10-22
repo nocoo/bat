@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.3.6
+
+### Fixed
+- Preserve the dashboard shell across navigation and correct tablet/mobile sidebar geometry, selection, spacing and theme behavior.
+- Keep host cards aligned within each row, prevent status labels from wrapping, and contain populated process tables on narrow screens.
+- Use standard Basalt controls for sorting, forms, tags, inline editing, copying, permissions and retention settings while preserving Connect authorization and key safeguards.
+- Patch Rust TLS/webpki and JavaScript dependency advisories while retaining static-musl probe packaging.
+
+### Changed
+- Upgrade Basalt to 3.2.1 and unify typography, content surfaces, headers and chart tooltips without duplicate control styling.
+- Add host-detail back navigation, standard time-range segments and a full-width Connect page layout.
+- Update React, React Router, Vite, Hono, Wrangler, TypeScript tooling and test dependencies to the validated lockfile versions.
+- Expand browser checks for keyboard interaction, editing, tag colors, responsive layouts and credential lifecycle behavior.
+
 ## v2.3.3
 
 ### Fixed
