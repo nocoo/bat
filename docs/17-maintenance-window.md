@@ -49,11 +49,7 @@ export function isValidTimeHHMM(time: string): boolean;
  * @param start    Window start "HH:MM" UTC
  * @param end      Window end "HH:MM" UTC
  */
-export function isInMaintenanceWindow(
-  nowHHMM: string,
-  start: string,
-  end: string,
-): boolean;
+export function isInMaintenanceWindow(nowHHMM: string, start: string, end: string): boolean;
 
 /** Convert unix seconds to "HH:MM" UTC string. */
 export function toUtcHHMM(unixSeconds: number): string;
@@ -75,15 +71,15 @@ else:
 export type HostStatus = "healthy" | "warning" | "critical" | "offline" | "maintenance";
 
 // HostOverviewItem: add fields
-maintenance_start: string | null;   // "HH:MM" UTC
-maintenance_end: string | null;     // "HH:MM" UTC
+maintenance_start: string | null; // "HH:MM" UTC
+maintenance_end: string | null; // "HH:MM" UTC
 maintenance_reason: string | null;
 
 // New DTO
 export interface MaintenanceWindow {
-  start: string;    // "HH:MM" UTC
-  end: string;      // "HH:MM" UTC
-  reason: string;   // may be ""
+	start: string; // "HH:MM" UTC
+	end: string; // "HH:MM" UTC
+	reason: string; // may be ""
 }
 ```
 
@@ -91,11 +87,11 @@ export interface MaintenanceWindow {
 
 ## API
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/api/hosts/:id/maintenance` | BAT_READ_KEY | Get maintenance window (or `null`) |
-| PUT | `/api/hosts/:id/maintenance` | BAT_WRITE_KEY | Set/update maintenance window |
-| DELETE | `/api/hosts/:id/maintenance` | BAT_WRITE_KEY | Remove maintenance window |
+| Method | Path                         | Auth          | Description                        |
+| ------ | ---------------------------- | ------------- | ---------------------------------- |
+| GET    | `/api/hosts/:id/maintenance` | BAT_READ_KEY  | Get maintenance window (or `null`) |
+| PUT    | `/api/hosts/:id/maintenance` | BAT_WRITE_KEY | Set/update maintenance window      |
+| DELETE | `/api/hosts/:id/maintenance` | BAT_WRITE_KEY | Remove maintenance window          |
 
 ### PUT `/api/hosts/:id/maintenance`
 
@@ -103,9 +99,9 @@ export interface MaintenanceWindow {
 
 ```json
 {
-  "start": "03:00",
-  "end": "05:00",
-  "reason": "Nightly backup"
+	"start": "03:00",
+	"end": "05:00",
+	"reason": "Nightly backup"
 }
 ```
 
@@ -190,14 +186,14 @@ All routes that return alerts must JOIN `hosts` and exclude maintenance hosts in
 
 **Affected routes:**
 
-| Route | Current behavior | Change |
-|-------|-----------------|--------|
-| `GET /api/alerts` (`alertsListRoute`) | Returns all alerts for active hosts | Filter out alerts where host is currently in maintenance |
-| `GET /api/monitoring/alerts` (`monitoringAlertsRoute`) | Same SQL, adds tags + severity filter | Same filtering, also exclude from `alert_count` and `by_severity` tallies |
-| `GET /api/hosts` (`hostsListRoute`) | Counts alerts per host for `alert_count` | Set `alert_count: 0` for maintenance hosts |
-| `GET /api/hosts/:id` (`hostDetailRoute`) | Returns single host with `alert_count` from raw `alerts.length` | Set `alert_count: 0` for maintenance hosts (status already derived via `deriveHostStatus`) |
-| `GET /api/monitoring/hosts` (`monitoringHostsRoute`) | Lists hosts with tier + alerts | Tier = `"maintenance"`, empty alerts array |
-| `GET /api/monitoring/hosts/:id` | Single host with alerts | Tier = `"maintenance"`, empty alerts array |
+| Route                                                  | Current behavior                                                | Change                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `GET /api/alerts` (`alertsListRoute`)                  | Returns all alerts for active hosts                             | Filter out alerts where host is currently in maintenance                                   |
+| `GET /api/monitoring/alerts` (`monitoringAlertsRoute`) | Same SQL, adds tags + severity filter                           | Same filtering, also exclude from `alert_count` and `by_severity` tallies                  |
+| `GET /api/hosts` (`hostsListRoute`)                    | Counts alerts per host for `alert_count`                        | Set `alert_count: 0` for maintenance hosts                                                 |
+| `GET /api/hosts/:id` (`hostDetailRoute`)               | Returns single host with `alert_count` from raw `alerts.length` | Set `alert_count: 0` for maintenance hosts (status already derived via `deriveHostStatus`) |
+| `GET /api/monitoring/hosts` (`monitoringHostsRoute`)   | Lists hosts with tier + alerts                                  | Tier = `"maintenance"`, empty alerts array                                                 |
+| `GET /api/monitoring/hosts/:id`                        | Single host with alerts                                         | Tier = `"maintenance"`, empty alerts array                                                 |
 
 **Pattern** (applied to each route):
 
@@ -206,17 +202,20 @@ All routes that return alerts must JOIN `hosts` and exclude maintenance hosts in
 const nowHHMM = toUtcHHMM(Math.floor(Date.now() / 1000));
 
 // For alert list routes — filter out maintenance host alerts:
-const visibleAlerts = alerts.filter(a => {
-    const host = hostMap.get(a.host_id);
-    if (host?.maintenance_start && host?.maintenance_end
-        && isInMaintenanceWindow(nowHHMM, host.maintenance_start, host.maintenance_end)) {
-        return false;
-    }
-    return true;
+const visibleAlerts = alerts.filter((a) => {
+	const host = hostMap.get(a.host_id);
+	if (
+		host?.maintenance_start &&
+		host?.maintenance_end &&
+		isInMaintenanceWindow(nowHHMM, host.maintenance_start, host.maintenance_end)
+	) {
+		return false;
+	}
+	return true;
 });
 
 // For host list/detail routes — zero out alert_count for maintenance hosts:
-const alertCount = isInMaintenance ? 0 : alertCountMap.get(host.host_id) ?? 0;
+const alertCount = isInMaintenance ? 0 : (alertCountMap.get(host.host_id) ?? 0);
 
 // For host detail route (single host, alerts already fetched):
 // alert_count is derived from raw alerts.length — override to 0 during maintenance.
@@ -231,11 +230,11 @@ New signature:
 
 ```typescript
 export function deriveHostStatus(
-  lastSeen: number,
-  now: number,
-  alerts: AlertRow[],
-  allowedPorts?: Set<number>,
-  maintenance?: { start: string; end: string } | null,
+	lastSeen: number,
+	now: number,
+	alerts: AlertRow[],
+	allowedPorts?: Set<number>,
+	maintenance?: { start: string; end: string } | null,
 ): HostStatus;
 ```
 
@@ -273,13 +272,13 @@ Fleet `status` is derived from the remaining non-maintenance hosts only. A fleet
 
 ```typescript
 interface HealthResponse {
-  status: "healthy" | "degraded" | "critical" | "empty";
-  total_hosts: number;
-  healthy: number;
-  warning: number;
-  critical: number;
-  maintenance: number;  // ← new
-  checked_at: number;
+	status: "healthy" | "degraded" | "critical" | "empty";
+	total_hosts: number;
+	healthy: number;
+	warning: number;
+	critical: number;
+	maintenance: number; // ← new
+	checked_at: number;
 }
 ```
 
@@ -336,19 +335,19 @@ New file: `packages/dashboard/src/app/api/hosts/[id]/maintenance/route.ts`
 
 ```typescript
 export async function GET(req, { params }) {
-    await auth();
-    return proxyToWorker(`/api/hosts/${params.id}/maintenance`);
+	await auth();
+	return proxyToWorker(`/api/hosts/${params.id}/maintenance`);
 }
 
 export async function PUT(req, { params }) {
-    await auth();
-    const body = await req.json();
-    return proxyToWorkerWithBody(`/api/hosts/${params.id}/maintenance`, "PUT", body, true);
+	await auth();
+	const body = await req.json();
+	return proxyToWorkerWithBody(`/api/hosts/${params.id}/maintenance`, "PUT", body, true);
 }
 
 export async function DELETE(req, { params }) {
-    await auth();
-    return proxyToWorkerWithBody(`/api/hosts/${params.id}/maintenance`, "DELETE", undefined, true);
+	await auth();
+	return proxyToWorkerWithBody(`/api/hosts/${params.id}/maintenance`, "DELETE", undefined, true);
 }
 ```
 
@@ -358,10 +357,9 @@ export async function DELETE(req, { params }) {
 
 ```typescript
 export function useHostMaintenance(hid: string | null) {
-    return useSWR<MaintenanceWindow | null>(
-        hid ? `maintenance-${hid}` : null,
-        () => fetchAPI(`/api/hosts/${hid}/maintenance`),
-    );
+	return useSWR<MaintenanceWindow | null>(hid ? `maintenance-${hid}` : null, () =>
+		fetchAPI(`/api/hosts/${hid}/maintenance`),
+	);
 }
 ```
 
@@ -379,10 +377,10 @@ Uses recharts `<ReferenceArea>` to render grey semi-transparent bands on time-se
  * (one per calendar day that intersects the chart range).
  */
 export function maintenanceAreas(
-  start: string,       // "HH:MM" UTC
-  end: string,         // "HH:MM" UTC
-  rangeFrom: number,   // unix seconds (chart X axis start)
-  rangeTo: number,     // unix seconds (chart X axis end)
+	start: string, // "HH:MM" UTC
+	end: string, // "HH:MM" UTC
+	rangeFrom: number, // unix seconds (chart X axis start)
+	rangeTo: number, // unix seconds (chart X axis end)
 ): { x1: number; x2: number }[];
 ```
 
@@ -390,12 +388,13 @@ Each area is rendered as:
 
 ```tsx
 <ReferenceArea
-  x1={area.x1} x2={area.x2}
-  fill="currentColor"
-  fillOpacity={0.06}
-  stroke="none"
-  ifOverflow="hidden"
-/>
+	x1={area.x1}
+	x2={area.x2}
+	fill="currentColor"
+	fillOpacity={0.06}
+	stroke="none"
+	ifOverflow="hidden"
+/>;
 ```
 
 All 6 time-series chart components gain an optional prop:
@@ -429,38 +428,38 @@ No changes needed — `HostOverviewItem` already includes `status`, which will b
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `packages/shared/src/maintenance.ts` | **NEW** — time utilities |
-| `packages/shared/src/api.ts` | HostStatus + HostOverviewItem + MaintenanceWindow |
-| `packages/shared/src/index.ts` | export maintenance module |
-| `packages/worker/migrations/0017_maintenance_window.sql` | **NEW** — ALTER TABLE hosts |
-| `packages/worker/src/routes/maintenance.ts` | **NEW** — CRUD handlers |
-| `packages/worker/src/routes/ingest.ts` | skip evaluateAlerts during maintenance |
-| `packages/worker/src/routes/hosts.ts` | SELECT + derive maintenance status |
-| `packages/worker/src/routes/host-detail.ts` | SELECT + derive maintenance status |
-| `packages/worker/src/routes/monitoring.ts` | maintenance-aware tier + query-time alert filtering |
-| `packages/worker/src/routes/alerts.ts` | query-time filter: exclude maintenance host alerts |
-| `packages/worker/src/routes/fleet-status.ts` | maintenance count bucket + exclude from fleet health |
-| `packages/worker/src/services/status.ts` | maintenance in deriveHostStatus |
-| `packages/worker/src/index.ts` | register maintenance routes |
-| `packages/worker/src/middleware/api-key.ts` | maintenance mutations as write routes |
-| `packages/shared/src/alerts.ts` | HealthResponse + maintenance count field |
-| `docs/03-data-structures.md` | HealthResponse type update |
-| `docs/06-dashboard.md` | proxy table + BAT_WRITE_KEY description update |
-| `packages/worker/test/e2e/wrangler.test.ts` | add 0017 to migration list |
-| `packages/dashboard/src/app/api/hosts/[id]/maintenance/route.ts` | **NEW** — proxy |
-| `packages/dashboard/src/components/maintenance-panel.tsx` | **NEW** — settings UI |
-| `packages/dashboard/src/components/charts/maintenance-overlay.tsx` | **NEW** — ReferenceArea |
-| `packages/dashboard/src/components/status-badge.tsx` | maintenance variant |
-| `packages/dashboard/src/components/charts/cpu-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/components/charts/memory-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/components/charts/network-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/components/charts/psi-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/components/charts/disk-io-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/components/charts/tcp-chart.tsx` | maintenanceWindow prop |
-| `packages/dashboard/src/lib/hooks.ts` | useHostMaintenance hook |
-| `packages/dashboard/src/app/hosts/[id]/page.tsx` | panel + chart overlay integration |
+| File                                                               | Change                                               |
+| ------------------------------------------------------------------ | ---------------------------------------------------- |
+| `packages/shared/src/maintenance.ts`                               | **NEW** — time utilities                             |
+| `packages/shared/src/api.ts`                                       | HostStatus + HostOverviewItem + MaintenanceWindow    |
+| `packages/shared/src/index.ts`                                     | export maintenance module                            |
+| `packages/worker/migrations/0017_maintenance_window.sql`           | **NEW** — ALTER TABLE hosts                          |
+| `packages/worker/src/routes/maintenance.ts`                        | **NEW** — CRUD handlers                              |
+| `packages/worker/src/routes/ingest.ts`                             | skip evaluateAlerts during maintenance               |
+| `packages/worker/src/routes/hosts.ts`                              | SELECT + derive maintenance status                   |
+| `packages/worker/src/routes/host-detail.ts`                        | SELECT + derive maintenance status                   |
+| `packages/worker/src/routes/monitoring.ts`                         | maintenance-aware tier + query-time alert filtering  |
+| `packages/worker/src/routes/alerts.ts`                             | query-time filter: exclude maintenance host alerts   |
+| `packages/worker/src/routes/fleet-status.ts`                       | maintenance count bucket + exclude from fleet health |
+| `packages/worker/src/services/status.ts`                           | maintenance in deriveHostStatus                      |
+| `packages/worker/src/index.ts`                                     | register maintenance routes                          |
+| `packages/worker/src/middleware/api-key.ts`                        | maintenance mutations as write routes                |
+| `packages/shared/src/alerts.ts`                                    | HealthResponse + maintenance count field             |
+| `docs/03-data-structures.md`                                       | HealthResponse type update                           |
+| `docs/06-dashboard.md`                                             | proxy table + BAT_WRITE_KEY description update       |
+| `packages/worker/test/e2e/wrangler.test.ts`                        | add 0017 to migration list                           |
+| `packages/dashboard/src/app/api/hosts/[id]/maintenance/route.ts`   | **NEW** — proxy                                      |
+| `packages/dashboard/src/components/maintenance-panel.tsx`          | **NEW** — settings UI                                |
+| `packages/dashboard/src/components/charts/maintenance-overlay.tsx` | **NEW** — ReferenceArea                              |
+| `packages/dashboard/src/components/status-badge.tsx`               | maintenance variant                                  |
+| `packages/dashboard/src/components/charts/cpu-chart.tsx`           | maintenanceWindow prop                               |
+| `packages/dashboard/src/components/charts/memory-chart.tsx`        | maintenanceWindow prop                               |
+| `packages/dashboard/src/components/charts/network-chart.tsx`       | maintenanceWindow prop                               |
+| `packages/dashboard/src/components/charts/psi-chart.tsx`           | maintenanceWindow prop                               |
+| `packages/dashboard/src/components/charts/disk-io-chart.tsx`       | maintenanceWindow prop                               |
+| `packages/dashboard/src/components/charts/tcp-chart.tsx`           | maintenanceWindow prop                               |
+| `packages/dashboard/src/lib/hooks.ts`                              | useHostMaintenance hook                              |
+| `packages/dashboard/src/app/hosts/[id]/page.tsx`                   | panel + chart overlay integration                    |
 
 ---
 

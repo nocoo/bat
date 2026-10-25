@@ -15,23 +15,23 @@
 
 ## Dimension Overview
 
-| Dimension | What | Tools | Trigger | Pass criteria |
-|-----------|------|-------|---------|---------------|
-| **L1** Unit | Pure logic tests | Bun test (TS), `cargo llvm-cov` (Rust) | pre-commit | ≥ 90% TS, ≥ 95% Rust |
-| **L2** Integration | Real HTTP E2E against Wrangler | Bun test + local Wrangler/D1 | pre-push | 100% route coverage |
-| **L3** Browser E2E | User flows in real browser | Playwright (Chromium) | CI only | All specs pass |
-| **G1** Static | Type errors, lint, format | Biome, tsc, clippy, cargo fmt | pre-commit | 0 diagnostics |
-| **G2** Security | CVEs + secrets | osv-scanner, gitleaks | pre-push | 0 vulnerabilities, 0 leaks |
-| **D1** Isolation | Test/prod resource separation | Local Miniflare only (`--local`) | runtime | L2/L3 never touch prod D1 |
+| Dimension          | What                           | Tools                                  | Trigger    | Pass criteria              |
+| ------------------ | ------------------------------ | -------------------------------------- | ---------- | -------------------------- |
+| **L1** Unit        | Pure logic tests               | Bun test (TS), `cargo llvm-cov` (Rust) | pre-commit | ≥ 90% TS, ≥ 95% Rust       |
+| **L2** Integration | Real HTTP E2E against Wrangler | Bun test + local Wrangler/D1           | pre-push   | 100% route coverage        |
+| **L3** Browser E2E | User flows in real browser     | Playwright (Chromium)                  | CI only    | All specs pass             |
+| **G1** Static      | Type errors, lint, format      | Biome, tsc, clippy, cargo fmt          | pre-commit | 0 diagnostics              |
+| **G2** Security    | CVEs + secrets                 | osv-scanner, gitleaks                  | pre-push   | 0 vulnerabilities, 0 leaks |
+| **D1** Isolation   | Test/prod resource separation  | Local Miniflare only (`--local`)       | runtime    | L2/L3 never touch prod D1  |
 
 ### Tier System
 
-| Tier | Requirement | Current status |
-|------|-------------|----------------|
-| **S** | All six dimensions green | **Yes** |
-| **A** | L1 + L2 + G1 + D1 + one more | — |
-| **B** | L1 + G1 | — |
-| **C** | Any basic dimension failing | — |
+| Tier  | Requirement                  | Current status |
+| ----- | ---------------------------- | -------------- |
+| **S** | All six dimensions green     | **Yes**        |
+| **A** | L1 + L2 + G1 + D1 + one more | —              |
+| **B** | L1 + G1                      | —              |
+| **C** | Any basic dimension failing  | —              |
 
 ---
 
@@ -45,11 +45,11 @@
 
 ### Coverage targets
 
-| Module | Tool | Target | Key test areas |
-|--------|------|--------|----------------|
-| `@bat/shared` | Bun test | ≥ 90% | Alert rule definitions, threshold constants, type guards |
-| `@bat/worker` | Bun test | ≥ 90% | Alert evaluation (6 rules), aggregation SQL, metrics resolution, middleware, route handlers |
-| `probe/` | `cargo llvm-cov` | ≥ 95% | Procfs parsing, delta calc, rate math, config parsing, payload serialization, retry logic |
+| Module        | Tool             | Target | Key test areas                                                                              |
+| ------------- | ---------------- | ------ | ------------------------------------------------------------------------------------------- |
+| `@bat/shared` | Bun test         | ≥ 90%  | Alert rule definitions, threshold constants, type guards                                    |
+| `@bat/worker` | Bun test         | ≥ 90%  | Alert evaluation (6 rules), aggregation SQL, metrics resolution, middleware, route handlers |
+| `probe/`      | `cargo llvm-cov` | ≥ 95%  | Procfs parsing, delta calc, rate math, config parsing, payload serialization, retry logic   |
 
 `@bat/ui` has no unit tests — it is a thin SPA shell. Build verification only.
 
@@ -86,11 +86,11 @@ Pre-commit hook blocks the commit. Developer must fix before retrying.
 
 ### Port convention
 
-| Purpose | Port |
-|---------|------|
-| Daily gateway | 7025 |
+| Purpose                           | Port                     |
+| --------------------------------- | ------------------------ |
+| Daily gateway                     | 7025                     |
 | Native Worker / Vite / inspectors | Ephemeral loopback ports |
-| L2 and L3 gateways | Per-run ephemeral ports |
+| L2 and L3 gateways                | Per-run ephemeral ports  |
 
 ### How it works
 
@@ -180,12 +180,12 @@ CI job fails; PR cannot merge. Test report uploaded as CI artifact for debugging
 
 ### Tools
 
-| Module | Tool | Config |
-|--------|------|--------|
-| All TS packages | Biome | `biome.json` at repo root, `all: true` strict mode |
-| All TS packages | TypeScript | `tsc --noEmit` (typecheck only) |
-| `probe/` | `cargo clippy` | `-- -D warnings` (deny all warnings) |
-| `probe/` | `cargo fmt` | `--check` (format verification) |
+| Module          | Tool           | Config                                             |
+| --------------- | -------------- | -------------------------------------------------- |
+| All TS packages | Biome          | `biome.json` at repo root, `all: true` strict mode |
+| All TS packages | TypeScript     | `tsc --noEmit` (typecheck only)                    |
+| `probe/`        | `cargo clippy` | `-- -D warnings` (deny all warnings)               |
+| `probe/`        | `cargo fmt`    | `--check` (format verification)                    |
 
 Biome lint runs via `lint-staged` on staged files only (incremental).
 
@@ -203,10 +203,10 @@ Pre-commit hook blocks the commit. Zero diagnostics required.
 
 ### Tools
 
-| Tool | What | Scope |
-|------|------|-------|
-| osv-scanner | Known CVEs in dependencies | `bun.lock` (JS) + `probe/Cargo.lock` (Rust) |
-| gitleaks | Secrets/credentials in staged commits | scans entire git history |
+| Tool        | What                                  | Scope                                       |
+| ----------- | ------------------------------------- | ------------------------------------------- |
+| osv-scanner | Known CVEs in dependencies            | `bun.lock` (JS) + `probe/Cargo.lock` (Rust) |
+| gitleaks    | Secrets/credentials in staged commits | scans entire git history                    |
 
 ### Run
 
@@ -235,13 +235,13 @@ Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
 
 ### Isolation layers
 
-| Layer | Mechanism | What it prevents |
-|-------|-----------|------------------|
-| 1 | `--local` flag | Wrangler uses in-process Miniflare, not remote CF |
-| 2 | `--persist-to .wrangler/environments/e2e-<uuid>` | Dedicated state dir, separate from other runs |
-| 3 | OS-assigned HTTP and Inspector ports | Concurrent runs cannot collide or probe another run's Worker |
-| 4 | `_test_marker` row asserted | Per-store owner and env markers created by the launcher, checked with its manifest |
-| 5 | Env var guard | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set |
+| Layer | Mechanism                                        | What it prevents                                                                   |
+| ----- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| 1     | `--local` flag                                   | Wrangler uses in-process Miniflare, not remote CF                                  |
+| 2     | `--persist-to .wrangler/environments/e2e-<uuid>` | Dedicated state dir, separate from other runs                                      |
+| 3     | OS-assigned HTTP and Inspector ports             | Concurrent runs cannot collide or probe another run's Worker                       |
+| 4     | `_test_marker` row asserted                      | Per-store owner and env markers created by the launcher, checked with its manifest |
+| 5     | Env var guard                                    | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set           |
 
 ### Failure behavior
 
@@ -259,15 +259,15 @@ There is no remote `bat-db-test` database or `[env.test]` wrangler environment. 
 
 Runs on every `git commit`. All stages execute in parallel; any failure blocks the commit.
 
-| Stage | Command | What |
-|-------|---------|------|
-| `unit_cov` | `bash scripts/check-coverage.sh 90 95` | L1: TS + Rust unit tests with coverage |
-| `typecheck` | `bun turbo typecheck` | G1: TypeScript type checking |
-| `lint` | `bunx lint-staged` | G1: Biome lint on staged files |
+| Stage       | Command                                            | What                                              |
+| ----------- | -------------------------------------------------- | ------------------------------------------------- |
+| `unit_cov`  | `bash scripts/check-coverage.sh 90 95`             | L1: TS + Rust unit tests with coverage            |
+| `typecheck` | `bun turbo typecheck`                              | G1: TypeScript type checking                      |
+| `lint`      | `bunx lint-staged`                                 | G1: Biome lint on staged files                    |
 | `rust_lint` | `cargo fmt --check && cargo clippy -- -D warnings` | G1: Rust format + lint (only if `probe/` changed) |
-| `gitleaks` | `gitleaks protect --staged --no-banner` | G2: Secrets detection on staged changes |
-| `routes` | `bun run gate:routes` | L2: Structural route coverage gate |
-| `pages` | `bun run gate:pages` | L3: Structural page coverage gate |
+| `gitleaks`  | `gitleaks protect --staged --no-banner`            | G2: Secrets detection on staged changes           |
+| `routes`    | `bun run gate:routes`                              | L2: Structural route coverage gate                |
+| `pages`     | `bun run gate:pages`                               | L3: Structural page coverage gate                 |
 
 **Total time**: ~15-20s (parallel, dominated by unit tests + Rust compilation).
 
@@ -275,18 +275,18 @@ Runs on every `git commit`. All stages execute in parallel; any failure blocks t
 
 Runs before `git push`. All stages execute in parallel; any failure blocks the push.
 
-| Stage | Command | What |
-|-------|---------|------|
-| `l2_e2e` | `bun run turbo test:e2e --filter=@bat/worker` | L2: Full API E2E |
-| `osv_js` | `osv-scanner scan --lockfile=bun.lock` | G2: CVE scanning for JS deps |
+| Stage      | Command                                        | What                           |
+| ---------- | ---------------------------------------------- | ------------------------------ |
+| `l2_e2e`   | `bun run turbo test:e2e --filter=@bat/worker`  | L2: Full API E2E               |
+| `osv_js`   | `osv-scanner scan --lockfile=bun.lock`         | G2: CVE scanning for JS deps   |
 | `osv_rust` | `osv-scanner scan --lockfile=probe/Cargo.lock` | G2: CVE scanning for Rust deps |
 
 **Total time**: ~25-30s (parallel, dominated by Wrangler startup + test execution).
 
 ### What's NOT in hooks
 
-| Dimension | Why not in hooks |
-|-----------|-----------------|
+| Dimension       | Why not in hooks                                                       |
+| --------------- | ---------------------------------------------------------------------- |
 | L3 (Playwright) | ~30s+ with browser startup, requires built UI assets — runs in CI only |
 
 ---
@@ -298,22 +298,22 @@ GitHub Actions runs all dimensions in parallel for maximum speed.
 ```yaml
 # .github/workflows/ci.yml
 jobs:
-  quality:         # L1 + G1 + G2 via nocoo/base-ci
-  coverage-gates:  # Route + page structural coverage
-  l2-e2e:          # L2: Worker E2E (local Wrangler/D1)
-  l3-playwright:   # L3: Browser E2E (Chromium)
-  probe:           # Rust: cargo test + clippy + fmt
+  quality: # L1 + G1 + G2 via nocoo/base-ci
+  coverage-gates: # Route + page structural coverage
+  l2-e2e: # L2: Worker E2E (local Wrangler/D1)
+  l3-playwright: # L3: Browser E2E (Chromium)
+  probe: # Rust: cargo test + clippy + fmt
 ```
 
 ### Job details
 
-| Job | Runs | Duration | Dependencies |
-|-----|------|----------|-------------|
-| `quality` | L1 unit tests, G1 typecheck + lint, G2 osv-scanner + gitleaks | ~45s | None |
-| `coverage-gates` | gate:routes + gate:pages structural coverage | ~10s | None |
-| `l2-e2e` | Worker API E2E tests against local Wrangler | ~30s | None |
-| `l3-playwright` | Playwright browser tests with Chromium | ~60s | None (builds UI internally) |
-| `probe` | `cargo test` + `cargo clippy` + `cargo fmt --check` | ~60s (cold) / ~20s (cached) | None |
+| Job              | Runs                                                          | Duration                    | Dependencies                |
+| ---------------- | ------------------------------------------------------------- | --------------------------- | --------------------------- |
+| `quality`        | L1 unit tests, G1 typecheck + lint, G2 osv-scanner + gitleaks | ~45s                        | None                        |
+| `coverage-gates` | gate:routes + gate:pages structural coverage                  | ~10s                        | None                        |
+| `l2-e2e`         | Worker API E2E tests against local Wrangler                   | ~30s                        | None                        |
+| `l3-playwright`  | Playwright browser tests with Chromium                        | ~60s                        | None (builds UI internally) |
+| `probe`          | `cargo test` + `cargo clippy` + `cargo fmt --check`           | ~60s (cold) / ~20s (cached) | None                        |
 
 All five jobs run in parallel (no `needs` dependency). Total CI time: ~60s (wall clock).
 
@@ -331,16 +331,16 @@ All five jobs run in parallel (no `needs` dependency). Total CI time: ~60s (wall
 
 Manual verification before each deployment (not automated in hooks):
 
-| # | Scenario | How to verify |
-|---|----------|---------------|
-| 1 | Probe → Worker ingest | Run Probe against local Wrangler, check `metrics_raw` in D1 |
-| 2 | Probe → Worker identity | Restart Probe, check `hosts` table updated |
-| 3 | Alert evaluation | Send metrics exceeding thresholds, check `alert_states` populated |
-| 4 | Live endpoint | After alerts fire, `curl /api/live` returns correct status + HTTP code |
-| 5 | UI → Worker API | Login to UI, verify host list loads from Worker via SWR |
-| 6 | Time range switching | Select 7d range in UI, verify hourly resolution data returned |
-| 7 | Retired host rejection | Retire a host via D1 console, verify Probe gets 403 |
-| 8 | Aggregation cron | Trigger `__scheduled`, verify `metrics_hourly` populated, old `metrics_raw` purged |
+| #   | Scenario                | How to verify                                                                     |
+| --- | ----------------------- | --------------------------------------------------------------------------------- |
+| 1   | Probe → Worker ingest   | Run Probe against local Wrangler, check `metrics_raw` in D1                       |
+| 2   | Probe → Worker identity | Restart Probe, check `hosts` table updated                                        |
+| 3   | Alert evaluation        | Send metrics exceeding thresholds, check `alert_states` populated                 |
+| 4   | Live endpoint           | After alerts fire, `curl /api/live` returns correct status + HTTP code            |
+| 5   | UI → Worker API         | Login to UI, verify host list loads from Worker via SWR                           |
+| 6   | Time range switching    | Select 7d range in UI, verify hourly resolution data returned                     |
+| 7   | Retired host rejection  | Retire a host via D1 console, verify Probe gets 403                               |
+| 8   | Aggregation cron        | Trigger`__scheduled`, verify `metrics_hourly` populated, old `metrics_raw` purged |
 
 ---
 
@@ -370,10 +370,10 @@ bun run scripts/verify-test-bindings.ts
 
 ### Test counts
 
-| Layer | Tests | Specs/Files |
-|-------|-------|-------------|
-| L1 TS | Coverage-based (≥90%) | Colocated `*.test.ts` |
-| L1 Rust | Coverage-based (≥95%) | Inline `#[cfg(test)]` |
-| L2 | 57 | 1 file (`wrangler.test.ts`) |
-| L3 | 69 | 7 specs |
-| **Total** | **126+** | — |
+| Layer     | Tests                 | Specs/Files                 |
+| --------- | --------------------- | --------------------------- |
+| L1 TS     | Coverage-based (≥90%) | Colocated `*.test.ts`       |
+| L1 Rust   | Coverage-based (≥95%) | Inline `#[cfg(test)]`       |
+| L2        | 57                    | 1 file (`wrangler.test.ts`) |
+| L3        | 69                    | 7 specs                     |
+| **Total** | **126+**              | —                           |

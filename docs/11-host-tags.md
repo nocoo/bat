@@ -71,31 +71,31 @@ Tag CRUD is handled by Worker routes (`packages/worker/src/routes/tags.ts`). The
 
 ### Tag CRUD (`/api/tags`)
 
-| Method | Route | Body | Response | Description |
-|--------|-------|------|----------|-------------|
-| `GET` | `/api/tags` | — | `TagItem[]` | List all tags with host count |
-| `POST` | `/api/tags` | `{ name, color? }` | `TagItem` | Create tag |
+| Method | Route       | Body               | Response    | Description                   |
+| ------ | ----------- | ------------------ | ----------- | ----------------------------- |
+| `GET`  | `/api/tags` | —                  | `TagItem[]` | List all tags with host count |
+| `POST` | `/api/tags` | `{ name, color? }` | `TagItem`   | Create tag                    |
 
 ### Tag by ID (`/api/tags/[id]`)
 
-| Method | Route | Body | Response | Description |
-|--------|-------|------|----------|-------------|
-| `PUT` | `/api/tags/:id` | `{ name?, color? }` | `TagItem` | Update tag |
-| `DELETE` | `/api/tags/:id` | — | `204` | Delete tag (cascade removes host_tags) |
+| Method   | Route           | Body                | Response  | Description                            |
+| -------- | --------------- | ------------------- | --------- | -------------------------------------- |
+| `PUT`    | `/api/tags/:id` | `{ name?, color? }` | `TagItem` | Update tag                             |
+| `DELETE` | `/api/tags/:id` | —                   | `204`     | Delete tag (cascade removes host_tags) |
 
 ### Host ↔ Tag assignment (`/api/hosts/[id]/tags`)
 
-| Method | Route | Body | Response | Description |
-|--------|-------|------|----------|-------------|
-| `GET` | `/api/hosts/:id/tags` | — | `HostTag[]` | Tags for a host |
-| `PUT` | `/api/hosts/:id/tags` | `{ tag_ids: number[] }` | `HostTag[]` | Replace host's tags (set semantics) |
-| `POST` | `/api/hosts/:id/tags` | `{ tag_id: number }` | `HostTag` | Add one tag |
+| Method | Route                 | Body                    | Response    | Description                         |
+| ------ | --------------------- | ----------------------- | ----------- | ----------------------------------- |
+| `GET`  | `/api/hosts/:id/tags` | —                       | `HostTag[]` | Tags for a host                     |
+| `PUT`  | `/api/hosts/:id/tags` | `{ tag_ids: number[] }` | `HostTag[]` | Replace host's tags (set semantics) |
+| `POST` | `/api/hosts/:id/tags` | `{ tag_id: number }`    | `HostTag`   | Add one tag                         |
 
 ### Remove tag from host (`/api/hosts/[id]/tags/[tagId]`)
 
-| Method | Route | Body | Response | Description |
-|--------|-------|------|----------|-------------|
-| `DELETE` | `/api/hosts/:id/tags/:tagId` | — | `204` | Remove one tag from host |
+| Method   | Route                        | Body | Response | Description              |
+| -------- | ---------------------------- | ---- | -------- | ------------------------ |
+| `DELETE` | `/api/hosts/:id/tags/:tagId` | —    | `204`    | Remove one tag from host |
 
 ### Implementation pattern
 
@@ -113,17 +113,17 @@ Two separate interfaces — management context vs host context:
 ```typescript
 /** Full tag info — returned by GET /api/tags (management page). */
 export interface TagItem {
-  id: number;
-  name: string;
-  color: number;
-  host_count: number;  // only populated for tag list
+	id: number;
+	name: string;
+	color: number;
+	host_count: number; // only populated for tag list
 }
 
 /** Lightweight tag reference — embedded in host cards. */
 export interface HostTag {
-  id: number;
-  name: string;
-  color: number;
+	id: number;
+	name: string;
+	color: number;
 }
 ```
 

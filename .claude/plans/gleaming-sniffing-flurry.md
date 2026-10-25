@@ -11,14 +11,14 @@ After expanding L3 from 9→36 tests and adding D1 check to pre-push, several sm
 
 ### 1. Update `docs/07-testing.md`
 
-| Line | Issue | Fix |
-|------|-------|-----|
-| 11 | `06-ui.md — UI SPA (build only, no tests)` | → `06-ui.md — UI SPA (L3 Playwright E2E)` |
-| 93-99 | L3 section says "Not implemented" | Rewrite with actual status: 36 tests, 7 spec files, 7 pages, port 27787, Chromium |
-| 108-109 | `pnpm-lock.yaml` | → `bun.lock` |
-| 159-166 | pre-push section missing D1 check | Add D1 isolation check step |
-| Post-line 184 | CI section missing L3 job | Add `l3-e2e` job description |
-| 19-26 | Dimension table L3 trigger "manual/CI" | Keep as-is (correct — not in hooks) |
+| Line          | Issue                                      | Fix                                                                               |
+| ------------- | ------------------------------------------ | --------------------------------------------------------------------------------- |
+| 11            | `06-ui.md — UI SPA (build only, no tests)` | → `06-ui.md — UI SPA (L3 Playwright E2E)`                                         |
+| 93-99         | L3 section says "Not implemented"          | Rewrite with actual status: 36 tests, 7 spec files, 7 pages, port 27787, Chromium |
+| 108-109       | `pnpm-lock.yaml`                           | → `bun.lock`                                                                      |
+| 159-166       | pre-push section missing D1 check          | Add D1 isolation check step                                                       |
+| Post-line 184 | CI section missing L3 job                  | Add `l3-e2e` job description                                                      |
+| 19-26         | Dimension table L3 trigger "manual/CI"     | Keep as-is (correct — not in hooks)                                               |
 
 ### 2. Deepen D1 Isolation (2 new layers)
 
@@ -49,11 +49,11 @@ Only fix: pre-commit header comment should mention G2 (gitleaks).
 
 ## Files to Modify
 
-| File | Change |
-|------|--------|
-| `docs/07-testing.md` | Update L3 section, fix pnpm ref, add D1 to pre-push, add L3 CI job |
-| `packages/worker/test/e2e/wrangler.test.ts` | Add `_test_marker` isolation verification test |
-| `.husky/pre-commit` | Fix comment: "L1 + G1 + G2-secrets" |
+| File                                        | Change                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| `docs/07-testing.md`                        | Update L3 section, fix pnpm ref, add D1 to pre-push, add L3 CI job |
+| `packages/worker/test/e2e/wrangler.test.ts` | Add `_test_marker` isolation verification test                     |
+| `.husky/pre-commit`                         | Fix comment: "L1 + G1 + G2-secrets"                                |
 
 ## Verification
 

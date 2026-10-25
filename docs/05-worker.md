@@ -12,18 +12,18 @@
 
 ## Route Table
 
-| Route | Auth | Method | Purpose |
-|-------|------|--------|---------|
-| `/api/ingest` | Write Key | POST | Receive Tier-1 metrics, evaluate alerts |
-| `/api/identity` | Write Key | POST | Receive/update host identity |
-| `/api/tier2` | Write Key | POST | Receive Tier-2 snapshot (ports, systemd, security, docker, disk, software) |
-| `/api/hosts` | Read Key | GET | List active hosts with latest status (`is_active = 1`) |
-| `/api/hosts/:id` | Read Key | GET | Single host detail (identity + latest metrics + alert state) |
-| `/api/hosts/:id/metrics` | Read Key | GET | Query metrics (`?from=&to=`, auto raw/hourly) |
-| `/api/hosts/:id/tier2` | Read Key | GET | Latest Tier-2 snapshot for a host |
-| `/api/alerts` | Read Key | GET | List all active alerts across all hosts |
-| `/api/health` | Public | GET | Overall health (200/degraded/503) for Uptime Kuma |
-| `/api/live` | Public | GET | Liveness check + version |
+| Route                    | Auth      | Method | Purpose                                                                    |
+| ------------------------ | --------- | ------ | -------------------------------------------------------------------------- |
+| `/api/ingest`            | Write Key | POST   | Receive Tier-1 metrics, evaluate alerts                                    |
+| `/api/identity`          | Write Key | POST   | Receive/update host identity                                               |
+| `/api/tier2`             | Write Key | POST   | Receive Tier-2 snapshot (ports, systemd, security, docker, disk, software) |
+| `/api/hosts`             | Read Key  | GET    | List active hosts with latest status (`is_active = 1`)                     |
+| `/api/hosts/:id`         | Read Key  | GET    | Single host detail (identity + latest metrics + alert state)               |
+| `/api/hosts/:id/metrics` | Read Key  | GET    | Query metrics (`?from=&to=`, auto raw/hourly)                              |
+| `/api/hosts/:id/tier2`   | Read Key  | GET    | Latest Tier-2 snapshot for a host                                          |
+| `/api/alerts`            | Read Key  | GET    | List all active alerts across all hosts                                    |
+| `/api/health`            | Public    | GET    | Overall health (200/degraded/503) for Uptime Kuma                          |
+| `/api/live`              | Public    | GET    | Liveness check + version                                                   |
 
 ---
 
@@ -146,6 +146,7 @@ Returns all active hosts (`is_active = 1`) as `HostOverviewItem[]` — including
 
 1. Fetch active hosts: `SELECT * FROM hosts WHERE is_active = 1`
 2. Fetch latest metrics per host (single query with window function):
+
    ```sql
    SELECT host_id, cpu_usage_pct, mem_used_pct, uptime_seconds
    FROM (
@@ -156,6 +157,7 @@ Returns all active hosts (`is_active = 1`) as `HostOverviewItem[]` — including
    ) WHERE rn = 1
    ```
 3. Count active alerts per host:
+
    ```sql
    SELECT host_id, COUNT(*) as alert_count
    FROM alert_states
@@ -230,12 +232,12 @@ Public endpoint (no auth). Returns aggregate health status for Uptime Kuma.
 
 ```json
 {
-  "status": "degraded",
-  "total_hosts": 6,
-  "healthy": 4,
-  "warning": 1,
-  "critical": 1,
-  "checked_at": 1742025600
+	"status": "degraded",
+	"total_hosts": 6,
+	"healthy": 4,
+	"warning": 1,
+	"critical": 1,
+	"checked_at": 1742025600
 }
 ```
 
@@ -292,17 +294,17 @@ Defined in `index.ts` scheduled handler.
 
 ### L1 — Unit Tests (`bun test`)
 
-| Test file | What |
-|-----------|------|
-| `middleware/api-key.test.ts` | Accept valid write key on POST, valid read key on GET. Reject invalid key (401), cross-scope key (403), missing header (401) |
-| `services/alerts.test.ts` | All 6 alert rules with mock payloads. Instant rules: fire and clear. Duration rules: track in pending, promote after 5 min, clear both tables. Edge cases: exactly-at-threshold, just-below-threshold |
-| `services/aggregation.test.ts` | Aggregation SQL correctness: avg/max/min computation, sample_count, purge thresholds |
-| `services/metrics.test.ts` | Auto-resolution logic: raw for ≤ 24h, hourly for > 24h. Column flattening. JSON stringify for disk/net |
-| `routes/ingest.test.ts` | Valid payload → 204. Invalid payload → 400. Clock skew → 400. Retired host → 403. Missing key → 401. Read key → 403 |
-| `routes/identity.test.ts` | Valid identity → 204, host created. Update existing → fields overwritten. Retired host → 403 |
-| `routes/hosts.test.ts` | List returns `HostOverviewItem[]` with correct status derivation (healthy/warning/critical/offline), latest metrics merged, alert counts. Metrics query returns correct resolution |
-| `routes/health.test.ts` | All healthy → 200. Warning only → 200 degraded. Critical → 503. Offline detection → 503. Zero hosts → 503 empty |
-| `routes/alerts.test.ts` | Returns active alerts. Filters out retired hosts |
+| Test file                      | What                                                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `middleware/api-key.test.ts`   | Accept valid write key on POST, valid read key on GET. Reject invalid key (401), cross-scope key (403), missing header (401)                                                                          |
+| `services/alerts.test.ts`      | All 6 alert rules with mock payloads. Instant rules: fire and clear. Duration rules: track in pending, promote after 5 min, clear both tables. Edge cases: exactly-at-threshold, just-below-threshold |
+| `services/aggregation.test.ts` | Aggregation SQL correctness: avg/max/min computation, sample_count, purge thresholds                                                                                                                  |
+| `services/metrics.test.ts`     | Auto-resolution logic: raw for ≤ 24h, hourly for > 24h. Column flattening. JSON stringify for disk/net                                                                                                |
+| `routes/ingest.test.ts`        | Valid payload → 204. Invalid payload → 400. Clock skew → 400. Retired host → 403. Missing key → 401. Read key → 403                                                                                   |
+| `routes/identity.test.ts`      | Valid identity → 204, host created. Update existing → fields overwritten. Retired host → 403                                                                                                          |
+| `routes/hosts.test.ts`         | List returns `HostOverviewItem[]` with correct status derivation (healthy/warning/critical/offline), latest metrics merged, alert counts. Metrics query returns correct resolution                    |
+| `routes/health.test.ts`        | All healthy → 200. Warning only → 200 degraded. Critical → 503. Offline detection → 503. Zero hosts → 503 empty                                                                                       |
+| `routes/alerts.test.ts`        | Returns active alerts. Filters out retired hosts                                                                                                                                                      |
 
 **Coverage target**: ≥ 90% on all services and middleware.
 
@@ -315,26 +317,26 @@ Defined in `index.ts` scheduled handler.
 
 Test every Worker route against local Wrangler dev server:
 
-| Test | Route | Validates |
-|------|-------|-----------|
-| Ingest valid payload | `POST /api/ingest` | 204, data in D1 |
-| Ingest missing API key | `POST /api/ingest` | 401 |
-| Ingest invalid payload | `POST /api/ingest` | 400 |
-| Ingest retired host | `POST /api/ingest` | 403, host is retired |
-| Send identity | `POST /api/identity` | 204, host in D1 |
-| List hosts | `GET /api/hosts` | Returns `HostOverviewItem[]` with status, CPU, MEM, alerts |
-| Query raw metrics | `GET /api/hosts/:id/metrics?from=&to=` | Correct count, raw resolution |
-| Query hourly metrics | `GET /api/hosts/:id/metrics?from=&to=` | Hourly resolution for > 24h range |
-| Health all healthy | `GET /api/health` | 200, all hosts healthy |
-| Health with warning only | `GET /api/health` | 200, status "degraded", no 503 |
-| Health with critical | `GET /api/health` | 503, status "critical" |
-| Offline detection | `GET /api/health` | Host with old `last_seen` → offline (503) |
-| Zero hosts health | `GET /api/health` | 503, status "empty", total_hosts: 0 |
-| List all alerts | `GET /api/alerts` | Returns active alerts across hosts |
-| Aggregation cron | `__scheduled` trigger | `metrics_hourly` populated, raw purged |
-| Unauthenticated API | `GET /api/hosts` (no key) | 401 |
-| Write key on read route | `GET /api/hosts` (write key) | 403, scope mismatch |
-| Read key on write route | `POST /api/ingest` (read key) | 403, scope mismatch |
+| Test                     | Route                                  | Validates                                                  |
+| ------------------------ | -------------------------------------- | ---------------------------------------------------------- |
+| Ingest valid payload     | `POST /api/ingest`                     | 204, data in D1                                            |
+| Ingest missing API key   | `POST /api/ingest`                     | 401                                                        |
+| Ingest invalid payload   | `POST /api/ingest`                     | 400                                                        |
+| Ingest retired host      | `POST /api/ingest`                     | 403, host is retired                                       |
+| Send identity            | `POST /api/identity`                   | 204, host in D1                                            |
+| List hosts               | `GET /api/hosts`                       | Returns `HostOverviewItem[]` with status, CPU, MEM, alerts |
+| Query raw metrics        | `GET /api/hosts/:id/metrics?from=&to=` | Correct count, raw resolution                              |
+| Query hourly metrics     | `GET /api/hosts/:id/metrics?from=&to=` | Hourly resolution for > 24h range                          |
+| Health all healthy       | `GET /api/health`                      | 200, all hosts healthy                                     |
+| Health with warning only | `GET /api/health`                      | 200, status "degraded", no 503                             |
+| Health with critical     | `GET /api/health`                      | 503, status "critical"                                     |
+| Offline detection        | `GET /api/health`                      | Host with old `last_seen` → offline (503)                  |
+| Zero hosts health        | `GET /api/health`                      | 503, status "empty", total_hosts: 0                        |
+| List all alerts          | `GET /api/alerts`                      | Returns active alerts across hosts                         |
+| Aggregation cron         | `__scheduled` trigger                  | `metrics_hourly` populated, raw purged                     |
+| Unauthenticated API      | `GET /api/hosts` (no key)              | 401                                                        |
+| Write key on read route  | `GET /api/hosts` (write key)           | 403, scope mismatch                                        |
+| Read key on write route  | `POST /api/ingest` (read key)          | 403, scope mismatch                                        |
 
 **Server convention**: Worker dev on port 37025, API E2E on port 18787.
 
@@ -346,17 +348,17 @@ Not applicable — Worker has no UI. API coverage is handled by L3.
 
 ## Atomic Commits (this module)
 
-| # | Commit | Files | Verify |
-|---|--------|-------|--------|
-| 2.1 | `feat: add d1 schema and migration infrastructure` | `packages/worker/migrations/0001_initial.sql` | `wrangler d1 execute --local --file=migrations/0001_initial.sql` |
-| 2.2 | `feat: add api key auth middleware with read/write scopes` | `middleware/api-key.ts` | UT: write key on POST routes, read key on GET routes, reject cross-scope usage |
-| 2.3 | `feat: add identity route` | `routes/identity.ts`, `services/metrics.ts` | UT + manual curl |
-| 2.4 | `feat: add ingest route` | `routes/ingest.ts` | UT + manual curl → 204 |
-| 2.5 | `feat: add alert evaluation service` | `services/alerts.ts` | UT: all 6 rules, instant + duration |
-| 2.6 | `feat: wire alert evaluation into ingest` | `routes/ingest.ts` | UT: ingest triggers alert state changes |
-| 2.7 | `feat: add hosts list route with overview dto` | `routes/hosts.ts`, `services/status.ts` | UT: returns `HostOverviewItem[]` with status, metrics, alert counts |
-| 2.8 | `feat: add metrics query route with auto resolution` | `routes/hosts.ts` | UT: raw vs hourly selection |
-| 2.9 | `feat: add health endpoint with warning/critical distinction` | `routes/health.ts` | UT: 200 (healthy/warning-only), 503 (critical), offline detection |
-| 2.10 | `feat: add alerts list route` | `routes/alerts.ts` | UT: returns all active alerts across hosts |
-| 2.11 | `feat: add hourly aggregation cron` | `services/aggregation.ts`, `index.ts` scheduled handler | UT: aggregate + purge logic |
-| 2.12 | `test: add api e2e tests for all worker routes` | `packages/worker/test/e2e/**` | All routes pass against local Wrangler |
+| #    | Commit                                                        | Files                                                   | Verify                                                                         |
+| ---- | ------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| 2.1  | `feat: add d1 schema and migration infrastructure`            | `packages/worker/migrations/0001_initial.sql`           | `wrangler d1 execute --local --file=migrations/0001_initial.sql`               |
+| 2.2  | `feat: add api key auth middleware with read/write scopes`    | `middleware/api-key.ts`                                 | UT: write key on POST routes, read key on GET routes, reject cross-scope usage |
+| 2.3  | `feat: add identity route`                                    | `routes/identity.ts`, `services/metrics.ts`             | UT + manual curl                                                               |
+| 2.4  | `feat: add ingest route`                                      | `routes/ingest.ts`                                      | UT + manual curl → 204                                                         |
+| 2.5  | `feat: add alert evaluation service`                          | `services/alerts.ts`                                    | UT: all 6 rules, instant + duration                                            |
+| 2.6  | `feat: wire alert evaluation into ingest`                     | `routes/ingest.ts`                                      | UT: ingest triggers alert state changes                                        |
+| 2.7  | `feat: add hosts list route with overview dto`                | `routes/hosts.ts`, `services/status.ts`                 | UT: returns `HostOverviewItem[]` with status, metrics, alert counts            |
+| 2.8  | `feat: add metrics query route with auto resolution`          | `routes/hosts.ts`                                       | UT: raw vs hourly selection                                                    |
+| 2.9  | `feat: add health endpoint with warning/critical distinction` | `routes/health.ts`                                      | UT: 200 (healthy/warning-only), 503 (critical), offline detection              |
+| 2.10 | `feat: add alerts list route`                                 | `routes/alerts.ts`                                      | UT: returns all active alerts across hosts                                     |
+| 2.11 | `feat: add hourly aggregation cron`                           | `services/aggregation.ts`, `index.ts` scheduled handler | UT: aggregate + purge logic                                                    |
+| 2.12 | `test: add api e2e tests for all worker routes`               | `packages/worker/test/e2e/**`                           | All routes pass against local Wrangler                                         |

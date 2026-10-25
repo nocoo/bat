@@ -25,16 +25,16 @@ Most of this information is available by reading a single file from procfs/sysfs
 
 These fields do not change without hardware replacement, re-provisioning, or reboot. Sent with `POST /api/identity` every 6 hours.
 
-| # | Field | Source | Parse | Example Value |
-|---|-------|--------|-------|---------------|
-| S1 | `cpu_logical` | `/proc/cpuinfo` | count `^processor` lines (= logical CPUs visible to OS) | `8` |
-| S2 | `cpu_physical` | `/proc/cpuinfo` | count unique (`physical id`, `core id`) pairs; fallback: parse first `cpu cores` value × distinct `physical id` count; fallback: `cpu_logical` (no HT) | `4` |
-| S3 | `mem_total_bytes` | `/proc/meminfo` | `MemTotal` × 1024 | `8388608000` |
-| S4 | `swap_total_bytes` | `/proc/meminfo` | `SwapTotal` × 1024 | `2147483648` |
-| S5 | `virtualization` | `/sys/class/dmi/id/sys_vendor` + `product_name` | map known vendors | `"kvm"`, `"vmware"`, `"bare-metal"` |
-| S6 | `net_interfaces` | `libc::getifaddrs()` + `/sys/class/net/{iface}/address` + `/sys/class/net/{iface}/speed` | per interface | `[{"iface":"eth0","mac":"aa:bb:cc:dd:ee:ff","ipv4":["10.0.1.5"],"ipv6":["fe80::1"],"speed_mbps":1000}]` |
-| S7 | `disks` | `/sys/block/{dev}/size` + `/sys/block/{dev}/queue/rotational` | 512 × sectors; 0=SSD, 1=HDD | `[{"device":"sda","size_bytes":500107862016,"rotational":false}]` |
-| S8 | `boot_mode` | `/sys/firmware/efi` | dir exists → `"uefi"`, else `"bios"` | `"uefi"` |
+| #   | Field              | Source                                                                                   | Parse                                                                                                                                                  | Example Value                                                                                           |
+| --- | ------------------ | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| S1  | `cpu_logical`      | `/proc/cpuinfo`                                                                          | count `^processor` lines (= logical CPUs visible to OS)                                                                                                | `8`                                                                                                     |
+| S2  | `cpu_physical`     | `/proc/cpuinfo`                                                                          | count unique (`physical id`, `core id`) pairs; fallback: parse first `cpu cores` value × distinct `physical id` count; fallback: `cpu_logical` (no HT) | `4`                                                                                                     |
+| S3  | `mem_total_bytes`  | `/proc/meminfo`                                                                          | `MemTotal` × 1024                                                                                                                                      | `8388608000`                                                                                            |
+| S4  | `swap_total_bytes` | `/proc/meminfo`                                                                          | `SwapTotal` × 1024                                                                                                                                     | `2147483648`                                                                                            |
+| S5  | `virtualization`   | `/sys/class/dmi/id/sys_vendor` + `product_name`                                          | map known vendors                                                                                                                                      | `"kvm"`, `"vmware"`, `"bare-metal"`                                                                     |
+| S6  | `net_interfaces`   | `libc::getifaddrs()` + `/sys/class/net/{iface}/address` + `/sys/class/net/{iface}/speed` | per interface                                                                                                                                          | `[{"iface":"eth0","mac":"aa:bb:cc:dd:ee:ff","ipv4":["10.0.1.5"],"ipv6":["fe80::1"],"speed_mbps":1000}]` |
+| S7  | `disks`            | `/sys/block/{dev}/size` + `/sys/block/{dev}/queue/rotational`                            | 512 × sectors; 0=SSD, 1=HDD                                                                                                                            | `[{"device":"sda","size_bytes":500107862016,"rotational":false}]`                                       |
+| S8  | `boot_mode`        | `/sys/firmware/efi`                                                                      | dir exists → `"uefi"`, else `"bios"`                                                                                                                   | `"uefi"`                                                                                                |
 
 **Already collected (no change needed):** `hostname`, `os`, `kernel`, `arch`, `cpu_model`, `uptime_seconds`, `boot_time`
 
@@ -55,26 +55,26 @@ Display format in dashboard: `"4C/8T"` means 4 physical cores, 8 logical threads
 
 These fields can change without reboot but do so infrequently. Sent with `POST /api/tier2` every 6 hours alongside existing tier-2 scans.
 
-| # | Field | Source | Parse | Example Value |
-|---|-------|--------|-------|---------------|
-| D1 | `timezone` | `/etc/timezone`, fallback `readlink /etc/localtime` | trim, extract after `zoneinfo/` | `"UTC"`, `"America/New_York"` |
-| D2 | `dns_resolvers` | `/etc/resolv.conf` | extract `nameserver` lines | `["1.1.1.1","8.8.8.8"]` |
-| D3 | `dns_search` | `/etc/resolv.conf` | extract `search` line | `["example.com"]` |
+| #   | Field           | Source                                              | Parse                           | Example Value                 |
+| --- | --------------- | --------------------------------------------------- | ------------------------------- | ----------------------------- |
+| D1  | `timezone`      | `/etc/timezone`, fallback `readlink /etc/localtime` | trim, extract after `zoneinfo/` | `"UTC"`, `"America/New_York"` |
+| D2  | `dns_resolvers` | `/etc/resolv.conf`                                  | extract `nameserver` lines      | `["1.1.1.1","8.8.8.8"]`       |
+| D3  | `dns_search`    | `/etc/resolv.conf`                                  | extract `search` line           | `["example.com"]`             |
 
 ### What We Explicitly Skip
 
 These are available but not worth the complexity/cost right now:
 
-| Data | Why Skip |
-|------|----------|
+| Data                             | Why Skip                                                                                                                                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `machine_id` (`/etc/machine-id`) | Raw 32-hex identifier adds no display value. We already have `host_id` as the primary key. If dedup/merge is needed later, it can be added as a server-side-only field without exposing to the dashboard |
-| Loaded kernel modules | Noisy (50–150 items), low signal-to-noise for fleet overview |
-| sysctl parameters | Too many knobs, better suited for a config-drift tool |
-| User accounts (`/etc/passwd`) | Security-sensitive, parsing edge cases, better done by dedicated audit tools |
-| SELinux/AppArmor status | Only meaningful on RHEL/Ubuntu respectively, adds conditional logic for little display value |
-| Hugepages/NUMA/cgroup version | Niche — matters for DB tuning, not general fleet monitoring |
-| Kernel cmdline | Raw string, hard to display meaningfully |
-| CPU frequency governor | Not universally available (especially on VMs), unreliable reads |
+| Loaded kernel modules            | Noisy (50–150 items), low signal-to-noise for fleet overview                                                                                                                                             |
+| sysctl parameters                | Too many knobs, better suited for a config-drift tool                                                                                                                                                    |
+| User accounts (`/etc/passwd`)    | Security-sensitive, parsing edge cases, better done by dedicated audit tools                                                                                                                             |
+| SELinux/AppArmor status          | Only meaningful on RHEL/Ubuntu respectively, adds conditional logic for little display value                                                                                                             |
+| Hugepages/NUMA/cgroup version    | Niche — matters for DB tuning, not general fleet monitoring                                                                                                                                              |
+| Kernel cmdline                   | Raw string, hard to display meaningfully                                                                                                                                                                 |
+| CPU frequency governor           | Not universally available (especially on VMs), unreliable reads                                                                                                                                          |
 
 ## Data Flow Changes
 
@@ -133,10 +133,10 @@ ALTER TABLE hosts ADD COLUMN dns_search       TEXT;  -- JSON array
 
 All new fields use **2-state wire semantics** that match the existing `#[serde(skip_serializing_if)]` pattern already used throughout the codebase (e.g., `Tier2Payload` optional sections, `MetricsPayload` tier-3 fields):
 
-| Wire state | Meaning | Worker behavior |
-|------------|---------|-----------------|
-| **Key present** in JSON (value is a string, number, array, or object) | Probe collected this field successfully | `UPDATE hosts SET field = ? WHERE host_id = ?` |
-| **Key absent** from JSON | Probe doesn't support this field (old version), or collection failed on this run | **No-op** — retain existing value in D1 |
+| Wire state                                                            | Meaning                                                                          | Worker behavior                                |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Key present** in JSON (value is a string, number, array, or object) | Probe collected this field successfully                                          | `UPDATE hosts SET field = ? WHERE host_id = ?` |
+| **Key absent** from JSON                                              | Probe doesn't support this field (old version), or collection failed on this run | **No-op** — retain existing value in D1        |
 
 There is no third "explicit null" state. If the probe finds nothing (e.g., no `/etc/timezone` and no `/etc/localtime` symlink), it sends a concrete sentinel value:
 - String fields: `""` (empty string)
@@ -172,13 +172,13 @@ A new endpoint serves the full host inventory for a single host:
 
 ```typescript
 interface HostDetailItem extends HostOverviewItem {
-    swap_total_bytes: number | null;
-    boot_mode: string | null;
-    timezone: string | null;
-    dns_resolvers: string[] | null;
-    dns_search: string[] | null;
-    net_interfaces: NetInterfaceDTO[] | null;
-    disks: BlockDeviceDTO[] | null;
+	swap_total_bytes: number | null;
+	boot_mode: string | null;
+	timezone: string | null;
+	dns_resolvers: string[] | null;
+	dns_search: string[] | null;
+	net_interfaces: NetInterfaceDTO[] | null;
+	disks: BlockDeviceDTO[] | null;
 }
 ```
 
@@ -218,22 +218,22 @@ If `cpu_physical == cpu_logical`, display just `"4C"` (no HT). If different, `"4
 
 Add rows for the new fields:
 
-| Label | Value |
-|-------|-------|
-| OS | Ubuntu 22.04.3 LTS |
-| Kernel | 5.15.0-91-generic |
-| Architecture | x86_64 |
-| CPU | Intel Xeon E5-2680 v4 (4 cores, 8 threads) |
-| Memory | 8 GB |
-| Swap | 2 GB |
-| Virtualization | KVM |
-| Boot Mode | UEFI |
-| Uptime | 14d 3h |
-| Boot Time | 2026-03-03 12:00:00 |
-| IP Addresses | eth0: 10.0.1.5 |
-| DNS | 1.1.1.1, 8.8.8.8 |
-| Timezone | UTC |
-| Disks | sda: 500 GB SSD |
+| Label          | Value                                      |
+| -------------- | ------------------------------------------ |
+| OS             | Ubuntu 22.04.3 LTS                         |
+| Kernel         | 5.15.0-91-generic                          |
+| Architecture   | x86_64                                     |
+| CPU            | Intel Xeon E5-2680 v4 (4 cores, 8 threads) |
+| Memory         | 8 GB                                       |
+| Swap           | 2 GB                                       |
+| Virtualization | KVM                                        |
+| Boot Mode      | UEFI                                       |
+| Uptime         | 14d 3h                                     |
+| Boot Time      | 2026-03-03 12:00:00                        |
+| IP Addresses   | eth0: 10.0.1.5                             |
+| DNS            | 1.1.1.1, 8.8.8.8                           |
+| Timezone       | UTC                                        |
+| Disks          | sda: 500 GB SSD                            |
 
 ## Implementation Phases
 

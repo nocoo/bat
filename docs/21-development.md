@@ -52,13 +52,13 @@ systemctl status bat-probe
 
 ## 认证与 CLI
 
-| 用途 | 凭据与入口 |
-| --- | --- |
-| 浏览器仪表盘 | `bat.hexly.ai` 上的 Cloudflare Access |
-| 探针上报 | 机器入口的 `BAT_WRITE_KEY` |
-| 外部监控查询 | `BAT_READ_KEY`，仅使用允许的 `/api/monitoring/*` 路径 |
-| 外部事件上报 | `/api/events` 的独立 Webhook token |
-| agent / asset / binding | 浏览器登录生成的 assets 范围 CLI token |
+| 用途                    | 凭据与入口                                            |
+| ----------------------- | ----------------------------------------------------- |
+| 浏览器仪表盘            | `bat.hexly.ai` 上的 Cloudflare Access                 |
+| 探针上报                | 机器入口的 `BAT_WRITE_KEY`                            |
+| 外部监控查询            | `BAT_READ_KEY`，仅使用允许的 `/api/monitoring/*` 路径 |
+| 外部事件上报            | `/api/events` 的独立 Webhook token                    |
+| agent / asset / binding | 浏览器登录生成的 assets 范围 CLI token                |
 
 机器入口按方法和路径放行请求，不是所有浏览器 API 的替代地址。自定义部署需要同步检查 `entry-control.ts`、`setup.ts`、`cli-auth.ts` 中的主机名判断和返回地址，配置浏览器 Access 与机器访问策略。
 

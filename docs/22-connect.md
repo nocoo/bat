@@ -24,26 +24,26 @@ The contract and route registration share `CONNECT_OPERATIONS` in `packages/work
 
 In this table, `S` means `/servers/{serverId}` under `/api/v1`.
 
-| Product information or action | Connect resource | Boundary |
-| --- | --- | --- |
-| Host list/detail, identity, current metrics, processes/network | `/servers`, `S` | List contains only the currently authorized active hosts; detail targets one server |
-| Host description | `PATCH S/description` | This host only |
-| Historical metrics and ingestion | `GET/POST S/metrics` | Required `from`/`to` Unix seconds for reads, maximum 30-day window; host payload must match |
-| Identity and tier-2 observations | `POST S/identity`, `GET/POST S/tier2` | Host payload must match; existing product validation applies |
-| Daily UTC maintenance | `GET/PUT/DELETE S/maintenance` | Existing recurring UTC window semantics |
-| Events | `GET/POST S/events` | Bound host; event payload retains product size/tag limits |
-| Alerts and health | `S/alerts`, `S/status` | Host alerts/status only |
-| External monitoring and groups | `S/monitoring`, `S/monitoring/groups`, `S/monitoring/alerts` | Group counts and members are filtered to this server |
-| Tag catalogue | `GET/POST S/tags`, `PUT/DELETE S/tags/{id}` | Visible tags may be read; mutation requires exclusive host ownership |
-| Host tag assignment | `S/host-tags`, `S/host-tags/{tagId}` | Only tags visible to this server |
-| Allowed ports | `S/allowed-ports`, `S/allowed-ports/{port}` | Existing per-host port allowlist |
-| Webhook event credentials | `S/webhooks`, `S/webhooks/{id}`, `S/webhooks/{id}/rotate` | Lists omit credentials; create/rotate require write and risk confirmation |
-| Agents and heartbeat | `S/agents`, `S/agents/{id}`, `S/agents/{id}/tags`, `S/agents/heartbeat` | Source/match-key collisions with other hosts are rejected; host reassignment is forbidden |
-| Assets, map and overview | `S/assets`, `S/assets/{id}`, `S/assets/{id}/tags`, `S/assets/map`, `S/assets/overview` | All results and graph edges are filtered to this host |
-| Agent/asset bindings | `S/bindings`, `S/bindings/{agentId}/{assetId}` | Both ends must belong to this host |
-| Effective retention and probe endpoint | `GET S/settings`, `GET S/setup` | No deployment credentials are returned |
-| Audit/provenance | `GET S/audit` | This host's API and credential-management records |
-| Retry outcome | `GET /requests/{key}` | Current token's records only, and only while the original target server remains authorized; no stored response secrets |
+| Product information or action                                  | Connect resource                                                                       | Boundary                                                                                                               |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Host list/detail, identity, current metrics, processes/network | `/servers`, `S`                                                                        | List contains only the currently authorized active hosts; detail targets one server                                    |
+| Host description                                               | `PATCH S/description`                                                                  | This host only                                                                                                         |
+| Historical metrics and ingestion                               | `GET/POST S/metrics`                                                                   | Required `from`/`to` Unix seconds for reads, maximum 30-day window; host payload must match                            |
+| Identity and tier-2 observations                               | `POST S/identity`, `GET/POST S/tier2`                                                  | Host payload must match; existing product validation applies                                                           |
+| Daily UTC maintenance                                          | `GET/PUT/DELETE S/maintenance`                                                         | Existing recurring UTC window semantics                                                                                |
+| Events                                                         | `GET/POST S/events`                                                                    | Bound host; event payload retains product size/tag limits                                                              |
+| Alerts and health                                              | `S/alerts`, `S/status`                                                                 | Host alerts/status only                                                                                                |
+| External monitoring and groups                                 | `S/monitoring`, `S/monitoring/groups`, `S/monitoring/alerts`                           | Group counts and members are filtered to this server                                                                   |
+| Tag catalogue                                                  | `GET/POST S/tags`, `PUT/DELETE S/tags/{id}`                                            | Visible tags may be read; mutation requires exclusive host ownership                                                   |
+| Host tag assignment                                            | `S/host-tags`, `S/host-tags/{tagId}`                                                   | Only tags visible to this server                                                                                       |
+| Allowed ports                                                  | `S/allowed-ports`, `S/allowed-ports/{port}`                                            | Existing per-host port allowlist                                                                                       |
+| Webhook event credentials                                      | `S/webhooks`, `S/webhooks/{id}`, `S/webhooks/{id}/rotate`                              | Lists omit credentials; create/rotate require write and risk confirmation                                              |
+| Agents and heartbeat                                           | `S/agents`, `S/agents/{id}`, `S/agents/{id}/tags`, `S/agents/heartbeat`                | Source/match-key collisions with other hosts are rejected; host reassignment is forbidden                              |
+| Assets, map and overview                                       | `S/assets`, `S/assets/{id}`, `S/assets/{id}/tags`, `S/assets/map`, `S/assets/overview` | All results and graph edges are filtered to this host                                                                  |
+| Agent/asset bindings                                           | `S/bindings`, `S/bindings/{agentId}/{assetId}`                                         | Both ends must belong to this host                                                                                     |
+| Effective retention and probe endpoint                         | `GET S/settings`, `GET S/setup`                                                        | No deployment credentials are returned                                                                                 |
+| Audit/provenance                                               | `GET S/audit`                                                                          | This host's API and credential-management records                                                                      |
+| Retry outcome                                                  | `GET /requests/{key}`                                                                  | Current token's records only, and only while the original target server remains authorized; no stored response secrets |
 
 Shared tags can describe multiple hosts. Connect-created tags have `owner_host_id`; their name/color/delete operations are rejected if another host has acquired a reference through the existing administrative UI or CLI. Deleting an agent or asset removes its tags and bindings, as in the product. Deletion is denied if a cascade would affect a binding whose other end is outside the request's target server. Webhook deletion stops its event-ingestion credential. The contract marks these operations as dangerous.
 
@@ -70,20 +70,26 @@ On `504`, connection loss, or `409 outcome_unknown`, inspect `/requests/{key}` a
 Errors use one schema:
 
 ```json
-{"error":{"code":"insufficient_scope","message":"A write token is required.","requestId":"request-uuid"}}
+{
+	"error": {
+		"code": "insufficient_scope",
+		"message": "A write token is required.",
+		"requestId": "request-uuid"
+	}
+}
 ```
 
-| Status | Meaning |
-| --- | --- |
-| 400 / 415 / 422 | Invalid payload, unsupported media type, or product limit |
-| 401 | Missing, invalid, expired, rotated or revoked credential |
-| 403 / 404 | Scope/host/product denial or unavailable resource |
-| 409 | Idempotency conflict, pending/expired outcome, or resource conflict |
-| 412 / 428 | Stale ETag or required precondition/confirmation missing |
-| 413 | Request or response exceeds the documented limit |
-| 429 | Rate/queue limit; honor `Retry-After` |
-| 501 | Explicitly unsupported product operation |
-| 503 / 504 | Dependency unavailable or deadline exceeded; a mutation may have an unknown outcome |
+| Status          | Meaning                                                                             |
+| --------------- | ----------------------------------------------------------------------------------- |
+| 400 / 415 / 422 | Invalid payload, unsupported media type, or product limit                           |
+| 401             | Missing, invalid, expired, rotated or revoked credential                            |
+| 403 / 404       | Scope/host/product denial or unavailable resource                                   |
+| 409             | Idempotency conflict, pending/expired outcome, or resource conflict                 |
+| 412 / 428       | Stale ETag or required precondition/confirmation missing                            |
+| 413             | Request or response exceeds the documented limit                                    |
+| 429             | Rate/queue limit; honor `Retry-After`                                               |
+| 501             | Explicitly unsupported product operation                                            |
+| 503 / 504       | Dependency unavailable or deadline exceeded; a mutation may have an unknown outcome |
 
 Every response is `no-store` and `no-transform`, has `X-Request-Id`, and never reflects an Authorization header. `no-transform` prevents CDN compression from weakening the configuration ETag: clients must be able to copy the returned strong validator into `If-Match` unchanged. Connect permits no browser CORS; cross-origin/OPTIONS requests are denied. Management mutations additionally require the exact same Origin and `X-Bat-Management: 1`. Bearer credentials are not taken from URLs, forms or cookies.
 
@@ -154,10 +160,10 @@ Cloudflare Access evaluates before the Worker. A valid Connect Bearer header alo
 
 The existing production controls were verified through an authenticated, read-only browser export on 2026-09-12. Preserve these existing controls for the dual-hostname deployment:
 
-| Application | Existing path coverage | Policies |
-|---|---|---|
-| `bat-auth` (`1ee43cb7-95a4-4ab6-9fa3-f756824fb605`) | `bat.hexly.ai`, including `/connect` and `/api/connect/*` | `Allow Authorized Users`: Allow for the configured email, 168-hour session; `Service-Auth`: Service Auth (`non_identity`) for three specific service tokens |
-| `shared-bypass` (`2950f1fa-7c5d-4a77-a007-09cc57c3e576`) | `*.hexly.ai/api/live`, including the explicit `bat.hexly.ai/api/live` destination | `Bypass`: Everyone; this shared application also serves other projects, so preserve its other destinations |
+| Application                                              | Existing path coverage                                                            | Policies                                                                                                                                                    |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `bat-auth` (`1ee43cb7-95a4-4ab6-9fa3-f756824fb605`)      | `bat.hexly.ai`, including `/connect` and `/api/connect/*`                         | `Allow Authorized Users`: Allow for the configured email, 168-hour session; `Service-Auth`: Service Auth (`non_identity`) for three specific service tokens |
+| `shared-bypass` (`2950f1fa-7c5d-4a77-a007-09cc57c3e576`) | `*.hexly.ai/api/live`, including the explicit `bat.hexly.ai/api/live` destination | `Bypass`: Everyone; this shared application also serves other projects, so preserve its other destinations                                                  |
 
 The browser audience is `f9289df18aed3f2a3f08ada1587c2a5fde199934b873c2026a94bf68863bdcd0`. These are legacy zone-scoped Access applications under zone `c64f1264b07d306e9ec8810cbec9f60f`; an empty account-scoped application listing does not mean the browser is unprotected. Verify access to the zone application/policy endpoints before attempting changes. Browser read access alone does not establish that an API credential can edit those policies.
 

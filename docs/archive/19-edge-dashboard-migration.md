@@ -59,15 +59,15 @@ Browser → Next.js (Railway) → Worker (CF) → D1
 
 ### 路由分类
 
-| 分类 | Method + 路由 | 认证方式 | 允许入口 |
-|------|---------------|----------|----------|
-| **Probe 写** | `POST /api/ingest`, `POST /api/identity`, `POST /api/tier2` | `BAT_WRITE_KEY` | `bat-ingest.*` only |
-| **Webhook 事件** | `POST /api/events` | Webhook token (自校验) | `bat-ingest.*` only |
-| **机器读** | `GET /api/monitoring/*` | `BAT_READ_KEY` | `bat-ingest.*` only |
-| **公开** | `GET /api/live` | 无 | 任意 |
-| **浏览器读** | `GET /api/hosts`, `GET /api/alerts`, `GET /api/events`, ... | Access JWT | `bat.*` only |
-| **浏览器写** | `POST/PUT/DELETE /api/tags/*`, `/api/webhooks/*`, ... | Access JWT | `bat.*` only |
-| **静态文件** | `GET /*` (非 /api) | Access (前置拦截) | `bat.*` only |
+| 分类             | Method + 路由                                               | 认证方式               | 允许入口            |
+| ---------------- | ----------------------------------------------------------- | ---------------------- | ------------------- |
+| **Probe 写**     | `POST /api/ingest`, `POST /api/identity`, `POST /api/tier2` | `BAT_WRITE_KEY`        | `bat-ingest.*` only |
+| **Webhook 事件** | `POST /api/events`                                          | Webhook token (自校验) | `bat-ingest.*` only |
+| **机器读**       | `GET /api/monitoring/*`                                     | `BAT_READ_KEY`         | `bat-ingest.*` only |
+| **公开**         | `GET /api/live`                                             | 无                     | 任意                |
+| **浏览器读**     | `GET /api/hosts`, `GET /api/alerts`, `GET /api/events`, ... | Access JWT             | `bat.*` only        |
+| **浏览器写**     | `POST/PUT/DELETE /api/tags/*`, `/api/webhooks/*`, ...       | Access JWT             | `bat.*` only        |
+| **静态文件**     | `GET /*` (非 /api)                                          | Access (前置拦截)      | `bat.*` only        |
 
 **关键设计**：`bat-ingest.*` 入口采用**白名单模式**，只允许明确列出的机器路由，其他一律 403。
 
@@ -75,12 +75,12 @@ Browser → Next.js (Railway) → Worker (CF) → D1
 
 本地 `wrangler dev` 和 L2 E2E 测试无法获得真实的 Access JWT。需要特殊处理：
 
-| 场景 | Host header | 认证方式 |
-|------|-------------|----------|
-| 本地开发 | `localhost:*` | 继续用 `BAT_READ_KEY` / `BAT_WRITE_KEY` |
-| E2E 测试 | `localhost:18787` | 继续用 API key（现有行为不变） |
-| 生产 bat.* | `bat.hexly.ai` | Access JWT |
-| 生产 bat-ingest.* | `bat-ingest.worker.hexly.ai` | API key（白名单路由） |
+| 场景              | Host header                  | 认证方式                                |
+| ----------------- | ---------------------------- | --------------------------------------- |
+| 本地开发          | `localhost:*`                | 继续用 `BAT_READ_KEY` / `BAT_WRITE_KEY` |
+| E2E 测试          | `localhost:18787`            | 继续用 API key（现有行为不变）          |
+| 生产 bat.*        | `bat.hexly.ai`               | Access JWT                              |
+| 生产 bat-ingest.* | `bat-ingest.worker.hexly.ai` | API key（白名单路由）                   |
 
 **实现**：`entryControl` 和 `accessAuth` 检测 `localhost` 时回退到 API key 认证，保持现有 E2E 测试兼容。
 
@@ -97,53 +97,53 @@ Worker 中间件按 Host header 决定允许哪些路由：
 
 // 机器入口白名单：method + path
 const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> = [
-  // Probe 写路由
-  { method: "POST", path: "/api/ingest" },
-  { method: "POST", path: "/api/identity" },
-  { method: "POST", path: "/api/tier2" },
-  // Webhook 事件接收（POST only，自带 token 校验）
-  { method: "POST", path: "/api/events" },
-  // 机器读路由（Uptime Kuma）
-  { method: "GET", path: "/api/monitoring", prefix: true },
-  // 公开路由
-  { method: "GET", path: "/api/live" },
+	// Probe 写路由
+	{ method: "POST", path: "/api/ingest" },
+	{ method: "POST", path: "/api/identity" },
+	{ method: "POST", path: "/api/tier2" },
+	// Webhook 事件接收（POST only，自带 token 校验）
+	{ method: "POST", path: "/api/events" },
+	// 机器读路由（Uptime Kuma）
+	{ method: "GET", path: "/api/monitoring", prefix: true },
+	// 公开路由
+	{ method: "GET", path: "/api/live" },
 ];
 
 function isAllowedMachineRoute(method: string, path: string): boolean {
-  return MACHINE_ROUTES.some(route => {
-    if (route.method !== method) return false;
-    if (route.prefix) {
-      return path === route.path || path.startsWith(route.path + "/");
-    }
-    return path === route.path;
-  });
+	return MACHINE_ROUTES.some((route) => {
+		if (route.method !== method) return false;
+		if (route.prefix) {
+			return path === route.path || path.startsWith(route.path + "/");
+		}
+		return path === route.path;
+	});
 }
 
 function isLocalhost(host: string): boolean {
-  return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+	return host.startsWith("localhost") || host.startsWith("127.0.0.1");
 }
 
 export function entryControl(c: Context, next: Next) {
-  const host = c.req.header("host") || "";
-  const path = c.req.path;
-  const method = c.req.method;
-  
-  // localhost：跳过入口控制，继续用 apiKeyAuth（本地开发 / E2E 测试）
-  if (isLocalhost(host)) {
-    return next();
-  }
-  
-  // bat-ingest.* 入口：白名单模式（method + path）
-  if (host.includes("bat-ingest")) {
-    if (!isAllowedMachineRoute(method, path)) {
-      return c.json({ error: "Route not allowed on machine endpoint" }, 403);
-    }
-    // 允许的路由继续走 apiKeyAuth
-    return next();
-  }
-  
-  // bat.* 入口：需要 Access JWT
-  return next(); // 后续由 accessAuth 处理
+	const host = c.req.header("host") || "";
+	const path = c.req.path;
+	const method = c.req.method;
+
+	// localhost：跳过入口控制，继续用 apiKeyAuth（本地开发 / E2E 测试）
+	if (isLocalhost(host)) {
+		return next();
+	}
+
+	// bat-ingest.* 入口：白名单模式（method + path）
+	if (host.includes("bat-ingest")) {
+		if (!isAllowedMachineRoute(method, path)) {
+			return c.json({ error: "Route not allowed on machine endpoint" }, 403);
+		}
+		// 允许的路由继续走 apiKeyAuth
+		return next();
+	}
+
+	// bat.* 入口：需要 Access JWT
+	return next(); // 后续由 accessAuth 处理
 }
 ```
 
@@ -159,47 +159,45 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 const TEAM_DOMAIN = "hexly.cloudflareaccess.com";
 const AUD = "<access-application-aud>"; // 从 Access 控制台复制
 
-const JWKS = createRemoteJWKSet(
-  new URL(`https://${TEAM_DOMAIN}/cdn-cgi/access/certs`)
-);
+const JWKS = createRemoteJWKSet(new URL(`https://${TEAM_DOMAIN}/cdn-cgi/access/certs`));
 
 function isLocalhost(host: string): boolean {
-  return host.startsWith("localhost") || host.startsWith("127.0.0.1");
+	return host.startsWith("localhost") || host.startsWith("127.0.0.1");
 }
 
 export async function accessAuth(c: Context<AppEnv>, next: Next) {
-  const host = c.req.header("host") || "";
-  
-  // localhost：跳过 Access JWT，继续用 apiKeyAuth（本地开发 / E2E 测试）
-  if (isLocalhost(host)) {
-    return next();
-  }
-  
-  // bat-ingest.* 入口已由 entryControl 处理，这里跳过
-  if (host.includes("bat-ingest")) {
-    return next();
-  }
-  
-  // 公开路由不需要 JWT
-  if (c.req.path === "/api/live") {
-    return next();
-  }
-  
-  const jwt = c.req.header("Cf-Access-Jwt-Assertion");
-  if (!jwt) {
-    return c.json({ error: "Missing Access JWT" }, 401);
-  }
-  
-  try {
-    await jwtVerify(jwt, JWKS, {
-      issuer: `https://${TEAM_DOMAIN}`,
-      audience: AUD,
-    });
-  } catch (e) {
-    return c.json({ error: "Invalid Access JWT" }, 403);
-  }
-  
-  return next();
+	const host = c.req.header("host") || "";
+
+	// localhost：跳过 Access JWT，继续用 apiKeyAuth（本地开发 / E2E 测试）
+	if (isLocalhost(host)) {
+		return next();
+	}
+
+	// bat-ingest.* 入口已由 entryControl 处理，这里跳过
+	if (host.includes("bat-ingest")) {
+		return next();
+	}
+
+	// 公开路由不需要 JWT
+	if (c.req.path === "/api/live") {
+		return next();
+	}
+
+	const jwt = c.req.header("Cf-Access-Jwt-Assertion");
+	if (!jwt) {
+		return c.json({ error: "Missing Access JWT" }, 401);
+	}
+
+	try {
+		await jwtVerify(jwt, JWKS, {
+			issuer: `https://${TEAM_DOMAIN}`,
+			audience: AUD,
+		});
+	} catch (e) {
+		return c.json({ error: "Invalid Access JWT" }, 403);
+	}
+
+	return next();
 }
 ```
 
@@ -221,7 +219,7 @@ app.use("*", entryControl);
 //    - bat-ingest.* → apiKeyAuth
 //    - bat.* → accessAuth
 app.use("/api/*", accessAuth);
-app.use("/api/*", apiKeyAuth);  // accessAuth 通过后，apiKeyAuth 对 bat.* 读路由放行
+app.use("/api/*", apiKeyAuth); // accessAuth 通过后，apiKeyAuth 对 bat.* 读路由放行
 
 // 3. 路由注册
 app.get("/api/live", liveHandler);
@@ -355,11 +353,11 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
-  build: {
-    outDir: "../worker/static",
-    emptyOutDir: true,
-  },
+	plugins: [react(), tailwindcss()],
+	build: {
+		outDir: "../worker/static",
+		emptyOutDir: true,
+	},
 });
 ```
 
@@ -371,30 +369,30 @@ export default defineConfig({
 
 ```json
 {
-  "$schema": "https://turbo.build/schema.json",
-  "tasks": {
-    "build": {
-      "dependsOn": ["^build"],
-      "outputs": ["dist/**", "static/**"]
-    },
-    "@bat/ui#build": {
-      "dependsOn": ["^build"],
-      "outputs": ["../worker/static/**"]
-    },
-    "typecheck": {
-      "dependsOn": ["^build"]
-    },
-    "test": {
-      "dependsOn": ["^build"]
-    },
-    "test:e2e": {
-      "dependsOn": ["^build"]
-    },
-    "dev": {
-      "cache": false,
-      "persistent": true
-    }
-  }
+	"$schema": "https://turbo.build/schema.json",
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build"],
+			"outputs": ["dist/**", "static/**"]
+		},
+		"@bat/ui#build": {
+			"dependsOn": ["^build"],
+			"outputs": ["../worker/static/**"]
+		},
+		"typecheck": {
+			"dependsOn": ["^build"]
+		},
+		"test": {
+			"dependsOn": ["^build"]
+		},
+		"test:e2e": {
+			"dependsOn": ["^build"]
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		}
+	}
 }
 ```
 
@@ -456,52 +454,52 @@ Application 创建后，记录：
 
 ### Phase 1: Worker 认证改造 ✅
 
-| # | 任务 | 状态 |
-|---|------|------|
-| 1.1 | 添加 `entryControl` 中间件（白名单机器路由） | ✅ |
-| 1.2 | 添加 `accessAuth` 中间件（JWT 验证，用 jose 库） | ✅ |
-| 1.3 | 调整中间件顺序：`entryControl` → `accessAuth` / `apiKeyAuth` | ✅ |
-| 1.4 | 浏览器读写路由移除 `BAT_READ_KEY` 依赖 | ✅ |
-| 1.5 | `/api/monitoring/*` 保留 `BAT_READ_KEY`（机器路由） | ✅ |
+| #   | 任务                                                         | 状态 |
+| --- | ------------------------------------------------------------ | ---- |
+| 1.1 | 添加 `entryControl` 中间件（白名单机器路由）                 | ✅   |
+| 1.2 | 添加 `accessAuth` 中间件（JWT 验证，用 jose 库）             | ✅   |
+| 1.3 | 调整中间件顺序：`entryControl` → `accessAuth` / `apiKeyAuth` | ✅   |
+| 1.4 | 浏览器读写路由移除 `BAT_READ_KEY` 依赖                       | ✅   |
+| 1.5 | `/api/monitoring/*` 保留 `BAT_READ_KEY`（机器路由）          | ✅   |
 
 ### Phase 2: Worker 静态资源 ✅
 
-| # | 任务 | 状态 |
-|---|------|------|
-| 2.1 | 配置 `wrangler.toml` 的 `[assets]` | ✅ |
-| 2.2 | 添加 `bat.hexly.ai` 路由（双域名） | ✅ |
-| 2.3 | 本地 `wrangler dev` 验证 | ✅ |
+| #   | 任务                               | 状态 |
+| --- | ---------------------------------- | ---- |
+| 2.1 | 配置 `wrangler.toml` 的 `[assets]` | ✅   |
+| 2.2 | 添加 `bat.hexly.ai` 路由（双域名） | ✅   |
+| 2.3 | 本地 `wrangler dev` 验证           | ✅   |
 
 ### Phase 3: 构建 UI ✅
 
-| # | 任务 | 状态 |
-|---|------|------|
-| 3.1 | 创建 `packages/ui`，配置 Vite 6 + React 19 + Tailwind | ✅ |
-| 3.2 | 迁移 UI 组件（shadcn/ui, layout, charts） | ✅ |
-| 3.3 | 迁移页面（去掉 SSR/代理逻辑） | ✅ |
-| 3.4 | 迁移 SWR hooks（URL 不变） | ✅ |
-| 3.5 | Setup 页面改造（不返回 write key） | ✅ |
+| #   | 任务                                                  | 状态 |
+| --- | ----------------------------------------------------- | ---- |
+| 3.1 | 创建 `packages/ui`，配置 Vite 6 + React 19 + Tailwind | ✅   |
+| 3.2 | 迁移 UI 组件（shadcn/ui, layout, charts）             | ✅   |
+| 3.3 | 迁移页面（去掉 SSR/代理逻辑）                         | ✅   |
+| 3.4 | 迁移 SWR hooks（URL 不变）                            | ✅   |
+| 3.5 | Setup 页面改造（不返回 write key）                    | ✅   |
 
 ### Phase 4: 上线
 
-| # | 任务 | 状态 |
-|---|------|------|
+| #   | 任务                                   | 状态        |
+| --- | -------------------------------------- | ----------- |
 | 4.1 | 配置 Cloudflare Access（bat.hexly.ai） | ⏳ 手动步骤 |
-| 4.2 | 部署 Worker（含静态资源） | ⏳ |
-| 4.3 | 验证：浏览器入口需登录，API 正常 | ⏳ |
-| 4.4 | 验证：Probe 写入正常（bat-ingest.*） | ⏳ |
-| 4.5 | 验证：Uptime Kuma monitoring API 正常 | ⏳ |
+| 4.2 | 部署 Worker（含静态资源）              | ⏳          |
+| 4.3 | 验证：浏览器入口需登录，API 正常       | ⏳          |
+| 4.4 | 验证：Probe 写入正常（bat-ingest.*）   | ⏳          |
+| 4.5 | 验证：Uptime Kuma monitoring API 正常  | ⏳          |
 
 ### Phase 5: 清理 ✅
 
-| # | 任务 | 状态 |
-|---|------|------|
-| 5.1 | 删除 `packages/dashboard` | ⏳ 生产验证后 |
-| 5.2 | 更新 `turbo.json` 和根 `package.json` | ✅ |
-| 5.3 | 更新 Husky hooks | ✅ (无需改动) |
-| 5.4 | 关闭 Railway 部署 | ⏳ 生产验证后 |
-| 5.5 | 更新 CLAUDE.md 和相关文档 | ✅ |
-| 5.6 | 更新 `scripts/sync-version.sh` 引用 ui 替代 dashboard | ✅ |
+| #   | 任务                                                  | 状态          |
+| --- | ----------------------------------------------------- | ------------- |
+| 5.1 | 删除 `packages/dashboard`                             | ⏳ 生产验证后 |
+| 5.2 | 更新 `turbo.json` 和根 `package.json`                 | ✅            |
+| 5.3 | 更新 Husky hooks                                      | ✅ (无需改动) |
+| 5.4 | 关闭 Railway 部署                                     | ⏳ 生产验证后 |
+| 5.5 | 更新 CLAUDE.md 和相关文档                             | ✅            |
+| 5.6 | 更新 `scripts/sync-version.sh` 引用 ui 替代 dashboard | ✅            |
 
 ---
 
@@ -528,10 +526,10 @@ bun add -d vite @vitejs/plugin-react @tailwindcss/vite tailwindcss typescript @t
 
 ## 10. 成功指标
 
-| 指标 | 目标 |
-|------|------|
-| 部署命令 | `bun run build && wrangler deploy` |
-| 基础设施 | 仅 Cloudflare（无 Railway） |
-| API Key | `BAT_WRITE_KEY`（Probe）+ `BAT_READ_KEY`（Uptime Kuma） |
-| 浏览器认证 | Cloudflare Access + JWT 签名验证 |
-| 机器入口 | 白名单路由，非允许路由返回 403 |
+| 指标       | 目标                                                    |
+| ---------- | ------------------------------------------------------- |
+| 部署命令   | `bun run build && wrangler deploy`                      |
+| 基础设施   | 仅 Cloudflare（无 Railway）                             |
+| API Key    | `BAT_WRITE_KEY`（Probe）+ `BAT_READ_KEY`（Uptime Kuma） |
+| 浏览器认证 | Cloudflare Access + JWT 签名验证                        |
+| 机器入口   | 白名单路由，非允许路由返回 403                          |

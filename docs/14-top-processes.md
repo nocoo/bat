@@ -29,17 +29,17 @@
 
 每个进程读取 **3 个文件**：
 
-| File | Parse Cost | Fields Extracted |
-|------|-----------|------------------|
-| `/proc/[pid]/stat` | 极低（单行，需 comm 括号感知解析，见 §2.2） | pid, comm, state, ppid, utime, stime, num_threads, starttime, vsize, rss, majflt, processor |
-| `/proc/[pid]/cmdline` | 极低（单次 read） | full command line（`\0` → space） |
-| `/proc/[pid]/io` | 极低（key-value），**默认弱可用**（见 §2.7） | read_bytes, write_bytes |
+| File                  | Parse Cost                                   | Fields Extracted                                                                            |
+| --------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `/proc/[pid]/stat`    | 极低（单行，需 comm 括号感知解析，见 §2.2）  | pid, comm, state, ppid, utime, stime, num_threads, starttime, vsize, rss, majflt, processor |
+| `/proc/[pid]/cmdline` | 极低（单次 read）                            | full command line（`\0` → space）                                                           |
+| `/proc/[pid]/io`      | 极低（key-value），**默认弱可用**（见 §2.7） | read_bytes, write_bytes                                                                     |
 
 **不读取的文件及原因**：
 
-| File | Reason to Skip |
-|------|---------------|
-| `/proc/[pid]/statm` | 与 stat 的 rss/vsize 重复，且 man page 标注 "inaccurate" |
+| File                 | Reason to Skip                                              |
+| -------------------- | ----------------------------------------------------------- |
+| `/proc/[pid]/statm`  | 与 stat 的 rss/vsize 重复，且 man page 标注 "inaccurate"    |
 | `/proc/[pid]/status` | 解析开销高（~49 行 key-value），仅 Uid 和 VmSwap 有独特价值 |
 
 ### 2.2 `/proc/[pid]/stat` Parse Strategy
@@ -87,20 +87,20 @@ fn parse_proc_stat(content: &str) -> Option<ProcStat> {
 
 52 个字段中，采集以下 12 个：
 
-| # | Field | Type | Purpose |
-|---|-------|------|---------|
-| 1 | `pid` | u32 | 进程标识 |
-| 2 | `comm` | String | 进程名（括号包裹，截断 16 字符） |
-| 3 | `state` | char | 进程状态：R(running), S(sleeping), D(disk-sleep), Z(zombie), T(stopped) |
-| 4 | `ppid` | u32 | 父进程 PID，用于构建进程树、识别孤儿进程 |
-| 14 | `utime` | u64 | 用户态 CPU ticks — **CPU% 计算核心** |
-| 15 | `stime` | u64 | 内核态 CPU ticks — **CPU% 计算核心** |
-| 20 | `num_threads` | u32 | 线程数 — 高线程数可能指示泄漏 |
-| 22 | `starttime` | u64 | 启动时间（boot 后 ticks）— 可算进程 uptime |
-| 23 | `vsize` | u64 | 虚拟内存 (bytes) |
-| 24 | `rss` | i64 | 驻留内存 (pages) — **内存核心**，需 × `page_size`（运行时通过 `sysconf(_SC_PAGESIZE)` 获取，**不可硬编码 4096**：aarch64 可能为 16KiB/64KiB） |
-| 12 | `majflt` | u64 | 主缺页（触发磁盘 I/O）— delta 有性能诊断价值 |
-| 39 | `processor` | i32 | 上次运行的 CPU 编号 — NUMA 调试 |
+| #   | Field         | Type   | Purpose                                                                                                                                       |
+| --- | ------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | `pid`         | u32    | 进程标识                                                                                                                                      |
+| 2   | `comm`        | String | 进程名（括号包裹，截断 16 字符）                                                                                                              |
+| 3   | `state`       | char   | 进程状态：R(running), S(sleeping), D(disk-sleep), Z(zombie), T(stopped)                                                                       |
+| 4   | `ppid`        | u32    | 父进程 PID，用于构建进程树、识别孤儿进程                                                                                                      |
+| 14  | `utime`       | u64    | 用户态 CPU ticks — **CPU% 计算核心**                                                                                                          |
+| 15  | `stime`       | u64    | 内核态 CPU ticks — **CPU% 计算核心**                                                                                                          |
+| 20  | `num_threads` | u32    | 线程数 — 高线程数可能指示泄漏                                                                                                                 |
+| 22  | `starttime`   | u64    | 启动时间（boot 后 ticks）— 可算进程 uptime                                                                                                    |
+| 23  | `vsize`       | u64    | 虚拟内存 (bytes)                                                                                                                              |
+| 24  | `rss`         | i64    | 驻留内存 (pages) — **内存核心**，需 × `page_size`（运行时通过 `sysconf(_SC_PAGESIZE)` 获取，**不可硬编码 4096**：aarch64 可能为 16KiB/64KiB） |
+| 12  | `majflt`      | u64    | 主缺页（触发磁盘 I/O）— delta 有性能诊断价值                                                                                                  |
+| 39  | `processor`   | i32    | 上次运行的 CPU 编号 — NUMA 调试                                                                                                               |
 
 ### 2.4 `/proc/[pid]/cmdline`
 
@@ -111,11 +111,10 @@ fn parse_proc_stat(content: &str) -> Option<ProcStat> {
 
 ### 2.5 `/proc/[pid]/io`（默认弱可用，见 §2.7）
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `read_bytes` | u64 | 真正从磁盘读取的字节（累计） |
-| `write_bytes` | u64 | 真正写入磁盘的字节（累计） |
-
+| Field         | Type | Description                  |
+| ------------- | ---- | ---------------------------- |
+| `read_bytes`  | u64  | 真正从磁盘读取的字节（累计） |
+| `write_bytes` | u64  | 真正写入磁盘的字节（累计）   |
 - 只取 `read_bytes` / `write_bytes`（物理 I/O），不取 `rchar`/`wchar`（含缓存命中，价值低）
 - 权限模型详见 §2.7；读取失败时字段为 `None`，graceful degradation
 - delta 计算后转为 bytes/sec
@@ -130,12 +129,12 @@ fn parse_proc_stat(content: &str) -> Option<ProcStat> {
 
 bat-probe 当前默认部署以 `bat` 专用用户运行（`docs/04-probe.md:211`，systemd `User=bat / Group=bat`）。`/proc/[pid]/io` 的可读性取决于内核参数和进程归属：
 
-| 条件 | 可读性 | 说明 |
-|------|--------|------|
-| **自身进程**（UID 匹配） | ✅ 始终可读 | 内核允许进程读取自己的 io |
-| **其他用户进程** + `ptrace_scope = 0` | ✅ 可读 | 大多数 VPS 默认值（Ubuntu/Debian） |
-| **其他用户进程** + `ptrace_scope = 1` | ❌ 不可读 | 需 `CAP_SYS_PTRACE` 或 root |
-| **以 root 运行 probe** | ✅ 全部可读 | 但当前部署不使用 root |
+| 条件                                  | 可读性      | 说明                               |
+| ------------------------------------- | ----------- | ---------------------------------- |
+| **自身进程**（UID 匹配）              | ✅ 始终可读 | 内核允许进程读取自己的 io          |
+| **其他用户进程** + `ptrace_scope = 0` | ✅ 可读     | 大多数 VPS 默认值（Ubuntu/Debian） |
+| **其他用户进程** + `ptrace_scope = 1` | ❌ 不可读   | 需 `CAP_SYS_PTRACE` 或 root        |
+| **以 root 运行 probe**                | ✅ 全部可读 | 但当前部署不使用 root              |
 
 **实际影响**：在当前 VPS 部署环境中（Ubuntu + `ptrace_scope = 1`），probe 以 `bat` 用户运行，**只能读取 `bat` 自有进程的 io**，其他用户（root、www-data 等）的进程 io 字段为 `null`。
 
@@ -191,14 +190,14 @@ struct PrevProcStat {
 
 ### 4.1 Overhead Analysis
 
-| Operation | Count per Cycle | Cost |
-|-----------|----------------|------|
-| List `/proc/` entries | 1 × readdir | ~0.1ms (200 进程) |
-| Read `/proc/[pid]/stat` | ~200 × read | ~0.2ms total |
-| Read `/proc/[pid]/cmdline` | ~200 × read | ~0.2ms total |
-| Read `/proc/[pid]/io` | ~200 × read | ~0.1ms total |
-| Parse + sort + truncate | 1 | ~0.05ms |
-| **Total** | — | **< 1ms per 30s cycle** |
+| Operation                  | Count per Cycle | Cost                    |
+| -------------------------- | --------------- | ----------------------- |
+| List `/proc/` entries      | 1 × readdir     | ~0.1ms (200 进程)       |
+| Read `/proc/[pid]/stat`    | ~200 × read     | ~0.2ms total            |
+| Read `/proc/[pid]/cmdline` | ~200 × read     | ~0.2ms total            |
+| Read `/proc/[pid]/io`      | ~200 × read     | ~0.1ms total            |
+| Parse + sort + truncate    | 1               | ~0.05ms                 |
+| **Total**                  | —               | **< 1ms per 30s cycle** |
 
 **对比**：
 - Netdata `apps.plugin`：~10ms/cycle + 120MB RSS (per-process tracking for ALL processes, all metrics)
@@ -225,35 +224,49 @@ struct PrevProcStat {
 
 ### 4.3 Memory Overhead
 
-| Component | Size |
-|-----------|------|
-| `prev_proc_stats` HashMap (200 entries) | ~20KB |
-| uid→username cache | ~5KB |
-| Current cycle process list (50 entries) | ~30KB |
-| **Total RSS delta** | **< 60KB** |
+| Component                               | Size       |
+| --------------------------------------- | ---------- |
+| `prev_proc_stats` HashMap (200 entries) | ~20KB      |
+| uid→username cache                      | ~5KB       |
+| Current cycle process list (50 entries) | ~30KB      |
+| **Total RSS delta**                     | **< 60KB** |
 
 ### 4.4 Payload Size
 
 每个进程 JSON ~250 bytes：
 ```json
-{"pid":1234,"name":"nginx","cmd":"nginx: worker process","state":"S","ppid":1230,
- "user":"www-data","cpu_pct":12.3,"mem_rss":268435456,"mem_pct":6.2,"mem_virt":536870912,
- "num_threads":4,"uptime":86400,"majflt_rate":0.0,"io_read_rate":1024,"io_write_rate":2048,
- "processor":2}
+{
+	"pid": 1234,
+	"name": "nginx",
+	"cmd": "nginx: worker process",
+	"state": "S",
+	"ppid": 1230,
+	"user": "www-data",
+	"cpu_pct": 12.3,
+	"mem_rss": 268435456,
+	"mem_pct": 6.2,
+	"mem_virt": 536870912,
+	"num_threads": 4,
+	"uptime": 86400,
+	"majflt_rate": 0.0,
+	"io_read_rate": 1024,
+	"io_write_rate": 2048,
+	"processor": 2
+}
 ```
 
 50 processes × 250B = **~12.5KB per payload**，30s 一次 = 36KB/min = 2.1MB/hour — 完全可接受。
 
 ### 4.5 Graceful Degradation
 
-| Scenario | Behavior |
-|----------|----------|
-| `/proc/[pid]/stat` read fails (EPERM/ENOENT) | Skip this PID, continue scanning |
-| `/proc/[pid]/io` read fails (non-root) | `io_read_rate: null, io_write_rate: null` |
-| `/proc/[pid]/cmdline` empty (zombie) | Fallback to `comm` from stat |
-| System has < 50 processes | Return all processes |
-| PID reuse between cycles | Detect via `starttime` mismatch, reset delta |
-| First cycle (no prev state) | `cpu_pct: null` for all processes（和现有 CPU/net metrics 一致） |
+| Scenario                                     | Behavior                                                         |
+| -------------------------------------------- | ---------------------------------------------------------------- |
+| `/proc/[pid]/stat` read fails (EPERM/ENOENT) | Skip this PID, continue scanning                                 |
+| `/proc/[pid]/io` read fails (non-root)       | `io_read_rate: null, io_write_rate: null`                        |
+| `/proc/[pid]/cmdline` empty (zombie)         | Fallback to `comm` from stat                                     |
+| System has < 50 processes                    | Return all processes                                             |
+| PID reuse between cycles                     | Detect via `starttime` mismatch, reset delta                     |
+| First cycle (no prev state)                  | `cpu_pct: null` for all processes（和现有 CPU/net metrics 一致） |
 
 ---
 
@@ -299,27 +312,27 @@ pub struct MetricsPayload {
 
 ```typescript
 export interface TopProcess {
-  pid: number;
-  name: string;
-  cmd: string;
-  state: string;
-  ppid: number;
-  user: string;
-  cpu_pct: number | null;
-  mem_rss: number;
-  mem_pct: number;
-  mem_virt: number;
-  num_threads: number;
-  uptime: number;
-  majflt_rate: number | null;
-  io_read_rate?: number | null;
-  io_write_rate?: number | null;
-  processor: number;
+	pid: number;
+	name: string;
+	cmd: string;
+	state: string;
+	ppid: number;
+	user: string;
+	cpu_pct: number | null;
+	mem_rss: number;
+	mem_pct: number;
+	mem_virt: number;
+	num_threads: number;
+	uptime: number;
+	majflt_rate: number | null;
+	io_read_rate?: number | null;
+	io_write_rate?: number | null;
+	processor: number;
 }
 
 export interface MetricsPayload {
-  // ... existing ...
-  top_processes?: TopProcess[];
+	// ... existing ...
+	top_processes?: TopProcess[];
 }
 ```
 
@@ -340,8 +353,8 @@ ALTER TABLE metrics_raw ADD COLUMN top_processes_json TEXT;
 
 ```typescript
 export interface MetricsDataPoint {
-  // ... existing ...
-  top_processes_json: string | null;
+	// ... existing ...
+	top_processes_json: string | null;
 }
 ```
 
@@ -374,19 +387,19 @@ export interface MetricsDataPoint {
 
 ### 6.2 Table Columns
 
-| Column | Width | Content | Default Sort |
-|--------|-------|---------|-------------|
-| PID | 60px | `pid` | — |
-| Name | 120px | `name`（comm），hover tooltip 显示完整 `cmd` | — |
-| User | 80px | `user` | — |
-| State | 50px | State badge（见 6.4 着色规则） | — |
-| CPU% | 70px | `cpu_pct`，右对齐，1 位小数 | **desc** (default) |
-| Memory | 80px | `mem_rss`，human-readable (MB/GB) | — |
-| Mem% | 60px | `mem_pct`，右对齐，1 位小数 | — |
-| Threads | 60px | `num_threads` | — |
-| I/O R | 70px | `io_read_rate`，human-readable/s，`—` if null | — |
-| I/O W | 70px | `io_write_rate`，human-readable/s，`—` if null | — |
-| Uptime | 80px | human-readable (2d 3h, 15m, etc.) | — |
+| Column  | Width | Content                                        | Default Sort       |
+| ------- | ----- | ---------------------------------------------- | ------------------ |
+| PID     | 60px  | `pid`                                          | —                  |
+| Name    | 120px | `name`（comm），hover tooltip 显示完整 `cmd`   | —                  |
+| User    | 80px  | `user`                                         | —                  |
+| State   | 50px  | State badge（见 6.4 着色规则）                 | —                  |
+| CPU%    | 70px  | `cpu_pct`，右对齐，1 位小数                    | **desc** (default) |
+| Memory  | 80px  | `mem_rss`，human-readable (MB/GB)              | —                  |
+| Mem%    | 60px  | `mem_pct`，右对齐，1 位小数                    | —                  |
+| Threads | 60px  | `num_threads`                                  | —                  |
+| I/O R   | 70px  | `io_read_rate`，human-readable/s，`—` if null  | —                  |
+| I/O W   | 70px  | `io_write_rate`，human-readable/s，`—` if null | —                  |
+| Uptime  | 80px  | human-readable (2d 3h, 15m, etc.)              | —                  |
 
 **隐藏列（默认不展示，空间不够时省略）**：
 - `mem_virt` — Virtual memory
@@ -410,27 +423,27 @@ export interface MetricsDataPoint {
 
 #### Process State Badges
 
-| State | Label | Color | CSS |
-|-------|-------|-------|-----|
-| R | Running | `success` (green) | `bg-success/10 text-success` |
-| S | Sleeping | `muted` (gray) | `bg-muted text-muted-foreground` |
-| D | Disk Sleep | `warning` (amber) | `bg-warning/10 text-warning` |
-| Z | Zombie | `destructive` (red) | `bg-destructive/10 text-destructive` |
-| T | Stopped | `purple` | `bg-purple/10 text-purple` |
+| State | Label      | Color               | CSS                                  |
+| ----- | ---------- | ------------------- | ------------------------------------ |
+| R     | Running    | `success` (green)   | `bg-success/10 text-success`         |
+| S     | Sleeping   | `muted` (gray)      | `bg-muted text-muted-foreground`     |
+| D     | Disk Sleep | `warning` (amber)   | `bg-warning/10 text-warning`         |
+| Z     | Zombie     | `destructive` (red) | `bg-destructive/10 text-destructive` |
+| T     | Stopped    | `purple`            | `bg-purple/10 text-purple`           |
 
 #### Row-Level Anomaly Highlighting
 
 整行背景着色（subtle），当进程触发以下条件：
 
-| Condition | Row Background | Meaning |
-|-----------|---------------|---------|
-| `cpu_pct > 80` | `bg-destructive/5` (faint red) | CPU hog |
-| `cpu_pct > 50` | `bg-warning/5` (faint amber) | High CPU |
-| `mem_pct > 30` | `bg-destructive/5` (faint red) | Memory hog |
-| `mem_pct > 15` | `bg-warning/5` (faint amber) | High memory |
-| `state == "D"` | `bg-warning/5` (faint amber) | Uninterruptible I/O wait |
-| `state == "Z"` | `bg-destructive/5` (faint red) | Zombie process |
-| `num_threads > 100` | `bg-warning/5` (faint amber) | Thread count anomaly |
+| Condition           | Row Background                 | Meaning                  |
+| ------------------- | ------------------------------ | ------------------------ |
+| `cpu_pct > 80`      | `bg-destructive/5` (faint red) | CPU hog                  |
+| `cpu_pct > 50`      | `bg-warning/5` (faint amber)   | High CPU                 |
+| `mem_pct > 30`      | `bg-destructive/5` (faint red) | Memory hog               |
+| `mem_pct > 15`      | `bg-warning/5` (faint amber)   | High memory              |
+| `state == "D"`      | `bg-warning/5` (faint amber)   | Uninterruptible I/O wait |
+| `state == "Z"`      | `bg-destructive/5` (faint red) | Zombie process           |
+| `num_threads > 100` | `bg-warning/5` (faint amber)   | Thread count anomaly     |
 
 **优先级**：destructive > warning > none。一行只显示最高优先级的颜色。
 
@@ -438,22 +451,22 @@ export interface MetricsDataPoint {
 
 数值列根据阈值着色（仅文字颜色）：
 
-| Column | Normal | Warning | Critical |
-|--------|--------|---------|----------|
-| CPU% | `text-foreground` | `text-warning` (>50%) | `text-destructive` (>80%) |
-| Mem% | `text-foreground` | `text-warning` (>15%) | `text-destructive` (>30%) |
-| Threads | `text-foreground` | `text-warning` (>50) | `text-destructive` (>100) |
-| State D | — | `text-warning` | — |
-| State Z | — | — | `text-destructive` |
+| Column  | Normal            | Warning               | Critical                  |
+| ------- | ----------------- | --------------------- | ------------------------- |
+| CPU%    | `text-foreground` | `text-warning` (>50%) | `text-destructive` (>80%) |
+| Mem%    | `text-foreground` | `text-warning` (>15%) | `text-destructive` (>30%) |
+| Threads | `text-foreground` | `text-warning` (>50)  | `text-destructive` (>100) |
+| State D | —                 | `text-warning`        | —                         |
+| State Z | —                 | —                     | `text-destructive`        |
 
 ### 6.5 Empty & Loading States
 
-| State | Display |
-|-------|---------|
-| Loading | Skeleton rows (5 rows × all columns) |
+| State                                         | Display                                                         |
+| --------------------------------------------- | --------------------------------------------------------------- |
+| Loading                                       | Skeleton rows (5 rows × all columns)                            |
 | No data (hourly resolution / timeRange > 24h) | "Process data is only available in real-time view (≤24h range)" |
-| First cycle (all cpu_pct null) | Show table, CPU% column displays `—` |
-| Probe version too old (no top_processes_json) | "Process monitoring requires probe ≥ 0.8.0" |
+| First cycle (all cpu_pct null)                | Show table, CPU% column displays `—`                            |
+| Probe version too old (no top_processes_json) | "Process monitoring requires probe ≥ 0.8.0"                     |
 
 ### 6.6 Data Source
 
@@ -483,17 +496,17 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 按依赖关系排列，每个 commit 独立可构建、可测试。
 
-| # | Commit | Files | Test | Status |
-|---|--------|-------|------|--------|
-| 1 | `feat: add top_processes collector (probe)` | `probe/src/collectors/top_processes.rs`, `probe/src/collectors/mod.rs` | `cargo test` — parse unit tests with sample `/proc/[pid]/stat` data | ✅ |
-| 2 | `feat: add TopProcess to payload and orchestrate (probe)` | `probe/src/payload.rs`, `probe/src/orchestrate.rs` | `cargo test` — serialization round-trip | ✅ |
-| 3 | `feat: wire top_processes into main loop (probe)` | `probe/src/main.rs` | `cargo test` — integration (mock procfs dir) | ✅ |
-| 4 | `feat: add TopProcess shared types` | `packages/shared/src/metrics.ts`, `packages/shared/src/api.ts` | `bun test` — type compilation check | ✅ |
-| 5 | `feat: add D1 migration for top_processes_json` | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts`, `packages/worker/src/test-helpers/mock-d1.ts` | `bun test` — E2E migration list sync + mock-d1 loads 0015 | ✅ |
-| 6 | `feat: ingest and store top_processes_json (worker)` | `packages/worker/src/services/metrics.ts` | `bun test` — E2E ingest with/without top_processes | ✅ |
-| 7 | `feat: return top_processes_json in metrics read (worker)` | `packages/worker/src/routes/metrics.ts` | `bun test` — E2E metrics endpoint returns new field | ✅ |
-| 8 | `feat: add TopProcessesTable component (dashboard)` | `packages/dashboard/src/components/charts/top-processes-table.tsx`, `packages/dashboard/src/lib/transforms.ts` | `bun test` — transform function unit tests | ✅ |
-| 9 | `feat: integrate TopProcessesTable into host detail page` | `packages/dashboard/src/app/hosts/[id]/page.tsx` | Manual visual verification + existing E2E | ✅ |
+| #   | Commit                                                     | Files                                                                                                                                           | Test                                                                | Status |
+| --- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------ |
+| 1   | `feat: add top_processes collector (probe)`                | `probe/src/collectors/top_processes.rs`, `probe/src/collectors/mod.rs`                                                                          | `cargo test` — parse unit tests with sample `/proc/[pid]/stat` data | ✅     |
+| 2   | `feat: add TopProcess to payload and orchestrate (probe)`  | `probe/src/payload.rs`, `probe/src/orchestrate.rs`                                                                                              | `cargo test` — serialization round-trip                             | ✅     |
+| 3   | `feat: wire top_processes into main loop (probe)`          | `probe/src/main.rs`                                                                                                                             | `cargo test` — integration (mock procfs dir)                        | ✅     |
+| 4   | `feat: add TopProcess shared types`                        | `packages/shared/src/metrics.ts`, `packages/shared/src/api.ts`                                                                                  | `bun test` — type compilation check                                 | ✅     |
+| 5   | `feat: add D1 migration for top_processes_json`            | `packages/worker/migrations/0015_top_processes.sql`, `packages/worker/test/e2e/wrangler.test.ts`, `packages/worker/src/test-helpers/mock-d1.ts` | `bun test` — E2E migration list sync + mock-d1 loads 0015           | ✅     |
+| 6   | `feat: ingest and store top_processes_json (worker)`       | `packages/worker/src/services/metrics.ts`                                                                                                       | `bun test` — E2E ingest with/without top_processes                  | ✅     |
+| 7   | `feat: return top_processes_json in metrics read (worker)` | `packages/worker/src/routes/metrics.ts`                                                                                                         | `bun test` — E2E metrics endpoint returns new field                 | ✅     |
+| 8   | `feat: add TopProcessesTable component (dashboard)`        | `packages/dashboard/src/components/charts/top-processes-table.tsx`, `packages/dashboard/src/lib/transforms.ts`                                  | `bun test` — transform function unit tests                          | ✅     |
+| 9   | `feat: integrate TopProcessesTable into host detail page`  | `packages/dashboard/src/app/hosts/[id]/page.tsx`                                                                                                | Manual visual verification + existing E2E                           | ✅     |
 
 ---
 
@@ -501,12 +514,12 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 ### 9.1 L1 — Unit Tests
 
-| Layer | File | Tests |
-|-------|------|-------|
-| Probe collector | `top_processes.rs` | `parse_proc_stat()` with real /proc/[pid]/stat samples; PID 复用检测 via starttime; cmdline truncation; io parse with/without permission; UID→username resolution |
-| Probe orchestrate | `orchestrate.rs` | CPU% delta calculation accuracy; first-cycle null handling; disappeared-process cleanup |
-| Shared types | `metrics.ts` | Type compilation（TS 编译即验证） |
-| Dashboard transform | `transforms.ts` | `transformTopProcessesData()` — sort, filter, null handling, empty state |
+| Layer               | File               | Tests                                                                                                                                                             |
+| ------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Probe collector     | `top_processes.rs` | `parse_proc_stat()` with real /proc/[pid]/stat samples; PID 复用检测 via starttime; cmdline truncation; io parse with/without permission; UID→username resolution |
+| Probe orchestrate   | `orchestrate.rs`   | CPU% delta calculation accuracy; first-cycle null handling; disappeared-process cleanup                                                                           |
+| Shared types        | `metrics.ts`       | Type compilation（TS 编译即验证）                                                                                                                                 |
+| Dashboard transform | `transforms.ts`    | `transformTopProcessesData()` — sort, filter, null handling, empty state                                                                                          |
 
 **Coverage target**: Probe collector ≥ 90%, Dashboard transform ≥ 90%
 
@@ -517,12 +530,12 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 ### 9.3 L3 — API E2E
 
-| Test | Assertion |
-|------|-----------|
-| POST /api/ingest with top_processes | 204, data stored in D1 |
-| POST /api/ingest without top_processes (backward compat) | 204, `top_processes_json = NULL` |
-| GET /api/hosts/:id/metrics (raw range) | Response includes `top_processes_json` |
-| GET /api/hosts/:id/metrics (hourly range) | Response has `top_processes_json: null` |
+| Test                                                     | Assertion                               |
+| -------------------------------------------------------- | --------------------------------------- |
+| POST /api/ingest with top_processes                      | 204, data stored in D1                  |
+| POST /api/ingest without top_processes (backward compat) | 204, `top_processes_json = NULL`        |
+| GET /api/hosts/:id/metrics (raw range)                   | Response includes `top_processes_json`  |
+| GET /api/hosts/:id/metrics (hourly range)                | Response has `top_processes_json: null` |
 
 ### 9.4 L4 — BDD E2E
 
@@ -534,45 +547,45 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 ### New Files (3)
 
-| File | Description |
-|------|-------------|
-| `probe/src/collectors/top_processes.rs` | procfs 采集逻辑 — parse stat/cmdline/io, two-phase scan |
-| `packages/worker/migrations/0015_top_processes.sql` | `ALTER TABLE metrics_raw ADD COLUMN top_processes_json TEXT` |
-| `packages/dashboard/src/components/charts/top-processes-table.tsx` | Table component with sort/filter/color |
+| File                                                               | Description                                                  |
+| ------------------------------------------------------------------ | ------------------------------------------------------------ |
+| `probe/src/collectors/top_processes.rs`                            | procfs 采集逻辑 — parse stat/cmdline/io, two-phase scan      |
+| `packages/worker/migrations/0015_top_processes.sql`                | `ALTER TABLE metrics_raw ADD COLUMN top_processes_json TEXT` |
+| `packages/dashboard/src/components/charts/top-processes-table.tsx` | Table component with sort/filter/color                       |
 
 ### Modified Files (11)
 
-| File | Change |
-|------|--------|
-| `probe/src/collectors/mod.rs` | Add `pub mod top_processes` |
-| `probe/src/payload.rs` | Add `TopProcess` struct + `MetricsPayload.top_processes` field |
-| `probe/src/orchestrate.rs` | Add `build_top_processes()` function, modify `build_metrics_payload()` signature |
-| `probe/src/main.rs` | Wire collector into `collect_metrics()`, manage prev-state HashMap |
-| `packages/shared/src/metrics.ts` | Add `TopProcess` interface + `MetricsPayload.top_processes` |
-| `packages/shared/src/index.ts` | Barrel export `TopProcess` type |
-| `packages/shared/src/api.ts` | Add `MetricsDataPoint.top_processes_json` |
-| `packages/worker/src/services/metrics.ts` | `insertMetricsRaw()` — add column + bind parameter (97→98) |
-| `packages/worker/src/test-helpers/mock-d1.ts` | Load `0015_top_processes.sql` migration in mock DB setup |
-| `packages/worker/src/routes/metrics.ts` | SELECT 加 `top_processes_json` |
-| `packages/dashboard/src/app/hosts/[id]/page.tsx` | Import and render `TopProcessesTable` |
+| File                                             | Change                                                                           |
+| ------------------------------------------------ | -------------------------------------------------------------------------------- |
+| `probe/src/collectors/mod.rs`                    | Add `pub mod top_processes`                                                      |
+| `probe/src/payload.rs`                           | Add `TopProcess` struct + `MetricsPayload.top_processes` field                   |
+| `probe/src/orchestrate.rs`                       | Add `build_top_processes()` function, modify `build_metrics_payload()` signature |
+| `probe/src/main.rs`                              | Wire collector into `collect_metrics()`, manage prev-state HashMap               |
+| `packages/shared/src/metrics.ts`                 | Add `TopProcess` interface + `MetricsPayload.top_processes`                      |
+| `packages/shared/src/index.ts`                   | Barrel export `TopProcess` type                                                  |
+| `packages/shared/src/api.ts`                     | Add `MetricsDataPoint.top_processes_json`                                        |
+| `packages/worker/src/services/metrics.ts`        | `insertMetricsRaw()` — add column + bind parameter (97→98)                       |
+| `packages/worker/src/test-helpers/mock-d1.ts`    | Load `0015_top_processes.sql` migration in mock DB setup                         |
+| `packages/worker/src/routes/metrics.ts`          | SELECT 加 `top_processes_json`                                                   |
+| `packages/dashboard/src/app/hosts/[id]/page.tsx` | Import and render `TopProcessesTable`                                            |
 
 ### Unchanged (no modification needed)
 
-| File | Reason |
-|------|--------|
-| `packages/worker/src/routes/ingest.ts` | Optional field, no validation needed |
+| File                                          | Reason                                  |
+| --------------------------------------------- | --------------------------------------- |
+| `packages/worker/src/routes/ingest.ts`        | Optional field, no validation needed    |
 | `packages/worker/src/services/aggregation.ts` | Snapshot data, not aggregated to hourly |
-| `packages/worker/src/services/alerts.ts` | No new alert rules (see §7) |
+| `packages/worker/src/services/alerts.ts`      | No new alert rules (see §7)             |
 
 ---
 
 ## 11. Risks & Mitigations
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| D1 100-column limit | 当前 98 列 + 1 = 99, 仅剩 1 列余量 | 未来新指标必须使用 `ext_json` 打包模式 |
-| `/proc/[pid]/io` 默认弱可用（见 §2.7） | 非 root 运行的 probe 仅能采集自有进程 I/O | Graceful degradation: `io_read_rate: null`；可通过 `setcap cap_sys_ptrace+ep` 提权 |
-| PID 复用（short-lived processes） | CPU% 计算错误 | `starttime` 校验，不匹配则重置 delta |
-| Payload 膨胀（50 processes × 250B） | 12.5KB/request | 可接受；若需进一步压缩，减少到 Top 20 |
-| Hourly 聚合无进程数据 | >24h 时间范围无进程表格 | UI 提示 "仅在实时视图（≤24h）中可用"；阈值与 `AUTO_RESOLUTION_THRESHOLD_SECONDS = 86400` 一致 |
-| 进程扫描的 race condition | `/proc/[pid]/` 在读取过程中消失 | 每个 read 操作 catch ENOENT/EPERM，skip |
+| Risk                                   | Impact                                    | Mitigation                                                                                    |
+| -------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------- |
+| D1 100-column limit                    | 当前 98 列 + 1 = 99, 仅剩 1 列余量        | 未来新指标必须使用 `ext_json` 打包模式                                                        |
+| `/proc/[pid]/io` 默认弱可用（见 §2.7） | 非 root 运行的 probe 仅能采集自有进程 I/O | Graceful degradation: `io_read_rate: null`；可通过 `setcap cap_sys_ptrace+ep` 提权            |
+| PID 复用（short-lived processes）      | CPU% 计算错误                             | `starttime` 校验，不匹配则重置 delta                                                          |
+| Payload 膨胀（50 processes × 250B）    | 12.5KB/request                            | 可接受；若需进一步压缩，减少到 Top 20                                                         |
+| Hourly 聚合无进程数据                  | >24h 时间范围无进程表格                   | UI 提示 "仅在实时视图（≤24h）中可用"；阈值与 `AUTO_RESOLUTION_THRESHOLD_SECONDS = 86400` 一致 |
+| 进程扫描的 race condition              | `/proc/[pid]/` 在读取过程中消失           | 每个 read 操作 catch ENOENT/EPERM，skip                                                       |

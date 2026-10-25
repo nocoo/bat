@@ -11,14 +11,14 @@ Two enhancements to the Tier 2 software discovery system:
 
 Probing 6 hosts reveals significant gaps between what's actually running and what's detected:
 
-| Host | Purpose | Missing Software | Domains to Discover |
-|------|---------|-----------------|-------------------|
-| jp | frp relay | frps, frpc | — |
-| us | Uptime Kuma monitoring | Uptime Kuma (Docker) | status.nocoo.cloud |
-| us2 | Xray proxy | Xray | — |
-| docker | Docker app platform | n8n, Portainer, Watchtower (Docker) | — |
-| blog | LEMP blog | *(all detected)* | lizheng.me, phpmyadmin.blog.nocoo.cloud |
-| tongji | tongji.net site | *(all detected)* | bbs.tongji.net, m.az4.infoviz.org |
+| Host   | Purpose                | Missing Software                    | Domains to Discover                     |
+| ------ | ---------------------- | ----------------------------------- | --------------------------------------- |
+| jp     | frp relay              | frps, frpc                          | —                                       |
+| us     | Uptime Kuma monitoring | Uptime Kuma (Docker)                | status.nocoo.cloud                      |
+| us2    | Xray proxy             | Xray                                | —                                       |
+| docker | Docker app platform    | n8n, Portainer, Watchtower (Docker) | —                                       |
+| blog   | LEMP blog              | _(all detected)_                    | lizheng.me, phpmyadmin.blog.nocoo.cloud |
+| tongji | tongji.net site        | _(all detected)_                    | bbs.tongji.net, m.az4.infoviz.org       |
 
 Additionally, **port detection is broken** — all software shows `src=process` with empty `listening_ports`. This is likely a permissions issue after the probe was changed to run as the `bat` user (reading `/proc/net/tcp` fd symlinks requires root or `CAP_NET_ADMIN`). This needs investigation and a fix.
 
@@ -30,29 +30,29 @@ Additionally, **port detection is broken** — all software shows `src=process` 
 
 Add a new `SoftwareCategory` value `"proxy"` for tunneling/proxy software.
 
-| ID | Name | Category | Ports | Process Names | Systemd Units | Binaries | dpkg |
-|----|------|----------|-------|---------------|---------------|----------|------|
-| frps | frp Server | proxy | 7000→frps, 7500→frps | frps | frps | frps | — |
-| frpc | frp Client | proxy | — | frpc | frpc | frpc | — |
-| xray | Xray | proxy | — | xray | xray | xray | — |
-| v2ray | V2Ray | proxy | — | v2ray | v2ray | v2ray | — |
-| clash | Clash | proxy | 7890→clash, 9090→clash | clash | clash | clash | — |
+| ID    | Name       | Category | Ports                  | Process Names | Systemd Units | Binaries | dpkg |
+| ----- | ---------- | -------- | ---------------------- | ------------- | ------------- | -------- | ---- |
+| frps  | frp Server | proxy    | 7000→frps, 7500→frps   | frps          | frps          | frps     | —    |
+| frpc  | frp Client | proxy    | —                      | frpc          | frpc          | frpc     | —    |
+| xray  | Xray       | proxy    | —                      | xray          | xray          | xray     | —    |
+| v2ray | V2Ray      | proxy    | —                      | v2ray         | v2ray         | v2ray    | —    |
+| clash | Clash      | proxy    | 7890→clash, 9090→clash | clash         | clash         | clash    | —    |
 
 ### 2.2 New Monitoring/Infra Entries
 
-| ID | Name | Category | Ports | Process Names | Systemd Units | Binaries | dpkg |
-|----|------|----------|-------|---------------|---------------|----------|------|
-| uptime_kuma | Uptime Kuma | monitoring | 3001→node | — | uptime-kuma | — | — |
-| umami | Umami | monitoring | 3000→node | — | — | — | — |
+| ID          | Name        | Category   | Ports     | Process Names | Systemd Units | Binaries | dpkg |
+| ----------- | ----------- | ---------- | --------- | ------------- | ------------- | -------- | ---- |
+| uptime_kuma | Uptime Kuma | monitoring | 3001→node | —             | uptime-kuma   | —        | —    |
+| umami       | Umami       | monitoring | 3000→node | —             | —             | —        | —    |
 
 > Note: Uptime Kuma and Umami run as Node.js processes, making process-based detection ambiguous. Port-based detection is the primary path. Docker-image-based detection is a stretch goal (§2.4).
 
 ### 2.3 New Automation/Container Entries
 
-| ID | Name | Category | Ports | Process Names | Systemd Units | Binaries | dpkg |
-|----|------|----------|-------|---------------|---------------|----------|------|
-| n8n | n8n | infra | 5678→node | — | n8n | — | — |
-| portainer | Portainer | container | 9000→portainer, 9443→portainer | portainer | — | — | — |
+| ID        | Name      | Category  | Ports                          | Process Names | Systemd Units | Binaries | dpkg |
+| --------- | --------- | --------- | ------------------------------ | ------------- | ------------- | -------- | ---- |
+| n8n       | n8n       | infra     | 5678→node                      | —             | n8n           | —        | —    |
+| portainer | Portainer | container | 9000→portainer, 9443→portainer | portainer     | —             | —        | —    |
 
 ### 2.4 Docker Image → Software Mapping (Stretch Goal)
 
@@ -302,12 +302,12 @@ Without the ability to map socket → PID → process name, `ListeningPort.proce
 
 ### 4.3 Fix Options
 
-| Option | Pros | Cons |
-|--------|------|------|
-| A. `ss -tlnp` command | Standard tool, shows process names | Requires `CAP_NET_ADMIN` or root for `-p` flag |
-| B. Grant `CAP_DAC_READ_SEARCH` to bat-probe | Fixes fd reading | Expands probe privileges |
-| C. Parse `/proc/net/tcp` inode → match from `/proc/[pid]/net/tcp6` per-pid | Works per-process | Complex, still needs /proc/[pid] access |
-| D. Hybrid: read `/proc/net/tcp` for ports, match against known port→software mapping without process name | No extra privileges | Less accurate (port 80 could be any web server) |
+| Option                                                                                                    | Pros                               | Cons                                            |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------- |
+| A. `ss -tlnp` command                                                                                     | Standard tool, shows process names | Requires `CAP_NET_ADMIN` or root for `-p` flag  |
+| B. Grant `CAP_DAC_READ_SEARCH` to bat-probe                                                               | Fixes fd reading                   | Expands probe privileges                        |
+| C. Parse `/proc/net/tcp` inode → match from `/proc/[pid]/net/tcp6` per-pid                                | Works per-process                  | Complex, still needs /proc/[pid] access         |
+| D. Hybrid: read `/proc/net/tcp` for ports, match against known port→software mapping without process name | No extra privileges                | Less accurate (port 80 could be any web server) |
 
 **Recommended**: Option B — grant `CAP_DAC_READ_SEARCH` via the systemd unit file. This is the minimal privilege needed to restore correct fd→inode→process mapping in `/proc/[pid]/fd/`.
 
@@ -333,23 +333,37 @@ The `install.sh` script must deploy the updated unit file. No `setcap` command n
 ```typescript
 // packages/shared/src/tier2.ts
 export type SoftwareCategory =
-  | "web" | "database" | "cache" | "queue" | "runtime"
-  | "monitoring" | "security" | "infra" | "container"
-  | "proxy";  // NEW
+	| "web"
+	| "database"
+	| "cache"
+	| "queue"
+	| "runtime"
+	| "monitoring"
+	| "security"
+	| "infra"
+	| "container"
+	| "proxy"; // NEW
 ```
 
 Update dashboard `CATEGORY_LABELS` and `CATEGORY_ORDER`:
 ```typescript
 // packages/dashboard/src/app/hosts/[id]/page.tsx
 const CATEGORY_LABELS: Record<SoftwareCategory, string> = {
-  // ...existing...
-  proxy: "Proxies & Tunnels",
+	// ...existing...
+	proxy: "Proxies & Tunnels",
 };
 
 const CATEGORY_ORDER: SoftwareCategory[] = [
-  "web", "database", "cache", "queue", "runtime",
-  "container", "proxy",  // NEW — after container, before monitoring
-  "monitoring", "security", "infra",
+	"web",
+	"database",
+	"cache",
+	"queue",
+	"runtime",
+	"container",
+	"proxy", // NEW — after container, before monitoring
+	"monitoring",
+	"security",
+	"infra",
 ];
 ```
 
@@ -357,20 +371,20 @@ const CATEGORY_ORDER: SoftwareCategory[] = [
 
 ```typescript
 // packages/shared/src/tier2.ts — DetectedSoftware.source
-source: "port" | "process" | "systemd" | "binary" | "package" | "docker";  // add "docker"
+source: "port" | "process" | "systemd" | "binary" | "package" | "docker"; // add "docker"
 ```
 
 ### 5.3 Website Types
 
 ```typescript
 export interface DiscoveredWebsite {
-  domain: string;
-  web_server: "nginx" | "apache";
-  ssl: boolean;
+	domain: string;
+	web_server: "nginx" | "apache";
+	ssl: boolean;
 }
 
 export interface WebsiteDiscoveryData {
-  sites: DiscoveredWebsite[];
+	sites: DiscoveredWebsite[];
 }
 ```
 
@@ -382,41 +396,41 @@ export interface WebsiteDiscoveryData {
 
 ### Probe (Rust)
 
-| File | Change |
-|------|--------|
+| File                                     | Change                                                                                                    |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `probe/src/collectors/tier2/software.rs` | Add ~10 new `SoftwareSignature` entries; add `"proxy"` category; add `match_by_docker_images()` (stretch) |
-| `probe/src/collectors/tier2/websites.rs` | **NEW** — Nginx/Apache vhost parser, `collect_websites()` |
-| `probe/src/collectors/tier2/mod.rs` | Export `websites` module |
-| `probe/src/collectors/tier2/docker.rs` | Export container list for software cross-reference (stretch) |
-| `probe/src/payload.rs` | Add `websites: Option<WebsiteDiscoveryData>` to `Tier2Payload` |
-| `probe/src/main.rs` | Call `collect_websites()` in `collect_tier2()`, pass result to payload |
-| `probe/dist/bat-probe.service` | Add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to restore port→process mapping |
-| `probe/install.sh` | Deploy updated unit file |
+| `probe/src/collectors/tier2/websites.rs` | **NEW** — Nginx/Apache vhost parser, `collect_websites()`                                                 |
+| `probe/src/collectors/tier2/mod.rs`      | Export `websites` module                                                                                  |
+| `probe/src/collectors/tier2/docker.rs`   | Export container list for software cross-reference (stretch)                                              |
+| `probe/src/payload.rs`                   | Add `websites: Option<WebsiteDiscoveryData>` to `Tier2Payload`                                            |
+| `probe/src/main.rs`                      | Call `collect_websites()` in `collect_tier2()`, pass result to payload                                    |
+| `probe/dist/bat-probe.service`           | Add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to restore port→process mapping                             |
+| `probe/install.sh`                       | Deploy updated unit file                                                                                  |
 
 ### Shared (TypeScript)
 
-| File | Change |
-|------|--------|
+| File                           | Change                                                                                                                                                                  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/shared/src/tier2.ts` | Add `"proxy"` to `SoftwareCategory`; add `"docker"` to source; add `DiscoveredWebsite` + `WebsiteDiscoveryData` types; add `websites` to `Tier2Payload`/`Tier2Snapshot` |
-| `packages/shared/src/index.ts` | Export new types |
+| `packages/shared/src/index.ts` | Export new types                                                                                                                                                        |
 
 ### Worker (TypeScript)
 
-| File | Change |
-|------|--------|
-| `packages/worker/migrations/0016_websites.sql` | **NEW** — `ALTER TABLE tier2_snapshots ADD COLUMN websites_json TEXT` |
+| File                                            | Change                                                                                                                          |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/worker/migrations/0016_websites.sql`  | **NEW** — `ALTER TABLE tier2_snapshots ADD COLUMN websites_json TEXT`                                                           |
 | `packages/worker/src/services/tier2-metrics.ts` | Add `websites_json` to `insertTier2Snapshot()` INSERT and `getLatestTier2Snapshot()` SELECT; `JSON.stringify()` / `safeParse()` |
-| `packages/worker/src/routes/tier2-ingest.ts` | Pass `payload.websites` through to `insertTier2Snapshot()` |
-| `packages/worker/src/routes/tier2-read.ts` | Include `websites` in API response from `getLatestTier2Snapshot()` result |
-| `packages/worker/src/test-helpers/mock-d1.ts` | Add migration path for 0016 |
-| `packages/worker/test/e2e/wrangler.test.ts` | Add `"migrations/0016_websites.sql"` to E2E migration list |
+| `packages/worker/src/routes/tier2-ingest.ts`    | Pass `payload.websites` through to `insertTier2Snapshot()`                                                                      |
+| `packages/worker/src/routes/tier2-read.ts`      | Include `websites` in API response from `getLatestTier2Snapshot()` result                                                       |
+| `packages/worker/src/test-helpers/mock-d1.ts`   | Add migration path for 0016                                                                                                     |
+| `packages/worker/test/e2e/wrangler.test.ts`     | Add `"migrations/0016_websites.sql"` to E2E migration list                                                                      |
 
 ### Dashboard (TypeScript/React)
 
-| File | Change |
-|------|--------|
-| `packages/dashboard/src/app/hosts/[id]/page.tsx` | Add `"proxy"` to `CATEGORY_LABELS`/`CATEGORY_ORDER`; render `WebsitesPanel` below `SoftwareCard` |
-| `packages/dashboard/src/components/websites-panel.tsx` | **NEW** — Websites card component |
+| File                                                   | Change                                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| `packages/dashboard/src/app/hosts/[id]/page.tsx`       | Add `"proxy"` to `CATEGORY_LABELS`/`CATEGORY_ORDER`; render `WebsitesPanel` below `SoftwareCard` |
+| `packages/dashboard/src/components/websites-panel.tsx` | **NEW** — Websites card component                                                                |
 
 ---
 
@@ -424,48 +438,48 @@ export interface WebsiteDiscoveryData {
 
 ### Probe Unit Tests
 
-| Area | Tests |
-|------|-------|
-| New registry entries | Verify frps/xray/v2ray/n8n signatures match expected patterns |
-| Port detection with capability | Verify `match_by_ports` correctly maps socket→PID→process when `/proc/[pid]/fd` is readable |
-| Nginx parser | Parse real-world nginx config with multiple server blocks, SSL, redirects, includes |
-| Nginx parser edge cases | `server_name _`, localhost, IP-only, commented `server_name`, missing files |
-| Apache parser | Parse `<VirtualHost>`, `ServerName`, `ServerAlias`, SSL detection |
-| Website dedup | Same domain in multiple blocks → single entry |
-| Docker image matching (stretch) | Known images map to correct software IDs |
-| Integration | `collect_websites` only runs when nginx/apache detected |
+| Area                            | Tests                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------- |
+| New registry entries            | Verify frps/xray/v2ray/n8n signatures match expected patterns                               |
+| Port detection with capability  | Verify `match_by_ports` correctly maps socket→PID→process when `/proc/[pid]/fd` is readable |
+| Nginx parser                    | Parse real-world nginx config with multiple server blocks, SSL, redirects, includes         |
+| Nginx parser edge cases         | `server_name _`, localhost, IP-only, commented `server_name`, missing files                 |
+| Apache parser                   | Parse `<VirtualHost>`, `ServerName`, `ServerAlias`, SSL detection                           |
+| Website dedup                   | Same domain in multiple blocks → single entry                                               |
+| Docker image matching (stretch) | Known images map to correct software IDs                                                    |
+| Integration                     | `collect_websites` only runs when nginx/apache detected                                     |
 
 ### Worker Tests
 
-| Area | Tests |
-|------|-------|
+| Area         | Tests                                               |
+| ------------ | --------------------------------------------------- |
 | Tier2 ingest | Website data round-trips through JSON serialization |
-| Tier2 read | `websites` field populated in API response |
+| Tier2 read   | `websites` field populated in API response          |
 
 ### Dashboard Tests
 
-| Area | Tests |
-|------|-------|
+| Area              | Tests                                     |
+| ----------------- | ----------------------------------------- |
 | `CATEGORY_LABELS` | All `SoftwareCategory` values have labels |
-| WebsitesPanel | Renders SSL indicators correctly |
-| Empty state | Panel hidden when no websites |
+| WebsitesPanel     | Renders SSL indicators correctly          |
+| Empty state       | Panel hidden when no websites             |
 
 ---
 
 ## 8. Atomic Commits
 
-| # | Scope | Description | Status |
-|---|-------|-------------|--------|
-| 1 | probe | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | ✅ `09eecb3` |
-| 2 | probe | Fix port detection: add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit file, deploy via `install.sh` | ✅ `6c8f70a` |
-| 3 | shared | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types | ✅ `eb8e6c5` (merged with #7 & #8) |
-| 4 | probe | Add `websites.rs` — Nginx vhost block parser with `collect_websites()` | ✅ `f093e3c` (merged #4+#5+#6) |
-| 5 | probe | Add Apache vhost parser to `websites.rs` | ✅ (in `f093e3c`) |
-| 6 | probe | Wire `collect_websites()` into `collect_tier2()` and `Tier2Payload` | ✅ (in `f093e3c`) |
-| 7 | worker | D1 migration `0016_websites.sql` + ingest/read `websites_json` column in `tier2-metrics.ts` | ✅ (in `eb8e6c5`) |
-| 8 | dashboard | Add `"proxy"` category to labels/order; add `WebsitesPanel` component with best-effort footer | ✅ `d8062dc` (merged with #9) |
-| 9 | dashboard | Wire `WebsitesPanel` into host detail page | ✅ (in `d8062dc`) |
-| 10 | probe (stretch) | Add Docker image → software mapping layer | ✅ `27d5532` |
+| #   | Scope           | Description                                                                                                                 | Status                             |
+| --- | --------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| 1   | probe           | Add new software registry entries (frps, frpc, xray, v2ray, clash, uptime_kuma, umami, n8n, portainer) + `"proxy"` category | ✅ `09eecb3`                       |
+| 2   | probe           | Fix port detection: add `AmbientCapabilities=CAP_DAC_READ_SEARCH` to systemd unit file, deploy via `install.sh`             | ✅ `6c8f70a`                       |
+| 3   | shared          | Add `"proxy"` to `SoftwareCategory`, `"docker"` to source, `DiscoveredWebsite` + `WebsiteDiscoveryData` types               | ✅ `eb8e6c5` (merged with #7 & #8) |
+| 4   | probe           | Add `websites.rs` — Nginx vhost block parser with `collect_websites()`                                                      | ✅ `f093e3c` (merged #4+#5+#6)     |
+| 5   | probe           | Add Apache vhost parser to `websites.rs`                                                                                    | ✅ (in `f093e3c`)                  |
+| 6   | probe           | Wire `collect_websites()` into `collect_tier2()` and `Tier2Payload`                                                         | ✅ (in `f093e3c`)                  |
+| 7   | worker          | D1 migration `0016_websites.sql` + ingest/read `websites_json` column in `tier2-metrics.ts`                                 | ✅ (in `eb8e6c5`)                  |
+| 8   | dashboard       | Add `"proxy"` category to labels/order; add `WebsitesPanel` component with best-effort footer                               | ✅ `d8062dc` (merged with #9)      |
+| 9   | dashboard       | Wire `WebsitesPanel` into host detail page                                                                                  | ✅ (in `d8062dc`)                  |
+| 10  | probe (stretch) | Add Docker image → software mapping layer                                                                                   | ✅ `27d5532`                       |
 
 ---
 

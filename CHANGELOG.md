@@ -3,12 +3,14 @@
 ## v2.3.6
 
 ### Fixed
+
 - Preserve the dashboard shell across navigation and correct tablet/mobile sidebar geometry, selection, spacing and theme behavior.
 - Keep host cards aligned within each row, prevent status labels from wrapping, and contain populated process tables on narrow screens.
 - Use standard Basalt controls for sorting, forms, tags, inline editing, copying, permissions and retention settings while preserving Connect authorization and key safeguards.
 - Patch Rust TLS/webpki and JavaScript dependency advisories while retaining static-musl probe packaging.
 
 ### Changed
+
 - Upgrade Basalt to 3.2.1 and unify typography, content surfaces, headers and chart tooltips without duplicate control styling.
 - Add host-detail back navigation, standard time-range segments and a full-width Connect page layout.
 - Update React, React Router, Vite, Hono, Wrangler, TypeScript tooling and test dependencies to the validated lockfile versions.
@@ -17,29 +19,35 @@
 ## v2.3.3
 
 ### Fixed
+
 - Persist host liveness directly in D1 on every probe ingest, removing high-frequency last-seen KV writes and per-host read overlays.
 - Preserve atomic metric insertion, retry deduplication, and the 120-second offline threshold across dashboard, fleet, and monitoring routes.
 - Align the deployment Wrangler version with the tested lockfile.
 - Clean up owned local state after failed startup and use real Access login for explicit local production access.
 
 ### Added
+
 - Isolated local Demo and E2E environments, guarded fixtures, environment switching, and native screenshot scenarios.
 
 ### Changed
+
 - Upgrade Biome to 2.5.15, Vitest and coverage to 5.0.3, Turbo to 2.11.7, and Basalt to 2.2.0.
 - Upgrade and clean up JavaScript and Rust dependencies, including reqwest 0.13.5 and toml 1.1.6, while preserving probe TLS and static-musl packaging.
 - Pin the patched Undici 7.29.1 dependency; an Undici 8.x migration is not included.
 - Document isolated development, verification, and operational lessons.
 
 ### Removed
+
 - Obsolete autoresearch artifacts and the host last-seen KV throttle.
 
 ## v2.3.2
 
 ### Added
+
 - Add Hexly project link and header tooltips
 
 ### Changed
+
 - Avoid D1 history scans and restore dashboard caching
 - Update wrangler
 - Update lucide-react
@@ -76,6 +84,7 @@
 - Update lint-staged to 17.5.1
 
 ### Fixed
+
 - Align release wrangler version
 - Add accessible sr-only text and fix Biome lint in toolbar
 - Isolate worker e2e inspector ports
@@ -85,15 +94,18 @@
 ## v2.3.1
 
 ### Fixed
+
 - Authorize keys across multiple servers
 - Preserve strong connect etags at edge
 
 ## v2.3.0
 
 ### Added
+
 - Add server-bound connect api
 
 ### Changed
+
 - Record verified access configuration
 - Isolate local http connections
 - Drain http responses between checks
@@ -106,6 +118,7 @@
 - Upgrade basalt to 2.1.7
 
 ### Fixed
+
 - Preserve strong Connect ETags through CDN compression so API clients can reuse them in If-Match.
 - Preserve locked dependencies during release
 - Use the protected dual-domain api boundary
@@ -117,16 +130,19 @@
 - Add release proof permissions
 
 ### Removed
+
 - Drop unused ci secrets inherit
 
 ## v2.2.0
 
 ### Added
+
 - Add standardized PageHeader title and subtitle across all pages
 - Add ThemeProvider, AccentProvider, and LinkProvider to App
 - Adopt bat family identity
 
 ### Changed
+
 - Add rich 32-host seed dataset and seed script for local development
 - Delegate Skeleton to @nocoo/basalt SkeletonLine
 - Use Basalt LayerCard in chart containers and host detail skeletons
@@ -226,6 +242,7 @@
 - Bump @biomejs/biome 2.5.8 → 2.5.9 (STU-3683)
 
 ### Fixed
+
 - Use semantic purple token with WCAG contrast for maintenance status badge
 - Ensure readable contrast for maintenance status badge text
 - Preserve prod target and secure TLS verification default in vite proxy
@@ -246,6 +263,7 @@
 - Restore jose caret range ^6.2.9 (STU-3642)
 
 ### Removed
+
 - Migrate common controls (Badge, Button, Table) to @nocoo/basalt and remove local shims
 - Drop one-click install claims
 - Remove conflicting nested claude handbook
@@ -253,9 +271,11 @@
 ## v2.1.1
 
 ### Added
+
 - Load sidebar identity from author api
 
 ### Changed
+
 - Bump wrangler 4.122.0 → 4.123.0 (STU-3526)
 - Bump hono 4.13.1 → 4.13.2 (STU-3524)
 - Bump @cloudflare/workers-types 5.20260813.1 → 5.20260814.1 (STU-3523)
@@ -364,6 +384,7 @@
 - Bump @cloudflare/workers-types from 4.20260625.1 to 4.20260626.1 in packages/worker
 
 ### Fixed
+
 - Keep release bump off fixture versions
 - Stabilize Playwright runtime and report (STU-2695)
 - Pin @playwright/test to exact 1.62.0 (STU-2246)
@@ -372,6 +393,7 @@
 ## v2.1.0
 
 ### Changed
+
 - Lift top_processes_json off metrics_raw onto hosts
 - Bump wrangler from 4.104.0 to 4.105.0 in packages/worker
 - Bump @cloudflare/workers-types from 4.20260624.1 to 4.20260625.1 in packages/worker
@@ -424,14 +446,17 @@
 - Untrack uptime-kuma/config.json, add .gitignore
 
 ### Fixed
+
 - Bump ws override 8.20.1 → 8.21.0 (GHSA-96hv-2xvq-fx4p)
 
 ### Removed
+
 - Remove uptime-kuma skill from bat
 
 ## v2.0.7
 
 ### Changed
+
 - Bump wrangler 4.98.0 → 4.99.0
 - Bump swr 2.3.3 → 2.4.1
 - Bump hono 4.12.23 → 4.12.25
@@ -440,12 +465,14 @@
 - Bump turbo 2.9.16 → 2.9.17
 
 ### Fixed
+
 - Make L2 baseline-snapshot maintenance fixture wall-clock independent
 - Add `environment: production` to probe-release job
 
 ## v2.0.6
 
 ### Changed
+
 - Bump recharts 2.15 → 3.8.1
 - Bump lucide-react 0.511 → 1.17.0
 - Bump @types/node 22 → 25 in packages/cli
@@ -454,20 +481,24 @@
 - Bump lint-staged 16.4 → 17.0.7
 
 ### Fixed
+
 - Use bunx wrangler from packages/worker for R2 probe upload
 
 ## v2.0.5
 
 ### Changed
+
 - Redact VPS fleet details, point to nmem instead
 
 ### Fixed
+
 - Use Duration::from_mins for clippy::duration_suboptimal_units
 - Add setup-bun to probe-release job
 
 ## v2.0.4
 
 ### Changed
+
 - Bump @biomejs/biome 1.9 → 2.4 and adapt config + sources
 - Bump vite 6 → 8, @vitejs/plugin-react 4 → 6
 - Bump toml 0.8 → 1.1
@@ -477,6 +508,7 @@
 ## v2.0.3
 
 ### Added
+
 - Host last_seen 5min flush in ingest (T6)
 - Host active/maintenance projection KV cache (T5)
 - Dashboard short-TTL KV cache (T4)
@@ -485,9 +517,11 @@
 - CLI token KV cache + revoke sentinel (T1)
 
 ### Changed
+
 - Wire BAT_KV production binding (id 57d8209e)
 
 ### Fixed
+
 - Unify tier2 payload to prevent snapshot overwrite
 - Concurrent pipe drain + bounded kill in run_command
 - Prevent iowait storm from disk-scan cycle stacking
@@ -496,6 +530,7 @@
 ## v2.0.2
 
 ### Added
+
 - Inline-editable description on host detail page
 - PATCH /api/hosts/:id/description endpoint
 - Add description column to hosts table
@@ -519,6 +554,7 @@
 - Add static coverage gates (gate:routes + gate:pages)
 
 ### Changed
+
 - Sync bun.lock trustedDependencies with package.json
 - Redact duration_seconds in baseline normalizer
 - C11 — migrate aggregation/cron to AggregationRepository
@@ -559,6 +595,7 @@
 - Split L2 E2E into per-route files + globalSetup
 
 ### Fixed
+
 - Exclude @bat/cli from `bun dev` to avoid one-shot exit failing turbo
 - Bump ws to 8.20.1 (GHSA-58qx-3vcg-4xpx)
 - Upgrade hono to 4.12.16+ (GHSA-69xw, GHSA-9vqf)
@@ -591,12 +628,14 @@
 - Isolate _test_marker from production migration stream
 
 ### Removed
+
 - C9 follow-up — drop alerts/ports/tags inline SQL from C9 routes
 - Remove unused cloud test resources — E2E is fully local
 
 ## v2.0.0
 
 ### Added
+
 - Show open public-port count badge on host card
 - Embed per-host alerts card on detail page
 - Add Websites and Software panels (tier2 slow-scan)
@@ -607,17 +646,20 @@
 - Restore allowed-ports panel after Next.js→Vite migration
 
 ### Fixed
+
 - Truncate long disk mount paths so size column stays single-line
 - Keep host-card height stable when sparkline series are empty
 
 ## v1.1.2
 
 ### Added
+
 - Migrate ui package from bun test to vitest
 - Migrate worker package from bun test to vitest
 - Migrate shared package from bun test to vitest
 
 ### Changed
+
 - Cut D1 writes per ingest by ~80% via diff + batch
 - Bring hooks under unit coverage and clarify UT scope
 - Cover handleDurationRule state machine
@@ -629,6 +671,7 @@
 - Update coverage scripts and thresholds for vitest
 
 ### Fixed
+
 - Exclude IP literals from stale-version scan
 - Port worker E2E suite from Bun APIs to node stdlib
 - Switch worker integration/e2e scripts to vitest
@@ -640,9 +683,11 @@
 ## v1.1.1
 
 ### Changed
+
 - Apply biome useBlockStatements fixes for base-ci v2026.1
 
 ### Fixed
+
 - Anchor collapsed sidebar logo to prevent jitter
 - Replace bg-muted with B05 background tokens in table components
 - Use rounded-card utility instead of arbitrary value
@@ -651,12 +696,14 @@
 ## v1.1.0
 
 ### Changed
+
 - Sync ui + probe versions to 1.0.4 (catch-up before v1.1.0)
 - Log run 50 — parsePortParam wire-semantics fix
 - Switch local dev to full-stack; lift worker coverage to 96%
 - MVVM simplification — reduce complexity_score 18.7% (49 experiments)
 
 ### Fixed
+
 - Cover ui package.json + probe Cargo.{toml,lock}
 - Root bun dev now launches ui + worker in parallel
 - Restore pre-refactor wire semantics for DELETE :port
@@ -664,6 +711,7 @@
 ## v1.0.4
 
 ### Added
+
 - Expand Playwright tests from 36 to 69 with seeded data
 - Add D1 seed data for Playwright tests
 - Add D1 isolation check to pre-push gate
@@ -682,6 +730,7 @@
 - Add automated release script
 
 ### Changed
+
 - Add edge deployment design and rewrite testing doc
 - Rewrite architecture for edge SPA, clean Next.js references
 - Update L3 section to reflect Playwright implementation
@@ -707,6 +756,7 @@
 - 6DQ L1+G1 compliance (#3)
 
 ### Fixed
+
 - Use non-colliding probe version in seed data
 - Remove stale dashboard/package.json reference
 - Replace border-input/bg-input with basalt tokens
@@ -733,6 +783,7 @@
 - Resolve CVEs in next and rand, clean up osv-scanner ignores
 
 ### Removed
+
 - Remove Next.js dashboard, migrate to edge UI
 
 ## v1.0.3 (2026-04-11)

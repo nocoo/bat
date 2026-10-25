@@ -94,17 +94,17 @@ Run `bun run test:environments` for lifecycle/configuration checks and
 
 ## Stack
 
-| Technology | Purpose |
-| --- | --- |
-| Rust / Tokio / reqwest | Linux metric collection and upload |
-| TypeScript / Bun / Turborepo | Shared code, workspaces, and CLI tooling |
-| Hono / Cloudflare Workers | Ingestion, API, scheduled tasks, and static assets |
-| Cloudflare D1 / KV | Persistent data and optional caches |
-| Vite / React / React Router / Recharts | Dashboard, routing, and trend charts |
-| Tailwind CSS / Radix UI | Styling and interface components |
-| Cloudflare Access / `@nocoo/base-cli` | Browser authentication and CLI login |
-| Vitest / Playwright / Cargo | TypeScript, browser, and Rust tests |
-| Cloudflare R2 | Probe binary and checksum distribution |
+| Technology                             | Purpose                                            |
+| -------------------------------------- | -------------------------------------------------- |
+| Rust / Tokio / reqwest                 | Linux metric collection and upload                 |
+| TypeScript / Bun / Turborepo           | Shared code, workspaces, and CLI tooling           |
+| Hono / Cloudflare Workers              | Ingestion, API, scheduled tasks, and static assets |
+| Cloudflare D1 / KV                     | Persistent data and optional caches                |
+| Vite / React / React Router / Recharts | Dashboard, routing, and trend charts               |
+| Tailwind CSS / Radix UI                | Styling and interface components                   |
+| Cloudflare Access / `@nocoo/base-cli`  | Browser authentication and CLI login               |
+| Vitest / Playwright / Cargo            | TypeScript, browser, and Rust tests                |
+| Cloudflare R2                          | Probe binary and checksum distribution             |
 
 ## Documentation
 

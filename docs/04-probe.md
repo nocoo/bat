@@ -44,13 +44,13 @@ This means the systemd unit works without any flags — the binary finds `/etc/b
 
 All real-time collectors read procfs/sysfs directly — zero process fork, zero root required. Metric definitions match [01-metrics-catalogue.md § Real-Time Signals](./01-metrics-catalogue.md).
 
-| Collector | Source | Notes |
-|-----------|--------|-------|
-| CPU | `/proc/stat`, `/proc/loadavg` | Delta method: two samples, diff idle/total jiffies |
-| Memory | `/proc/meminfo` | Parse MemTotal, MemAvailable, SwapTotal, SwapFree |
-| Disk | `/proc/mounts` + `statvfs()` | Filter by fs type, exclude configured mounts |
-| Network | `/sys/class/net/*/statistics/*` | Counter → rate (bytes/sec), handle u64 wrap |
-| Identity | `/etc/hostname`, `/etc/os-release`, `/proc/version`, `/proc/uptime` | Sent on startup + every 6h |
+| Collector | Source                                                              | Notes                                              |
+| --------- | ------------------------------------------------------------------- | -------------------------------------------------- |
+| CPU       | `/proc/stat`, `/proc/loadavg`                                       | Delta method: two samples, diff idle/total jiffies |
+| Memory    | `/proc/meminfo`                                                     | Parse MemTotal, MemAvailable, SwapTotal, SwapFree  |
+| Disk      | `/proc/mounts` + `statvfs()`                                        | Filter by fs type, exclude configured mounts       |
+| Network   | `/sys/class/net/*/statistics/*`                                     | Counter → rate (bytes/sec), handle u64 wrap        |
+| Identity  | `/etc/hostname`, `/etc/os-release`, `/proc/version`, `/proc/uptime` | Sent on startup + every 6h                         |
 
 ### CPU collector (`collectors/cpu.rs`)
 
@@ -96,7 +96,7 @@ Read `/sys/class/net/{iface}/statistics/{rx,tx}_{bytes,errors}` for each non-exc
 
 **Rate calculation** (`rate.rs`):
 - **Bytes**: `rate = (current - previous) / interval_seconds` → bytes/sec (gauge)
-- **Errors**: `delta = current - previous` → error count in the interval (not per-second rate, just the increment). This ensures each `metrics_raw` row records errors *during that interval*, not a cumulative counter. Hourly aggregation can safely sum these deltas.
+- **Errors**: `delta = current - previous` → error count in the interval (not per-second rate, just the increment). This ensures each `metrics_raw` row records errors _during that interval_, not a cumulative counter. Hourly aggregation can safely sum these deltas.
 
 Counters are u64 — handle wrap by treating `current < previous` as `current + (u64::MAX - previous)`.
 
@@ -104,15 +104,15 @@ Output: array of `{ iface, rx_bytes_rate, tx_bytes_rate, rx_errors, tx_errors }`
 
 ### Identity collector (`collectors/identity.rs`)
 
-| Field | Source |
-|-------|--------|
-| `hostname` | `/etc/hostname` (trimmed) |
-| `os` | `/etc/os-release` → `PRETTY_NAME` |
-| `kernel` | `/proc/version` → first token after "Linux version" |
-| `arch` | `uname -m` equivalent (from `libc::uname`) |
-| `cpu_model` | `/proc/cpuinfo` → `model name` (first occurrence) |
-| `uptime_seconds` | `/proc/uptime` → first field (float → u64) |
-| `boot_time` | `now() - uptime_seconds` |
+| Field            | Source                                              |
+| ---------------- | --------------------------------------------------- |
+| `hostname`       | `/etc/hostname` (trimmed)                           |
+| `os`             | `/etc/os-release` → `PRETTY_NAME`                   |
+| `kernel`         | `/proc/version` → first token after "Linux version" |
+| `arch`           | `uname -m` equivalent (from `libc::uname`)          |
+| `cpu_model`      | `/proc/cpuinfo` → `model name` (first occurrence)   |
+| `uptime_seconds` | `/proc/uptime` → first field (float → u64)          |
+| `boot_time`      | `now() - uptime_seconds`                            |
 
 Sent via `POST /api/identity` on startup and every 6h. Payload maps to `IdentityPayload` in [03-data-structures.md § Identity payload](./03-data-structures.md).
 
@@ -149,11 +149,11 @@ loop {
 
 The Probe does NOT retry these HTTP status codes — retrying would waste resources on errors that cannot self-resolve:
 
-| Status | Meaning | Probe action |
-|--------|---------|-------------|
-| `400` | Clock skew > 5 min, or invalid payload | Log error, skip this tick. Fix NTP. |
-| `401` | Bad `BAT_WRITE_KEY` | Log error, skip this tick. Fix config. |
-| `403` | Host is retired (`is_active = 0`) | Log error, skip this tick. Reactivate host or stop Probe. |
+| Status | Meaning                                | Probe action                                              |
+| ------ | -------------------------------------- | --------------------------------------------------------- |
+| `400`  | Clock skew > 5 min, or invalid payload | Log error, skip this tick. Fix NTP.                       |
+| `401`  | Bad `BAT_WRITE_KEY`                    | Log error, skip this tick. Fix config.                    |
+| `403`  | Host is retired (`is_active = 0`)      | Log error, skip this tick. Reactivate host or stop Probe. |
 
 All other errors (5xx, network timeout, connection refused) are retried up to 5 times with exponential backoff (1s → 2s → 4s → 8s → 60s cap).
 
@@ -227,17 +227,17 @@ WantedBy=multi-user.target
 
 ### L1 — Unit Tests (`cargo test`)
 
-| Test file | What |
-|-----------|------|
-| `config.rs` | Parse valid TOML, reject invalid, default values, `--config` override |
-| `payload.rs` | Serialize Rust structs to expected JSON matching `MetricsPayload` / `IdentityPayload` |
-| `collectors/cpu.rs` | Parse `/proc/stat` fixture data, delta calculation, edge cases (all idle, all busy) |
-| `collectors/memory.rs` | Parse `/proc/meminfo` fixture, compute used_pct, zero swap handling |
-| `collectors/disk.rs` | Mount filtering logic (exclude tmpfs, exclude configured mounts, keep overlay) |
-| `collectors/network.rs` | Rate calculation, u64 counter wrap handling, interface filtering |
-| `collectors/identity.rs` | Parse `/etc/os-release` fixture, `/proc/version` parsing |
-| `rate.rs` | Counter diff math, wrap detection, zero interval edge case |
-| `sender.rs` | Retry logic (mock HTTP), permanent error detection (401/400/403), backoff timing |
+| Test file                | What                                                                                  |
+| ------------------------ | ------------------------------------------------------------------------------------- |
+| `config.rs`              | Parse valid TOML, reject invalid, default values, `--config` override                 |
+| `payload.rs`             | Serialize Rust structs to expected JSON matching `MetricsPayload` / `IdentityPayload` |
+| `collectors/cpu.rs`      | Parse `/proc/stat` fixture data, delta calculation, edge cases (all idle, all busy)   |
+| `collectors/memory.rs`   | Parse `/proc/meminfo` fixture, compute used_pct, zero swap handling                   |
+| `collectors/disk.rs`     | Mount filtering logic (exclude tmpfs, exclude configured mounts, keep overlay)        |
+| `collectors/network.rs`  | Rate calculation, u64 counter wrap handling, interface filtering                      |
+| `collectors/identity.rs` | Parse `/etc/os-release` fixture, `/proc/version` parsing                              |
+| `rate.rs`                | Counter diff math, wrap detection, zero interval edge case                            |
+| `sender.rs`              | Retry logic (mock HTTP), permanent error detection (401/400/403), backoff timing      |
 
 **Fixture approach**: Tests use embedded string fixtures (not real `/proc` reads) to ensure determinism and cross-platform test execution.
 
@@ -263,16 +263,16 @@ Not applicable — Probe is a headless daemon, no UI.
 
 ## Atomic Commits (this module)
 
-| # | Commit | Files | Verify |
-|---|--------|-------|--------|
-| 3.1 | `feat: add config parsing` | `config.rs` | `cargo test` — parse valid/invalid TOML |
-| 3.2 | `feat: add payload structs` | `payload.rs` | `cargo test` — serialize to expected JSON |
-| 3.3 | `feat: add cpu collector` | `collectors/cpu.rs` | `cargo test` — parse fixture, delta calc |
-| 3.4 | `feat: add memory collector` | `collectors/memory.rs` | `cargo test` — parse fixture |
-| 3.5 | `feat: add disk collector` | `collectors/disk.rs` | `cargo test` — mount filtering |
-| 3.6 | `feat: add network collector with rate calc` | `collectors/network.rs`, `rate.rs` | `cargo test` — rate calc, wrap handling |
-| 3.7 | `feat: add identity collector` | `collectors/identity.rs` | `cargo test` — parse fixtures |
-| 3.8 | `feat: add http sender with retry backoff` | `sender.rs` | `cargo test` — retry logic |
-| 3.9 | `feat: add main loop with graceful shutdown` | `main.rs` | `cargo build --release`, binary < 10MB |
-| 3.10 | `chore: add systemd unit file` | `dist/bat-probe.service` | Validate syntax |
-| 3.11 | `test: integration test probe against local worker` | Manual test | Metrics appear in D1, health endpoint reflects data |
+| #    | Commit                                              | Files                              | Verify                                              |
+| ---- | --------------------------------------------------- | ---------------------------------- | --------------------------------------------------- |
+| 3.1  | `feat: add config parsing`                          | `config.rs`                        | `cargo test` — parse valid/invalid TOML             |
+| 3.2  | `feat: add payload structs`                         | `payload.rs`                       | `cargo test` — serialize to expected JSON           |
+| 3.3  | `feat: add cpu collector`                           | `collectors/cpu.rs`                | `cargo test` — parse fixture, delta calc            |
+| 3.4  | `feat: add memory collector`                        | `collectors/memory.rs`             | `cargo test` — parse fixture                        |
+| 3.5  | `feat: add disk collector`                          | `collectors/disk.rs`               | `cargo test` — mount filtering                      |
+| 3.6  | `feat: add network collector with rate calc`        | `collectors/network.rs`, `rate.rs` | `cargo test` — rate calc, wrap handling             |
+| 3.7  | `feat: add identity collector`                      | `collectors/identity.rs`           | `cargo test` — parse fixtures                       |
+| 3.8  | `feat: add http sender with retry backoff`          | `sender.rs`                        | `cargo test` — retry logic                          |
+| 3.9  | `feat: add main loop with graceful shutdown`        | `main.rs`                          | `cargo build --release`, binary < 10MB              |
+| 3.10 | `chore: add systemd unit file`                      | `dist/bat-probe.service`           | Validate syntax                                     |
+| 3.11 | `test: integration test probe against local worker` | Manual test                        | Metrics appear in D1, health endpoint reflects data |

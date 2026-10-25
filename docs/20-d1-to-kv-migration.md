@@ -7,20 +7,20 @@
 
 ### v5 → v6 (this revision)
 
-| # | v5 issue (reviewer) | v6 fix |
-|---|---|---|
-| Q1 | "SQL only in adapters/d1" conflicted with "one-shot `db.prepare` may stay in route/domain" | §3.5 rewritten: **zero D1/SQL access outside `adapters/d1/`**. Thin SQL becomes a small adapter method or an adapter-private helper — never inline in routes/middleware/domain/lib. §8 grep gate covers `packages/worker/src/**` minus `adapters/d1/`, tests, test-helpers. |
-| Q2 | Missing DB callsites and wrong endpoint paths | §3.1 adds `lib/resolve-host.ts` (→ folded into `HostsRepository.resolveByIdOrHid`); `routes/live.ts:SELECT 1 AS probe` (→ `HostsRepository.pingDatabase()`, no exception); `routes/monitoring.ts` direct SQL (→ assigned to C9 alongside the rest of host reads). §6.5 fixes endpoint paths (`/api/fleet/status`, `/api/hosts/:id/maintenance`) and adds the 4 `/api/monitoring/*` reads. |
+| #   | v5 issue (reviewer)                                                                        | v6 fix                                                                                                                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | "SQL only in adapters/d1" conflicted with "one-shot `db.prepare` may stay in route/domain" | §3.5 rewritten: **zero D1/SQL access outside `adapters/d1/`**. Thin SQL becomes a small adapter method or an adapter-private helper — never inline in routes/middleware/domain/lib. §8 grep gate covers `packages/worker/src/**` minus `adapters/d1/`, tests, test-helpers.                                                                                                               |
+| Q2  | Missing DB callsites and wrong endpoint paths                                              | §3.1 adds `lib/resolve-host.ts` (→ folded into `HostsRepository.resolveByIdOrHid`); `routes/live.ts:SELECT 1 AS probe` (→ `HostsRepository.pingDatabase()`, no exception); `routes/monitoring.ts` direct SQL (→ assigned to C9 alongside the rest of host reads). §6.5 fixes endpoint paths (`/api/fleet/status`, `/api/hosts/:id/maintenance`) and adds the 4 `/api/monitoring/*` reads. |
 
 ### v4 → v5
 
-| # | v4 issue (reviewer) | v5 fix |
-|---|---|---|
-| P1 | "Delete `services/*` wholesale" conflates DB access with business logic & middleware glue | §3 splits `services/*` into three buckets: **DB access** → `adapters/d1/*`, **pure business/derivation** → `domain/*`, **stay put** (used by middleware) → `services/*` remains. Acceptance becomes "routes/middleware/cron never touch `c.env.DB` directly; SQL only lives in `adapters/d1/`". |
-| P2 | C2 too wide; C6 too wide | §7 phasing rewritten as **11 atomic commits**, each touches 1–2 domains. `hosts`, `metrics`, `aggregation` each get their own commit. |
-| P3 | `c.var.repos` wiring under-specified | §4 adds the typing for `Variables`, a `reposMiddleware`, fake-repo injection pattern for route unit tests, and the scheduled-handler wiring. Concrete code shape included. |
-| P4 | "bit-for-bit every read endpoint" snapshot is brittle | §6 reframes C0 as **normalized snapshots** — fixed clock + fixed seed + fixed auth keys, redacted volatile fields (timestamps, generated ids), explicit list of covered endpoints. Not all endpoints; the critical reads only. |
-| P5 | "methods mirror call sites" risks shallow SQL wrappers | §3.5 adds the **repo inclusion rule**: only logic with SQL **and** (joins / FK / invariant / multi-route reuse / non-trivial test value) goes through a repo. Thin one-shot SQL stays inline OR moves to a domain helper; we don't create a method just to host a single-statement select. |
+| #   | v4 issue (reviewer)                                                                       | v5 fix                                                                                                                                                                                                                                                                                          |
+| --- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P1  | "Delete `services/*` wholesale" conflates DB access with business logic & middleware glue | §3 splits `services/*` into three buckets: **DB access** → `adapters/d1/*`, **pure business/derivation** → `domain/*`, **stay put** (used by middleware) → `services/*` remains. Acceptance becomes "routes/middleware/cron never touch `c.env.DB` directly; SQL only lives in `adapters/d1/`". |
+| P2  | C2 too wide; C6 too wide                                                                  | §7 phasing rewritten as **11 atomic commits**, each touches 1–2 domains. `hosts`, `metrics`, `aggregation` each get their own commit.                                                                                                                                                           |
+| P3  | `c.var.repos` wiring under-specified                                                      | §4 adds the typing for `Variables`, a `reposMiddleware`, fake-repo injection pattern for route unit tests, and the scheduled-handler wiring. Concrete code shape included.                                                                                                                      |
+| P4  | "bit-for-bit every read endpoint" snapshot is brittle                                     | §6 reframes C0 as **normalized snapshots** — fixed clock + fixed seed + fixed auth keys, redacted volatile fields (timestamps, generated ids), explicit list of covered endpoints. Not all endpoints; the critical reads only.                                                                  |
+| P5  | "methods mirror call sites" risks shallow SQL wrappers                                    | §3.5 adds the **repo inclusion rule**: only logic with SQL **and** (joins / FK / invariant / multi-route reuse / non-trivial test value) goes through a repo. Thin one-shot SQL stays inline OR moves to a domain helper; we don't create a method just to host a single-statement select.      |
 
 ## 1. Goal & non-negotiables
 
@@ -41,23 +41,23 @@
 
 ### 3.1 Classification
 
-| File | Today's content | v5 destination |
-|---|---|---|
-| `services/metrics.ts` | D1 insert builders for `metrics_raw`, host upsert | `adapters/d1/metrics.ts` |
-| `services/agents.ts` | List/get/upsert/heartbeat agents with FK joins, ON CONFLICT | `adapters/d1/agents.ts` |
-| `services/assets.ts` | Asset CRUD over D1 | `adapters/d1/assets.ts` |
-| `services/bindings.ts` | Binding CRUD over D1 | `adapters/d1/bindings.ts` |
-| `services/cli-tokens.ts` | Token create/lookup over D1 (used by `middleware/api-key.ts` via dynamic import) | `adapters/d1/cli-tokens.ts`; middleware gets the repo via `c.var.repos` (no dynamic import) |
-| `services/aggregation.ts` | Hourly aggregation + purge — mixes D1 reads/writes with pure compute | Split: SQL parts → `adapters/d1/aggregation.ts`; pure roll-up math → `domain/aggregation.ts` |
-| `services/events.ts` | Event insert + list over D1 | `adapters/d1/events.ts` |
-| `services/heartbeat.ts` | Host `last_seen` update | folded into `adapters/d1/hosts.ts` |
-| `services/alerts.ts` | Alert evaluation (pure rules from MetricsPayload + thresholds) | `domain/alerts/evaluate.ts` (pure); persistence (`alert_states`, `alert_pending`) moves to `adapters/d1/alerts.ts` |
-| `services/tier2-alerts.ts` | Pure tier-2 evaluation rules | `domain/alerts/tier2.ts` |
-| `services/tier2-metrics.ts` | Tier2 snapshot upsert/read | `adapters/d1/tier2.ts` |
-| `services/status.ts` | Pure host-status derivation from alerts | `domain/status.ts` (pure; no DB) |
-| `lib/resolve-host.ts` | `resolveHostIdByHash(db, id)` — D1 lookup of opaque `hid` → real `host_id`; reused by `host-detail`/`metrics`/`tier2-read`/`monitoring` | DB part → `HostsRepository.resolveByIdOrHid(idOrHid)`; pure `isOpaqueHid` stays in `lib/` (or `domain/`) since it carries no I/O |
-| `routes/live.ts` | inline `SELECT 1 AS probe` health check | → `HostsRepository.pingDatabase()` (no inline-SQL exception kept) |
-| `routes/monitoring.ts` | direct D1 SQL across 4 monitoring endpoints | adapter calls land in `adapters/d1/hosts.ts` + reuse of existing repos; pure rule logic moves to `domain/monitoring.ts`. Scheduled in **C9** alongside the rest of host reads. |
+| File                        | Today's content                                                                                                                         | v5 destination                                                                                                                                                                 |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `services/metrics.ts`       | D1 insert builders for `metrics_raw`, host upsert                                                                                       | `adapters/d1/metrics.ts`                                                                                                                                                       |
+| `services/agents.ts`        | List/get/upsert/heartbeat agents with FK joins, ON CONFLICT                                                                             | `adapters/d1/agents.ts`                                                                                                                                                        |
+| `services/assets.ts`        | Asset CRUD over D1                                                                                                                      | `adapters/d1/assets.ts`                                                                                                                                                        |
+| `services/bindings.ts`      | Binding CRUD over D1                                                                                                                    | `adapters/d1/bindings.ts`                                                                                                                                                      |
+| `services/cli-tokens.ts`    | Token create/lookup over D1 (used by `middleware/api-key.ts` via dynamic import)                                                        | `adapters/d1/cli-tokens.ts`; middleware gets the repo via `c.var.repos` (no dynamic import)                                                                                    |
+| `services/aggregation.ts`   | Hourly aggregation + purge — mixes D1 reads/writes with pure compute                                                                    | Split: SQL parts → `adapters/d1/aggregation.ts`; pure roll-up math → `domain/aggregation.ts`                                                                                   |
+| `services/events.ts`        | Event insert + list over D1                                                                                                             | `adapters/d1/events.ts`                                                                                                                                                        |
+| `services/heartbeat.ts`     | Host `last_seen` update                                                                                                                 | folded into `adapters/d1/hosts.ts`                                                                                                                                             |
+| `services/alerts.ts`        | Alert evaluation (pure rules from MetricsPayload + thresholds)                                                                          | `domain/alerts/evaluate.ts` (pure); persistence (`alert_states`, `alert_pending`) moves to `adapters/d1/alerts.ts`                                                             |
+| `services/tier2-alerts.ts`  | Pure tier-2 evaluation rules                                                                                                            | `domain/alerts/tier2.ts`                                                                                                                                                       |
+| `services/tier2-metrics.ts` | Tier2 snapshot upsert/read                                                                                                              | `adapters/d1/tier2.ts`                                                                                                                                                         |
+| `services/status.ts`        | Pure host-status derivation from alerts                                                                                                 | `domain/status.ts` (pure; no DB)                                                                                                                                               |
+| `lib/resolve-host.ts`       | `resolveHostIdByHash(db, id)` — D1 lookup of opaque `hid` → real `host_id`; reused by `host-detail`/`metrics`/`tier2-read`/`monitoring` | DB part → `HostsRepository.resolveByIdOrHid(idOrHid)`; pure `isOpaqueHid` stays in `lib/` (or `domain/`) since it carries no I/O                                               |
+| `routes/live.ts`            | inline `SELECT 1 AS probe` health check                                                                                                 | → `HostsRepository.pingDatabase()` (no inline-SQL exception kept)                                                                                                              |
+| `routes/monitoring.ts`      | direct D1 SQL across 4 monitoring endpoints                                                                                             | adapter calls land in `adapters/d1/hosts.ts` + reuse of existing repos; pure rule logic moves to `domain/monitoring.ts`. Scheduled in **C9** alongside the rest of host reads. |
 
 Two files **keep their name and path** because they have neither SQL nor non-trivial business logic: none, after classification. So after v5 lands, the `services/` directory is empty and can be removed.
 
@@ -100,7 +100,7 @@ And the `gate:routes`/`gate:pages` coverage gates plus the 95% unit-coverage gat
 - No `c.env.DB`, no `D1Database` typed param, no `db.prepare` / `db.batch` anywhere in `routes/**`, `middleware/**`, `domain/**`, `lib/**`, `index.ts`. The grep gate in §8 enforces this across `packages/worker/src/**` minus `adapters/d1/`, tests, and test-helpers.
 - A one-statement select is **not** an excuse to inline SQL. It either becomes a small method on the matching domain repo, or an **adapter-private helper** inside `adapters/d1/<domain>.ts`. The repo inclusion rule below decides which.
 
-**Repo *method* inclusion rule** (what becomes a public repo method vs. an adapter-private helper):
+**Repo _method_ inclusion rule** (what becomes a public repo method vs. an adapter-private helper):
 
 A public `Repository` method exists when SQL plus at least one of:
 
@@ -120,29 +120,29 @@ This way "no thin SQL wrapper on the public interface" and "zero SQL in routes/m
 ```ts
 // packages/worker/src/repos/types.ts
 export interface Repositories {
-  hosts: HostsRepository;
-  metrics: MetricsRepository;
-  alerts: AlertsRepository;
-  events: EventsRepository;
-  webhooks: WebhooksRepository;
-  ports: PortAllowlistRepository;
-  tags: TagsRepository;
-  settings: SettingsRepository;
-  maintenance: MaintenanceRepository;
-  agents: AgentsRepository;
-  assets: AssetsRepository;
-  bindings: BindingsRepository;
-  tier2: Tier2Repository;
-  cliTokens: CliTokensRepository;
-  aggregation: AggregationRepository;
+	hosts: HostsRepository;
+	metrics: MetricsRepository;
+	alerts: AlertsRepository;
+	events: EventsRepository;
+	webhooks: WebhooksRepository;
+	ports: PortAllowlistRepository;
+	tags: TagsRepository;
+	settings: SettingsRepository;
+	maintenance: MaintenanceRepository;
+	agents: AgentsRepository;
+	assets: AssetsRepository;
+	bindings: BindingsRepository;
+	tier2: Tier2Repository;
+	cliTokens: CliTokensRepository;
+	aggregation: AggregationRepository;
 }
 ```
 
 ```ts
 // packages/worker/src/types.ts
 export type Variables = {
-  accessAuthenticated?: boolean;
-  repos: Repositories; // ← added in C1
+	accessAuthenticated?: boolean;
+	repos: Repositories; // ← added in C1
 };
 ```
 
@@ -154,11 +154,11 @@ import { D1HostsRepository } from "../adapters/d1/hosts.js";
 // … one import per adapter …
 
 export function createD1Repositories(db: D1Database): Repositories {
-  return {
-    hosts:       new D1HostsRepository(db),
-    metrics:     new D1MetricsRepository(db),
-    // … one per repo …
-  };
+	return {
+		hosts: new D1HostsRepository(db),
+		metrics: new D1MetricsRepository(db),
+		// … one per repo …
+	};
 }
 ```
 
@@ -169,8 +169,8 @@ import type { AppEnv } from "../types.js";
 import { createD1Repositories } from "../repos/factory.js";
 
 export const reposMiddleware: MiddlewareHandler<AppEnv> = async (c, next) => {
-  c.set("repos", createD1Repositories(c.env.DB));
-  await next();
+	c.set("repos", createD1Repositories(c.env.DB));
+	await next();
 };
 ```
 
@@ -197,7 +197,7 @@ No `c.var.repos` here because there's no Hono context — we use the factory dir
 ```ts
 // packages/worker/test/helpers/fakeRepos.ts
 export function makeFakeRepos(overrides: Partial<Repositories> = {}): Repositories {
-  return { hosts: stubHosts(), metrics: stubMetrics(), /* … */, ...overrides };
+	return { hosts: stubHosts(), metrics: stubMetrics(), /* … */, ...overrides };
 }
 ```
 
@@ -222,7 +222,7 @@ Existing `services/*.test.ts` files lift to `adapters/d1/*.test.ts` with import 
 
 ### 6.3 Route tests (real D1) stay; route unit tests (fake repos) optional
 
-We don't *replace* the existing route-against-real-D1 tests — they're our integration safety net. New route-unit tests with `makeFakeRepos` may be added where the route logic is complex enough (validation tables, branching responses); we add them opportunistically, not as a mandate.
+We don't _replace_ the existing route-against-real-D1 tests — they're our integration safety net. New route-unit tests with `makeFakeRepos` may be added where the route logic is complex enough (validation tables, branching responses); we add them opportunistically, not as a mandate.
 
 ### 6.4 C0 normalized snapshot baseline (replaces v4's bit-for-bit)
 
@@ -273,20 +273,20 @@ This is the realistic version of "bit-for-bit": targeted, normalized, fast, dete
 
 Each commit ships green for `lint` + `typecheck` + `test` + `gate:routes` + `gate:pages` + `gate:security` + coverage gates. Each commit has a single reviewable theme.
 
-| # | Commit | Scope |
-|---|---|---|
-| C0 | **Baseline snapshot test** (§6.4) — pre-refactor capture | new test file only |
-| C1 | `Repositories` type, `createD1Repositories` factory, `reposMiddleware`, `Variables.repos` wired into Hono; scheduled handler uses factory directly. No routes consume it yet; adapters are empty stubs (re-exporting today's service functions to make wiring compile + green). | wiring only |
-| C2 | `SettingsRepository` + `WebhooksRepository`. Smallest blast radius. Includes their contract tests. Adapters carry SQL verbatim. Routes switch. Old service files deleted. | 2 domains |
-| C3 | `PortAllowlistRepository` + `MaintenanceRepository` (incl. `activeAt(now)` used by alerts cron). | 2 domains |
-| C4 | `Tier2Repository` + `TagsRepository` (tags include paired edge/reverse SQL). | 2 domains |
-| C5 | `AssetsRepository` + `BindingsRepository`. | 2 domains |
-| C6 | `AgentsRepository` + `CliTokensRepository`. `upsertBy` keeps today's `ON CONFLICT(source_key, match_key)`. Middleware `api-key` switches to `c.var.repos.cliTokens` (drops dynamic import). | 2 domains |
-| C7 | `AlertsRepository` (state + pending CRUD only). Move alert evaluation pure logic to `domain/alerts/{evaluate,tier2}.ts` in the same commit (no behaviour change; same inputs, same outputs). | 1 domain + 1 domain helper extraction |
-| C8 | `EventsRepository`. | 1 domain |
-| C9 | `HostsRepository` — read paths (`list`, `getById`, `resolveByIdOrHid`, `pingDatabase`) + status helper extraction to `domain/status.ts` + `routes/monitoring.ts` (4 endpoints) and `routes/live.ts` and `routes/fleet-status.ts` rewired through the repo; pure monitoring rule logic moves to `domain/monitoring.ts`. | hosts read surface + monitoring |
-| C10 | `MetricsRepository` (`appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour`) + remaining write paths on `HostsRepository` (`upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`/`unretire`). Largest single move (`metrics_raw` insert). | 1 large domain + finish hosts |
-| C11 | `AggregationRepository` (`aggregateHour`, `purgeRaw`, `purgeHourly`). Pure roll-up math lives in `domain/aggregation.ts`. Cron handler uses the factory. Final cleanup: remove `services/` if empty, delete `RUN_DIFF.md`, re-run C0 snapshot test. | cron + cleanup |
+| #   | Commit                                                                                                                                                                                                                                                                                                                 | Scope                                 |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| C0  | **Baseline snapshot test** (§6.4) — pre-refactor capture                                                                                                                                                                                                                                                               | new test file only                    |
+| C1  | `Repositories` type, `createD1Repositories` factory, `reposMiddleware`, `Variables.repos` wired into Hono; scheduled handler uses factory directly. No routes consume it yet; adapters are empty stubs (re-exporting today's service functions to make wiring compile + green).                                        | wiring only                           |
+| C2  | `SettingsRepository` + `WebhooksRepository`. Smallest blast radius. Includes their contract tests. Adapters carry SQL verbatim. Routes switch. Old service files deleted.                                                                                                                                              | 2 domains                             |
+| C3  | `PortAllowlistRepository` + `MaintenanceRepository` (incl. `activeAt(now)` used by alerts cron).                                                                                                                                                                                                                       | 2 domains                             |
+| C4  | `Tier2Repository` + `TagsRepository` (tags include paired edge/reverse SQL).                                                                                                                                                                                                                                           | 2 domains                             |
+| C5  | `AssetsRepository` + `BindingsRepository`.                                                                                                                                                                                                                                                                             | 2 domains                             |
+| C6  | `AgentsRepository` + `CliTokensRepository`.`upsertBy` keeps today's `ON CONFLICT(source_key, match_key)`. Middleware `api-key` switches to `c.var.repos.cliTokens` (drops dynamic import).                                                                                                                             | 2 domains                             |
+| C7  | `AlertsRepository` (state + pending CRUD only). Move alert evaluation pure logic to `domain/alerts/{evaluate,tier2}.ts` in the same commit (no behaviour change; same inputs, same outputs).                                                                                                                           | 1 domain + 1 domain helper extraction |
+| C8  | `EventsRepository`.                                                                                                                                                                                                                                                                                                    | 1 domain                              |
+| C9  | `HostsRepository` — read paths (`list`, `getById`, `resolveByIdOrHid`, `pingDatabase`) + status helper extraction to `domain/status.ts` + `routes/monitoring.ts` (4 endpoints) and `routes/live.ts` and `routes/fleet-status.ts` rewired through the repo; pure monitoring rule logic moves to `domain/monitoring.ts`. | hosts read surface + monitoring       |
+| C10 | `MetricsRepository` (`appendTick`, `getLatest`, `readWindow`, `readHourly`, `getActiveHostIdsInHour`) + remaining write paths on `HostsRepository` (`upsertIdentity`, `touchHeartbeat`, `setDescription`, `retire`/`unretire`). Largest single move (`metrics_raw` insert).                                            | 1 large domain + finish hosts         |
+| C11 | `AggregationRepository` (`aggregateHour`, `purgeRaw`, `purgeHourly`). Pure roll-up math lives in `domain/aggregation.ts`. Cron handler uses the factory. Final cleanup: remove `services/` if empty, delete `RUN_DIFF.md`, re-run C0 snapshot test.                                                                    | cron + cleanup                        |
 
 Total: **11 commits + 1 baseline (C0)**. Reviewer-friendly per-commit scope, no single commit larger than ~600-800 LOC including tests. Estimated 4–7 working days end-to-end depending on review pace.
 

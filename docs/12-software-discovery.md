@@ -14,13 +14,13 @@ Software detection uses multiple signals combined. No single method catches ever
 
 ### Signal Sources (checked in order)
 
-| # | Method | What it catches | Cost |
-|---|--------|----------------|------|
-| 1 | **Listening ports** (already collected) | Network services by well-known port → process name | Free (reuse `ports.listening`) |
-| 2 | **Running processes** (`/proc/*/comm` + `/proc/*/cmdline`) | All actively running software | Cheap procfs scan |
-| 3 | **Systemd units** (`systemctl list-unit-files --type=service`) | Installed services even if not running | One subprocess |
-| 4 | **Binary probing** (`which` / path existence) | CLI tools, runtimes, not-running-right-now software | ~20 stat() calls |
-| 5 | **Package manager** (dpkg-query for key packages) | Installed but no service/binary in PATH | One subprocess |
+| #   | Method                                                         | What it catches                                     | Cost                           |
+| --- | -------------------------------------------------------------- | --------------------------------------------------- | ------------------------------ |
+| 1   | **Listening ports** (already collected)                        | Network services by well-known port → process name  | Free (reuse `ports.listening`) |
+| 2   | **Running processes** (`/proc/*/comm` + `/proc/*/cmdline`)     | All actively running software                       | Cheap procfs scan              |
+| 3   | **Systemd units** (`systemctl list-unit-files --type=service`) | Installed services even if not running              | One subprocess                 |
+| 4   | **Binary probing** (`which` / path existence)                  | CLI tools, runtimes, not-running-right-now software | ~20 stat() calls               |
+| 5   | **Package manager** (dpkg-query for key packages)              | Installed but no service/binary in PATH             | One subprocess                 |
 
 ### Detection Flow
 
@@ -205,30 +205,30 @@ pub struct SoftwareDiscoveryData {
 // --- Software Discovery (2.7) ---
 
 export interface DetectedSoftware {
-  id: string;              // "nginx", "postgres", "redis"
-  name: string;            // "Nginx", "PostgreSQL", "Redis"
-  category: SoftwareCategory;
-  version: string | null;
-  source: "port" | "process" | "systemd" | "binary" | "package";
-  running: boolean;
-  listening_ports: number[];
+	id: string; // "nginx", "postgres", "redis"
+	name: string; // "Nginx", "PostgreSQL", "Redis"
+	category: SoftwareCategory;
+	version: string | null;
+	source: "port" | "process" | "systemd" | "binary" | "package";
+	running: boolean;
+	listening_ports: number[];
 }
 
 export type SoftwareCategory =
-  | "web"
-  | "database"
-  | "cache"
-  | "queue"
-  | "runtime"
-  | "monitoring"
-  | "security"
-  | "infra"
-  | "container";
+	| "web"
+	| "database"
+	| "cache"
+	| "queue"
+	| "runtime"
+	| "monitoring"
+	| "security"
+	| "infra"
+	| "container";
 
 export interface SoftwareDiscoveryData {
-  detected: DetectedSoftware[];
-  scan_duration_ms: number;          // core detection only
-  version_duration_ms: number;       // version probing only
+	detected: DetectedSoftware[];
+	scan_duration_ms: number; // core detection only
+	version_duration_ms: number; // version probing only
 }
 ```
 
@@ -270,9 +270,9 @@ The Dashboard reads software data via `GET /api/hosts/:id/tier2` (Worker read ro
 
 Dashboard proxy route already exists or needs to be added:
 
-| Dashboard route file | Method | Proxies to Worker | Status |
-|---------------------|--------|-------------------|--------|
-| `/api/hosts/[id]/tier2/route.ts` | GET | `GET /api/hosts/:id/tier2` | **New** — must be added as a dashboard proxy route |
+| Dashboard route file             | Method | Proxies to Worker          | Status                                             |
+| -------------------------------- | ------ | -------------------------- | -------------------------------------------------- |
+| `/api/hosts/[id]/tier2/route.ts` | GET    | `GET /api/hosts/:id/tier2` | **New** — must be added as a dashboard proxy route |
 
 The host detail page (`/hosts/[id]`) will call this proxy route to fetch tier2 data (including software). Currently the host detail page only renders Tier 1 metrics charts; the tier2 API exists on the worker side but has no corresponding dashboard proxy or UI — both must be added as part of this feature.
 

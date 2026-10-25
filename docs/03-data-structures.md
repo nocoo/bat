@@ -224,12 +224,12 @@ packages/worker/migrations/
 
 Two separate time sources, each authoritative for its purpose:
 
-| Field | Source | Why |
-|-------|--------|-----|
-| `metrics_raw.ts` | **Probe** (payload `timestamp`) | Chart X-axis must reflect when metrics were *measured*, not when they arrived. Network latency or retry delay should not shift data points. |
-| `hosts.last_seen` | **Worker** (`Date.now()` at request time) | Offline detection compares `last_seen` against server-side `now`. If `last_seen` used Probe time, NTP drift on a VPS could mask or fabricate offline alerts. |
-| `hosts.identity_updated_at` | **Worker** (`Date.now()`) | Same rationale as `last_seen`. |
-| `alert_states.triggered_at` | **Worker** (`Date.now()`) | Alert timing must be consistent with offline evaluation. |
+| Field                       | Source                                    | Why                                                                                                                                                          |
+| --------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `metrics_raw.ts`            | **Probe** (payload `timestamp`)           | Chart X-axis must reflect when metrics were _measured_, not when they arrived. Network latency or retry delay should not shift data points.                  |
+| `hosts.last_seen`           | **Worker** (`Date.now()` at request time) | Offline detection compares `last_seen` against server-side `now`. If `last_seen` used Probe time, NTP drift on a VPS could mask or fabricate offline alerts. |
+| `hosts.identity_updated_at` | **Worker** (`Date.now()`)                 | Same rationale as `last_seen`.                                                                                                                               |
+| `alert_states.triggered_at` | **Worker** (`Date.now()`)                 | Alert timing must be consistent with offline evaluation.                                                                                                     |
 
 **Implication for ingest**: The UPSERT writes `last_seen = Date.now()` (server time), NOT the Probe's `payload.timestamp`. The payload timestamp is only written to `metrics_raw.ts`.
 
@@ -265,104 +265,104 @@ Sent every 30s via `POST /api/ingest`. Full metric definitions in [01-metrics-ca
 ```typescript
 // @bat/shared — packages/shared/src/metrics.ts
 interface MetricsPayload {
-  probe_version?: string;
-  host_id: string;
-  timestamp: number;        // Unix seconds, Probe clock
-  interval: number;         // 30
-  cpu: {
-    load1: number;
-    load5: number;
-    load15: number;
-    usage_pct: number;
-    iowait_pct: number;
-    steal_pct: number;
-    count: number;
-    // Tier 3 extensions (optional — omitted by probes < v0.4.0)
-    context_switches_sec?: number;  // ctxt delta / elapsed
-    forks_sec?: number;             // processes delta / elapsed
-    procs_running?: number;
-    procs_blocked?: number;
-  };
-  mem: {
-    total_bytes: number;
-    available_bytes: number;
-    used_pct: number;
-    // Tier 3 extension
-    oom_kills_delta?: number;  // delta since last sample
-  };
-  swap: {
-    total_bytes: number;
-    used_bytes: number;
-    used_pct: number;
-  };
-  disk: DiskMetric[];
-  net: NetMetric[];
-  uptime_seconds: number;
-  // Tier 3 additions (optional — omitted by probes < v0.4.0)
-  psi?: PsiMetrics;        // /proc/pressure/{cpu,memory,io}
-  disk_io?: DiskIoMetric[]; // /proc/diskstats
-  tcp?: TcpMetrics;         // /proc/net/sockstat
-  fd?: FdMetrics;           // /proc/sys/fs/file-nr
+	probe_version?: string;
+	host_id: string;
+	timestamp: number; // Unix seconds, Probe clock
+	interval: number; // 30
+	cpu: {
+		load1: number;
+		load5: number;
+		load15: number;
+		usage_pct: number;
+		iowait_pct: number;
+		steal_pct: number;
+		count: number;
+		// Tier 3 extensions (optional — omitted by probes < v0.4.0)
+		context_switches_sec?: number; // ctxt delta / elapsed
+		forks_sec?: number; // processes delta / elapsed
+		procs_running?: number;
+		procs_blocked?: number;
+	};
+	mem: {
+		total_bytes: number;
+		available_bytes: number;
+		used_pct: number;
+		// Tier 3 extension
+		oom_kills_delta?: number; // delta since last sample
+	};
+	swap: {
+		total_bytes: number;
+		used_bytes: number;
+		used_pct: number;
+	};
+	disk: DiskMetric[];
+	net: NetMetric[];
+	uptime_seconds: number;
+	// Tier 3 additions (optional — omitted by probes < v0.4.0)
+	psi?: PsiMetrics; // /proc/pressure/{cpu,memory,io}
+	disk_io?: DiskIoMetric[]; // /proc/diskstats
+	tcp?: TcpMetrics; // /proc/net/sockstat
+	fd?: FdMetrics; // /proc/sys/fs/file-nr
 }
 
 interface DiskMetric {
-  mount: string;
-  total_bytes: number;
-  avail_bytes: number;
-  used_pct: number;
+	mount: string;
+	total_bytes: number;
+	avail_bytes: number;
+	used_pct: number;
 }
 
 interface NetMetric {
-  iface: string;
-  rx_bytes_rate: number;    // bytes/sec over interval
-  tx_bytes_rate: number;
-  rx_errors: number;        // error count delta in this interval (not cumulative counter)
-  tx_errors: number;        // error count delta in this interval (not cumulative counter)
-  // NOTE: rx_packets/tx_packets from 01-metrics-catalogue.md are intentionally
-  // excluded from the MVP payload. Packet rates add payload size without
-  // actionable alerting value. Bytes + errors are sufficient for MVP.
-  // Add in post-MVP if per-packet analysis is needed.
+	iface: string;
+	rx_bytes_rate: number; // bytes/sec over interval
+	tx_bytes_rate: number;
+	rx_errors: number; // error count delta in this interval (not cumulative counter)
+	tx_errors: number; // error count delta in this interval (not cumulative counter)
+	// NOTE: rx_packets/tx_packets from 01-metrics-catalogue.md are intentionally
+	// excluded from the MVP payload. Packet rates add payload size without
+	// actionable alerting value. Bytes + errors are sufficient for MVP.
+	// Add in post-MVP if per-packet analysis is needed.
 }
 
 // --- Tier 3 types (added in v0.4.0, design in 09-tier3-signals.md) ---
 
 interface PsiMetrics {
-  cpu_some_avg10: number;
-  cpu_some_avg60: number;
-  cpu_some_avg300: number;
-  mem_some_avg10: number;
-  mem_some_avg60: number;
-  mem_some_avg300: number;
-  mem_full_avg10: number;
-  mem_full_avg60: number;
-  mem_full_avg300: number;
-  io_some_avg10: number;
-  io_some_avg60: number;
-  io_some_avg300: number;
-  io_full_avg10: number;
-  io_full_avg60: number;
-  io_full_avg300: number;
+	cpu_some_avg10: number;
+	cpu_some_avg60: number;
+	cpu_some_avg300: number;
+	mem_some_avg10: number;
+	mem_some_avg60: number;
+	mem_some_avg300: number;
+	mem_full_avg10: number;
+	mem_full_avg60: number;
+	mem_full_avg300: number;
+	io_some_avg10: number;
+	io_some_avg60: number;
+	io_some_avg300: number;
+	io_full_avg10: number;
+	io_full_avg60: number;
+	io_full_avg300: number;
 }
 
 interface DiskIoMetric {
-  device: string;
-  read_iops: number;
-  write_iops: number;
-  read_bytes_sec: number;
-  write_bytes_sec: number;
-  io_util_pct: number;
+	device: string;
+	read_iops: number;
+	write_iops: number;
+	read_bytes_sec: number;
+	write_bytes_sec: number;
+	io_util_pct: number;
 }
 
 interface TcpMetrics {
-  established: number;  // TCP inuse (ESTABLISHED + CLOSE_WAIT)
-  time_wait: number;
-  orphan: number;
-  allocated: number;    // total TCP sockets including all states
+	established: number; // TCP inuse (ESTABLISHED + CLOSE_WAIT)
+	time_wait: number;
+	orphan: number;
+	allocated: number; // total TCP sockets including all states
 }
 
 interface FdMetrics {
-  allocated: number;
-  max: number;
+	allocated: number;
+	max: number;
 }
 ```
 
@@ -373,14 +373,14 @@ Sent on startup + every 6h via `POST /api/identity`. Metric definitions in [01-m
 ```typescript
 // @bat/shared — packages/shared/src/identity.ts
 interface IdentityPayload {
-  host_id: string;
-  hostname: string;
-  os: string;               // PRETTY_NAME from /etc/os-release
-  kernel: string;           // from /proc/version
-  arch: string;             // uname -m
-  cpu_model: string;        // from /proc/cpuinfo
-  uptime_seconds: number;
-  boot_time: number;        // computed: now() - uptime
+	host_id: string;
+	hostname: string;
+	os: string; // PRETTY_NAME from /etc/os-release
+	kernel: string; // from /proc/version
+	arch: string; // uname -m
+	cpu_model: string; // from /proc/cpuinfo
+	uptime_seconds: number;
+	boot_time: number; // computed: now() - uptime
 }
 ```
 
@@ -388,23 +388,23 @@ interface IdentityPayload {
 
 How payloads map to D1 columns (Worker performs this flattening at ingest time):
 
-| Payload field | D1 table | D1 column | Notes |
-|---------------|----------|-----------|-------|
-| `timestamp` | `metrics_raw` | `ts` | Probe time |
-| `cpu.load1` | `metrics_raw` | `cpu_load1` | |
-| `cpu.usage_pct` | `metrics_raw` | `cpu_usage_pct` | |
-| `cpu.iowait_pct` | `metrics_raw` | `cpu_iowait` | |
-| `cpu.steal_pct` | `metrics_raw` | `cpu_steal` | |
-| `cpu.count` | `metrics_raw` | `cpu_count` | |
-| `mem.total_bytes` | `metrics_raw` | `mem_total` | |
-| `mem.available_bytes` | `metrics_raw` | `mem_available` | |
-| `mem.used_pct` | `metrics_raw` | `mem_used_pct` | |
-| `swap.total_bytes` | `metrics_raw` | `swap_total` | |
-| `swap.used_bytes` | `metrics_raw` | `swap_used` | |
-| `swap.used_pct` | `metrics_raw` | `swap_used_pct` | |
-| `disk` (array) | `metrics_raw` | `disk_json` | `JSON.stringify()` |
-| `net` (array) | `metrics_raw` | `net_json` | `JSON.stringify()` |
-| `uptime_seconds` | `metrics_raw` | `uptime_seconds` | |
+| Payload field         | D1 table      | D1 column        | Notes              |
+| --------------------- | ------------- | ---------------- | ------------------ |
+| `timestamp`           | `metrics_raw` | `ts`             | Probe time         |
+| `cpu.load1`           | `metrics_raw` | `cpu_load1`      |                    |
+| `cpu.usage_pct`       | `metrics_raw` | `cpu_usage_pct`  |                    |
+| `cpu.iowait_pct`      | `metrics_raw` | `cpu_iowait`     |                    |
+| `cpu.steal_pct`       | `metrics_raw` | `cpu_steal`      |                    |
+| `cpu.count`           | `metrics_raw` | `cpu_count`      |                    |
+| `mem.total_bytes`     | `metrics_raw` | `mem_total`      |                    |
+| `mem.available_bytes` | `metrics_raw` | `mem_available`  |                    |
+| `mem.used_pct`        | `metrics_raw` | `mem_used_pct`   |                    |
+| `swap.total_bytes`    | `metrics_raw` | `swap_total`     |                    |
+| `swap.used_bytes`     | `metrics_raw` | `swap_used`      |                    |
+| `swap.used_pct`       | `metrics_raw` | `swap_used_pct`  |                    |
+| `disk` (array)        | `metrics_raw` | `disk_json`      | `JSON.stringify()` |
+| `net` (array)         | `metrics_raw` | `net_json`       | `JSON.stringify()` |
+| `uptime_seconds`      | `metrics_raw` | `uptime_seconds` |                    |
 
 ---
 
@@ -412,14 +412,14 @@ How payloads map to D1 columns (Worker performs this flattening at ingest time):
 
 6 Tier-1 rules for MVP, aligned with [01-metrics-catalogue.md § Alert rules](./01-metrics-catalogue.md). The full catalogue defines 15 rules total — 6 MVP + 9 deferred (8 Tier-2-dependent + 1 Tier-1 low-priority). Deferred rules are implemented post-MVP when Tier 2 collection is added.
 
-| Rule ID | Field | Condition | Severity | Duration | From 01 spec |
-|---------|-------|-----------|----------|----------|--------------|
-| `mem_high` | `mem.used_pct` + `swap.used_pct` | mem > 85 AND swap > 50 | critical | instant | "tongji OOM risk" |
-| `no_swap` | `swap.total_bytes` + `mem.used_pct` | swap == 0 AND mem > 70 | critical | instant | "tongji had 0 swap" |
-| `disk_full` | `disk.*.used_pct` | > 85 | critical | instant | "tongji root at 71%" |
-| `iowait_high` | `cpu.iowait_pct` | > 20 | warning | 5 min | "docker 30-34% iowait" |
-| `steal_high` | `cpu.steal_pct` | > 10 | warning | 5 min | "oversold VPS detection" |
-| `host_offline` | `hosts.last_seen` | > 120s ago | critical | query-time | implicit |
+| Rule ID        | Field                               | Condition              | Severity | Duration   | From 01 spec             |
+| -------------- | ----------------------------------- | ---------------------- | -------- | ---------- | ------------------------ |
+| `mem_high`     | `mem.used_pct` + `swap.used_pct`    | mem > 85 AND swap > 50 | critical | instant    | "tongji OOM risk"        |
+| `no_swap`      | `swap.total_bytes` + `mem.used_pct` | swap == 0 AND mem > 70 | critical | instant    | "tongji had 0 swap"      |
+| `disk_full`    | `disk.*.used_pct`                   | > 85                   | critical | instant    | "tongji root at 71%"     |
+| `iowait_high`  | `cpu.iowait_pct`                    | > 20                   | warning  | 5 min      | "docker 30-34% iowait"   |
+| `steal_high`   | `cpu.steal_pct`                     | > 10                   | warning  | 5 min      | "oversold VPS detection" |
+| `host_offline` | `hosts.last_seen`                   | > 120s ago             | critical | query-time | implicit                 |
 
 **Note**: [01-metrics-catalogue.md](./01-metrics-catalogue.md) defines a standalone "uptime anomaly" rule (`uptime_seconds < 300`, info severity) — deferred to post-MVP due to low priority. CPU load has no standalone rule (context-dependent per-host).
 
@@ -434,28 +434,28 @@ How payloads map to D1 columns (Worker performs this flattening at ingest time):
 ```typescript
 // @bat/shared — packages/shared/src/alerts.ts
 interface AlertRule {
-  id: string;               // e.g. "mem_high"
-  severity: "warning" | "critical";
-  duration_seconds: number; // 0 = instant, 300 = 5 min
+	id: string; // e.g. "mem_high"
+	severity: "warning" | "critical";
+	duration_seconds: number; // 0 = instant, 300 = 5 min
 }
 
 interface AlertState {
-  host_id: string;
-  rule_id: string;
-  severity: "warning" | "critical";
-  value: number;
-  triggered_at: number;     // Worker time
-  message: string;
+	host_id: string;
+	rule_id: string;
+	severity: "warning" | "critical";
+	value: number;
+	triggered_at: number; // Worker time
+	message: string;
 }
 
 interface HealthResponse {
-  status: "healthy" | "degraded" | "critical" | "empty";
-  total_hosts: number;
-  healthy: number;
-  warning: number;
-  critical: number;
-  maintenance: number;
-  checked_at: number;
+	status: "healthy" | "degraded" | "critical" | "empty";
+	total_hosts: number;
+	healthy: number;
+	warning: number;
+	critical: number;
+	maintenance: number;
+	checked_at: number;
 }
 ```
 
@@ -464,26 +464,26 @@ interface HealthResponse {
 ```typescript
 // @bat/shared — packages/shared/src/constants.ts
 export const ALERT_THRESHOLDS = {
-  MEM_HIGH_PCT: 85,
-  MEM_HIGH_SWAP_PCT: 50,
-  NO_SWAP_MEM_PCT: 70,
-  DISK_FULL_PCT: 85,
-  IOWAIT_HIGH_PCT: 20,
-  STEAL_HIGH_PCT: 10,
-  OFFLINE_SECONDS: 120,
-  IOWAIT_DURATION_SECONDS: 300,
-  STEAL_DURATION_SECONDS: 300,
+	MEM_HIGH_PCT: 85,
+	MEM_HIGH_SWAP_PCT: 50,
+	NO_SWAP_MEM_PCT: 70,
+	DISK_FULL_PCT: 85,
+	IOWAIT_HIGH_PCT: 20,
+	STEAL_HIGH_PCT: 10,
+	OFFLINE_SECONDS: 120,
+	IOWAIT_DURATION_SECONDS: 300,
+	STEAL_DURATION_SECONDS: 300,
 } as const;
 
 export const RETENTION = {
-  RAW_DAYS: 7,
-  HOURLY_DAYS: 90,
+	RAW_DAYS: 7,
+	HOURLY_DAYS: 90,
 } as const;
 
 export const INTERVALS = {
-  METRICS_SECONDS: 30,
-  IDENTITY_HOURS: 6,
-  CLOCK_SKEW_MAX_SECONDS: 300,
+	METRICS_SECONDS: 30,
+	IDENTITY_HOURS: 6,
+	CLOCK_SKEW_MAX_SECONDS: 300,
 } as const;
 ```
 
@@ -500,40 +500,40 @@ Response types for Worker read routes. Consumed by Dashboard proxy and SWR hooks
 
 /** Sparkline data point — one hour of aggregated data */
 interface SparklinePoint {
-  ts: number;     // unix seconds (hour boundary)
-  v: number;      // value (0–100 pct)
+	ts: number; // unix seconds (hour boundary)
+	v: number; // value (0–100 pct)
 }
 
 interface HostOverviewItem {
-  hid: string;                 // opaque FNV-1a hash of host_id for URL routing
-  host_id: string;
-  hostname: string;
-  os: string | null;
-  kernel: string | null;
-  arch: string | null;
-  cpu_model: string | null;
-  boot_time: number | null;
-  status: "healthy" | "warning" | "critical" | "offline";
-  cpu_usage_pct: number | null;    // latest metrics_raw value
-  mem_used_pct: number | null;     // latest metrics_raw value
-  uptime_seconds: number | null;   // latest metrics_raw value
-  last_seen: number;               // unix seconds (Worker time)
-  alert_count: number;             // count of active alerts for this host
-  // Host inventory scalar fields (for list-page subtitle)
-  cpu_logical: number | null;
-  cpu_physical: number | null;
-  mem_total_bytes: number | null;
-  virtualization: string | null;
-  public_ip: string | null;
-  // Extended overview fields
-  probe_version: string | null;
-  cpu_load1: number | null;
-  swap_used_pct: number | null;
-  disk_root_used_pct: number | null;
-  net_rx_rate: number | null;      // bytes/sec aggregate
-  net_tx_rate: number | null;      // bytes/sec aggregate
-  cpu_sparkline: SparklinePoint[] | null;  // 24h hourly CPU usage
-  mem_sparkline: SparklinePoint[] | null;  // 24h hourly Memory usage
+	hid: string; // opaque FNV-1a hash of host_id for URL routing
+	host_id: string;
+	hostname: string;
+	os: string | null;
+	kernel: string | null;
+	arch: string | null;
+	cpu_model: string | null;
+	boot_time: number | null;
+	status: "healthy" | "warning" | "critical" | "offline";
+	cpu_usage_pct: number | null; // latest metrics_raw value
+	mem_used_pct: number | null; // latest metrics_raw value
+	uptime_seconds: number | null; // latest metrics_raw value
+	last_seen: number; // unix seconds (Worker time)
+	alert_count: number; // count of active alerts for this host
+	// Host inventory scalar fields (for list-page subtitle)
+	cpu_logical: number | null;
+	cpu_physical: number | null;
+	mem_total_bytes: number | null;
+	virtualization: string | null;
+	public_ip: string | null;
+	// Extended overview fields
+	probe_version: string | null;
+	cpu_load1: number | null;
+	swap_used_pct: number | null;
+	disk_root_used_pct: number | null;
+	net_rx_rate: number | null; // bytes/sec aggregate
+	net_tx_rate: number | null; // bytes/sec aggregate
+	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
+	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
 }
 ```
 
@@ -544,14 +544,14 @@ interface HostOverviewItem {
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
 interface HostDetailItem extends HostOverviewItem {
-  probe_version: string | null;
-  swap_total_bytes: number | null;
-  boot_mode: string | null;
-  timezone: string | null;
-  dns_resolvers: string[] | null;
-  dns_search: string[] | null;
-  net_interfaces: NetInterfaceDTO[] | null;
-  disks: BlockDeviceDTO[] | null;
+	probe_version: string | null;
+	swap_total_bytes: number | null;
+	boot_mode: string | null;
+	timezone: string | null;
+	dns_resolvers: string[] | null;
+	dns_search: string[] | null;
+	net_interfaces: NetInterfaceDTO[] | null;
+	disks: BlockDeviceDTO[] | null;
 }
 ```
 
@@ -562,18 +562,18 @@ Extends the overview item with full identity fields and host inventory data. Use
 ```typescript
 // @bat/shared — packages/shared/src/tier2.ts
 interface Tier2Snapshot {
-  host_id: string;
-  ts: number;
-  ports: ServicePortsData | null;
-  updates: PackageUpdatesData | null;
-  systemd: SystemdServicesData | null;
-  security: SecurityPostureData | null;
-  docker: DockerStatusData | null;
-  disk_deep: DiskDeepScanData | null;
-  software: SoftwareDiscoveryData | null;  // see docs/12-software-discovery.md
-  timezone: string | null;
-  dns_resolvers: string[] | null;
-  dns_search: string[] | null;
+	host_id: string;
+	ts: number;
+	ports: ServicePortsData | null;
+	updates: PackageUpdatesData | null;
+	systemd: SystemdServicesData | null;
+	security: SecurityPostureData | null;
+	docker: DockerStatusData | null;
+	disk_deep: DiskDeepScanData | null;
+	software: SoftwareDiscoveryData | null; // see docs/12-software-discovery.md
+	timezone: string | null;
+	dns_resolvers: string[] | null;
+	dns_search: string[] | null;
 }
 ```
 
@@ -584,39 +584,39 @@ Returns the latest Tier-2 snapshot. Each JSON column is parsed by the Worker and
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
 interface MetricsQueryResponse {
-  host_id: string;
-  resolution: "raw" | "hourly";    // which table was queried
-  from: number;                     // echoed back
-  to: number;                       // echoed back
-  data: MetricsDataPoint[];
+	host_id: string;
+	resolution: "raw" | "hourly"; // which table was queried
+	from: number; // echoed back
+	to: number; // echoed back
+	data: MetricsDataPoint[];
 }
 
 interface MetricsDataPoint {
-  ts: number;
-  cpu_usage_pct: number | null;
-  cpu_iowait: number | null;
-  cpu_steal: number | null;
-  cpu_load1: number | null;
-  cpu_load5: number | null;
-  cpu_load15: number | null;
-  cpu_count: number | null;
-  mem_total: number | null;
-  mem_available: number | null;
-  mem_used_pct: number | null;
-  swap_total: number | null;
-  swap_used: number | null;         // raw: swap_used, hourly: swap_used_max
-  swap_used_pct: number | null;     // raw: swap_used_pct, hourly: swap_used_pct_avg
-  disk_json: string | null;         // JSON string, Dashboard parses (raw: current, hourly: last sample)
-  // Network: raw uses net_json, hourly uses scalar fields
-  net_json: string | null;          // raw only — JSON string of NetMetric[]
-  net_rx_bytes_avg: number | null;  // hourly only — avg rx bytes/sec
-  net_rx_bytes_max: number | null;  // hourly only — max rx bytes/sec
-  net_tx_bytes_avg: number | null;  // hourly only — avg tx bytes/sec
-  net_tx_bytes_max: number | null;  // hourly only — max tx bytes/sec
-  net_rx_errors: number | null;     // hourly only — sum of per-interval deltas
-  net_tx_errors: number | null;     // hourly only — sum of per-interval deltas
-  uptime_seconds: number | null;    // raw: uptime_seconds, hourly: uptime_min
-  sample_count?: number;            // hourly only
+	ts: number;
+	cpu_usage_pct: number | null;
+	cpu_iowait: number | null;
+	cpu_steal: number | null;
+	cpu_load1: number | null;
+	cpu_load5: number | null;
+	cpu_load15: number | null;
+	cpu_count: number | null;
+	mem_total: number | null;
+	mem_available: number | null;
+	mem_used_pct: number | null;
+	swap_total: number | null;
+	swap_used: number | null; // raw: swap_used, hourly: swap_used_max
+	swap_used_pct: number | null; // raw: swap_used_pct, hourly: swap_used_pct_avg
+	disk_json: string | null; // JSON string, Dashboard parses (raw: current, hourly: last sample)
+	// Network: raw uses net_json, hourly uses scalar fields
+	net_json: string | null; // raw only — JSON string of NetMetric[]
+	net_rx_bytes_avg: number | null; // hourly only — avg rx bytes/sec
+	net_rx_bytes_max: number | null; // hourly only — max rx bytes/sec
+	net_tx_bytes_avg: number | null; // hourly only — avg tx bytes/sec
+	net_tx_bytes_max: number | null; // hourly only — max tx bytes/sec
+	net_rx_errors: number | null; // hourly only — sum of per-interval deltas
+	net_tx_errors: number | null; // hourly only — sum of per-interval deltas
+	uptime_seconds: number | null; // raw: uptime_seconds, hourly: uptime_min
+	sample_count?: number; // hourly only
 }
 ```
 
@@ -627,14 +627,14 @@ interface MetricsDataPoint {
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
 interface AlertItem {
-  hid: string;                    // opaque hash of host_id for URL routing
-  host_id: string;
-  hostname: string;                 // JOIN from hosts table
-  rule_id: string;
-  severity: "warning" | "critical";
-  value: number | null;
-  triggered_at: number;             // unix seconds (Worker time)
-  message: string | null;
+	hid: string; // opaque hash of host_id for URL routing
+	host_id: string;
+	hostname: string; // JOIN from hosts table
+	rule_id: string;
+	severity: "warning" | "critical";
+	value: number | null;
+	triggered_at: number; // unix seconds (Worker time)
+	message: string | null;
 }
 ```
 
@@ -645,15 +645,15 @@ interface AlertItem {
 ```typescript
 // @bat/shared — packages/shared/src/api.ts
 export const API_ROUTES = {
-  INGEST: "/api/ingest",
-  IDENTITY: "/api/identity",
-  TIER2_INGEST: "/api/tier2",
-  HOSTS: "/api/hosts",
-  HOST_DETAIL: "/api/hosts/:id",
-  HOST_METRICS: "/api/hosts/:id/metrics",
-  HOST_TIER2: "/api/hosts/:id/tier2",
-  ALERTS: "/api/alerts",
-  LIVE: "/api/live",
+	INGEST: "/api/ingest",
+	IDENTITY: "/api/identity",
+	TIER2_INGEST: "/api/tier2",
+	HOSTS: "/api/hosts",
+	HOST_DETAIL: "/api/hosts/:id",
+	HOST_METRICS: "/api/hosts/:id/metrics",
+	HOST_TIER2: "/api/hosts/:id/tier2",
+	ALERTS: "/api/alerts",
+	LIVE: "/api/live",
 } as const;
 ```
 
@@ -665,10 +665,10 @@ The `@bat/shared` package contains pure type definitions and constants. Testing 
 
 ### L1 — Unit Tests
 
-| Test file | What |
-|-----------|------|
-| `alerts.test.ts` | Alert rule definitions are complete (all 6 rules), severity values valid, duration values correct |
-| `constants.test.ts` | Threshold values match documented rules, retention/interval values correct |
+| Test file           | What                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------- |
+| `alerts.test.ts`    | Alert rule definitions are complete (all 6 rules), severity values valid, duration values correct |
+| `constants.test.ts` | Threshold values match documented rules, retention/interval values correct                        |
 
 ### L2 — Lint
 
@@ -681,10 +681,10 @@ Not applicable — `@bat/shared` is a pure types/constants package with no runti
 
 ### Atomic commits (this module)
 
-| # | Commit | Files | Verify |
-|---|--------|-------|--------|
-| 1.1 | `feat: add metrics payload types` | `packages/shared/src/metrics.ts` | Typecheck passes |
-| 1.2 | `feat: add identity payload types` | `packages/shared/src/identity.ts` | Typecheck passes |
-| 1.3 | `feat: add alert types and 6 tier-1 rules` | `packages/shared/src/alerts.ts`, `constants.ts` | Typecheck passes |
-| 1.4 | `feat: add api route types, response dtos, and constants` | `packages/shared/src/api.ts`, `index.ts` | Build + typecheck |
-| 1.5 | `test: add unit tests for shared types` | `packages/shared/src/__tests__/alerts.test.ts` | `bun test` passes |
+| #   | Commit                                                    | Files                                           | Verify            |
+| --- | --------------------------------------------------------- | ----------------------------------------------- | ----------------- |
+| 1.1 | `feat: add metrics payload types`                         | `packages/shared/src/metrics.ts`                | Typecheck passes  |
+| 1.2 | `feat: add identity payload types`                        | `packages/shared/src/identity.ts`               | Typecheck passes  |
+| 1.3 | `feat: add alert types and 6 tier-1 rules`                | `packages/shared/src/alerts.ts`, `constants.ts` | Typecheck passes  |
+| 1.4 | `feat: add api route types, response dtos, and constants` | `packages/shared/src/api.ts`, `index.ts`        | Build + typecheck |
+| 1.5 | `test: add unit tests for shared types`                   | `packages/shared/src/__tests__/alerts.test.ts`  | `bun test` passes |
