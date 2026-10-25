@@ -53,31 +53,31 @@ Environment design, fixture matrix, and capture limitations: [local environments
 
 6DQ keeps its name with unified L1, L2/L3, G2 and D1; the owner merged former G1 into L1 on 2026-09-21. Statuses: `enforced`, `planned`, `manual`, `N/A`.
 
-| Dimension | Required proof | Status | Current enforcement / gap |
-|---|---|---|---|
-| L1 TypeScript | Statements, branches, functions and lines each ≥95%; no `.skip`/`.only`; strict types and check-only lint, zero errors/warnings | planned | Enforced static subchecks: commit typecheck/lint-staged and CI typecheck/lint. Coverage: shared config is four-metric 95%; Worker/UI branches are 90%. Script checks lines, commit passes TS=90, CI defaults TS=95; skip/focus gate incomplete and gates run on the working tree |
-| L1 Rust | Preserve ≥95% lines and raise measurable remaining coverage to ≥95%; clippy warnings denied and rustfmt check | planned | Enforced static subchecks: commit clippy/rustfmt when probe changes and the CI probe job always tests/lints/formats. Commit requires llvm-cov 95% lines; script/CI default is 90%. Branch/function/statement enforcement is absent |
-| L2 API | Real local HTTP over 100% of endpoint/method combinations | planned | Pre-push/CI run real Wrangler tests and route mapping; static coverage hits do not verify every assertion/method |
-| L3 UI/probe | Critical dashboard and probe-to-server workflows | planned | CI Chromium covers dashboard; complete native probe system acceptance is not enforced |
-| G2 security | Secret and dependency scans in both lanes; missing tools fail | enforced | Pre-push scans Bun/Cargo locks and secrets; CI default quality scan covers Bun only. Local secret range uses upstream or a recent-commit fallback |
-| D1 isolation | Per-run local stores, guards and verified marker before mutations/cleanup | planned | Both lanes use fresh native stores/identities and ports through the shared launcher; owner and D1 markers gate cleanup |
-| Build | Real dashboard bundle and native artifact | enforced | CI prepares UI, probe compiles during tests; release packages its intended artifacts |
-| Docs / operations | Architecture and migration/release behavior reviewed | manual | Numbered docs and maintainer checks |
+| Dimension         | Required proof                                                                                                                  | Status   | Current enforcement / gap                                                                                                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1 TypeScript     | Statements, branches, functions and lines each ≥95%; no `.skip`/`.only`; strict types and check-only lint, zero errors/warnings | planned  | Enforced static subchecks: commit typecheck/lint-staged and CI typecheck/lint. Coverage: shared config is four-metric 95%; Worker/UI branches are 90%. Script checks lines, commit passes TS=90, CI defaults TS=95; skip/focus gate incomplete and gates run on the working tree |
+| L1 Rust           | Preserve ≥95% lines and raise measurable remaining coverage to ≥95%; clippy warnings denied and rustfmt check                   | planned  | Enforced static subchecks: commit clippy/rustfmt when probe changes and the CI probe job always tests/lints/formats. Commit requires llvm-cov 95% lines; script/CI default is 90%. Branch/function/statement enforcement is absent                                               |
+| L2 API            | Real local HTTP over 100% of endpoint/method combinations                                                                       | planned  | Pre-push/CI run real Wrangler tests and route mapping; static coverage hits do not verify every assertion/method                                                                                                                                                                 |
+| L3 UI/probe       | Critical dashboard and probe-to-server workflows                                                                                | planned  | CI Chromium covers dashboard; complete native probe system acceptance is not enforced                                                                                                                                                                                            |
+| G2 security       | Secret and dependency scans in both lanes; missing tools fail                                                                   | enforced | Pre-push scans Bun/Cargo locks and secrets; CI default quality scan covers Bun only. Local secret range uses upstream or a recent-commit fallback                                                                                                                                |
+| D1 isolation      | Per-run local stores, guards and verified marker before mutations/cleanup                                                       | planned  | Both lanes use fresh native stores/identities and ports through the shared launcher; owner and D1 markers gate cleanup                                                                                                                                                           |
+| Build             | Real dashboard bundle and native artifact                                                                                       | enforced | CI prepares UI, probe compiles during tests; release packages its intended artifacts                                                                                                                                                                                             |
+| Docs / operations | Architecture and migration/release behavior reviewed                                                                            | manual   | Numbered docs and maintainer checks                                                                                                                                                                                                                                              |
 
-| Hook | Current behavior | Required follow-up |
-|---|---|---|
-| pre-commit | Working-tree coverage/types/staged lint/secrets/route/page gates; conditional Rust lint | Unified L1 on an index snapshot, <30s |
-| pre-push | Local Worker L2 and G2 in parallel | Test commits named by stdin push refs, <3min |
+| Hook       | Current behavior                                                                        | Required follow-up                           |
+| ---------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| pre-commit | Working-tree coverage/types/staged lint/secrets/route/page gates; conditional Rust lint | Unified L1 on an index snapshot, <30s        |
+| pre-push   | Local Worker L2 and G2 in parallel                                                      | Test commits named by stdin push refs, <3min |
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on commits or branch pushes. CI pins shared workflows at `ac635753a869cb85fad1f52aae4ccbd6119f3cae`.
 
 ## Resources and isolation
 
-| Lane | Resource | Boundary |
-|---|---|---|
-| Daily dev | Gateway 7025; `.wrangler/environments/demo` | Persistent synthetic CRUD; explicit Prod access only |
-| L2 | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Automated lock, fresh identity, owned D1 cleanup |
-| L3 | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
+| Lane      | Resource                                             | Boundary                                                            |
+| --------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
+| Daily dev | Gateway 7025; `.wrangler/environments/demo`          | Persistent synthetic CRUD; explicit Prod access only                |
+| L2        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Automated lock, fresh identity, owned D1 cleanup                    |
+| L3        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
 
 Every Worker test lane must reject remote bindings, assert test context, initialize `_test_marker(key,value)` with `env=test` and verify it before resets/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid workerd pipe failures.
 

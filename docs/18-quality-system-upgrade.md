@@ -5,16 +5,16 @@
 
 ## Current Assessment (2026-03-23)
 
-| Dimension | Status | Detail |
-|-----------|:------:|--------|
-| L1 Unit | ⚠️ | 1,183t — shared 100%, worker 93.8%, **dashboard 39.8%** ❌, probe 99.1% ✅ |
-| G1 Static | ⚠️ | Biome `recommended` (not strict), 2 warn rules not blocking, no lint-staged, no `--error-on-warnings` |
-| L2 Integration | ✅ | `wrangler.test.ts` real HTTP on :18787, 29/37 endpoints covered (78%) |
-| L3 System/E2E | ✅ | Playwright 10 tests (dashboard) + Wrangler real HTTP E2E (worker) |
-| G2 Security | ❌ | Zero osv-scanner, zero gitleaks — no security scanning at all |
-| D1 Isolation | ⚠️ | Worker E2E uses local SQLite (`.wrangler/e2e/`), but dev/prod share same D1 ID; `bat-db-test` created but not wired |
-| Hooks | ✅ | pre-commit (L1+G1), pre-push (L2) — missing G2 |
-| **Tier** | **C** | L1 dashboard + G1 not strict → basic items not met |
+| Dimension      | Status | Detail                                                                                                              |
+| -------------- | :----: | ------------------------------------------------------------------------------------------------------------------- |
+| L1 Unit        |   ⚠️   | 1,183t — shared 100%, worker 93.8%, **dashboard 39.8%** ❌, probe 99.1% ✅                                          |
+| G1 Static      |   ⚠️   | Biome `recommended` (not strict), 2 warn rules not blocking, no lint-staged, no `--error-on-warnings`               |
+| L2 Integration |   ✅   | `wrangler.test.ts` real HTTP on :18787, 29/37 endpoints covered (78%)                                               |
+| L3 System/E2E  |   ✅   | Playwright 10 tests (dashboard) + Wrangler real HTTP E2E (worker)                                                   |
+| G2 Security    |   ❌   | Zero osv-scanner, zero gitleaks — no security scanning at all                                                       |
+| D1 Isolation   |   ⚠️   | Worker E2E uses local SQLite (`.wrangler/e2e/`), but dev/prod share same D1 ID; `bat-db-test` created but not wired |
+| Hooks          |   ✅   | pre-commit (L1+G1), pre-push (L2) — missing G2                                                                      |
+| **Tier**       | **C**  | L1 dashboard + G1 not strict → basic items not met                                                                  |
 
 ### Target: Tier S (six dimensions all green)
 
@@ -32,11 +32,11 @@
 
 ### Changes
 
-| File | Change |
-|------|--------|
-| `biome.json` | `warn` → `error` for both rules; add `all: true` under `linter.rules` for maximum strictness |
-| `package.json` (root) | Add `lint-staged` to devDependencies; add `lint-staged` config |
-| `.husky/pre-commit` | Replace `pnpm biome check .` with `pnpm lint-staged` |
+| File                  | Change                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| `biome.json`          | `warn` → `error` for both rules; add `all: true` under `linter.rules` for maximum strictness |
+| `package.json` (root) | Add `lint-staged` to devDependencies; add `lint-staged` config                               |
+| `.husky/pre-commit`   | Replace `pnpm biome check .` with `pnpm lint-staged`                                         |
 
 ### biome.json diff
 
@@ -79,11 +79,11 @@ pnpm lint-staged
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 1 | `refactor: upgrade biome rules to strict with all errors` | `biome.json` + fix existing violations |
-| 2 | `chore: add lint-staged for incremental lint` | `package.json` (root) — add dep + config |
-| 3 | `chore: pre-commit use lint-staged instead of full biome check` | `.husky/pre-commit` |
+| #   | Commit message                                                  | Scope                                    |
+| --- | --------------------------------------------------------------- | ---------------------------------------- |
+| 1   | `refactor: upgrade biome rules to strict with all errors`       | `biome.json` + fix existing violations   |
+| 2   | `chore: add lint-staged for incremental lint`                   | `package.json` (root) — add dep + config |
+| 3   | `chore: pre-commit use lint-staged instead of full biome check` | `.husky/pre-commit`                      |
 
 ### Verification
 
@@ -119,9 +119,9 @@ contain the `"All files"` line when the Playwright spec file errors under bun.
 
 ### Changes
 
-| File | Change |
-|------|--------|
-| `scripts/check-coverage.sh` | `return 0` → `return 1` when no coverage data found |
+| File                              | Change                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `scripts/check-coverage.sh`       | `return 0` → `return 1` when no coverage data found                                                       |
 | `packages/dashboard/package.json` | `test` script: ensure only `src/` tests run (exclude `e2e/`) — already correct: `"test": "bun test src/"` |
 
 ```bash
@@ -136,11 +136,11 @@ fi
 
 Dashboard at 39.8% needs significant test work to reach 90%. Key areas to cover:
 
-| Priority | Component | Current coverage | Files |
-|----------|-----------|:----------------:|-------|
-| P0 | `src/lib/` (transforms, proxy-logic, api) | ~85% | Already tested, minor gaps |
-| P1 | `src/components/` (host-card, sidebar, status-badge, alert-table) | ~40% | Need render tests |
-| P2 | `src/app/` pages (hosts, alerts, setup) | ~10% | Page-level logic extraction needed |
+| Priority | Component                                                         | Current coverage | Files                              |
+| -------- | ----------------------------------------------------------------- | :--------------: | ---------------------------------- |
+| P0       | `src/lib/` (transforms, proxy-logic, api)                         |       ~85%       | Already tested, minor gaps         |
+| P1       | `src/components/` (host-card, sidebar, status-badge, alert-table) |       ~40%       | Need render tests                  |
+| P2       | `src/app/` pages (hosts, alerts, setup)                           |       ~10%       | Page-level logic extraction needed |
 
 > **Strategy**: Extract logic from page components into testable ViewModel
 > functions under `src/lib/`, then test those. UI thin shells (`page.tsx`,
@@ -152,10 +152,10 @@ Dashboard at 39.8% needs significant test work to reach 90%. Key areas to cover:
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 4 | `fix: check-coverage.sh fail on missing coverage data` | `scripts/check-coverage.sh` |
-| 5 | `test: dashboard coverage improvements` | `packages/dashboard/src/**/*.test.ts` (future, iterative) |
+| #   | Commit message                                         | Scope                                                     |
+| --- | ------------------------------------------------------ | --------------------------------------------------------- |
+| 4   | `fix: check-coverage.sh fail on missing coverage data` | `scripts/check-coverage.sh`                               |
+| 5   | `test: dashboard coverage improvements`                | `packages/dashboard/src/**/*.test.ts` (future, iterative) |
 
 ### Verification
 
@@ -178,11 +178,11 @@ bash -c 'source scripts/check-coverage.sh; check_ts_coverage "test" ""'
 
 ### Changes
 
-| File | Change |
-|------|--------|
+| File                      | Change                                     |
+| ------------------------- | ------------------------------------------ |
 | `scripts/run-security.ts` | Create — single entry point for both tools |
-| `package.json` (root) | Add `security` script |
-| `.husky/pre-push` | Add G2 gate parallel to L2 |
+| `package.json` (root)     | Add `security` script                      |
+| `.husky/pre-push`         | Add G2 gate parallel to L2                 |
 
 ### scripts/run-security.ts
 
@@ -261,10 +261,10 @@ brew install gitleaks
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 6 | `feat: add G2 security gate script (osv-scanner + gitleaks)` | `scripts/run-security.ts`, `package.json` |
-| 7 | `chore: wire G2 security gate into pre-push hook` | `.husky/pre-push` |
+| #   | Commit message                                               | Scope                                     |
+| --- | ------------------------------------------------------------ | ----------------------------------------- |
+| 6   | `feat: add G2 security gate script (osv-scanner + gitleaks)` | `scripts/run-security.ts`, `package.json` |
+| 7   | `chore: wire G2 security gate into pre-push hook`            | `.husky/pre-push`                         |
 
 ### Verification
 
@@ -304,11 +304,11 @@ Cloudflare's infrastructure). We wire it now for completeness.
 
 ### Changes
 
-| File | Change |
-|------|--------|
-| `packages/worker/wrangler.toml` | Add `[env.test]` section with `bat-db-test` binding |
-| `scripts/verify-test-bindings.ts` | Create — validates `[env.test]` bindings contain `-test` suffix |
-| `packages/worker/migrations/0018_test_marker.sql` | Create `_test_marker` table (only applied to test DB) |
+| File                                              | Change                                                          |
+| ------------------------------------------------- | --------------------------------------------------------------- |
+| `packages/worker/wrangler.toml`                   | Add `[env.test]` section with `bat-db-test` binding             |
+| `scripts/verify-test-bindings.ts`                 | Create — validates `[env.test]` bindings contain `-test` suffix |
+| `packages/worker/migrations/0018_test_marker.sql` | Create `_test_marker` table (only applied to test DB)           |
 
 ### wrangler.toml addition
 
@@ -360,11 +360,11 @@ console.log(`✔ All test bindings verified: ${dbNames.join(", ")}`);
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 8 | `feat: add wrangler.toml [env.test] with bat-db-test binding` | `packages/worker/wrangler.toml` |
-| 9 | `feat: add verify-test-bindings script for D1 isolation guard` | `scripts/verify-test-bindings.ts` |
-| 10 | `feat: add _test_marker migration for test DB identification` | `packages/worker/migrations/0018_test_marker.sql` |
+| #   | Commit message                                                 | Scope                                             |
+| --- | -------------------------------------------------------------- | ------------------------------------------------- |
+| 8   | `feat: add wrangler.toml [env.test] with bat-db-test binding`  | `packages/worker/wrangler.toml`                   |
+| 9   | `feat: add verify-test-bindings script for D1 isolation guard` | `scripts/verify-test-bindings.ts`                 |
+| 10  | `feat: add _test_marker migration for test DB identification`  | `packages/worker/migrations/0018_test_marker.sql` |
 
 ### Verification
 
@@ -457,9 +457,9 @@ echo "✔ pre-push passed (L2 + G2)"
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 11 | `refactor: align hooks to six-dimension quality mapping (L1+G1, L2+G2)` | `.husky/pre-commit`, `.husky/pre-push` |
+| #   | Commit message                                                          | Scope                                  |
+| --- | ----------------------------------------------------------------------- | -------------------------------------- |
+| 11  | `refactor: align hooks to six-dimension quality mapping (L1+G1, L2+G2)` | `.husky/pre-commit`, `.husky/pre-push` |
 
 ### Verification
 
@@ -481,49 +481,49 @@ bash .husky/pre-push
 
 ### Changes
 
-| File | Change |
-|------|--------|
-| `docs/README.md` | Add row #18 (this document) |
+| File                 | Change                                              |
+| -------------------- | --------------------------------------------------- |
+| `docs/README.md`     | Add row #18 (this document)                         |
 | `docs/07-testing.md` | Update from four-layer to six-dimension terminology |
 
 ### Atomic commits
 
-| # | Commit message | Scope |
-|---|----------------|-------|
-| 12 | `docs: add quality system upgrade document and update index` | `docs/18-quality-system-upgrade.md`, `docs/README.md` |
+| #   | Commit message                                               | Scope                                                 |
+| --- | ------------------------------------------------------------ | ----------------------------------------------------- |
+| 12  | `docs: add quality system upgrade document and update index` | `docs/18-quality-system-upgrade.md`, `docs/README.md` |
 
 ---
 
 ## Commit Summary
 
-| # | Message | Dimension | Files |
-|---|---------|-----------|-------|
-| 1 | `refactor: upgrade biome rules to strict with all errors` | G1 | `biome.json` + violation fixes |
-| 2 | `chore: add lint-staged for incremental lint` | G1 | `package.json` |
-| 3 | `chore: pre-commit use lint-staged instead of full biome check` | G1 | `.husky/pre-commit` |
-| 4 | `fix: check-coverage.sh fail on missing coverage data` | L1 | `scripts/check-coverage.sh` |
-| 5 | `test: dashboard coverage improvements` | L1 | `packages/dashboard/src/**/*.test.ts` (iterative) |
-| 6 | `feat: add G2 security gate script (osv-scanner + gitleaks)` | G2 | `scripts/run-security.ts`, `package.json` |
-| 7 | `chore: wire G2 security gate into pre-push hook` | G2 | `.husky/pre-push` |
-| 8 | `feat: add wrangler.toml [env.test] with bat-db-test binding` | D1 | `packages/worker/wrangler.toml` |
-| 9 | `feat: add verify-test-bindings script for D1 isolation guard` | D1 | `scripts/verify-test-bindings.ts` |
-| 10 | `feat: add _test_marker migration for test DB identification` | D1 | `packages/worker/migrations/0018_test_marker.sql` |
-| 11 | `refactor: align hooks to six-dimension quality mapping` | Hooks | `.husky/pre-commit`, `.husky/pre-push` |
-| 12 | `docs: add quality system upgrade document and update index` | Docs | `docs/18-*.md`, `docs/README.md` |
+| #   | Message                                                         | Dimension | Files                                             |
+| --- | --------------------------------------------------------------- | --------- | ------------------------------------------------- |
+| 1   | `refactor: upgrade biome rules to strict with all errors`       | G1        | `biome.json` + violation fixes                    |
+| 2   | `chore: add lint-staged for incremental lint`                   | G1        | `package.json`                                    |
+| 3   | `chore: pre-commit use lint-staged instead of full biome check` | G1        | `.husky/pre-commit`                               |
+| 4   | `fix: check-coverage.sh fail on missing coverage data`          | L1        | `scripts/check-coverage.sh`                       |
+| 5   | `test: dashboard coverage improvements`                         | L1        | `packages/dashboard/src/**/*.test.ts` (iterative) |
+| 6   | `feat: add G2 security gate script (osv-scanner + gitleaks)`    | G2        | `scripts/run-security.ts`, `package.json`         |
+| 7   | `chore: wire G2 security gate into pre-push hook`               | G2        | `.husky/pre-push`                                 |
+| 8   | `feat: add wrangler.toml [env.test] with bat-db-test binding`   | D1        | `packages/worker/wrangler.toml`                   |
+| 9   | `feat: add verify-test-bindings script for D1 isolation guard`  | D1        | `scripts/verify-test-bindings.ts`                 |
+| 10  | `feat: add _test_marker migration for test DB identification`   | D1        | `packages/worker/migrations/0018_test_marker.sql` |
+| 11  | `refactor: align hooks to six-dimension quality mapping`        | Hooks     | `.husky/pre-commit`, `.husky/pre-push`            |
+| 12  | `docs: add quality system upgrade document and update index`    | Docs      | `docs/18-*.md`, `docs/README.md`                  |
 
 ---
 
 ## Post-Upgrade Assessment (Expected)
 
-| Dimension | Before | After | Notes |
-|-----------|:------:|:-----:|-------|
-| L1 Unit | ⚠️ | ⚠️→✅ | Gate fixed (commit 4). Dashboard 39.8% will **block commits** until tests are added (commit 5, separate effort) |
-| G1 Static | ⚠️ | ✅ | Biome strict + lint-staged + 0 warnings (commits 1-3) |
-| L2 Integration | ✅ | ✅ | Already passing. 7 uncovered endpoints tracked as backlog |
-| L3 System/E2E | ✅ | ✅ | Playwright (dashboard) + Wrangler E2E (worker) already in place |
-| G2 Security | ❌ | ✅ | osv-scanner + gitleaks installed and gated (commits 6-7) |
-| D1 Isolation | ⚠️ | ✅ | `[env.test]` wired to `bat-db-test`, verify script, marker table (commits 8-10) |
-| Hooks | ✅ | ✅ | Aligned to L1+G1 / L2+G2 mapping (commit 11) |
+| Dimension      | Before | After | Notes                                                                                                           |
+| -------------- | :----: | :---: | --------------------------------------------------------------------------------------------------------------- |
+| L1 Unit        |   ⚠️   | ⚠️→✅ | Gate fixed (commit 4). Dashboard 39.8% will **block commits** until tests are added (commit 5, separate effort) |
+| G1 Static      |   ⚠️   |  ✅   | Biome strict + lint-staged + 0 warnings (commits 1-3)                                                           |
+| L2 Integration |   ✅   |  ✅   | Already passing. 7 uncovered endpoints tracked as backlog                                                       |
+| L3 System/E2E  |   ✅   |  ✅   | Playwright (dashboard) + Wrangler E2E (worker) already in place                                                 |
+| G2 Security    |   ❌   |  ✅   | osv-scanner + gitleaks installed and gated (commits 6-7)                                                        |
+| D1 Isolation   |   ⚠️   |  ✅   | `[env.test]` wired to `bat-db-test`, verify script, marker table (commits 8-10)                                 |
+| Hooks          |   ✅   |  ✅   | Aligned to L1+G1 / L2+G2 mapping (commit 11)                                                                    |
 
 ### Tier progression
 
@@ -556,11 +556,11 @@ pnpm add -D -w lint-staged
 
 ## Appendix: Six-Dimension Reference
 
-| Dimension | What | When | Tool |
-|-----------|------|------|------|
-| **L1** Unit | Logic, pure functions, ≥90% coverage | pre-commit | `bun test --coverage`, `cargo llvm-cov` |
-| **L2** Integration | Real HTTP E2E, 100% API coverage | pre-push | `wrangler.test.ts` on :18787 |
-| **L3** System/E2E | Browser flows, user perspective | manual/CI | Playwright on :28787 |
-| **G1** Static | 0 error + 0 warning, strict | pre-commit | `biome check --error-on-warnings`, `cargo clippy -D warnings` |
-| **G2** Security | CVE scan + secrets detection | pre-push | `osv-scanner`, `gitleaks` |
-| **D1** Isolation | Test resources physically separated | build-time | `[env.test]`, `verify-test-bindings.ts`, `_test_marker` |
+| Dimension          | What                                 | When       | Tool                                                          |
+| ------------------ | ------------------------------------ | ---------- | ------------------------------------------------------------- |
+| **L1** Unit        | Logic, pure functions, ≥90% coverage | pre-commit | `bun test --coverage`, `cargo llvm-cov`                       |
+| **L2** Integration | Real HTTP E2E, 100% API coverage     | pre-push   | `wrangler.test.ts` on :18787                                  |
+| **L3** System/E2E  | Browser flows, user perspective      | manual/CI  | Playwright on :28787                                          |
+| **G1** Static      | 0 error + 0 warning, strict          | pre-commit | `biome check --error-on-warnings`, `cargo clippy -D warnings` |
+| **G2** Security    | CVE scan + secrets detection         | pre-push   | `osv-scanner`, `gitleaks`                                     |
+| **D1** Isolation   | Test resources physically separated  | build-time | `[env.test]`, `verify-test-bindings.ts`, `_test_marker`       |

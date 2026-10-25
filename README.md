@@ -86,17 +86,17 @@ Test entrypoints reject inherited production API/Access/BAT credentials. Chromiu
 
 ## 技术栈
 
-| 技术 | 用途 |
-| --- | --- |
-| Rust / Tokio / reqwest | Linux 指标采集与上报 |
-| TypeScript / Bun / Turborepo | 共享代码、workspace 与 CLI 工具 |
-| Hono / Cloudflare Workers | 数据接收、API、定时任务与静态资源 |
-| Cloudflare D1 / KV | 数据持久化与可选热点缓存 |
-| Vite / React / React Router / Recharts | 仪表盘、路由与趋势图 |
-| Tailwind CSS / Radix UI | 样式与交互组件 |
-| Cloudflare Access / `@nocoo/base-cli` | 浏览器认证与 CLI 登录 |
-| Vitest / Playwright / Cargo | TypeScript、浏览器和 Rust 测试 |
-| Cloudflare R2 | 发布探针二进制及校验文件 |
+| 技术                                   | 用途                              |
+| -------------------------------------- | --------------------------------- |
+| Rust / Tokio / reqwest                 | Linux 指标采集与上报              |
+| TypeScript / Bun / Turborepo           | 共享代码、workspace 与 CLI 工具   |
+| Hono / Cloudflare Workers              | 数据接收、API、定时任务与静态资源 |
+| Cloudflare D1 / KV                     | 数据持久化与可选热点缓存          |
+| Vite / React / React Router / Recharts | 仪表盘、路由与趋势图              |
+| Tailwind CSS / Radix UI                | 样式与交互组件                    |
+| Cloudflare Access / `@nocoo/base-cli`  | 浏览器认证与 CLI 登录             |
+| Vitest / Playwright / Cargo            | TypeScript、浏览器和 Rust 测试    |
+| Cloudflare R2                          | 发布探针二进制及校验文件          |
 
 ## 文档
 

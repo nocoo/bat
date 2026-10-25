@@ -4,7 +4,7 @@
 
 ## Overview
 
-Expose a new set of Worker APIs under `/api/monitoring/*` that let external monitoring systems (specifically Uptime Kuma) query onboarded hosts, their health tiers, active alerts, and group-level summaries. The goal is to close the loop: bat monitors *internal* host health, Uptime Kuma monitors *external* reachability — this API bridges both worlds.
+Expose a new set of Worker APIs under `/api/monitoring/*` that let external monitoring systems (specifically Uptime Kuma) query onboarded hosts, their health tiers, active alerts, and group-level summaries. The goal is to close the loop: bat monitors _internal_ host health, Uptime Kuma monitors _external_ reachability — this API bridges both worlds.
 
 ## Motivation
 
@@ -38,49 +38,49 @@ List all onboarded hosts with their current health tier and alert summary.
 
 ```jsonc
 {
-  "status": "ok",
-  "host_count": 6,
-  "by_tier": {
-    "healthy": 4,
-    "warning": 1,
-    "critical": 0,
-    "offline": 1
-  },
-  "hosts": [
-    {
-      "host_id": "abc123",
-      "hostname": "us.nocoo.cloud",
-      "tier": "healthy",       // healthy | warning | critical | offline
-      "last_seen": 1711036800,
-      "alert_count": 0,
-      "alerts": []
-    },
-    {
-      "host_id": "def456",
-      "hostname": "jp.nocoo.cloud",
-      "tier": "warning",
-      "last_seen": 1711036790,
-      "alert_count": 1,
-      "alerts": [
-        {
-          "rule_id": "iowait_high",
-          "severity": "warning",
-          "value": 22.5,
-          "message": "I/O wait 22.5% > 20% for 5m",
-          "triggered_at": 1711036500
-        }
-      ]
-    }
-  ]
+	"status": "ok",
+	"host_count": 6,
+	"by_tier": {
+		"healthy": 4,
+		"warning": 1,
+		"critical": 0,
+		"offline": 1
+	},
+	"hosts": [
+		{
+			"host_id": "abc123",
+			"hostname": "us.nocoo.cloud",
+			"tier": "healthy", // healthy | warning | critical | offline
+			"last_seen": 1711036800,
+			"alert_count": 0,
+			"alerts": []
+		},
+		{
+			"host_id": "def456",
+			"hostname": "jp.nocoo.cloud",
+			"tier": "warning",
+			"last_seen": 1711036790,
+			"alert_count": 1,
+			"alerts": [
+				{
+					"rule_id": "iowait_high",
+					"severity": "warning",
+					"value": 22.5,
+					"message": "I/O wait 22.5% > 20% for 5m",
+					"triggered_at": 1711036500
+				}
+			]
+		}
+	]
 }
 ```
 
 **Query params:**
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `tier` | string | (all) | Filter: `healthy`, `warning`, `critical`, `offline` |
-| `tag` | string | (all) | Filter by tag name (multiple allowed, AND logic) |
+| Param  | Type   | Default | Description                                         |
+| ------ | ------ | ------- | --------------------------------------------------- |
+| `tier` | string | (all)   | Filter: `healthy`, `warning`, `critical`, `offline` |
+| `tag`  | string | (all)   | Filter by tag name (multiple allowed, AND logic)    |
 
 **Uptime Kuma usage:** this endpoint is for **discovery and fleet overview** — the sync script reads it to enumerate hosts and create per-host monitors. It is **not** suitable as a keyword monitor target (matching `"tier":"healthy"` against a list would false-positive on any single healthy host). For per-host monitoring use `/api/monitoring/hosts/:id`. For fleet-level liveness use the existing `GET /api/live` (public, no auth) or `GET /api/fleet/status` (auth, returns `"status":"healthy"/"degraded"/"critical"`).
 
@@ -94,15 +94,15 @@ Single host health detail — designed as a dedicated Uptime Kuma keyword endpoi
 
 ```jsonc
 {
-  "status": "ok",
-  "host_id": "abc123",
-  "hostname": "us.nocoo.cloud",
-  "tier": "healthy",
-  "last_seen": 1711036800,
-  "uptime_seconds": 864000,
-  "alert_count": 0,
-  "alerts": [],
-  "tags": ["vps", "us-east"]
+	"status": "ok",
+	"host_id": "abc123",
+	"hostname": "us.nocoo.cloud",
+	"tier": "healthy",
+	"last_seen": 1711036800,
+	"uptime_seconds": 864000,
+	"alert_count": 0,
+	"alerts": [],
+	"tags": ["vps", "us-east"]
 }
 ```
 
@@ -122,33 +122,33 @@ Hosts with **no tags** are collected into a synthetic `"(untagged)"` group so th
 
 ```jsonc
 {
-  "status": "ok",
-  "groups": [
-    {
-      "tag": "vps",
-      "host_count": 6,
-      "tier": "warning",       // worst tier among group members
-      "by_tier": {
-        "healthy": 4,
-        "warning": 1,
-        "critical": 0,
-        "offline": 1
-      },
-      "alert_count": 2,
-      "hosts": [
-        { "host_id": "abc123", "hostname": "us.nocoo.cloud" },
-        { "host_id": "def456", "hostname": "jp.nocoo.cloud" }
-      ]
-    },
-    {
-      "tag": "(untagged)",
-      "host_count": 1,
-      "tier": "healthy",
-      "by_tier": { "healthy": 1, "warning": 0, "critical": 0, "offline": 0 },
-      "alert_count": 0,
-      "hosts": [{ "host_id": "ghi789", "hostname": "new-host.example.com" }]
-    }
-  ]
+	"status": "ok",
+	"groups": [
+		{
+			"tag": "vps",
+			"host_count": 6,
+			"tier": "warning", // worst tier among group members
+			"by_tier": {
+				"healthy": 4,
+				"warning": 1,
+				"critical": 0,
+				"offline": 1
+			},
+			"alert_count": 2,
+			"hosts": [
+				{ "host_id": "abc123", "hostname": "us.nocoo.cloud" },
+				{ "host_id": "def456", "hostname": "jp.nocoo.cloud" }
+			]
+		},
+		{
+			"tag": "(untagged)",
+			"host_count": 1,
+			"tier": "healthy",
+			"by_tier": { "healthy": 1, "warning": 0, "critical": 0, "offline": 0 },
+			"alert_count": 0,
+			"hosts": [{ "host_id": "ghi789", "hostname": "new-host.example.com" }]
+		}
+	]
 }
 ```
 
@@ -166,35 +166,35 @@ Active alerts enriched for monitoring consumption — flatter structure than `/a
 
 ```jsonc
 {
-  "status": "ok",
-  "alert_count": 3,
-  "by_severity": {
-    "critical": 1,
-    "warning": 2,
-    "info": 0
-  },
-  "alerts": [
-    {
-      "host_id": "abc123",
-      "hostname": "us.nocoo.cloud",
-      "rule_id": "mem_high",
-      "severity": "critical",
-      "value": 92.3,
-      "message": "Memory 92.3% with swap 65%",
-      "triggered_at": 1711036500,
-      "duration_seconds": 300,
-      "tags": ["vps", "us-east"]
-    }
-  ]
+	"status": "ok",
+	"alert_count": 3,
+	"by_severity": {
+		"critical": 1,
+		"warning": 2,
+		"info": 0
+	},
+	"alerts": [
+		{
+			"host_id": "abc123",
+			"hostname": "us.nocoo.cloud",
+			"rule_id": "mem_high",
+			"severity": "critical",
+			"value": 92.3,
+			"message": "Memory 92.3% with swap 65%",
+			"triggered_at": 1711036500,
+			"duration_seconds": 300,
+			"tags": ["vps", "us-east"]
+		}
+	]
 }
 ```
 
 **Query params:**
 
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `severity` | string | (all) | Filter: `critical`, `warning`, `info` |
-| `tag` | string | (all) | Filter by host tag |
+| Param      | Type   | Default | Description                           |
+| ---------- | ------ | ------- | ------------------------------------- |
+| `severity` | string | (all)   | Filter: `critical`, `warning`, `info` |
+| `tag`      | string | (all)   | Filter by host tag                    |
 
 **Uptime Kuma usage:** keyword monitor on `"alert_count":0` — any active alert triggers DOWN.
 
@@ -204,12 +204,12 @@ Active alerts enriched for monitoring consumption — flatter structure than `/a
 
 **Must call `deriveHostStatus()` from `services/status.ts`** — not re-implement. This function encapsulates the full derivation logic including the `port_allowlist` suppression rule:
 
-| Tier | Condition | Uptime Kuma Keyword |
-|------|-----------|---------------------|
-| `healthy` | No alerts, last_seen < 120s | `"tier":"healthy"` |
-| `warning` | Any warning-severity alert (excluding port_allowlist-suppressed `public_port`) | `"tier":"warning"` |
-| `critical` | Any critical-severity alert | `"tier":"critical"` |
-| `offline` | last_seen > 120s | `"tier":"offline"` |
+| Tier       | Condition                                                                      | Uptime Kuma Keyword |
+| ---------- | ------------------------------------------------------------------------------ | ------------------- |
+| `healthy`  | No alerts, last_seen < 120s                                                    | `"tier":"healthy"`  |
+| `warning`  | Any warning-severity alert (excluding port_allowlist-suppressed `public_port`) | `"tier":"warning"`  |
+| `critical` | Any critical-severity alert                                                    | `"tier":"critical"` |
+| `offline`  | last_seen > 120s                                                               | `"tier":"offline"`  |
 
 The monitoring endpoints must query `port_allowlist` and pass `allowedPorts` to `deriveHostStatus`, exactly as `fleet-status.ts` and `hosts.ts` already do. This ensures Dashboard and Uptime Kuma always agree on a host's tier.
 

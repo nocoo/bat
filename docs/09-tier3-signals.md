@@ -16,18 +16,18 @@ Netdata on jp.nocoo.cloud exposes ~700 charts consuming 237 MB RSS. 490 of those
 
 ### Gap analysis (Netdata vs bat-probe)
 
-| Signal | Netdata | bat-probe T1 | bat-probe T2 | Gap |
-|--------|---------|-------------|-------------|-----|
-| CPU per-state (user/system/nice/irq/softirq) | ✅ | ❌ aggregate only | — | Low priority (aggregate sufficient for alerting) |
-| **PSI pressure (cpu/mem/io)** | ✅ avg10/60/300 | ❌ | — | **Critical** — superior to load average |
-| **Disk I/O (IOPS, throughput)** | ✅ per-device | ❌ | — | **Critical** — biggest blind spot |
-| **TCP connection state** | ✅ established/tw/orphan | ❌ | listening ports | **High** — connection leak/DDoS signal |
-| Context switches + forks | ✅ | ❌ | — | Medium — available from existing `/proc/stat` read |
-| OOM kills | ✅ | ❌ | — | Medium — critical for small-memory VPS |
-| File descriptor usage | ✅ | ❌ | — | Low — near-zero read cost |
-| Memory breakdown (buffers/cached/slab) | ✅ | ❌ | — | Skip — `available_bytes` sufficient |
-| Per-process CPU/mem | ✅ (490 charts) | ❌ | — | Skip — O(n) scan, 120MB+ cost |
-| netfilter conntrack | ✅ | ❌ | — | Skip — niche, firewall tuning only |
+| Signal                                       | Netdata                  | bat-probe T1      | bat-probe T2    | Gap                                                |
+| -------------------------------------------- | ------------------------ | ----------------- | --------------- | -------------------------------------------------- |
+| CPU per-state (user/system/nice/irq/softirq) | ✅                       | ❌ aggregate only | —               | Low priority (aggregate sufficient for alerting)   |
+| **PSI pressure (cpu/mem/io)**                | ✅ avg10/60/300          | ❌                | —               | **Critical** — superior to load average            |
+| **Disk I/O (IOPS, throughput)**              | ✅ per-device            | ❌                | —               | **Critical** — biggest blind spot                  |
+| **TCP connection state**                     | ✅ established/tw/orphan | ❌                | listening ports | **High** — connection leak/DDoS signal             |
+| Context switches + forks                     | ✅                       | ❌                | —               | Medium — available from existing `/proc/stat` read |
+| OOM kills                                    | ✅                       | ❌                | —               | Medium — critical for small-memory VPS             |
+| File descriptor usage                        | ✅                       | ❌                | —               | Low — near-zero read cost                          |
+| Memory breakdown (buffers/cached/slab)       | ✅                       | ❌                | —               | Skip — `available_bytes` sufficient                |
+| Per-process CPU/mem                          | ✅ (490 charts)          | ❌                | —               | Skip — O(n) scan, 120MB+ cost                      |
+| netfilter conntrack                          | ✅                       | ❌                | —               | Skip — niche, firewall tuning only                 |
 
 ---
 
@@ -91,11 +91,11 @@ pub struct PsiMetrics {
 
 **Alert rules**:
 
-| # | Alert | Condition | Severity |
-|---|-------|-----------|----------|
-| 16 | CPU pressure | `cpu_some_avg60 > 25` for 5 min | warning |
-| 17 | Memory pressure | `mem_some_avg60 > 10` for 5 min | warning |
-| 18 | I/O pressure | `io_some_avg60 > 20` for 5 min | warning |
+| #   | Alert           | Condition                       | Severity |
+| --- | --------------- | ------------------------------- | -------- |
+| 16  | CPU pressure    | `cpu_some_avg60 > 25` for 5 min | warning  |
+| 17  | Memory pressure | `mem_some_avg60 > 10` for 5 min | warning  |
+| 18  | I/O pressure    | `io_some_avg60 > 20` for 5 min  | warning  |
 
 **File**: `probe/src/collectors/psi.rs`
 **Estimated lines**: ~60
@@ -104,7 +104,7 @@ pub struct PsiMetrics {
 
 ### 3.2 Disk I/O (Priority: Critical)
 
-**Why**: bat-probe tracks disk *space* but has zero visibility into disk *performance*. The docker.nocoo.cloud audit showed 30-34% iowait with no way to identify which device or whether the bottleneck was read vs write. This is the single largest observability gap.
+**Why**: bat-probe tracks disk _space_ but has zero visibility into disk _performance_. The docker.nocoo.cloud audit showed 30-34% iowait with no way to identify which device or whether the bottleneck was read vs write. This is the single largest observability gap.
 
 **Source**: `/proc/diskstats`
 
@@ -139,9 +139,9 @@ pub struct DiskIoMetric {
 
 **Alert rules**:
 
-| # | Alert | Condition | Severity |
-|---|-------|-----------|----------|
-| 19 | Disk I/O saturated | ANY device `io_util_pct > 80` for 5 min | warning |
+| #   | Alert              | Condition                               | Severity |
+| --- | ------------------ | --------------------------------------- | -------- |
+| 19  | Disk I/O saturated | ANY device `io_util_pct > 80` for 5 min | warning  |
 
 **File**: `probe/src/collectors/disk_io.rs`
 **Estimated lines**: ~80
@@ -150,7 +150,7 @@ pub struct DiskIoMetric {
 
 ### 3.3 TCP Connection State (Priority: High)
 
-**Why**: The T2 ports scan tells us what's *listening*, but not what's *connected*. A web server with 500 TIME_WAIT connections is leaking. A host with 0 ESTABLISHED and 50 orphaned connections is under attack. This is a 200-byte file read.
+**Why**: The T2 ports scan tells us what's _listening_, but not what's _connected_. A web server with 500 TIME_WAIT connections is leaking. A host with 0 ESTABLISHED and 50 orphaned connections is under attack. This is a 200-byte file read.
 
 **Source**: `/proc/net/sockstat`
 
@@ -179,9 +179,9 @@ pub struct TcpMetrics {
 
 **Alert rules**:
 
-| # | Alert | Condition | Severity |
-|---|-------|-----------|----------|
-| 20 | TCP connection leak | `time_wait > 500` for 5 min | warning |
+| #   | Alert               | Condition                   | Severity |
+| --- | ------------------- | --------------------------- | -------- |
+| 20  | TCP connection leak | `time_wait > 500` for 5 min | warning  |
 
 **File**: `probe/src/collectors/tcp.rs`
 **Estimated lines**: ~40
@@ -250,9 +250,9 @@ pub struct MemMetrics {
 
 **Alert rules**:
 
-| # | Alert | Condition | Severity |
-|---|-------|-----------|----------|
-| 21 | OOM kill detected | `oom_kills_delta > 0` | critical |
+| #   | Alert             | Condition             | Severity |
+| --- | ----------------- | --------------------- | -------- |
+| 21  | OOM kill detected | `oom_kills_delta > 0` | critical |
 
 **File**: `probe/src/collectors/memory.rs` (extend)
 **Estimated lines**: ~15 additional
@@ -291,14 +291,14 @@ pub struct FdMetrics {
 
 ## Excluded Signals (with rationale)
 
-| Signal | Netdata has it | Why excluded |
-|--------|---------------|--------------|
-| Per-process CPU/mem | ✅ 490 charts via apps.plugin | O(n) procfs scan per process. Needs setuid or `CAP_DAC_READ_SEARCH`. 120MB+ RSS. Noise ≫ signal for fleet monitoring. |
-| Memory breakdown (buffers/cached/slab) | ✅ | `available_bytes` already accounts for reclaimable pages. No additional alerting value. |
-| CPU per-state breakdown | ✅ user/system/nice/irq/softirq | Aggregate `usage_pct` is sufficient for alerting. Per-state is diagnostic noise at 30s resolution. |
-| netfilter conntrack | ✅ | Only useful for firewall tuning. No alerting value for fleet monitoring. |
-| Entropy | ✅ | Modern kernels (≥5.6) use CRNG, entropy pool is always full. Dead metric. |
-| Network errors/drops detail | ✅ per-type | Already collecting `rx_errors`/`tx_errors` aggregate in T1. Per-type breakdown (fifo, frame, compressed) is diagnostic noise. |
+| Signal                                 | Netdata has it                  | Why excluded                                                                                                                  |
+| -------------------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Per-process CPU/mem                    | ✅ 490 charts via apps.plugin   | O(n) procfs scan per process. Needs setuid or `CAP_DAC_READ_SEARCH`. 120MB+ RSS. Noise ≫ signal for fleet monitoring.         |
+| Memory breakdown (buffers/cached/slab) | ✅                              | `available_bytes` already accounts for reclaimable pages. No additional alerting value.                                       |
+| CPU per-state breakdown                | ✅ user/system/nice/irq/softirq | Aggregate `usage_pct` is sufficient for alerting. Per-state is diagnostic noise at 30s resolution.                            |
+| netfilter conntrack                    | ✅                              | Only useful for firewall tuning. No alerting value for fleet monitoring.                                                      |
+| Entropy                                | ✅                              | Modern kernels (≥5.6) use CRNG, entropy pool is always full. Dead metric.                                                     |
+| Network errors/drops detail            | ✅ per-type                     | Already collecting `rx_errors`/`tx_errors` aggregate in T1. Per-type breakdown (fifo, frame, compressed) is diagnostic noise. |
 
 ---
 
@@ -342,65 +342,65 @@ pub struct MetricsPayload {
 ```typescript
 // New interfaces
 export interface PsiMetrics {
-  cpu_some_avg10: number;
-  cpu_some_avg60: number;
-  cpu_some_avg300: number;
-  mem_some_avg10: number;
-  mem_some_avg60: number;
-  mem_some_avg300: number;
-  mem_full_avg10: number;
-  mem_full_avg60: number;
-  mem_full_avg300: number;
-  io_some_avg10: number;
-  io_some_avg60: number;
-  io_some_avg300: number;
-  io_full_avg10: number;
-  io_full_avg60: number;
-  io_full_avg300: number;
+	cpu_some_avg10: number;
+	cpu_some_avg60: number;
+	cpu_some_avg300: number;
+	mem_some_avg10: number;
+	mem_some_avg60: number;
+	mem_some_avg300: number;
+	mem_full_avg10: number;
+	mem_full_avg60: number;
+	mem_full_avg300: number;
+	io_some_avg10: number;
+	io_some_avg60: number;
+	io_some_avg300: number;
+	io_full_avg10: number;
+	io_full_avg60: number;
+	io_full_avg300: number;
 }
 
 export interface DiskIoMetric {
-  device: string;
-  read_iops: number;
-  write_iops: number;
-  read_bytes_sec: number;
-  write_bytes_sec: number;
-  io_util_pct: number;
+	device: string;
+	read_iops: number;
+	write_iops: number;
+	read_bytes_sec: number;
+	write_bytes_sec: number;
+	io_util_pct: number;
 }
 
 export interface TcpMetrics {
-  established: number;
-  time_wait: number;
-  orphan: number;
-  allocated: number;
+	established: number;
+	time_wait: number;
+	orphan: number;
+	allocated: number;
 }
 
 export interface FdMetrics {
-  allocated: number;
-  max: number;
+	allocated: number;
+	max: number;
 }
 
 // Extended existing interfaces
 export interface CpuMetrics {
-  // ... existing fields ...
-  context_switches_sec?: number;
-  forks_sec?: number;
-  procs_running?: number;
-  procs_blocked?: number;
+	// ... existing fields ...
+	context_switches_sec?: number;
+	forks_sec?: number;
+	procs_running?: number;
+	procs_blocked?: number;
 }
 
 export interface MemMetrics {
-  // ... existing fields ...
-  oom_kills_delta?: number;
+	// ... existing fields ...
+	oom_kills_delta?: number;
 }
 
 // Top-level payload additions
 export interface MetricsPayload {
-  // ... existing fields ...
-  psi?: PsiMetrics;
-  disk_io?: DiskIoMetric[];
-  tcp?: TcpMetrics;
-  fd?: FdMetrics;
+	// ... existing fields ...
+	psi?: PsiMetrics;
+	disk_io?: DiskIoMetric[];
+	tcp?: TcpMetrics;
+	fd?: FdMetrics;
 }
 ```
 
@@ -408,36 +408,72 @@ export interface MetricsPayload {
 
 ```json
 {
-  "probe_version": "0.3.0",
-  "host_id": "jp.nocoo.cloud",
-  "timestamp": 1773699670,
-  "interval": 30,
-  "cpu": {
-    "load1": 0.5, "load5": 0.3, "load15": 0.2,
-    "usage_pct": 2.0, "iowait_pct": 0.0, "steal_pct": 0.0, "count": 1,
-    "context_switches_sec": 889.9, "forks_sec": 7.1,
-    "procs_running": 1, "procs_blocked": 0
-  },
-  "mem": {
-    "total_bytes": 1085284352, "available_bytes": 113967104, "used_pct": 89.5,
-    "oom_kills_delta": 0
-  },
-  "swap": { "total_bytes": 1677709312, "used_bytes": 29360128, "used_pct": 1.7 },
-  "disk": [{ "mount": "/", "total_bytes": 21474836480, "avail_bytes": 15032385536, "used_pct": 30.0 }],
-  "net": [{ "iface": "eth0", "rx_bytes_rate": 1024.5, "tx_bytes_rate": 512.3, "rx_errors": 0, "tx_errors": 0 }],
-  "uptime_seconds": 2764800,
-  "psi": {
-    "cpu_some_avg10": 2.40, "cpu_some_avg60": 2.13, "cpu_some_avg300": 1.40,
-    "mem_some_avg10": 0.0, "mem_some_avg60": 0.0, "mem_some_avg300": 0.0,
-    "mem_full_avg10": 0.0, "mem_full_avg60": 0.0, "mem_full_avg300": 0.0,
-    "io_some_avg10": 0.0, "io_some_avg60": 0.01, "io_some_avg300": 0.0,
-    "io_full_avg10": 0.0, "io_full_avg60": 0.0, "io_full_avg300": 0.0
-  },
-  "disk_io": [
-    { "device": "sda", "read_iops": 0.0, "write_iops": 12.0, "read_bytes_sec": 0.0, "write_bytes_sec": 49152.0, "io_util_pct": 3.2 }
-  ],
-  "tcp": { "established": 6, "time_wait": 26, "orphan": 0, "allocated": 19 },
-  "fd": { "allocated": 1344, "max": 9223372036854775807 }
+	"probe_version": "0.3.0",
+	"host_id": "jp.nocoo.cloud",
+	"timestamp": 1773699670,
+	"interval": 30,
+	"cpu": {
+		"load1": 0.5,
+		"load5": 0.3,
+		"load15": 0.2,
+		"usage_pct": 2.0,
+		"iowait_pct": 0.0,
+		"steal_pct": 0.0,
+		"count": 1,
+		"context_switches_sec": 889.9,
+		"forks_sec": 7.1,
+		"procs_running": 1,
+		"procs_blocked": 0
+	},
+	"mem": {
+		"total_bytes": 1085284352,
+		"available_bytes": 113967104,
+		"used_pct": 89.5,
+		"oom_kills_delta": 0
+	},
+	"swap": { "total_bytes": 1677709312, "used_bytes": 29360128, "used_pct": 1.7 },
+	"disk": [
+		{ "mount": "/", "total_bytes": 21474836480, "avail_bytes": 15032385536, "used_pct": 30.0 }
+	],
+	"net": [
+		{
+			"iface": "eth0",
+			"rx_bytes_rate": 1024.5,
+			"tx_bytes_rate": 512.3,
+			"rx_errors": 0,
+			"tx_errors": 0
+		}
+	],
+	"uptime_seconds": 2764800,
+	"psi": {
+		"cpu_some_avg10": 2.4,
+		"cpu_some_avg60": 2.13,
+		"cpu_some_avg300": 1.4,
+		"mem_some_avg10": 0.0,
+		"mem_some_avg60": 0.0,
+		"mem_some_avg300": 0.0,
+		"mem_full_avg10": 0.0,
+		"mem_full_avg60": 0.0,
+		"mem_full_avg300": 0.0,
+		"io_some_avg10": 0.0,
+		"io_some_avg60": 0.01,
+		"io_some_avg300": 0.0,
+		"io_full_avg10": 0.0,
+		"io_full_avg60": 0.0,
+		"io_full_avg300": 0.0
+	},
+	"disk_io": [
+		{
+			"device": "sda",
+			"read_iops": 0.0,
+			"write_iops": 12.0,
+			"read_bytes_sec": 0.0,
+			"write_bytes_sec": 49152.0,
+			"io_util_pct": 3.2
+		}
+	],
+	"tcp": { "established": 6, "time_wait": 26, "orphan": 0, "allocated": 19 },
+	"fd": { "allocated": 1344, "max": 9223372036854775807 }
 }
 ```
 
@@ -447,28 +483,28 @@ export interface MetricsPayload {
 
 ### Resource Budget Impact
 
-| Resource | Before T3 | After T3 | Delta |
-|----------|----------|---------|-------|
-| File reads/tick | ~15 | ~22 | +7 (psi×3, diskstats×1, sockstat×1, vmstat×1, file-nr×1; ctxt/forks from existing /proc/stat) |
-| Payload size | ~800 bytes | ~1100 bytes | +300 bytes |
-| State (prev counters) | cpu_jiffies + net_counters | + disk_io_counters + oom_counter | ~200 bytes |
-| Code | ~4800 lines | ~5025 lines | +225 lines |
-| RSS | < 15 MB | < 15 MB | negligible |
-| CPU per tick | < 1ms | < 1.1ms | < 0.1ms |
+| Resource              | Before T3                  | After T3                         | Delta                                                                                         |
+| --------------------- | -------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
+| File reads/tick       | ~15                        | ~22                              | +7 (psi×3, diskstats×1, sockstat×1, vmstat×1, file-nr×1; ctxt/forks from existing /proc/stat) |
+| Payload size          | ~800 bytes                 | ~1100 bytes                      | +300 bytes                                                                                    |
+| State (prev counters) | cpu_jiffies + net_counters | + disk_io_counters + oom_counter | ~200 bytes                                                                                    |
+| Code                  | ~4800 lines                | ~5025 lines                      | +225 lines                                                                                    |
+| RSS                   | < 15 MB                    | < 15 MB                          | negligible                                                                                    |
+| CPU per tick          | < 1ms                      | < 1.1ms                          | < 0.1ms                                                                                       |
 
 ### Atomic Commits
 
-| # | Commit | Files | Verify | Status |
-|---|--------|-------|--------|--------|
-| 1 | `feat: add PSI pressure collector` | `collectors/psi.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse fixture, graceful None on missing | ✅ |
-| 2 | `feat: add disk I/O collector` | `collectors/disk_io.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse diskstats fixture, delta calc, partition filtering | ✅ |
-| 3 | `feat: add TCP connection state collector` | `collectors/tcp.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse sockstat fixture | ✅ |
-| 4 | `feat: extend CPU collector with ctxt/forks/procs` | `collectors/cpu.rs`, `payload.rs`, `orchestrate.rs` | `cargo test` — parse extended /proc/stat, delta ctxt/forks | ✅ |
-| 5 | `feat: add OOM kill counter to memory collector` | `collectors/memory.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse vmstat fixture, delta calc | ✅ |
-| 6 | `feat: add file descriptor usage collector` | `collectors/fd.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse file-nr fixture | ✅ |
-| 7 | `feat: add T3 worker ingest + D1 columns` | `packages/worker/`, `packages/shared/` | `bun test` — new columns accepted, old payloads still work | ✅ |
-| 8 | `feat: add T3 alert rules (#16-21)` | `packages/worker/src/services/alerts.ts` | `bun test` — PSI/disk IO/TCP/OOM alert evaluation | ✅ |
-| 9 | `feat: add T3 dashboard charts` | `packages/dashboard/` | Visual — PSI pressure, disk I/O, TCP connections | ✅ |
+| #   | Commit                                             | Files                                                              | Verify                                                                  | Status |
+| --- | -------------------------------------------------- | ------------------------------------------------------------------ | ----------------------------------------------------------------------- | ------ |
+| 1   | `feat: add PSI pressure collector`                 | `collectors/psi.rs`, `payload.rs`, `orchestrate.rs`, `main.rs`     | `cargo test` — parse fixture, graceful None on missing                  | ✅     |
+| 2   | `feat: add disk I/O collector`                     | `collectors/disk_io.rs`, `payload.rs`, `orchestrate.rs`, `main.rs` | `cargo test` — parse diskstats fixture, delta calc, partition filtering | ✅     |
+| 3   | `feat: add TCP connection state collector`         | `collectors/tcp.rs`, `payload.rs`, `orchestrate.rs`, `main.rs`     | `cargo test` — parse sockstat fixture                                   | ✅     |
+| 4   | `feat: extend CPU collector with ctxt/forks/procs` | `collectors/cpu.rs`, `payload.rs`, `orchestrate.rs`                | `cargo test` — parse extended /proc/stat, delta ctxt/forks              | ✅     |
+| 5   | `feat: add OOM kill counter to memory collector`   | `collectors/memory.rs`, `payload.rs`, `orchestrate.rs`, `main.rs`  | `cargo test` — parse vmstat fixture, delta calc                         | ✅     |
+| 6   | `feat: add file descriptor usage collector`        | `collectors/fd.rs`, `payload.rs`, `orchestrate.rs`, `main.rs`      | `cargo test` — parse file-nr fixture                                    | ✅     |
+| 7   | `feat: add T3 worker ingest + D1 columns`          | `packages/worker/`, `packages/shared/`                             | `bun test` — new columns accepted, old payloads still work              | ✅     |
+| 8   | `feat: add T3 alert rules (#16-21)`                | `packages/worker/src/services/alerts.ts`                           | `bun test` — PSI/disk IO/TCP/OOM alert evaluation                       | ✅     |
+| 9   | `feat: add T3 dashboard charts`                    | `packages/dashboard/`                                              | Visual — PSI pressure, disk I/O, TCP connections                        | ✅     |
 
 ### D1 Schema Additions
 
@@ -523,38 +559,38 @@ ALTER TABLE metrics_raw ADD COLUMN fd_max INTEGER;
 
 **Cross-reference checklist** (payload field → D1 column → alert dependency):
 
-| Payload field | D1 column | Alert |
-|---------------|-----------|-------|
-| `psi.cpu_some_avg60` | `psi_cpu_some_avg60` | #16 |
-| `psi.mem_some_avg60` | `psi_mem_some_avg60` | #17 |
-| `psi.io_some_avg60` | `psi_io_some_avg60` | #18 |
-| `disk_io[].io_util_pct` | `disk_io` (JSON) | #19 |
-| `tcp.time_wait` | `tcp_time_wait` | #20 |
-| `mem.oom_kills_delta` | `oom_kills` | #21 |
-| `psi.*` (all 15 fields) | 15 `psi_*` columns | dashboard charts |
-| `tcp.established` | `tcp_established` | dashboard |
-| `tcp.orphan` | `tcp_orphan` | dashboard |
-| `tcp.allocated` | `tcp_allocated` | dashboard |
-| `cpu.context_switches_sec` | `context_switches_sec` | diagnostic |
-| `cpu.forks_sec` | `forks_sec` | diagnostic |
-| `cpu.procs_running` | `procs_running` | diagnostic |
-| `cpu.procs_blocked` | `procs_blocked` | diagnostic |
-| `fd.allocated` | `fd_allocated` | dashboard |
-| `fd.max` | `fd_max` | dashboard |
+| Payload field              | D1 column              | Alert            |
+| -------------------------- | ---------------------- | ---------------- |
+| `psi.cpu_some_avg60`       | `psi_cpu_some_avg60`   | #16              |
+| `psi.mem_some_avg60`       | `psi_mem_some_avg60`   | #17              |
+| `psi.io_some_avg60`        | `psi_io_some_avg60`    | #18              |
+| `disk_io[].io_util_pct`    | `disk_io` (JSON)       | #19              |
+| `tcp.time_wait`            | `tcp_time_wait`        | #20              |
+| `mem.oom_kills_delta`      | `oom_kills`            | #21              |
+| `psi.*` (all 15 fields)    | 15 `psi_*` columns     | dashboard charts |
+| `tcp.established`          | `tcp_established`      | dashboard        |
+| `tcp.orphan`               | `tcp_orphan`           | dashboard        |
+| `tcp.allocated`            | `tcp_allocated`        | dashboard        |
+| `cpu.context_switches_sec` | `context_switches_sec` | diagnostic       |
+| `cpu.forks_sec`            | `forks_sec`            | diagnostic       |
+| `cpu.procs_running`        | `procs_running`        | diagnostic       |
+| `cpu.procs_blocked`        | `procs_blocked`        | diagnostic       |
+| `fd.allocated`             | `fd_allocated`         | dashboard        |
+| `fd.max`                   | `fd_max`               | dashboard        |
 
 ### Worker Aggregation
 
 Hourly rollup strategy for each new column family:
 
-| Columns | Aggregation | Rationale |
-|---------|-------------|-----------|
-| `psi_*` (15 cols) | `AVG()` + `MAX()` | Pressure is a percentage; avg shows sustained load, max shows spikes |
-| `disk_io` (JSON) | `AVG()` per device per field | Same as existing network rate aggregation |
-| `tcp_established`, `tcp_time_wait`, `tcp_orphan`, `tcp_allocated` | `AVG()` + `MAX()` | Gauge values; max catches connection spikes |
-| `context_switches_sec`, `forks_sec` | `AVG()` + `MAX()` | Rate values; max catches burst activity |
-| `procs_running`, `procs_blocked` | `AVG()` + `MAX()` | Gauge values |
-| `oom_kills` | `SUM()` | Counter delta; total kills per hour |
-| `fd_allocated`, `fd_max` | `AVG(fd_allocated)`, `MAX(fd_allocated)`, `LAST(fd_max)` | fd_max is static, only latest value needed |
+| Columns                                                           | Aggregation                                              | Rationale                                                            |
+| ----------------------------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------- |
+| `psi_*` (15 cols)                                                 | `AVG()` + `MAX()`                                        | Pressure is a percentage; avg shows sustained load, max shows spikes |
+| `disk_io` (JSON)                                                  | `AVG()` per device per field                             | Same as existing network rate aggregation                            |
+| `tcp_established`, `tcp_time_wait`, `tcp_orphan`, `tcp_allocated` | `AVG()` + `MAX()`                                        | Gauge values; max catches connection spikes                          |
+| `context_switches_sec`, `forks_sec`                               | `AVG()` + `MAX()`                                        | Rate values; max catches burst activity                              |
+| `procs_running`, `procs_blocked`                                  | `AVG()` + `MAX()`                                        | Gauge values                                                         |
+| `oom_kills`                                                       | `SUM()`                                                  | Counter delta; total kills per hour                                  |
+| `fd_allocated`, `fd_max`                                          | `AVG(fd_allocated)`, `MAX(fd_allocated)`, `LAST(fd_max)` | fd_max is static, only latest value needed                           |
 
 ### metrics_hourly Schema Additions
 
@@ -616,27 +652,27 @@ ALTER TABLE metrics_hourly ADD COLUMN fd_max INTEGER;  -- last sample (static va
 
 **Cross-reference** — hourly columns needed by long-range alert evaluation:
 
-| Alert | metrics_hourly column used | Query |
-|-------|--------------------------|-------|
-| #16 CPU pressure | `psi_cpu_some_avg60_max` | `MAX > 25` in sliding window |
-| #17 Memory pressure | `psi_mem_some_avg60_max` | `MAX > 10` in sliding window |
-| #18 I/O pressure | `psi_io_some_avg60_max` | `MAX > 10` in sliding window |
-| #19 Disk I/O saturated | `disk_io_json` → `io_util_pct_max` | per-device MAX > 80 |
-| #20 TCP connection leak | `tcp_time_wait_max` | `MAX > 500` in sliding window |
-| #21 OOM kill detected | `oom_kills_sum` | `SUM > 0` in any hour |
+| Alert                   | metrics_hourly column used         | Query                         |
+| ----------------------- | ---------------------------------- | ----------------------------- |
+| #16 CPU pressure        | `psi_cpu_some_avg60_max`           | `MAX > 25` in sliding window  |
+| #17 Memory pressure     | `psi_mem_some_avg60_max`           | `MAX > 10` in sliding window  |
+| #18 I/O pressure        | `psi_io_some_avg60_max`            | `MAX > 10` in sliding window  |
+| #19 Disk I/O saturated  | `disk_io_json` → `io_util_pct_max` | per-device MAX > 80           |
+| #20 TCP connection leak | `tcp_time_wait_max`                | `MAX > 500` in sliding window |
+| #21 OOM kill detected   | `oom_kills_sum`                    | `SUM > 0` in any hour         |
 
 ---
 
 ## New Alert Rules Summary
 
-| # | Alert | Condition | Severity | Semantics | Source |
-|---|-------|-----------|----------|-----------|--------|
-| 16 | CPU pressure | `psi.cpu_some_avg60 > 25` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/cpu` |
-| 17 | Memory pressure | `psi.mem_some_avg60 > 10` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/memory` |
-| 18 | I/O pressure | `psi.io_some_avg60 > 20` for 5 min | warning | Scalar — single value per sample | `/proc/pressure/io` |
-| 19 | Disk I/O saturated | **ANY** `disk_io[].io_util_pct > 80` for 5 min | warning | Array — iterate devices, fire on first match (same pattern as `disk_full` rule #3) | `/proc/diskstats` |
-| 20 | TCP connection leak | `tcp.time_wait > 500` for 5 min | warning | Scalar — single value per sample | `/proc/net/sockstat` |
-| 21 | OOM kill detected | `mem.oom_kills_delta > 0` (instant) | critical | Scalar — single value per sample | `/proc/vmstat` |
+| #   | Alert               | Condition                                      | Severity | Semantics                                                                          | Source                  |
+| --- | ------------------- | ---------------------------------------------- | -------- | ---------------------------------------------------------------------------------- | ----------------------- |
+| 16  | CPU pressure        | `psi.cpu_some_avg60 > 25` for 5 min            | warning  | Scalar — single value per sample                                                   | `/proc/pressure/cpu`    |
+| 17  | Memory pressure     | `psi.mem_some_avg60 > 10` for 5 min            | warning  | Scalar — single value per sample                                                   | `/proc/pressure/memory` |
+| 18  | I/O pressure        | `psi.io_some_avg60 > 20` for 5 min             | warning  | Scalar — single value per sample                                                   | `/proc/pressure/io`     |
+| 19  | Disk I/O saturated  | **ANY** `disk_io[].io_util_pct > 80` for 5 min | warning  | Array — iterate devices, fire on first match (same pattern as `disk_full` rule #3) | `/proc/diskstats`       |
+| 20  | TCP connection leak | `tcp.time_wait > 500` for 5 min                | warning  | Scalar — single value per sample                                                   | `/proc/net/sockstat`    |
+| 21  | OOM kill detected   | `mem.oom_kills_delta > 0` (instant)            | critical | Scalar — single value per sample                                                   | `/proc/vmstat`          |
 
 ### Alert #19 array semantics (detail)
 
@@ -645,17 +681,17 @@ ALTER TABLE metrics_hourly ADD COLUMN fd_max INTEGER;  -- last sample (static va
 ```typescript
 // Worker implementation pattern (same as disk_full):
 for (const device of payload.disk_io ?? []) {
-    if (device.io_util_pct > ALERT_THRESHOLDS.DISK_IO_UTIL_PCT) {
-        results.push({
-            ruleId: "disk_io_saturated",
-            fired: true,
-            severity: "warning",
-            value: device.io_util_pct,
-            message: `Disk ${device.device} I/O utilization at ${device.io_util_pct.toFixed(1)}%`,
-            durationSeconds: 300,
-        });
-        break; // One alert per host, report worst device
-    }
+	if (device.io_util_pct > ALERT_THRESHOLDS.DISK_IO_UTIL_PCT) {
+		results.push({
+			ruleId: "disk_io_saturated",
+			fired: true,
+			severity: "warning",
+			value: device.io_util_pct,
+			message: `Disk ${device.device} I/O utilization at ${device.io_util_pct.toFixed(1)}%`,
+			durationSeconds: 300,
+		});
+		break; // One alert per host, report worst device
+	}
 }
 ```
 

@@ -55,20 +55,20 @@ Replace Netdata (120-243MB RSS) across VPS hosts with a purpose-built monitoring
 
 ## Key Decisions
 
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Probe language | Rust | Single static binary, < 15MB RSS, < 10MB disk |
-| Transport | HTTPS POST JSON | CF Worker native, ~1KB/report, simple |
-| Auth (probe→worker) | BAT_WRITE_KEY | `Authorization: Bearer` on write routes only |
-| Auth (browser) | Cloudflare Access | Zero-trust, email allowlist, JWT verification at edge |
-| Auth (monitoring) | BAT_READ_KEY | `Authorization: Bearer` for machine read routes |
-| Server | CF Worker (Hono) + D1 | Single Worker serves API + SPA static assets |
-| Data retention | 7d raw + 90d hourly | ~17K rows/day raw, hourly cron aggregates + purges |
-| UI | Vite + React SPA | Built into Worker static assets, served at edge |
-| Design system | Basalt | 3-tier luminance, shadcn/ui, Recharts, 24-color chart palette |
-| Alerting | Tier 1/2/3 rules + health endpoint | Uptime Kuma polls `/api/live`. Rules in [03-data-structures.md](./03-data-structures.md) |
-| Monorepo | bun workspaces + Cargo | TS packages managed by bun, Rust probe by Cargo |
-| Deployment | CF Worker + D1 | Single deployment target, no separate hosting for UI |
+| Decision            | Choice                             | Rationale                                                                                |
+| ------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------- |
+| Probe language      | Rust                               | Single static binary, < 15MB RSS, < 10MB disk                                            |
+| Transport           | HTTPS POST JSON                    | CF Worker native, ~1KB/report, simple                                                    |
+| Auth (probe→worker) | BAT_WRITE_KEY                      | `Authorization: Bearer` on write routes only                                             |
+| Auth (browser)      | Cloudflare Access                  | Zero-trust, email allowlist, JWT verification at edge                                    |
+| Auth (monitoring)   | BAT_READ_KEY                       | `Authorization: Bearer` for machine read routes                                          |
+| Server              | CF Worker (Hono) + D1              | Single Worker serves API + SPA static assets                                             |
+| Data retention      | 7d raw + 90d hourly                | ~17K rows/day raw, hourly cron aggregates + purges                                       |
+| UI                  | Vite + React SPA                   | Built into Worker static assets, served at edge                                          |
+| Design system       | Basalt                             | 3-tier luminance, shadcn/ui, Recharts, 24-color chart palette                            |
+| Alerting            | Tier 1/2/3 rules + health endpoint | Uptime Kuma polls `/api/live`. Rules in [03-data-structures.md](./03-data-structures.md) |
+| Monorepo            | bun workspaces + Cargo             | TS packages managed by bun, Rust probe by Cargo                                          |
+| Deployment          | CF Worker + D1                     | Single deployment target, no separate hosting for UI                                     |
 
 ---
 
@@ -143,12 +143,12 @@ Connect extends this model with a separate server-bound Bearer surface at `https
 
 ### Three auth scopes
 
-| Scope | Mechanism | Who uses it | Routes |
-|-------|-----------|-------------|--------|
-| **Write** | `BAT_WRITE_KEY` (Bearer token) | Probe | `POST /api/ingest`, `POST /api/identity`, `POST /api/tier2` |
-| **Machine read** | `BAT_READ_KEY` (Bearer token) | Uptime Kuma | `GET /api/monitoring/*` |
-| **Browser** | Cloudflare Access JWT | Dashboard users | `GET /api/hosts`, `/api/alerts`, `/api/tags`, etc. |
-| **Public** | None | Anyone | `GET /api/live`, `GET /api/me` |
+| Scope            | Mechanism                      | Who uses it     | Routes                                                      |
+| ---------------- | ------------------------------ | --------------- | ----------------------------------------------------------- |
+| **Write**        | `BAT_WRITE_KEY` (Bearer token) | Probe           | `POST /api/ingest`, `POST /api/identity`, `POST /api/tier2` |
+| **Machine read** | `BAT_READ_KEY` (Bearer token)  | Uptime Kuma     | `GET /api/monitoring/*`                                     |
+| **Browser**      | Cloudflare Access JWT          | Dashboard users | `GET /api/hosts`, `/api/alerts`, `/api/tags`, etc.          |
+| **Public**       | None                           | Anyone          | `GET /api/live`, `GET /api/me`                              |
 
 Worker middleware (`entry-control.ts`) routes requests based on hostname:
 - Requests from `bat.hexly.ai` → Access JWT verification
@@ -184,11 +184,11 @@ Binaries (not `install.sh`) are on R2: `https://s.zhe.to/apps/bat/latest/bat-pro
 
 ### Resource budget
 
-| Metric | Target | How to verify |
-|--------|--------|---------------|
-| Probe RSS | < 15 MB | `cat /proc/$(pidof bat-probe)/status \| grep VmRSS` |
-| Probe binary | < 4 MB | `ls -lh bat-probe` (musl static) |
-| Probe CPU | < 0.1% idle | `top -p $(pidof bat-probe)` |
-| Network per probe | ~3 KB/min | `tcpdump` sample |
-| Worker latency | < 50ms ingest | Wrangler logs |
-| D1 rows/day | ~17,280 (6 hosts × 2/min × 1440 min) | `SELECT COUNT(*) FROM metrics_raw` |
+| Metric            | Target                               | How to verify                                       |
+| ----------------- | ------------------------------------ | --------------------------------------------------- |
+| Probe RSS         | < 15 MB                              | `cat /proc/$(pidof bat-probe)/status \| grep VmRSS` |
+| Probe binary      | < 4 MB                               | `ls -lh bat-probe` (musl static)                    |
+| Probe CPU         | < 0.1% idle                          | `top -p $(pidof bat-probe)`                         |
+| Network per probe | ~3 KB/min                            | `tcpdump` sample                                    |
+| Worker latency    | < 50ms ingest                        | Wrangler logs                                       |
+| D1 rows/day       | ~17,280 (6 hosts × 2/min × 1440 min) | `SELECT COUNT(*) FROM metrics_raw`                  |

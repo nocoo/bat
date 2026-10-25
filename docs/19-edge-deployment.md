@@ -37,10 +37,10 @@ A single Cloudflare Worker instance serves both the API and the SPA static asset
 
 ### Two endpoints, one Worker
 
-| Endpoint | Domain | Cloudflare Access | Purpose |
-|----------|--------|-------------------|---------|
-| Browser | `bat.hexly.ai` | Yes (email allowlist) | Dashboard UI + browser API |
-| Machine | `bat-ingest.worker.hexly.ai` | No | Probe writes, monitoring reads, public health |
+| Endpoint | Domain                       | Cloudflare Access     | Purpose                                       |
+| -------- | ---------------------------- | --------------------- | --------------------------------------------- |
+| Browser  | `bat.hexly.ai`               | Yes (email allowlist) | Dashboard UI + browser API                    |
+| Machine  | `bat-ingest.worker.hexly.ai` | No                    | Probe writes, monitoring reads, public health |
 
 Both domains are configured as custom domains in `wrangler.toml` and resolve to the same Worker deployment.
 
@@ -50,12 +50,12 @@ Both domains are configured as custom domains in `wrangler.toml` and resolve to 
 
 ### Three auth scopes
 
-| Scope | Mechanism | Who uses it | Routes |
-|-------|-----------|-------------|--------|
-| **Write** | `BAT_WRITE_KEY` (Bearer) | Probe | `POST /api/ingest`, `/api/identity`, `/api/tier2` |
-| **Machine read** | `BAT_READ_KEY` (Bearer) | Uptime Kuma | `GET /api/monitoring/*` |
-| **Browser** | Cloudflare Access JWT | Dashboard users | `GET /api/hosts`, `/api/alerts`, `/api/tags`, etc. |
-| **Public** | None | Anyone | `GET /api/live`, `GET /api/me` |
+| Scope            | Mechanism                | Who uses it     | Routes                                             |
+| ---------------- | ------------------------ | --------------- | -------------------------------------------------- |
+| **Write**        | `BAT_WRITE_KEY` (Bearer) | Probe           | `POST /api/ingest`, `/api/identity`, `/api/tier2`  |
+| **Machine read** | `BAT_READ_KEY` (Bearer)  | Uptime Kuma     | `GET /api/monitoring/*`                            |
+| **Browser**      | Cloudflare Access JWT    | Dashboard users | `GET /api/hosts`, `/api/alerts`, `/api/tags`, etc. |
+| **Public**       | None                     | Anyone          | `GET /api/live`, `GET /api/me`                     |
 
 ### Middleware chain
 
@@ -69,23 +69,23 @@ Request → entryControl → accessAuth → apiKeyAuth → Route handler
 
 First gate. Routes requests based on hostname:
 
-| Hostname pattern | Behavior |
-|-----------------|----------|
-| `localhost` / `127.0.0.1` / `*.dev.hexly.ai` | **Bypass** — local dev / E2E testing, no auth |
-| `bat-ingest.*` | **Whitelist mode** — only pre-approved method+path pairs pass; everything else → 403 |
-| Everything else (`bat.*`) | **Pass through** — browser endpoint, handled by accessAuth |
+| Hostname pattern                             | Behavior                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `localhost` / `127.0.0.1` / `*.dev.hexly.ai` | **Bypass** — local dev / E2E testing, no auth                                        |
+| `bat-ingest.*`                               | **Whitelist mode** — only pre-approved method+path pairs pass; everything else → 403 |
+| Everything else (`bat.*`)                    | **Pass through** — browser endpoint, handled by accessAuth                           |
 
 Machine endpoint whitelist:
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/api/ingest` | Probe metrics |
-| POST | `/api/identity` | Probe host identity |
-| POST | `/api/tier2` | Probe tier-2 checks |
-| POST | `/api/events` | Webhook event ingestion |
-| GET | `/api/monitoring/*` | Uptime Kuma reads (prefix match) |
-| GET | `/api/live` | Public health check |
-| GET | `/api/me` | Public user info |
+| Method | Path                | Purpose                          |
+| ------ | ------------------- | -------------------------------- |
+| POST   | `/api/ingest`       | Probe metrics                    |
+| POST   | `/api/identity`     | Probe host identity              |
+| POST   | `/api/tier2`        | Probe tier-2 checks              |
+| POST   | `/api/events`       | Webhook event ingestion          |
+| GET    | `/api/monitoring/*` | Uptime Kuma reads (prefix match) |
+| GET    | `/api/live`         | Public health check              |
+| GET    | `/api/me`           | Public user info                 |
 
 Any request to `bat-ingest.*` not matching this whitelist returns 403 immediately. This prevents the machine endpoint from being used to access browser-only routes.
 
@@ -134,10 +134,10 @@ Final auth layer. Enforces API key on machine routes, skips for browser users wh
 
 **Key scope separation**:
 
-| Key | Scope | Routes |
-|-----|-------|--------|
+| Key             | Scope            | Routes                                                                                             |
+| --------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
 | `BAT_WRITE_KEY` | Write operations | `POST /api/ingest`, `/api/identity`, `/api/tier2`, plus CRUD on webhooks, maintenance, tags, ports |
-| `BAT_READ_KEY` | Read operations | All GET routes on machine endpoint |
+| `BAT_READ_KEY`  | Read operations  | All GET routes on machine endpoint                                                                 |
 
 Cross-key usage is rejected: using a read key on a write route (or vice versa) returns a specific error message. Token is extracted from `Authorization: Bearer <token>`.
 
@@ -337,12 +337,12 @@ L2/L3 tests use local Miniflare D1 only (`--local` flag) — no remote test data
 
 ## Security Boundaries
 
-| Boundary | Enforcement | Fail mode |
-|----------|-------------|-----------|
-| Browser → API | Cloudflare Access JWT (edge) + Worker verification | 401/403 (fail-closed) |
-| Probe → API | Bearer token (BAT_WRITE_KEY) | 401 (no token) / 403 (wrong key) |
-| Monitoring → API | Bearer token (BAT_READ_KEY) | 401/403 |
-| Machine → browser routes | Entry control whitelist | 403 (blocked at first middleware) |
-| Cross-key usage | Scope separation in apiKeyAuth | Specific error message |
-| Missing env vars | Fail-closed check in accessAuth | 500 (not silent pass-through) |
-| SPA client-side routes | `not_found_handling = "single-page-application"` | Returns index.html (React Router handles) |
+| Boundary                 | Enforcement                                        | Fail mode                                 |
+| ------------------------ | -------------------------------------------------- | ----------------------------------------- |
+| Browser → API            | Cloudflare Access JWT (edge) + Worker verification | 401/403 (fail-closed)                     |
+| Probe → API              | Bearer token (BAT_WRITE_KEY)                       | 401 (no token) / 403 (wrong key)          |
+| Monitoring → API         | Bearer token (BAT_READ_KEY)                        | 401/403                                   |
+| Machine → browser routes | Entry control whitelist                            | 403 (blocked at first middleware)         |
+| Cross-key usage          | Scope separation in apiKeyAuth                     | Specific error message                    |
+| Missing env vars         | Fail-closed check in accessAuth                    | 500 (not silent pass-through)             |
+| SPA client-side routes   | `not_found_handling = "single-page-application"`   | Returns index.html (React Router handles) |
