@@ -1,7 +1,7 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { Cpu } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformCpuData } from "@/lib/transforms";
 import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
@@ -36,7 +36,7 @@ export function CpuChart({
 			<ChartHeader icon={Cpu} title="CPU" series={SERIES} />
 
 			<DashboardResponsiveContainer width="100%" height={256}>
-				<LineChart data={chartData}>
+				<AreaChart data={chartData}>
 					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
@@ -47,6 +47,7 @@ export function CpuChart({
 					/>
 					<YAxis
 						domain={[0, 100]}
+						allowDataOverflow
 						tickFormatter={(v: number) => `${v}%`}
 						axisLine={false}
 						tickLine={false}
@@ -65,18 +66,21 @@ export function CpuChart({
 						/>
 					))}
 					{SERIES.map((s) => (
-						<Line
+						<Area
 							key={s.key}
+							stackId="cpu"
 							type="monotone"
 							dataKey={s.key}
 							name={s.label}
 							stroke={s.color}
+							fill={s.color}
+							fillOpacity={0.3}
 							dot={false}
 							strokeWidth={s.width}
 							isAnimationActive={false}
 						/>
 					))}
-				</LineChart>
+				</AreaChart>
 			</DashboardResponsiveContainer>
 		</ChartCard>
 	);

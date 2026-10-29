@@ -1,7 +1,7 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { Cable } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformTcpData } from "@/lib/transforms";
 import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
@@ -36,7 +36,7 @@ export function TcpChart({
 			<ChartHeader icon={Cable} title="TCP Connections" series={SERIES} />
 
 			<DashboardResponsiveContainer width="100%" height={256}>
-				<LineChart data={chartData}>
+				<AreaChart data={chartData}>
 					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
@@ -46,7 +46,7 @@ export function TcpChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<YAxis axisLine={false} tickLine={false} tick={{ fill: chartAxis, fontSize: 11 }} />
-					<Tooltip content={<ChartTooltip />} />
+					<Tooltip content={<ChartTooltip valueFormatter={(value) => value.toLocaleString()} />} />
 					{mwAreas.map((area) => (
 						<ReferenceArea
 							key={`mw-${area.x1}`}
@@ -59,18 +59,21 @@ export function TcpChart({
 						/>
 					))}
 					{SERIES.map((s) => (
-						<Line
+						<Area
 							key={s.key}
+							stackId="tcp"
 							type="monotone"
 							dataKey={s.key}
 							name={s.label}
 							stroke={s.color}
+							fill={s.color}
+							fillOpacity={0.3}
 							dot={false}
 							strokeWidth={s.width}
 							isAnimationActive={false}
 						/>
 					))}
-				</LineChart>
+				</AreaChart>
 			</DashboardResponsiveContainer>
 		</ChartCard>
 	);
