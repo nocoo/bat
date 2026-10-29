@@ -31,17 +31,15 @@ import {
 	Eye,
 	EyeOff,
 	KeyRound,
-	LockKeyhole,
 	Pencil,
-	Plug,
 	Plus,
 	RefreshCw,
-	ShieldCheck,
 	Terminal,
 	Trash2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
+import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	connectDate,
@@ -349,11 +347,24 @@ export function ConnectPage() {
 			<div className="space-y-basalt-layout" data-bat-dirty={creating || !!action}>
 				<PageHeader
 					title="Connect"
-					description="Give your agents a secure connection to Bat."
 					actions={
-						<Badge variant="outline" className="gap-2">
-							<Plug className="size-3.5" aria-hidden="true" /> API v1
-						</Badge>
+						<Button
+							size="sm"
+							onClick={() => {
+								opener.current = document.activeElement as HTMLElement;
+								generation.current++;
+								setSecret(null);
+								setError("");
+								setName("");
+								setScope("read");
+								setExpiry("");
+								setServerIds([]);
+								setCreating(true);
+							}}
+							disabled={!servers.data || !tokens.data || !!loadError || busy}
+						>
+							<Plus className="size-4" aria-hidden="true" /> Create token
+						</Button>
 					}
 				/>
 				{(error || loadError) && (
@@ -374,49 +385,13 @@ export function ConnectPage() {
 					{notice && <Check className="size-4 text-basalt-success" aria-hidden="true" />}
 					{notice}
 				</div>
-				<LayerCard>
-					<LayerCard.Body>
-						<div className="flex items-start gap-4">
-							<div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-basalt-accent text-basalt-primary">
-								<ShieldCheck className="size-5" aria-hidden="true" />
-							</div>
-							<div>
-								<h2 className="text-basalt-base font-semibold">
-									One key. Your authorized servers.
-								</h2>
-								<p className="mt-1 max-w-lg text-basalt-base text-basalt-muted-foreground">
-									Choose which servers each key can access. Multiple keys can access the same
-									server, each with its own read or write permission.
-								</p>
-							</div>
-						</div>
-					</LayerCard.Body>
-				</LayerCard>
 				<div className="grid items-start gap-basalt-layout xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
 					<section aria-labelledby="tokens-heading" className="min-w-0 space-y-4">
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<div className="flex items-center gap-2">
-								<h2 id="tokens-heading" className="text-basalt-lg font-semibold tracking-tight">
-									Access tokens
-								</h2>
-								<Badge variant="secondary">{active} active</Badge>
-							</div>
-							<Button
-								onClick={() => {
-									opener.current = document.activeElement as HTMLElement;
-									generation.current++;
-									setSecret(null);
-									setError("");
-									setName("");
-									setScope("read");
-									setExpiry("");
-									setServerIds([]);
-									setCreating(true);
-								}}
-								disabled={!servers.data || !tokens.data || !!loadError || busy}
-							>
-								<Plus className="size-4" aria-hidden="true" /> Create token
-							</Button>
+						<div className="flex items-center gap-2">
+							<h2 id="tokens-heading" className="text-basalt-lg font-semibold tracking-tight">
+								Access tokens
+							</h2>
+							<Badge variant="secondary">{active} active</Badge>
 						</div>
 						{tokens.isLoading || servers.isLoading ? (
 							<LayerCard>
@@ -434,10 +409,9 @@ export function ConnectPage() {
 										strokeWidth={1.5}
 										aria-hidden="true"
 									/>
-									<h3 className="font-medium">Your next connection starts here</h3>
+									<h3 className="font-medium">No tokens yet</h3>
 									<p className="mt-2 max-w-xs text-basalt-base text-basalt-muted-foreground">
-										Create a token for an agent, script or integration. Select its authorized
-										servers and start with read access.
+										Create a token and select its authorized servers.
 									</p>
 								</LayerCard.Body>
 							</LayerCard>
@@ -617,7 +591,7 @@ export function ConnectPage() {
 								</div>
 								<SegmentControl
 									legend="Example format"
-									className="[&>legend]:sr-only"
+									className={INLINE_SEGMENT}
 									value={example}
 									onValueChange={(value) => setExample(value as "curl" | "agent")}
 									options={[
@@ -629,8 +603,8 @@ export function ConnectPage() {
 									{examples[example]}
 								</CodeBlock>
 								<p className="text-basalt-sm leading-relaxed text-basalt-muted-foreground">
-									Discover available operations at <code>/capabilities</code>. The machine-readable
-									contract is at <code>/openapi.json</code>. Both require your Bearer token.
+									<code>/capabilities</code> lists operations; <code>/openapi.json</code> provides
+									the API schema. Both require a Bearer token.
 								</p>
 								<a
 									className="inline-flex items-center gap-1.5 text-basalt-base font-medium underline-offset-4 hover:underline"
@@ -641,23 +615,6 @@ export function ConnectPage() {
 									API guide
 									<ArrowUpRight className="size-3.5" aria-hidden="true" />
 								</a>
-							</LayerCard.Body>
-						</LayerCard>
-						<LayerCard>
-							<LayerCard.Body className="space-y-3">
-								<div className="flex items-center gap-2">
-									<LockKeyhole className="size-4 text-basalt-muted-foreground" aria-hidden="true" />
-									<h2 className="text-basalt-base font-semibold">Keep access intentional</h2>
-								</div>
-								<p className="text-basalt-base leading-relaxed text-basalt-muted-foreground">
-									Tokens never expire by default. Anyone holding a key retains its access until you
-									revoke it. Set an expiry for temporary work.
-								</p>
-								<p className="text-basalt-base leading-relaxed text-basalt-muted-foreground">
-									Use one token per integration, keep it in a secret store, and prefer read access.
-									Reveals and changes are audited. Rotation invalidates the previous key
-									immediately.
-								</p>
 							</LayerCard.Body>
 						</LayerCard>
 					</aside>

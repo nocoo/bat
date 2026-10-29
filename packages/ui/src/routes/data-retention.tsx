@@ -2,9 +2,10 @@ import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
 import { SegmentControl } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, Check, Database } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
+import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings } from "@/hooks";
 
@@ -62,7 +63,7 @@ export function DataRetentionPage() {
 		<div className="space-y-basalt-layout max-w-4xl">
 			<PageHeader
 				title="Data Retention"
-				description="Configure how long monitoring data is stored. All metrics, snapshots, and events older than the selected window are automatically purged every hour."
+				description="Data outside this window is permanently deleted hourly."
 			/>
 
 			{/* Action error banner */}
@@ -74,22 +75,9 @@ export function DataRetentionPage() {
 
 			<LayerCard>
 				<LayerCard.Body>
-					<div className="flex items-start gap-3 mb-4">
-						<Database
-							className="h-5 w-5 text-basalt-muted-foreground mt-0.5 shrink-0"
-							strokeWidth={1.5}
-						/>
-						<div>
-							<p className="text-basalt-base font-medium">Retention Window</p>
-							<p className="text-basalt-sm text-basalt-muted-foreground mt-0.5">
-								Data older than this period will be permanently deleted.
-							</p>
-						</div>
-					</div>
-
 					<SegmentControl
 						legend="Retention window"
-						className="[&>legend]:sr-only"
+						className={INLINE_SEGMENT}
 						value={String(settings?.retention_days ?? "")}
 						onValueChange={(value) => handleChange(Number(value) as RetentionDays)}
 						disabled={saving}
