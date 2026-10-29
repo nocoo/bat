@@ -90,6 +90,7 @@ describe("host deletion and deliberate re-registration", () => {
 			INSERT INTO metrics_hourly(host_id, hour_ts, sample_count) VALUES ('${HOST}', 1, 1);
 			INSERT INTO tier2_snapshots(host_id, ts) VALUES ('${HOST}', 1);
 			INSERT INTO alert_states(host_id, rule_id, severity, triggered_at) VALUES ('${HOST}', 'cpu_high', 'warning', 1);
+			INSERT INTO alert_pending(host_id, rule_id, first_seen) VALUES ('${HOST}', 'iowait_high', 1);
 			INSERT INTO port_allowlist(host_id, port) VALUES ('${HOST}', 22);
 			INSERT INTO webhook_configs(id, host_id, token) VALUES (1, '${HOST}', 'secret');
 			INSERT INTO events(host_id, webhook_config_id, title, body, source_ip) VALUES ('${HOST}', 1, 'event', 'body', '127.0.0.1');
@@ -115,6 +116,7 @@ describe("host deletion and deliberate re-registration", () => {
 			"metrics_hourly",
 			"tier2_snapshots",
 			"alert_states",
+			"alert_pending",
 			"port_allowlist",
 			"host_tags",
 			"events",
@@ -163,6 +165,12 @@ describe("host deletion and deliberate re-registration", () => {
 	});
 
 	test("all ingest paths reject deletion and database triggers close stale-read races", async () => {
+		await db
+			.prepare(
+				"INSERT INTO alert_pending(host_id, rule_id, first_seen) VALUES (?, 'iowait_high', 1)",
+			)
+			.bind(HOST)
+			.run();
 		expect((await request(`/api/hosts/${HOST}`, "DELETE")).status).toBe(200);
 		const now = Math.floor(Date.now() / 1000);
 		const identity = {
@@ -198,11 +206,28 @@ describe("host deletion and deliberate re-registration", () => {
 			"INSERT INTO metrics_raw(host_id, ts) VALUES (?, 1)",
 			"INSERT INTO tier2_snapshots(host_id, ts) VALUES (?, 1)",
 			"INSERT INTO alert_states(host_id, rule_id, severity, triggered_at) VALUES (?, 'cpu_high', 'warning', 1)",
+			"INSERT INTO alert_pending(host_id, rule_id, first_seen) VALUES (?, 'iowait_high', 1)",
 		])
 			await expect(db.prepare(sql).bind(HOST).run()).rejects.toThrow("host_deleted");
 		expect((await request(`/api/hosts/${HOST}/register`, "POST")).status).toBe(200);
 		expect(await createD1Repositories(db).hosts.getActiveFlag(HOST)).toBeNull();
 		expect((await request("/api/identity", "POST", identity)).status).toBe(204);
+		metrics.cpu.iowait_pct = 50;
+		expect((await request("/api/ingest", "POST", metrics)).status).toBe(204);
+		expect(
+			await db
+				.prepare(
+					"SELECT first_seen FROM alert_pending WHERE host_id = ? AND rule_id = 'iowait_high'",
+				)
+				.bind(HOST)
+				.first("first_seen"),
+		).toBeGreaterThanOrEqual(now);
+		expect(
+			await db
+				.prepare("SELECT 1 FROM alert_states WHERE host_id = ? AND rule_id = 'iowait_high'")
+				.bind(HOST)
+				.first(),
+		).toBeNull();
 		expect(await createD1Repositories(db).hosts.isDeleted(HOST)).toBe(false);
 		expect(
 			await db

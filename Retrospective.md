@@ -1,5 +1,14 @@
 # Retrospective
 
+## 2026-10-29 - Include non-FK state in host deletion
+
+The first deletion implementation covered active alerts but omitted the separate
+duration-staging table, which has no host foreign key. Independent review caught
+the retained timers and the possibility of a concurrent ingest rewriting them.
+Inventory every host-keyed table, not only foreign keys; delete pending timers in
+the same transaction, guard delayed inserts with the tombstone, and verify that
+re-registration starts duration rules from a new first-seen timestamp.
+
 ## 2026-10-29 - Validate workspace setup before focused tests
 
 The first targeted Vitest invocation used the repository root with a package-local

@@ -61,6 +61,7 @@ export class D1HostsRepository implements HostsRepository {
 				"metrics_hourly",
 				"tier2_snapshots",
 				"alert_states",
+				"alert_pending",
 				"agents",
 				"assets",
 			].map((table) => this.db.prepare(`DELETE FROM ${table} WHERE host_id = ?`).bind(hostId)),

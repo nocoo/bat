@@ -23,4 +23,9 @@ WHEN EXISTS (SELECT 1 FROM deleted_hosts WHERE host_id = NEW.host_id) BEGIN
   SELECT RAISE(ABORT, 'host_deleted');
 END;
 
+CREATE TRIGGER deleted_host_pending BEFORE INSERT ON alert_pending
+WHEN EXISTS (SELECT 1 FROM deleted_hosts WHERE host_id = NEW.host_id) BEGIN
+  SELECT RAISE(ABORT, 'host_deleted');
+END;
+
 INSERT INTO _migrations(name) VALUES ('0030_host_deletion');
