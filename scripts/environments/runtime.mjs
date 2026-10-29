@@ -115,6 +115,8 @@ export function localConfig(path, identity, owner) {
 			CF_ACCESS_AUD: owner,
 			CF_ACCESS_LOCAL_JWKS: JSON.stringify({ keys: [identity.publicKey] }),
 			CONNECT_MANAGERS: "email:operator@example.test",
+			// Browser suites share one operator; keep the per-minute management budget from flaking them.
+			CONNECT_MANAGEMENT_RATE_LIMIT: "6000",
 			BAT_WRITE_KEY: identity.writeKey,
 			BAT_READ_KEY: identity.readKey,
 			CONNECT_TOKEN_KEYS: JSON.stringify({

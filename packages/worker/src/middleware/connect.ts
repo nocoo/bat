@@ -204,6 +204,16 @@ function isLocalAccessSession(c: Context<AppEnv>): boolean {
 	);
 }
 
+const MANAGEMENT_PER_MINUTE = 60;
+
+/** Local isolated runs may raise the per-principal management budget; production always uses the default. */
+function managementRateLimit(c: Context<AppEnv>, local: boolean): number {
+	const override = Number(c.env.CONNECT_MANAGEMENT_RATE_LIMIT);
+	return local && Number.isInteger(override) && override > MANAGEMENT_PER_MINUTE
+		? override
+		: MANAGEMENT_PER_MINUTE;
+}
+
 export async function connectManager(c: Context<AppEnv>, next: Next) {
 	const local = isLocalAccessSession(c);
 
@@ -242,7 +252,11 @@ export async function connectManager(c: Context<AppEnv>, next: Next) {
 	)
 		throw new ConnectFault(403, "server_forbidden", "You cannot manage this server.");
 	if (
-		!(await c.var.repos.connect.rate(`manager:${await fingerprint(principal)}`, 60, nowSeconds()))
+		!(await c.var.repos.connect.rate(
+			`manager:${await fingerprint(principal)}`,
+			managementRateLimit(c, local),
+			nowSeconds(),
+		))
 	)
 		throw new ConnectFault(
 			429,

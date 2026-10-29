@@ -17,6 +17,8 @@ export type Bindings = Pick<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_K
 		// request hits the handler.
 		CONNECT_TOKEN_KEYS?: string;
 		CONNECT_MANAGERS?: string;
+		/** Local development/E2E only: per-minute management request limit override. Ignored in production. */
+		CONNECT_MANAGEMENT_RATE_LIMIT?: string;
 		/** Internal execution state, overwritten at the public Worker entry. Never a request header. */
 		CONNECT_COORDINATED?: boolean;
 	};

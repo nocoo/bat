@@ -472,6 +472,24 @@ describe("Connect Access and request boundaries", () => {
 		expect((await f.management("/api/connect/servers")).status).toBe(429);
 	});
 
+	test("local management rate override only raises the per-minute budget", async () => {
+		const f = await connectFixture();
+		const setCount = (count: number) =>
+			f.db
+				.prepare("UPDATE connect_rate_windows SET count = ? WHERE key LIKE 'manager:%'")
+				.bind(count)
+				.run();
+		f.env.CONNECT_MANAGEMENT_RATE_LIMIT = "10";
+		expect((await f.management("/api/connect/servers")).status).toBe(200);
+		await setCount(30);
+		expect((await f.management("/api/connect/servers")).status).toBe(200);
+		f.env.CONNECT_MANAGEMENT_RATE_LIMIT = "100";
+		await setCount(60);
+		expect((await f.management("/api/connect/servers")).status).toBe(200);
+		await setCount(100);
+		expect((await f.management("/api/connect/servers")).status).toBe(429);
+	});
+
 	test("timeouts return structured outcomes and oversize responses are bounded", async () => {
 		const f = await connectFixture();
 		const read = await f.mint("read");

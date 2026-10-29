@@ -1,5 +1,13 @@
 # Changelog
 
+## v2.4.1
+
+### Fixed
+
+- Keep maintenance window input typed before the saved window finishes loading instead of clearing it.
+- Allow isolated local runs to raise the per-principal Connect management rate budget; production keeps 60 requests per minute.
+- Stabilize browser checks for the CI-hidden environment picker, mobile host card reflow and back-to-back Connect management flows.
+
 ## v2.4.0
 
 ### Fixed

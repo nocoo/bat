@@ -126,10 +126,20 @@ test.describe("Hosts list page", () => {
 					.toBe(true);
 			}
 			await page.setViewportSize({ width: 390, height: 844 });
-			const first = await cards.first().boundingBox();
-			const second = await cards.nth(1).boundingBox();
-			expect(first && second && second.y >= first.y + first.height).toBe(true);
-			expect(first && second && first.height > second.height).toBe(true);
+			// Resize reflows asynchronously; poll until the single-column layout settles.
+			await expect
+				.poll(() =>
+					cards.evaluateAll((elements) => {
+						const [first, second] = elements.map((element) => element.getBoundingClientRect());
+						return (
+							!!first &&
+							!!second &&
+							second.top >= first.bottom - 0.5 &&
+							first.height > second.height
+						);
+					}),
+				)
+				.toBe(true);
 		} finally {
 			expect(
 				(await page.request.put(path, { data: { tag_ids: tags.map((tag) => tag.id) } })).ok(),
