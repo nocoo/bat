@@ -9,8 +9,8 @@ import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
 const SERIES = [
-	{ key: "rx_rate", label: "Download", color: chart.lime },
-	{ key: "tx_rate", label: "Upload", color: chart.amber },
+	{ key: "rx_rate", label: "Inbound", color: chart.lime },
+	{ key: "tx_rate", label: "Outbound", color: chart.amber },
 ] as const;
 
 export function NetworkChart({

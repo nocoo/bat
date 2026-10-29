@@ -469,6 +469,23 @@ describe("GET /api/hosts cache wiring (Task #17 T4)", () => {
 		expect(calls.puts).toBe(1);
 	});
 
+	test("cached overview cannot resurrect a deleted host", async () => {
+		const { kv } = makeKv();
+		const db = createMockD1();
+		await db
+			.prepare(
+				"INSERT INTO hosts(host_id, hostname, last_seen) VALUES ('cached-host', 'cached', 1)",
+			)
+			.run();
+		const app = createProdApp(db, kv);
+		expect(await (await get(app)).json()).toHaveLength(1);
+		await createD1Repositories(db).hosts.deleteHost("cached-host", 2);
+		const response = await get(app);
+		expect(response.headers.get("X-Bat-Cache")).toBe("hit");
+		expect(response.headers.get("Cache-Control")).toBe("no-store");
+		expect(await response.json()).toEqual([]);
+	});
+
 	test("cache is bypassed when ENVIRONMENT is not production (default test app)", async () => {
 		const { kv, calls } = makeKv();
 		const db = createMockD1();

@@ -1,6 +1,10 @@
 // Pure formatting helpers for the host-detail page.
 import { formatCpuTopology } from "./host-card-format";
 
+export function hasRecentUpload(lastSeen: number, now = Date.now() / 1000): boolean {
+	return Number.isFinite(lastSeen) && lastSeen > 0 && now - lastSeen <= 300;
+}
+
 /** Format CPU label — e.g. "AMD EPYC 7763 (4 cores, 8 threads)". */
 export function formatCpuLabel(
 	model: string | null | undefined,

@@ -1,5 +1,25 @@
 import { describe, expect, test } from "vitest";
-import { capitalizeVirt, formatBootTime, formatCpuLabel } from "./host-detail-format";
+import {
+	capitalizeVirt,
+	formatBootTime,
+	formatCpuLabel,
+	hasRecentUpload,
+} from "./host-detail-format";
+
+describe("hasRecentUpload", () => {
+	test("treats the last five minutes and future timestamps conservatively as recent", () => {
+		expect(hasRecentUpload(1000, 1000)).toBe(true);
+		expect(hasRecentUpload(700, 1000)).toBe(true);
+		expect(hasRecentUpload(1001, 1000)).toBe(true);
+		expect(hasRecentUpload(Date.now() / 1000)).toBe(true);
+	});
+
+	test("does not label stale or missing timestamps as recent", () => {
+		expect(hasRecentUpload(699, 1000)).toBe(false);
+		expect(hasRecentUpload(0, 1000)).toBe(false);
+		expect(hasRecentUpload(Number.NaN, 1000)).toBe(false);
+	});
+});
 
 describe("formatCpuLabel", () => {
 	test("model + cores+threads", () => {

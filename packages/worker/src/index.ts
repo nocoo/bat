@@ -65,6 +65,7 @@ import { fleetStatusRoute } from "./routes/fleet-status.js";
 import { agentsHeartbeatRoute } from "./routes/heartbeat.js";
 import { hostDescriptionPatchRoute } from "./routes/host-description.js";
 import { hostDetailRoute } from "./routes/host-detail.js";
+import { hostDeleteRoute, hostRegisterRoute } from "./routes/host-lifecycle.js";
 import { hostsListRoute } from "./routes/hosts.js";
 import { identityRoute } from "./routes/identity.js";
 import { ingestRoute } from "./routes/ingest.js";
@@ -139,6 +140,8 @@ app.use("/api/*", (c, next) =>
 );
 
 app.onError((error, c) => {
+	if (error.message.includes("host_deleted"))
+		return c.json({ error: "Host is deleted; browser re-registration is required" }, 403);
 	if (c.env?.ENVIRONMENT === "development") c.header("X-Bat-Diagnostic", errorCategory(error));
 	if (isConnectPath(c.req.path)) return connectError(c, error);
 	// Never log request bodies, authorization headers or exception SQL bindings.
@@ -198,6 +201,8 @@ app.get("/api/hosts/:id/allowed-ports", hostAllowedPortsListRoute);
 app.post("/api/hosts/:id/allowed-ports", hostAllowedPortsAddRoute);
 app.patch("/api/hosts/:id/description", hostDescriptionPatchRoute);
 app.get("/api/hosts/:id", hostDetailRoute);
+app.delete("/api/hosts/:id", hostDeleteRoute);
+app.post("/api/hosts/:id/register", hostRegisterRoute);
 app.get("/api/alerts", alertsListRoute);
 app.get("/api/events", eventsListRoute);
 app.get("/api/fleet/status", fleetStatusRoute);

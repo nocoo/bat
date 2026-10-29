@@ -20,7 +20,12 @@ test.describe("Data Retention page", () => {
 		await expect(page.getByRole("heading", { name: "Data Retention", level: 1 })).toBeVisible({
 			timeout: 15_000,
 		});
-		await expect(page.getByText("Configure how long monitoring data")).toBeVisible();
+		await expect(
+			page.getByText("Data outside this window is permanently deleted hourly."),
+		).toBeVisible();
+		await expect(
+			page.getByText("Data older than this period will be permanently deleted."),
+		).toHaveCount(0);
 	});
 
 	test("shows retention radios with proper labels", async ({ page }) => {

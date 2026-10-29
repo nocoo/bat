@@ -12,18 +12,20 @@
 
 ## Route Table
 
-| Route                    | Auth      | Method | Purpose                                                                    |
-| ------------------------ | --------- | ------ | -------------------------------------------------------------------------- |
-| `/api/ingest`            | Write Key | POST   | Receive Tier-1 metrics, evaluate alerts                                    |
-| `/api/identity`          | Write Key | POST   | Receive/update host identity                                               |
-| `/api/tier2`             | Write Key | POST   | Receive Tier-2 snapshot (ports, systemd, security, docker, disk, software) |
-| `/api/hosts`             | Read Key  | GET    | List active hosts with latest status (`is_active = 1`)                     |
-| `/api/hosts/:id`         | Read Key  | GET    | Single host detail (identity + latest metrics + alert state)               |
-| `/api/hosts/:id/metrics` | Read Key  | GET    | Query metrics (`?from=&to=`, auto raw/hourly)                              |
-| `/api/hosts/:id/tier2`   | Read Key  | GET    | Latest Tier-2 snapshot for a host                                          |
-| `/api/alerts`            | Read Key  | GET    | List all active alerts across all hosts                                    |
-| `/api/health`            | Public    | GET    | Overall health (200/degraded/503) for Uptime Kuma                          |
-| `/api/live`              | Public    | GET    | Liveness check + version                                                   |
+| Route                     | Auth           | Method | Purpose                                                                    |
+| ------------------------- | -------------- | ------ | -------------------------------------------------------------------------- |
+| `/api/ingest`             | Write Key      | POST   | Receive Tier-1 metrics, evaluate alerts                                    |
+| `/api/identity`           | Write Key      | POST   | Receive/update host identity                                               |
+| `/api/tier2`              | Write Key      | POST   | Receive Tier-2 snapshot (ports, systemd, security, docker, disk, software) |
+| `/api/hosts`              | Read Key       | GET    | List active hosts with latest status (`is_active = 1`)                     |
+| `/api/hosts/:id`          | Read Key       | GET    | Single host detail (identity + latest metrics + alert state)               |
+| `/api/hosts/:id`          | Browser Access | DELETE | Permanently delete with exact `confirm_host_id`; block subsequent ingest   |
+| `/api/hosts/:id/register` | Browser Access | POST   | Explicitly clear a deleted raw host ID for fresh probe onboarding          |
+| `/api/hosts/:id/metrics`  | Read Key       | GET    | Query metrics (`?from=&to=`, auto raw/hourly)                              |
+| `/api/hosts/:id/tier2`    | Read Key       | GET    | Latest Tier-2 snapshot for a host                                          |
+| `/api/alerts`             | Read Key       | GET    | List all active alerts across all hosts                                    |
+| `/api/health`             | Public         | GET    | Overall health (200/degraded/503) for Uptime Kuma                          |
+| `/api/live`               | Public         | GET    | Liveness check + version                                                   |
 
 ---
 

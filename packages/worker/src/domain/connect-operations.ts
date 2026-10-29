@@ -434,7 +434,7 @@ export const CONNECT_UNSUPPORTED = [
 	{
 		feature: "host.delete_or_retire",
 		reason:
-			"Bat has no product operation for deleting/retiring hosts. DELETE on a server returns 501.",
+			"Host deletion and re-registration require the Access-protected dashboard. Connect DELETE on a server returns 501.",
 	},
 	{
 		feature: "remote_shell_or_software_install",

@@ -6,7 +6,7 @@ import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
-import { patchAPI } from "@/api";
+import { ApiError, patchAPI } from "@/api";
 import {
 	CpuChart,
 	DiskBars,
@@ -19,9 +19,11 @@ import {
 } from "@/components/charts";
 import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
+import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
+import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
@@ -89,12 +91,13 @@ export function HostDetailPage() {
 	const from = now - rangeSeconds;
 
 	const { data: hosts } = useHosts();
-	const { data: detail, mutate: mutateDetail } = useHostDetail(hid);
+	const { data: detail, error: detailError, mutate: mutateDetail } = useHostDetail(hid);
 	const { data: alerts } = useAlerts();
 	const { data: metricsResponse, isLoading: metricsLoading } = useHostMetrics(hid, from, now);
 	const { data: tier2 } = useHostTier2(hid);
 
-	const host = hosts?.find((h) => hashHostId(h.host_id) === hid);
+	const host =
+		hosts?.find((item) => item.host_id === hid || hashHostId(item.host_id) === hid) ?? detail;
 
 	const handleDescriptionSaved = useCallback(
 		(desc: string | null) => {
@@ -105,43 +108,72 @@ export function HostDetailPage() {
 		[detail, mutateDetail],
 	);
 
+	if (detailError instanceof ApiError && detailError.status === 404) {
+		return (
+			<div className="space-y-basalt-layout">
+				<PageHeader
+					title="Host not found"
+					description="This host was deleted or is no longer available."
+				/>
+				<Button asChild variant="outline">
+					<Link to="/hosts">
+						<ArrowLeft aria-hidden="true" />
+						Back to hosts
+					</Link>
+				</Button>
+			</div>
+		);
+	}
+
 	return (
-		<div className="space-y-6">
+		<div className="space-y-basalt-layout">
 			{/* Header */}
-			<div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-basalt-layout-sm">
-				<Button asChild={true} variant="ghost" size="icon">
+			<div
+				className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-basalt-space-lg"
+				data-testid="host-detail-header"
+			>
+				<Button
+					asChild={true}
+					variant="ghost"
+					size="icon"
+					className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
+				>
 					<Link to="/hosts" aria-label="Back to hosts">
 						<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
 					</Link>
 				</Button>
-				<PageHeader
-					title={host?.hostname ?? hid}
-					description={
-						host ? (
-							<span className="inline-flex items-center gap-2 mt-1">
-								<StatusBadge status={host.status} />
-								<span className="text-basalt-base text-basalt-muted-foreground">
-									Real-time metrics, system specifications, and services.
-								</span>
-							</span>
-						) : (
-							"Real-time metrics, system specifications, and services."
-						)
-					}
-					actions={
-						<SegmentControl
-							legend="Time range"
-							className="[&>legend]:sr-only"
-							value={String(rangeSeconds)}
-							onValueChange={(value) => setRangeSeconds(Number(value))}
-							options={TIME_RANGES.map(({ label, seconds }) => ({ label, value: String(seconds) }))}
+				<div className="min-w-0 space-y-basalt-space-sm">
+					<div className="flex min-w-0 flex-wrap items-center justify-between gap-basalt-space-lg">
+						<div className="flex min-w-0 basis-full flex-wrap items-center gap-basalt-space-lg xl:basis-auto xl:flex-1 [&>[data-testid=status-badge]]:h-basalt-control-sm">
+							<div className="min-w-0 max-w-full">
+								<PageHeader title={host?.hostname ?? hid} />
+							</div>
+							{host && <StatusBadge status={host.status} />}
+							{host && <HostTagsPanel key={host.host_id} hostId={host.host_id} />}
+						</div>
+						<div className="flex min-w-0 max-w-full items-center gap-basalt-space-sm">
+							<SegmentControl
+								legend="Time range"
+								className={INLINE_SEGMENT}
+								value={String(rangeSeconds)}
+								onValueChange={(value) => setRangeSeconds(Number(value))}
+								options={TIME_RANGES.map(({ label, seconds }) => ({
+									label,
+									value: String(seconds),
+								}))}
+							/>
+							{host && <HostDeleteDialog key={host.host_id} host={host} routeId={hid} />}
+						</div>
+					</div>
+					{detail && (
+						<DescriptionEditor
+							hid={hid}
+							value={detail.description}
+							onSaved={handleDescriptionSaved}
 						/>
-					}
-				/>
+					)}
+				</div>
 			</div>
-			{detail && (
-				<DescriptionEditor hid={hid} value={detail.description} onSaved={handleDescriptionSaved} />
-			)}
 
 			{/* Metrics — simplified for now */}
 			{metricsLoading && !metricsResponse ? (
@@ -238,7 +270,6 @@ export function HostDetailPage() {
 								</LayerCard.Body>
 							</LayerCard>
 						)}
-						{host && <HostTagsPanel hostId={host.host_id} />}
 						{host && <MaintenancePanel hostId={host.host_id} />}
 						{host && (
 							<AllowedPortsPanel

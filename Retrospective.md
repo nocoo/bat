@@ -1,5 +1,31 @@
 # Retrospective
 
+## 2026-10-29 - Keep lockfile updates limited to versions
+
+An offline Bun install using the machine's mirror rewrote package tarball URLs
+while synchronizing workspace versions. The dependency graph was unchanged, so
+the unrelated mirror URL churn was removed and the four workspace-version edits
+were verified with a frozen offline install. Review lockfile diffs before staging
+and do not publish machine-specific registry rewrites with a product version bump.
+
+## 2026-10-29 - Include non-FK state in host deletion
+
+The first deletion implementation covered active alerts but omitted the separate
+duration-staging table, which has no host foreign key. Independent review caught
+the retained timers and the possibility of a concurrent ingest rewriting them.
+Inventory every host-keyed table, not only foreign keys; delete pending timers in
+the same transaction, guard delayed inserts with the tombstone, and verify that
+re-registration starts duration rules from a new first-seen timestamp.
+
+## 2026-10-29 - Validate workspace setup before focused tests
+
+The first targeted Vitest invocation used the repository root with a package-local
+configuration, so its relative include matched no tests. The next invocation
+reached the suite but the fresh checkout had not built `@bat/shared`. Build the
+shared workspace first and run focused suites from their package directory.
+An initial deletion fixture also assumed a webhook `name` column that does not
+exist; use the actual migration schema when seeding relationship tests.
+
 Accident narratives for this repo.
 
 Routing: narrative stays here. A project-specific rule that will recur may become one line in `AGENTS.md`. Cross-project lessons go to nmem or a global rule. If it can be checked by a machine, add a hook or test instead of prose.
@@ -225,3 +251,13 @@ weak capture. The chart grid column now has `min-w-0`, keeping scrolling inside
 the standard Table. A populated two-process browser fixture checks mobile width,
 sorting and filtering; visual checks wait for rows, chart and editor content
 before testing overflow and capture the scrolled editors and active tooltip.
+
+## 2026-10-29 - Bind chart grids to explicit axes
+
+The Disk I/O dual-axis conversion assigned named axes to every series and
+maintenance overlay but left CartesianGrid on its default axis. Recharts used
+an implicit axis, dropping the interior IOPS grid lines. The initial browser
+check only compared the outer grid bounds, so it missed the defect. Review
+caught it before push. Bind the grid to the IOPS axis and verify that every
+interior left-axis tick has an aligned horizontal grid line. The new assertion
+failed against the original build before the binding fix.

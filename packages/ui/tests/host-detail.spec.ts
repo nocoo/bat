@@ -3,6 +3,14 @@ import { expect, test } from "@playwright/test";
 test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
 
+	test("network legend uses inbound and outbound labels", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		const networkHeader = page.getByText("Network", { exact: true }).locator("..");
+		await expect(networkHeader.getByText("Inbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText("Outbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText(/^(Download|Upload)$/)).toHaveCount(0);
+	});
+
 	test("sidebar navigation is present", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
@@ -41,7 +49,7 @@ test.describe("Host detail page", () => {
 		});
 	});
 
-	test("back control sits left of the title and subtitle and returns to Hosts", async ({
+	test("back control sits left of the title and editable description and returns to Hosts", async ({
 		page,
 	}) => {
 		await page.goto(`/hosts/${alphaHid}`);
@@ -53,11 +61,11 @@ test.describe("Host detail page", () => {
 			await page.setViewportSize({ width, height: 900 });
 			const button = await back.boundingBox();
 			const heading = await title.boundingBox();
-			const subtitle = await page
-				.getByText("Real-time metrics, system specifications, and services.", { exact: true })
+			const description = await page
+				.getByRole("group", { name: "Host description", exact: true })
 				.boundingBox();
 			expect(button && heading && button.x + button.width < heading.x).toBe(true);
-			expect(button && subtitle && button.x + button.width < subtitle.x).toBe(true);
+			expect(button && description && button.x + button.width < description.x).toBe(true);
 			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 				true,
 			);

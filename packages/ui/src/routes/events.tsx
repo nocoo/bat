@@ -82,7 +82,7 @@ export function EventsPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : !events || events.length === 0 ? (
-		<div className="space-y-4">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Events"
 				description="Audit timeline of webhook triggers, deployments, and host events."
@@ -96,7 +96,7 @@ export function EventsPage() {
 			</div>
 		</div>
 	) : (
-		<div className="space-y-4">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Events"
 				description="Audit timeline of webhook triggers, deployments, and host events."

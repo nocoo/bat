@@ -69,7 +69,8 @@ test.describe("Connect private credential management", () => {
 		const bounds = await header.boundingBox();
 		expect(bounds?.x).toBe(hostsLeft);
 		expect(bounds?.width).toBe(availableWidth);
-		await expect(header.getByText("API v1", { exact: true })).toBeVisible();
+		await expect(header.getByRole("button", { name: "Create token", exact: true })).toBeVisible();
+		await expect(header.getByText("API v1", { exact: true })).toHaveCount(0);
 		await page.setViewportSize({ width: 390, height: 844 });
 		await expect(page.getByRole("button", { name: "Create token", exact: true })).toBeVisible();
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

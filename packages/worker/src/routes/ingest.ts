@@ -125,6 +125,8 @@ export async function ingestRoute(c: Context<AppEnv>) {
 	}
 
 	const repos = c.var.repos;
+	if (await repos.hosts.isDeleted(body.host_id))
+		return c.json({ error: "Host is deleted; browser re-registration is required" }, 403);
 
 	// Single SELECT covers retired check, maintenance window, and host existence.
 	const existing = await repos.hosts.getActiveAndMaintenance(body.host_id, {

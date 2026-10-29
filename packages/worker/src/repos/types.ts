@@ -45,6 +45,9 @@ import type { ConnectProductsRepository } from "./connect-products.js";
  * which composes both repos' SQL into a single `db.batch` for atomicity.
  */
 export interface HostsRepository {
+	isDeleted(hostId: string): Promise<boolean>;
+	deleteHost(hostId: string, nowSeconds: number): Promise<void>;
+	registerHost(hostId: string): Promise<boolean>;
 	/** SELECT 1 — used by `/api/live` to confirm the binding is reachable. */
 	probe(): Promise<void>;
 

@@ -42,7 +42,7 @@ export function SetupPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-6 max-w-3xl">
+		<div className="space-y-basalt-layout max-w-3xl">
 			<PageHeader
 				title="Install Probe"
 				description="Deploy the monitoring probe on your Linux servers."

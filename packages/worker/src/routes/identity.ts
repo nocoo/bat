@@ -75,6 +75,8 @@ export async function identityRoute(c: Context<AppEnv>) {
 	}
 
 	const repos = c.var.repos;
+	if (await repos.hosts.isDeleted(body.host_id))
+		return c.json({ error: "Host is deleted; browser re-registration is required" }, 403);
 
 	// Check if host is retired
 	const existing = await repos.hosts.getActiveFlag(body.host_id, { kv: c.env.BAT_KV });
