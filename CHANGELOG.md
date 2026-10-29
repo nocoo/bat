@@ -11,12 +11,15 @@
 - Permanently delete hosts from the dashboard with two-step exact-ID confirmation and a prominent recent-upload warning.
 - Atomically remove host data and related credentials, grants and bindings; block probe recreation with a persistent tombstone until explicit browser re-registration.
 - Verify deletion, probe rejection, re-registration, metadata editing and responsive layouts with isolated API and browser tests.
+- Show CPU and TCP state as stacked area charts, and Disk I/O as stacked read/write IOPS with a utilization line.
 
 ### Changed
 
 - Move editable host descriptions and tag management into the detail header, including hosts without metrics.
 - Compact dashboard chrome, cards, tables and forms with Basalt tokens and giraffe-inspired spacing, preserving Bat branding.
 - Add migration 0030 for deletion tombstones and race-safe ingestion guards; apply it before deploying dependent Worker code.
+- Compact host header controls into one band and rename network traffic labels.
+- Remove the Connect marketing banner and align Connect and Retention actions with the shared page header.
 
 ## v2.3.6
 
