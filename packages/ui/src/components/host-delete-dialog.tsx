@@ -38,9 +38,13 @@ export function HostDeleteDialog({ host, routeId }: { host: HostOverviewItem; ro
 	return (
 		<AlertDialog open={open} onOpenChange={changeOpen}>
 			<AlertDialogTrigger asChild>
-				<Button variant="outline" className="text-basalt-destructive">
+				<Button
+					variant="destructive"
+					size="icon"
+					className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
+					aria-label="Delete host"
+				>
 					<Trash2 aria-hidden="true" />
-					Delete host
 				</Button>
 			</AlertDialogTrigger>
 			<AlertDialogContent

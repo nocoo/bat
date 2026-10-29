@@ -23,6 +23,7 @@ import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
+import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
@@ -131,32 +132,29 @@ export function HostDetailPage() {
 				className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-basalt-space-lg"
 				data-testid="host-detail-header"
 			>
-				<Button asChild={true} variant="ghost" size="icon">
+				<Button
+					asChild={true}
+					variant="ghost"
+					size="icon"
+					className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
+				>
 					<Link to="/hosts" aria-label="Back to hosts">
 						<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
 					</Link>
 				</Button>
-				<div className="min-w-0 space-y-basalt-space-lg">
-					<div className="grid items-start gap-basalt-space-lg xl:grid-cols-[minmax(0,1fr)_auto]">
-						<div className="min-w-0 space-y-basalt-space-sm">
-							<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-lg">
-								<div className="min-w-0 max-w-full">
-									<PageHeader title={host?.hostname ?? hid} />
-								</div>
-								{host && <StatusBadge status={host.status} />}
+				<div className="min-w-0 space-y-basalt-space-sm">
+					<div className="flex min-w-0 flex-wrap items-center justify-between gap-basalt-space-lg">
+						<div className="flex min-w-0 basis-full flex-wrap items-center gap-basalt-space-lg xl:basis-auto xl:flex-1 [&>[data-testid=status-badge]]:h-basalt-control-sm">
+							<div className="min-w-0 max-w-full">
+								<PageHeader title={host?.hostname ?? hid} />
 							</div>
-							{detail && (
-								<DescriptionEditor
-									hid={hid}
-									value={detail.description}
-									onSaved={handleDescriptionSaved}
-								/>
-							)}
+							{host && <StatusBadge status={host.status} />}
+							{host && <HostTagsPanel key={host.host_id} hostId={host.host_id} />}
 						</div>
-						<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-lg">
+						<div className="flex min-w-0 max-w-full items-center gap-basalt-space-sm">
 							<SegmentControl
 								legend="Time range"
-								className="[&>legend]:sr-only"
+								className={INLINE_SEGMENT}
 								value={String(rangeSeconds)}
 								onValueChange={(value) => setRangeSeconds(Number(value))}
 								options={TIME_RANGES.map(({ label, seconds }) => ({
@@ -167,7 +165,13 @@ export function HostDetailPage() {
 							{host && <HostDeleteDialog key={host.host_id} host={host} routeId={hid} />}
 						</div>
 					</div>
-					{host && <HostTagsPanel key={host.host_id} hostId={host.host_id} />}
+					{detail && (
+						<DescriptionEditor
+							hid={hid}
+							value={detail.description}
+							onSaved={handleDescriptionSaved}
+						/>
+					)}
 				</div>
 			</div>
 

@@ -1,6 +1,7 @@
 import { SegmentControl } from "@nocoo/basalt";
 import { useState } from "react";
 import { type EnvironmentMode, environment, selectEnvironment } from "../../environment";
+import { INLINE_SEGMENT } from "./segment";
 
 export function EnvironmentSwitch() {
 	const [busy, setBusy] = useState(false);
@@ -32,7 +33,7 @@ export function EnvironmentSwitch() {
 			)}
 			<SegmentControl
 				legend="Environment"
-				className="[&>legend]:sr-only"
+				className={`${INLINE_SEGMENT} shrink-0 [&_[data-slot=segment-control-viewport]]:overflow-visible`}
 				value={environment.mode}
 				onValueChange={switchMode}
 				disabled={busy || environment.locked}
