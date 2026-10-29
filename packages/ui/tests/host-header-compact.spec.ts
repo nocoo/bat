@@ -59,6 +59,16 @@ for (const theme of ["light", "dark"] as const) {
 	}, testInfo) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.addInitScript((value) => localStorage.setItem("theme", value), theme);
+		// CI hides the locked environment picker (visible: !ci); force it visible to measure it.
+		await page.route("**/__bat/bootstrap.js", async (route) => {
+			const response = await route.fetch();
+			const config = JSON.parse((await response.text()).slice("window.__BAT_LOCAL__=".length, -1));
+			const instance = config.instance && { ...config.instance, visible: true };
+			await route.fulfill({
+				response,
+				body: `window.__BAT_LOCAL__=${JSON.stringify({ ...config, visible: true, instance })};`,
+			});
+		});
 		await page.goto("/hosts/f0d3fd30");
 		const header = page.getByTestId("host-detail-header");
 		const title = header.getByRole("heading", { name: "alpha.test.local", exact: true });
