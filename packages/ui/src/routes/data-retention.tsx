@@ -59,7 +59,7 @@ export function DataRetentionPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-4 max-w-4xl">
+		<div className="space-y-basalt-layout max-w-4xl">
 			<PageHeader
 				title="Data Retention"
 				description="Configure how long monitoring data is stored. All metrics, snapshots, and events older than the selected window are automatically purged every hour."

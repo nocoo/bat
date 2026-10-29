@@ -149,7 +149,10 @@ export function HostCard({
 	const openPorts = openPublicPorts ?? 0;
 
 	return (
-		<Link to={`/hosts/${hashHostId(host.host_id)}`} className="block h-full">
+		<Link
+			to={`/hosts/${hashHostId(host.host_id)}`}
+			className="block h-full rounded-basalt-lg outline-offset-2 focus-visible:outline-2 focus-visible:outline-basalt-ring"
+		>
 			<LayerCard
 				padding="sm"
 				className="flex h-full flex-col transition-colors hover:bg-basalt-hover"
@@ -164,7 +167,7 @@ export function HostCard({
 					<div className="flex items-center gap-1.5 shrink-0">
 						{openPorts > 0 && (
 							<span
-								className="flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-basalt-sm font-medium text-amber-600 dark:text-amber-400"
+								className="flex items-center gap-basalt-space-xs rounded-basalt-md bg-basalt-warning/10 px-basalt-space-md py-basalt-space-xs text-basalt-sm font-medium text-basalt-warning"
 								title={`${openPorts} public port${openPorts === 1 ? "" : "s"} not on allowlist`}
 							>
 								<Unlock className="h-2.5 w-2.5" />
@@ -220,7 +223,7 @@ export function HostCard({
 				</div>
 
 				{/* Footer */}
-				<div className="mt-auto pt-2.5 flex items-center gap-1.5 text-basalt-sm text-basalt-muted-foreground px-0.5">
+				<div className="mt-auto pt-basalt-layout-sm flex flex-wrap items-center gap-x-basalt-space-md gap-y-basalt-space-xs text-basalt-sm text-basalt-muted-foreground px-0.5">
 					{host.probe_version && <span>Probe v{host.probe_version}</span>}
 					{host.probe_version && <span>·</span>}
 					<span>Last seen {formatLastSeen(host.last_seen)}</span>

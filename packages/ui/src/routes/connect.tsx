@@ -346,7 +346,7 @@ export function ConnectPage() {
 	const loadError = servers.error ?? tokens.error;
 	return (
 		<>
-			<div className="space-y-6" data-bat-dirty={creating || !!action}>
+			<div className="space-y-basalt-layout" data-bat-dirty={creating || !!action}>
 				<PageHeader
 					title="Connect"
 					description="Give your agents a secure connection to Bat."
@@ -392,7 +392,7 @@ export function ConnectPage() {
 						</div>
 					</LayerCard.Body>
 				</LayerCard>
-				<div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
+				<div className="grid items-start gap-basalt-layout xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
 					<section aria-labelledby="tokens-heading" className="min-w-0 space-y-4">
 						<div className="flex flex-wrap items-center justify-between gap-3">
 							<div className="flex items-center gap-2">

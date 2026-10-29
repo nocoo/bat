@@ -83,6 +83,7 @@ function AppShellInner({ children }: AppShellProps) {
 
 			<AppMain>
 				<AppHeader
+					density="compact"
 					breadcrumbs={breadcrumbs}
 					leading={
 						showHamburger ? (
@@ -123,7 +124,9 @@ function AppShellInner({ children }: AppShellProps) {
 
 				{/* Floating island content area */}
 				<div className="flex min-h-0 flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
-					<ContentIsland>{children}</ContentIsland>
+					<ContentIsland className="bat-workspace md:p-basalt-layout lg:px-basalt-layout-lg">
+						{children}
+					</ContentIsland>
 				</div>
 			</AppMain>
 		</BasaltAppShell>

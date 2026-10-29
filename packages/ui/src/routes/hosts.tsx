@@ -129,7 +129,7 @@ export function HostsPage() {
 	) : !hosts || hosts.length === 0 ? (
 		<HostsEmpty />
 	) : (
-		<div className="space-y-6">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Hosts"
 				description="Monitored servers and real-time infrastructure status."

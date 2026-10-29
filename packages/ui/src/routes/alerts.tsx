@@ -89,7 +89,7 @@ export function AlertsPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : !alerts || alerts.length === 0 ? (
-		<div className="space-y-4">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Alerts"
 				description="Active alerts and incident notifications across your fleet."

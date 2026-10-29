@@ -99,7 +99,7 @@ export function TagsPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-4" data-bat-dirty={!!newName || editingId !== null}>
+		<div className="space-y-basalt-layout" data-bat-dirty={!!newName || editingId !== null}>
 			<PageHeader
 				title="Tags"
 				description="Labels and categorization rules for grouping monitored hosts."
@@ -122,7 +122,7 @@ export function TagsPage() {
 							value={newName}
 							onChange={(e) => setNewName(e.target.value)}
 							size="sm"
-							className="flex-1"
+							className="min-w-0 flex-1"
 							maxLength={32}
 						/>
 						<Button
