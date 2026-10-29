@@ -27,14 +27,21 @@ export function buildUrl(path: string, params?: Record<string, string>): string 
 interface RequestOptions {
 	body?: unknown;
 	params?: Record<string, string>;
+	management?: boolean;
 }
 
 async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
 	const hasBody = opts.body !== undefined;
+	const headers: Record<string, string> = {};
+	if (hasBody) headers["Content-Type"] = "application/json";
+	if (opts.management) headers["X-Bat-Management"] = "1";
 	const res = await fetch(environmentUrl(buildUrl(path, opts.params)), {
 		method,
-		headers: hasBody ? { "Content-Type": "application/json" } : undefined,
+		headers: Object.keys(headers).length ? headers : undefined,
 		body: hasBody ? JSON.stringify(opts.body) : undefined,
+		...(opts.management
+			? ({ credentials: "same-origin", cache: "no-store", redirect: "error" } as const)
+			: {}),
 	});
 	if (!res.ok) {
 		throw new ApiError(res.status, `API error: ${res.status}`);
@@ -58,3 +65,9 @@ export const patchAPI = <T>(path: string, body?: unknown): Promise<T> =>
 	request<T>("PATCH", path, { body });
 
 export const deleteAPI = (path: string): Promise<void> => request<void>("DELETE", path);
+
+export const deleteHostAPI = (id: string, confirmHostId: string): Promise<{ ok: true }> =>
+	request("DELETE", `/api/hosts/${encodeURIComponent(id)}`, {
+		body: { confirm_host_id: confirmHostId },
+		management: true,
+	});

@@ -20,4 +20,5 @@ export {
 	useTags,
 	useWebhooks,
 } from "./queries";
+export { useDeleteHost } from "./use-delete-host";
 export { useIsMobile } from "./use-mobile";

@@ -1,5 +1,4 @@
 import { type HostTag, MAX_TAGS_PER_HOST, type TagItem } from "@bat/shared";
-import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { MultiSelect } from "@nocoo/basalt/components/multi-select";
 import { Tags } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -100,20 +99,22 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 	);
 
 	return (
-		<LayerCard className="overflow-visible">
-			<LayerCard.Header>
-				<h2 className="flex items-center gap-2">
-					<Tags className="h-4 w-4" />
-					Tags
-					{atLimit && (
-						<span className="text-basalt-sm font-normal text-basalt-muted-foreground">
-							(max {MAX_TAGS_PER_HOST})
-						</span>
-					)}
-				</h2>
-			</LayerCard.Header>
-			<LayerCard.Body>
+		<div
+			className="flex min-w-0 flex-wrap items-start gap-basalt-space-lg"
+			data-testid="host-tags-manager"
+		>
+			<span className="inline-flex h-basalt-control items-center gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground">
+				<Tags className="size-4" aria-hidden="true" />
+				Tags
+				{atLimit && (
+					<span className="text-basalt-sm font-normal text-basalt-muted-foreground">
+						(max {MAX_TAGS_PER_HOST})
+					</span>
+				)}
+			</span>
+			<div className="min-w-0 flex-1">
 				<MultiSelect
+					className="inline-grid max-w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-basalt-space-lg space-y-0"
 					label="Host tags"
 					placeholder="Add tags"
 					searchPlaceholder="Add tag..."
@@ -158,7 +159,7 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 						{error}
 					</p>
 				)}
-			</LayerCard.Body>
-		</LayerCard>
+			</div>
+		</div>
 	);
 }

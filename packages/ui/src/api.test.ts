@@ -1,5 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import { ApiError, buildUrl, deleteAPI, getAPI, postAPI, putAPI } from "./api";
+import {
+	ApiError,
+	buildUrl,
+	deleteAPI,
+	deleteHostAPI,
+	getAPI,
+	patchAPI,
+	postAPI,
+	putAPI,
+} from "./api";
 
 // Minimal fetch stub — records every call and returns a configurable Response.
 interface Call {
@@ -96,6 +105,12 @@ describe("postAPI / putAPI", () => {
 		expect(calls[0]?.init?.method).toBe("PUT");
 		expect(calls[0]?.init?.body).toBe(JSON.stringify({ color: 3 }));
 	});
+
+	test("PATCH sends the edited description as JSON", async () => {
+		await patchAPI("/api/hosts/host/description", { description: "Catalog service" });
+		expect(calls[0]?.init?.method).toBe("PATCH");
+		expect(calls[0]?.init?.body).toBe(JSON.stringify({ description: "Catalog service" }));
+	});
 });
 
 describe("deleteAPI", () => {
@@ -108,5 +123,35 @@ describe("deleteAPI", () => {
 	test("throws ApiError on non-2xx", async () => {
 		nextResponse = () => new Response("forbidden", { status: 403 });
 		await expect(deleteAPI("/api/tags/1")).rejects.toBeInstanceOf(ApiError);
+	});
+});
+
+describe("deleteHostAPI", () => {
+	test("uses browser management headers, same-origin credentials and an exact raw ID body", async () => {
+		nextResponse = () => Response.json({ ok: true });
+		await expect(deleteHostAPI("a1b2c3d4", "Exact HOST/id")).resolves.toEqual({ ok: true });
+		expect(calls[0]).toEqual({
+			url: "/api/hosts/a1b2c3d4",
+			init: {
+				method: "DELETE",
+				headers: { "Content-Type": "application/json", "X-Bat-Management": "1" },
+				body: JSON.stringify({ confirm_host_id: "Exact HOST/id" }),
+				credentials: "same-origin",
+				cache: "no-store",
+				redirect: "error",
+			},
+		});
+	});
+
+	test("encodes a raw ID in the route but does not trim the confirmation", async () => {
+		await deleteHostAPI("host/with space", "host/with space ");
+		expect(calls[0]?.url).toBe("/api/hosts/host%2Fwith%20space");
+		expect(calls[0]?.init?.body).toBe(JSON.stringify({ confirm_host_id: "host/with space " }));
+	});
+
+	test("does not retry a rejected management request", async () => {
+		nextResponse = () => new Response("forbidden", { status: 403 });
+		await expect(deleteHostAPI("host", "host")).rejects.toMatchObject({ status: 403 });
+		expect(calls).toHaveLength(1);
 	});
 });

@@ -64,7 +64,11 @@ test("description editor validates, cancels and persists without duplicate saves
 	});
 	try {
 		await page.goto(detail);
-		const editor = page.getByRole("group", { name: "Host description", exact: true });
+		const header = page.getByTestId("host-detail-header");
+		await expect(
+			header.getByText("Real-time metrics, system specifications, and services."),
+		).toHaveCount(0);
+		const editor = header.getByRole("group", { name: "Host description", exact: true });
 		await editor.getByRole("button", { name: "Edit Host description" }).click();
 		const input = editor.getByRole("textbox", { name: "Host description" });
 		await input.fill("x".repeat(201));
@@ -128,7 +132,10 @@ test("tag picker creates, attaches and removes using standard keyboard controls"
 	let id: number | undefined;
 	try {
 		await page.goto(detail);
-		await page.getByRole("button", { name: "Host tags", exact: true }).click();
+		await page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: "Host tags", exact: true })
+			.click();
 		const search = page.getByRole("combobox", { name: "Host tags: search" });
 		await search.fill(name);
 		await expect(page.getByRole("option", { name: `Create "${name}"` })).toBeVisible();
