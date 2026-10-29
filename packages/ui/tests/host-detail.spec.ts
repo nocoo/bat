@@ -3,6 +3,14 @@ import { expect, test } from "@playwright/test";
 test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
 
+	test("network legend uses inbound and outbound labels", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		const networkHeader = page.getByText("Network", { exact: true }).locator("..");
+		await expect(networkHeader.getByText("Inbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText("Outbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText(/^(Download|Upload)$/)).toHaveCount(0);
+	});
+
 	test("sidebar navigation is present", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
