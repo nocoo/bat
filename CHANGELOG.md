@@ -1,5 +1,19 @@
 # Changelog
 
+## v2.4.0
+
+### Added
+
+- Permanently delete hosts from the dashboard with two-step exact-ID confirmation and a prominent recent-upload warning.
+- Atomically remove host data and related credentials, grants and bindings; block probe recreation with a persistent tombstone until explicit browser re-registration.
+- Verify deletion, probe rejection, re-registration, metadata editing and responsive layouts with isolated API and browser tests.
+
+### Changed
+
+- Move editable host descriptions and tag management into the detail header, including hosts without metrics.
+- Compact dashboard chrome, cards, tables and forms with Basalt tokens and giraffe-inspired spacing, preserving Bat branding.
+- Add migration 0030 for deletion tombstones and race-safe ingestion guards; apply it before deploying dependent Worker code.
+
 ## v2.3.6
 
 ### Fixed

@@ -1,5 +1,13 @@
 # Retrospective
 
+## 2026-10-29 - Keep lockfile updates limited to versions
+
+An offline Bun install using the machine's mirror rewrote package tarball URLs
+while synchronizing workspace versions. The dependency graph was unchanged, so
+the unrelated mirror URL churn was removed and the four workspace-version edits
+were verified with a frozen offline install. Review lockfile diffs before staging
+and do not publish machine-specific registry rewrites with a product version bump.
+
 ## 2026-10-29 - Include non-FK state in host deletion
 
 The first deletion implementation covered active alerts but omitted the separate
