@@ -91,6 +91,15 @@ for (const resolution of ["raw", "hourly"] as const) {
 								.evaluateAll((lines) => lines.map((line) => Number(line.getAttribute("y1"))));
 							const top = Math.min(...gridYs),
 								bottom = Math.max(...gridYs);
+							const tickYs = await axes
+								.nth(0)
+								.locator("text")
+								.evaluateAll((ticks) => ticks.map((tick) => Number(tick.getAttribute("y"))));
+							const interiorTickYs = tickYs.slice(1, -1);
+							expect(interiorTickYs.length).toBeGreaterThan(0);
+							for (const tickY of interiorTickYs) {
+								expect(gridYs.some((gridY) => Math.abs(gridY - tickY) < 1)).toBe(true);
+							}
 							expect(Math.abs(lineY - (top + (bottom - top) * 0.4))).toBeLessThan(1);
 						}
 						await chart.hover();

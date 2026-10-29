@@ -48,7 +48,7 @@ export function DiskIoChart({
 
 			<DashboardResponsiveContainer width="100%" height={256}>
 				<ComposedChart data={chartData}>
-					<CartesianGrid stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
+					<CartesianGrid yAxisId="iops" stroke={chartAxis} strokeOpacity={0.15} vertical={false} />
 					<XAxis
 						dataKey="ts"
 						tickFormatter={tickFormatter}

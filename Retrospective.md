@@ -251,3 +251,13 @@ weak capture. The chart grid column now has `min-w-0`, keeping scrolling inside
 the standard Table. A populated two-process browser fixture checks mobile width,
 sorting and filtering; visual checks wait for rows, chart and editor content
 before testing overflow and capture the scrolled editors and active tooltip.
+
+## 2026-10-29 - Bind chart grids to explicit axes
+
+The Disk I/O dual-axis conversion assigned named axes to every series and
+maintenance overlay but left CartesianGrid on its default axis. Recharts used
+an implicit axis, dropping the interior IOPS grid lines. The initial browser
+check only compared the outer grid bounds, so it missed the defect. Review
+caught it before push. Bind the grid to the IOPS axis and verify that every
+interior left-axis tick has an aligned horizontal grid line. The new assertion
+failed against the original build before the binding fix.
