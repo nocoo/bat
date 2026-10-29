@@ -2,6 +2,10 @@
 
 ## v2.4.0
 
+### Fixed
+
+- Update Tokio to 1.53.3 to fix RUSTSEC-2026-0386 without changing unrelated probe dependencies.
+
 ### Added
 
 - Permanently delete hosts from the dashboard with two-step exact-ID confirmation and a prominent recent-upload warning.
