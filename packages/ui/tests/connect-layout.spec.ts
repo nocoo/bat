@@ -63,6 +63,15 @@ for (const theme of ["light", "dark"] as const) {
 				const curl = guide.getByRole("radio", { name: "curl", exact: true });
 				await curl.click();
 				await expect(curl).toBeChecked();
+				await expect
+					.poll(async () => {
+						const selected = await curl.evaluate((element) => element.getBoundingClientRect().x);
+						const indicator = await guide
+							.locator("[data-slot=selection-indicator]")
+							.evaluate((element) => element.getBoundingClientRect().x);
+						return Math.abs(indicator - selected);
+					})
+					.toBeLessThan(1);
 				expect(
 					await guide
 						.getByRole("radiogroup", { name: "Example format", exact: true })
