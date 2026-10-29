@@ -1,7 +1,7 @@
 import { Button, Field, Input } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Wrench } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
 import { deleteAPI, putAPI } from "@/api";
 import { useHostMaintenance } from "@/hooks";
@@ -28,17 +28,21 @@ export function MaintenancePanel({ hostId }: MaintenancePanelProps) {
 	const [busy, setBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
-	// Sync form state from server when window changes (e.g. after save).
+	// Sync form state from server when window changes (e.g. after save). Skip the
+	// loading state and an initially empty window so early typing is not erased.
+	const synced = useRef<typeof window>(undefined);
 	useEffect(() => {
+		if (window === undefined) return;
 		if (window) {
 			setStart(utcHHMMToLocal(window.start, tzOffset));
 			setEnd(utcHHMMToLocal(window.end, tzOffset));
 			setReason(window.reason ?? "");
-		} else {
+		} else if (synced.current) {
 			setStart("");
 			setEnd("");
 			setReason("");
 		}
+		synced.current = window;
 		setError(null);
 	}, [window, tzOffset]);
 

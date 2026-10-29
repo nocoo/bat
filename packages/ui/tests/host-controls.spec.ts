@@ -125,6 +125,44 @@ test("maintenance fields preserve local time and clear the saved window", async 
 	}
 });
 
+test("maintenance input typed before the saved window loads is kept", async ({ page }) => {
+	const path = `${host}/maintenance`;
+	const initial = await (await page.request.get(path)).json();
+	if (initial) expect((await page.request.delete(path)).ok()).toBe(true);
+	let release!: () => void;
+	const held = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	let requested!: () => void;
+	const loading = new Promise<void>((resolve) => {
+		requested = resolve;
+	});
+	await page.route("**/api/hosts/pw-host-alpha/maintenance", async (route) => {
+		if (route.request().method() !== "GET") return route.fallback();
+		requested();
+		await held;
+		await route.fallback();
+	});
+	try {
+		await page.goto(detail);
+		await loading;
+		await page.getByLabel("Start", { exact: true }).fill("02:00");
+		const loaded = page.waitForResponse(
+			(response) =>
+				response.url().endsWith("/api/hosts/pw-host-alpha/maintenance") &&
+				response.request().method() === "GET",
+		);
+		release();
+		await loaded;
+		await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+		await expect(page.getByLabel("Start", { exact: true })).toHaveValue("02:00");
+	} finally {
+		release();
+		await page.unrouteAll({ behavior: "wait" });
+		if (initial) expect((await page.request.put(path, { data: initial })).ok()).toBe(true);
+	}
+});
+
 test("tag picker creates, attaches and removes using standard keyboard controls", async ({
 	page,
 }) => {
