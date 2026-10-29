@@ -416,6 +416,8 @@ export function createMockD1(connectVersion: 28 | 29 = 29): D1Database {
 			readFileSync(resolve(__dirname, "../../migrations/0029_connect_token_servers.sql"), "utf-8"),
 		);
 
+	if (connectVersion === 29)
+		db.exec(readFileSync(resolve(__dirname, "../../migrations/0030_host_deletion.sql"), "utf-8"));
 	return {
 		prepare(sql: string): D1PreparedStatement {
 			return new MockD1PreparedStatement(db, sql);

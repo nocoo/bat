@@ -1,5 +1,14 @@
 # Retrospective
 
+## 2026-10-29 - Validate workspace setup before focused tests
+
+The first targeted Vitest invocation used the repository root with a package-local
+configuration, so its relative include matched no tests. The next invocation
+reached the suite but the fresh checkout had not built `@bat/shared`. Build the
+shared workspace first and run focused suites from their package directory.
+An initial deletion fixture also assumed a webhook `name` column that does not
+exist; use the actual migration schema when seeding relationship tests.
+
 Accident narratives for this repo.
 
 Routing: narrative stays here. A project-specific rule that will recur may become one line in `AGENTS.md`. Cross-project lessons go to nmem or a global rule. If it can be checked by a machine, add a hook or test instead of prose.

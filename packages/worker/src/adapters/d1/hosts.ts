@@ -33,6 +33,50 @@ export class D1HostsRepository implements HostsRepository {
 		this.db = db;
 	}
 
+	async isDeleted(hostId: string): Promise<boolean> {
+		return (
+			(await this.db
+				.prepare("SELECT 1 FROM deleted_hosts WHERE host_id = ?")
+				.bind(hostId)
+				.first()) !== null
+		);
+	}
+
+	async deleteHost(hostId: string, nowSeconds: number): Promise<void> {
+		await this.db.batch([
+			this.db
+				.prepare(
+					"INSERT INTO deleted_hosts(host_id, deleted_at) VALUES (?, ?) ON CONFLICT(host_id) DO NOTHING",
+				)
+				.bind(hostId, nowSeconds),
+			this.db
+				.prepare(`UPDATE tags SET owner_host_id = NULL WHERE owner_host_id = ? AND (
+				EXISTS (SELECT 1 FROM host_tags WHERE tag_id = tags.id AND host_id != tags.owner_host_id)
+				OR EXISTS (SELECT 1 FROM agent_tags JOIN agents ON agents.id = agent_tags.agent_id WHERE tag_id = tags.id AND (agents.host_id IS NULL OR agents.host_id != tags.owner_host_id))
+				OR EXISTS (SELECT 1 FROM asset_tags JOIN assets ON assets.id = asset_tags.asset_id WHERE tag_id = tags.id AND (assets.host_id IS NULL OR assets.host_id != tags.owner_host_id))
+			)`)
+				.bind(hostId),
+			...[
+				"metrics_raw",
+				"metrics_hourly",
+				"tier2_snapshots",
+				"alert_states",
+				"agents",
+				"assets",
+			].map((table) => this.db.prepare(`DELETE FROM ${table} WHERE host_id = ?`).bind(hostId)),
+			this.db.prepare("DELETE FROM connect_requests WHERE server_id = ?").bind(hostId),
+			this.db.prepare("DELETE FROM hosts WHERE host_id = ?").bind(hostId),
+		]);
+	}
+
+	async registerHost(hostId: string): Promise<boolean> {
+		const result = await this.db
+			.prepare("DELETE FROM deleted_hosts WHERE host_id = ?")
+			.bind(hostId)
+			.run();
+		return result.meta.changes > 0;
+	}
+
 	async probe(): Promise<void> {
 		await this.db.prepare("SELECT 1 AS probe").first();
 	}

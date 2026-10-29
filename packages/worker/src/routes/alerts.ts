@@ -8,12 +8,18 @@ import type { AppEnv } from "../types.js";
 const ALERTS_CACHE_TTL_SECONDS = 30;
 
 export async function alertsListRoute(c: Context<AppEnv>) {
+	c.header("Cache-Control", "no-store");
 	const cacheEnabled = c.env.ENVIRONMENT === "production" && !c.var.connectToken;
 	const cacheOpts = { route: "alerts", ttlSeconds: ALERTS_CACHE_TTL_SECONDS };
 	if (cacheEnabled) {
 		const cached = await tryReadCache(c.env.BAT_KV, c.req.raw, cacheOpts);
 		if (cached) {
-			return cached;
+			const activeIds = new Set(
+				(await c.var.repos.hosts.listActiveHostIds()).map((host) => host.host_id),
+			);
+			const items = await cached.json<AlertItem[]>();
+			c.header("X-Bat-Cache", "hit");
+			return c.json(items.filter((alert) => activeIds.has(alert.host_id)));
 		}
 	}
 

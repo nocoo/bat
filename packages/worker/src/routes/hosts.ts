@@ -67,6 +67,7 @@ export interface SparklineRow {
 }
 
 export async function hostsListRoute(c: Context<AppEnv>) {
+	c.header("Cache-Control", "no-store");
 	// Short-TTL KV cache — stale tolerated up to TTL. Disabled outside
 	// production so dev / e2e snapshots see fresh state. Cache API is not
 	// usable behind Cloudflare Access, so this is KV-backed.
@@ -75,7 +76,12 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	if (cacheEnabled) {
 		const cached = await tryReadCache(c.env.BAT_KV, c.req.raw, cacheOpts);
 		if (cached) {
-			return cached;
+			const activeIds = new Set(
+				(await c.var.repos.hosts.listActiveHostIds()).map((host) => host.host_id),
+			);
+			const items = await cached.json<HostOverviewItem[]>();
+			c.header("X-Bat-Cache", "hit");
+			return c.json(items.filter((host) => activeIds.has(host.host_id)));
 		}
 	}
 
