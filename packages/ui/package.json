@@ -1,6 +1,6 @@
 {
 	"name": "@bat/ui",
-	"version": "2.4.1",
+	"version": "2.4.2",
 	"type": "module",
 	"scripts": {
 		"dev": "bun ../../scripts/environments/launcher.mjs",
