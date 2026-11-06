@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.0.1
+
+### Fixed
+
+- Gate release tags on successful ci
+
 ## v3.0.0
 
 ### Added
