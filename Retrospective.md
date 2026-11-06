@@ -304,3 +304,12 @@ final evidence; never treat an alternate runner path as the permanent fix.
 Freeze agent edits and alternate-runner invocations before coordinator hooks:
 the first commit correctly failed when concurrent runners repopulated incompatible
 transform caches. Clear only the task-owned cache and rerun the canonical command.
+
+## 2026-11-07 - Freeze dependency graphs during version-only releases
+
+The release preflight exposed a mirror install that would rewrite dependency URLs
+and a stale-version scan that rejected historical test samples. Sync only the Bun
+workspace version metadata and validate with a frozen install; keep real runtime
+constants in the scan while excluding test fixtures. Review also caught a nested
+dependency named `version` being mistaken for workspace metadata. Match direct
+members only and assert byte-for-byte preservation of nested dependencies.

@@ -25,6 +25,7 @@ jobs:
       install-policy: "trusted"
       timeout-minutes: 5
       command: |
+        bun test scripts/release.test.ts
         bun run gate:routes
         bun run gate:pages
         python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'

@@ -3,7 +3,9 @@
  * Automated release script for bat monorepo.
  *
  * Bumps version across all package.json files and source constants,
- * syncs lockfile, generates CHANGELOG entries from conventional commits,
+ * rewrites the Bun workspace version metadata in bun.lock in place (never
+ * resolving or rewriting the dependency graph), installs with
+ * --frozen-lockfile, generates CHANGELOG entries from conventional commits,
  * verifies no stale version strings remain, commits, tags, pushes,
  * and creates a GitHub release.
  *
@@ -21,7 +23,7 @@
 
 import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
-import { resolve as pathResolve } from "node:path";
+import { basename, dirname, resolve as pathResolve } from "node:path";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -29,6 +31,7 @@ import { resolve as pathResolve } from "node:path";
 
 const PROJECT_ROOT = pathResolve(import.meta.dirname as string, "..");
 const PACKAGE_JSON = pathResolve(PROJECT_ROOT, "package.json");
+const BUN_LOCK = pathResolve(PROJECT_ROOT, "bun.lock");
 const CHANGELOG_MD = pathResolve(PROJECT_ROOT, "CHANGELOG.md");
 
 // ---------------------------------------------------------------------------
@@ -93,6 +96,7 @@ const COMMIT_TYPE_MAP: Record<string, keyof ChangelogSections> = {
 const REMOVED_KEYWORDS = /\b(remove|delete|drop)\b/i;
 const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const CONVENTIONAL_RE = /^(\w+)(?:\(.+?\))?!?:\s*(.+)$/;
+const RELEASE_COMMIT_RE = /^chore: release v\d/;
 
 // ---------------------------------------------------------------------------
 // Shell helpers
@@ -250,6 +254,148 @@ function updateVersionInFile(
 }
 
 // ---------------------------------------------------------------------------
+// Bun lockfile version sync
+// ---------------------------------------------------------------------------
+
+// Bun records each workspace version in bun.lock but omits the root one.
+const ROOT_WORKSPACE = "";
+
+const VERSION_LINE_RE = /^(\s*)"version"\s*:\s*"([^"]*)"(,?)\s*$/;
+
+/** Workspace directories whose version lives in bun.lock, derived from VERSION_TARGETS. */
+export function versionedWorkspaceDirs(targets: VersionTarget[] = VERSION_TARGETS): string[] {
+	const dirs: string[] = [];
+	for (const target of targets) {
+		if (target.pattern !== "json-version" || basename(target.path) !== "package.json") {
+			continue;
+		}
+		const dir = dirname(target.path);
+		dirs.push(dir === "." ? ROOT_WORKSPACE : dir);
+	}
+	return dirs;
+}
+
+function braceDepthDelta(line: string): number {
+	const withoutStrings = line.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+	let delta = 0;
+	for (const char of withoutStrings) {
+		if (char === "{") {
+			delta++;
+		} else if (char === "}") {
+			delta--;
+		}
+	}
+	return delta;
+}
+
+function findWorkspaceBlocks(lines: string[]): Map<string, { start: number; end: number }> {
+	const sectionStart = lines.findIndex((line) => /^\s*"workspaces"\s*:\s*\{\s*$/.test(line));
+	if (sectionStart === -1) {
+		throw new Error('missing "workspaces" section');
+	}
+
+	const blocks = new Map<string, { start: number; end: number }>();
+	let depth = 0;
+	let current: { dir: string; start: number } | undefined;
+
+	for (let i = sectionStart; i < lines.length; i++) {
+		const line = lines[i] ?? "";
+		if (current === undefined && depth === 1) {
+			const open = /^\s*"((?:[^"\\]|\\.)*)"\s*:\s*\{\s*$/.exec(line);
+			if (open) {
+				current = { dir: open[1] ?? "", start: i };
+			}
+		}
+		depth += braceDepthDelta(line);
+		if (current !== undefined && depth === 1 && i > current.start) {
+			blocks.set(current.dir, { start: current.start, end: i });
+			current = undefined;
+		}
+		if (depth <= 0) {
+			break;
+		}
+	}
+
+	return blocks;
+}
+
+/**
+ * Rewrite only the workspace version strings of a bun.lock text. Everything
+ * else (dependency graph, integrity hashes, empty registry slots, whitespace) is
+ * preserved bytewise, so `bun install --frozen-lockfile` can validate the result
+ * without resolving anything. Fails closed on a missing or unexpected version.
+ */
+export function syncBunLockWorkspaceVersions(
+	lockContent: string,
+	oldVersion: string,
+	newVersion: string,
+	workspaceDirs: readonly string[] = versionedWorkspaceDirs(),
+): { content: string; updated: string[] } {
+	const lines = lockContent.split("\n");
+	const blocks = findWorkspaceBlocks(lines);
+	const updated: string[] = [];
+
+	for (const dir of workspaceDirs) {
+		const block = blocks.get(dir);
+		if (!block) {
+			throw new Error(`workspace "${dir || "(root)"}" not found`);
+		}
+
+		let versionLine: number | undefined;
+		let found: RegExpExecArray | undefined;
+		// Only direct members of the workspace object count; a dependency named
+		// "version" inside devDependencies must never be mistaken for it.
+		let depth = 1;
+		for (let i = block.start + 1; i < block.end; i++) {
+			const line = lines[i] ?? "";
+			if (depth === 1) {
+				const match = VERSION_LINE_RE.exec(line);
+				if (match) {
+					versionLine = i;
+					found = match;
+					break;
+				}
+			}
+			depth += braceDepthDelta(line);
+		}
+
+		if (versionLine === undefined || found === undefined) {
+			if (dir === ROOT_WORKSPACE) {
+				continue;
+			}
+			throw new Error(`workspace "${dir}" has no "version" entry`);
+		}
+
+		const current = found[2] ?? "";
+		if (current !== oldVersion) {
+			throw new Error(`workspace "${dir}" has version "${current}", expected "${oldVersion}"`);
+		}
+
+		lines[versionLine] = `${found[1] ?? ""}"version": "${newVersion}"${found[3] ?? ""}`;
+		updated.push(dir || "(root)");
+	}
+
+	return { content: lines.join("\n"), updated };
+}
+
+function syncBunLockVersions(oldVersion: string, newVersion: string, dryRun: boolean): string[] {
+	let synced: { content: string; updated: string[] };
+	try {
+		synced = syncBunLockWorkspaceVersions(readFileSync(BUN_LOCK, "utf-8"), oldVersion, newVersion);
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error(`❌ bun.lock workspace version sync failed: ${message}`);
+		console.error("   Run `git checkout .` to revert any partial version bump.");
+		process.exit(1);
+	}
+
+	if (!dryRun) {
+		writeFileSync(BUN_LOCK, synced.content, "utf-8");
+	}
+	return synced.updated;
+}
+
+// ---------------------------------------------------------------------------
 // Git helpers
 // ---------------------------------------------------------------------------
 
@@ -280,7 +426,17 @@ async function getCommitsSinceTag(tag: string | undefined): Promise<Commit[]> {
 				subject: line.slice(sepIdx + 3),
 			};
 		})
-		.filter((c) => !c.subject.startsWith("release: v"));
+		.filter((c) => !isReleaseCommit(c.subject));
+}
+
+/** Release commits are generated noise; keep them out of the next CHANGELOG. */
+export function isReleaseCommit(subject: string): boolean {
+	return RELEASE_COMMIT_RE.test(subject);
+}
+
+/** Conventional commit subject; `release:` is not an allowed type. */
+export function releaseCommitMessage(version: string): string {
+	return `chore: release v${version}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -376,6 +532,34 @@ function updateChangelog(newSection: string): void {
 }
 
 // ---------------------------------------------------------------------------
+// Stale version scan
+// ---------------------------------------------------------------------------
+
+// Test-only files legitimately keep historical version literals as fixtures;
+// runtime sources hard-coding the old version must still fail the release.
+const STALE_VERSION_GLOBS = [
+	"*.ts",
+	"*.tsx",
+	"!node_modules/**",
+	"!scripts/release.ts",
+	"!**/*.test.ts",
+	"!**/*.test.tsx",
+	"!**/*.spec.ts",
+	"!**/*.spec.tsx",
+	"!**/test/**",
+	"!**/tests/**",
+	"!**/__tests__/**",
+];
+
+export function buildStaleVersionArgs(version: string): string[] {
+	const escaped = version.replace(/\./g, "\\.");
+	// Match the version when wrapped in quotes or prefixed with `v`, but never
+	// as a substring of an IPv4 literal (e.g. 1.1.1 inside 1.1.1.1).
+	const versionPattern = `(?<![.\\d])(?:["']${escaped}["']|v${escaped})(?![.\\d])`;
+	return ["-P", versionPattern, ...STALE_VERSION_GLOBS.flatMap((glob) => ["--glob", glob])];
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -420,6 +604,8 @@ async function main(): Promise<void> {
 		for (const t of VERSION_TARGETS) {
 			console.info(`  [dry-run] would update ${t.path}`);
 		}
+		const preview = syncBunLockVersions(currentVersion, newVersion, true);
+		console.info(`  [dry-run] would sync bun.lock workspace versions: ${preview.join(", ")}`);
 	} else {
 		let failures = 0;
 		for (const target of VERSION_TARGETS) {
@@ -434,9 +620,14 @@ async function main(): Promise<void> {
 			console.error("   Run `git checkout .` to revert partial changes.");
 			process.exit(1);
 		}
-		const installResult = await run("bun", ["install"], { inherit: true });
+		const syncedWorkspaces = syncBunLockVersions(currentVersion, newVersion, false);
+		console.info(`  ✓ bun.lock — synced workspace versions: ${syncedWorkspaces.join(", ")}`);
+		// Frozen: the lockfile already carries the new workspace versions, so Bun
+		// only validates it and never resolves dependencies (which would rewrite
+		// integrity and registry fields).
+		const installResult = await run("bun", ["install", "--frozen-lockfile"], { inherit: true });
 		if (installResult.code !== 0) {
-			console.error("❌ bun install failed");
+			console.error("❌ bun install --frozen-lockfile failed");
 			process.exit(1);
 		}
 		// Sync only the probe's version, preserving the tested dependency graph.
@@ -464,26 +655,7 @@ async function main(): Promise<void> {
 		updateChangelog(changelogSection);
 	}
 
-	// Match the version when wrapped in quotes or prefixed with `v`, but never
-	// as a substring of an IPv4 literal (e.g. 1.1.1 inside 1.1.1.1).
-	const escaped = currentVersion.replace(/\./g, "\\.");
-	const versionPattern = `(?<![.\\d])(?:["']${escaped}["']|v${escaped})(?![.\\d])`;
-	const rgResult = await run("rg", [
-		"-P",
-		versionPattern,
-		"--glob",
-		"*.ts",
-		"--glob",
-		"*.tsx",
-		"--glob",
-		"!node_modules/**",
-		"--glob",
-		"!scripts/release.ts",
-		"--glob",
-		"!**/__tests__/**",
-		"--glob",
-		"!**/tests/**",
-	]);
+	const rgResult = await run("rg", buildStaleVersionArgs(currentVersion));
 
 	if (rgResult.code === 0 && rgResult.stdout.trim()) {
 		console.error(`❌ Found stale version "${currentVersion}" in source files:`);
@@ -509,7 +681,7 @@ async function main(): Promise<void> {
 		console.info("[dry-run] Would commit and stage files.");
 	} else {
 		await runOrDie("git", ["add", ...filesToStage], "Failed to stage files");
-		const commitResult = await run("git", ["commit", "-m", `release: v${newVersion}`]);
+		const commitResult = await run("git", ["commit", "-m", releaseCommitMessage(newVersion)]);
 		if (commitResult.code !== 0) {
 			console.error("❌ Commit failed (pre-commit hooks?)");
 			if (commitResult.stderr.trim()) {
@@ -586,7 +758,9 @@ async function main(): Promise<void> {
 	}
 }
 
-main().catch((err: unknown) => {
-	console.error("❌ Unexpected error:", err);
-	process.exit(1);
-});
+if (import.meta.main) {
+	main().catch((err: unknown) => {
+		console.error("❌ Unexpected error:", err);
+		process.exit(1);
+	});
+}
