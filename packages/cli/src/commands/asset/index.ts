@@ -1,4 +1,4 @@
-// bat-cli asset — Asset management commands.
+// bat asset — Asset management commands.
 // Subcommands: list, create, update, delete, tags
 
 import { defineCommand } from "@nocoo/base-cli";

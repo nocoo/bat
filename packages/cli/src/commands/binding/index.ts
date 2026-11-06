@@ -1,4 +1,4 @@
-// bat-cli binding — Binding management commands.
+// bat binding — Binding management commands.
 // Subcommands: list, create, delete
 
 import { defineCommand } from "@nocoo/base-cli";

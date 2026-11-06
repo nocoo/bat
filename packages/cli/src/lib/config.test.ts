@@ -16,7 +16,7 @@ import {
 let tempDir: string;
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-config-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-config-"));
 });
 
 afterEach(() => {

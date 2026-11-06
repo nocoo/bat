@@ -1,4 +1,4 @@
-// bat-cli asset update — Update an existing asset's fields.
+// bat asset update — Update an existing asset's fields.
 // Only fields explicitly provided are sent; absent fields are left unchanged.
 // Null semantics: --clear-* flags send null to clear a field.
 // Mutual exclusion: --field and --clear-field for the same field is an error.
@@ -34,7 +34,7 @@ export async function runAssetUpdate(
 	},
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -133,7 +133,7 @@ export async function runAssetUpdate(
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof ApiError && err.status === 404) {
@@ -144,7 +144,7 @@ export async function runAssetUpdate(
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Failed to update asset: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Failed to update asset: ${(err as Error).message}`);
 		return 1;
 	}
 }

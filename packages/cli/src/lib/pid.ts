@@ -1,10 +1,10 @@
 // PID file utilities for the service command.
-// PID file lives at ~/.config/bat/bat-cli.pid by default.
+// PID file lives at ~/.config/bat/bat.pid by default.
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { getConfigDir } from "./config.js";
 
-const PID_FILENAME = "bat-cli.pid";
+const PID_FILENAME = "bat.pid";
 
 /**
  * Get the default PID file path.

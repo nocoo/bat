@@ -75,9 +75,12 @@ echo "---"
 failed=0
 
 # TypeScript packages — run vitest in each package dir
-for pkg in shared worker ui; do
+for pkg in shared worker ui cli; do
   pkg_dir="packages/${pkg}"
   filter="@bat/${pkg}"
+  if [ "$pkg" = "cli" ]; then
+    filter="@nocoo/bat"
+  fi
 
   if ! output=$(cd "$pkg_dir" && npx vitest run --coverage 2>&1); then
     echo "✘ ${filter}: unit tests or configured coverage thresholds failed"

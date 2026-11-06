@@ -1,4 +1,4 @@
-// Tests for bat-cli status command
+// Tests for bat status command
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { BatCliConfig } from "../lib/config.js";
 import { createConfigManager } from "../lib/config.js";
-import { runStatus } from "./status.js";
+import status, { runStatus } from "./status.js";
 
 // Mock fetch globally
 const mockFetch = vi.fn<typeof fetch>();
@@ -24,7 +24,7 @@ vi.mock("consola", () => ({
 let tempDir: string;
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-status-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-status-"));
 	mockFetch.mockReset();
 	vi.stubGlobal("fetch", mockFetch);
 });
@@ -104,4 +104,33 @@ describe("runStatus", () => {
 		const exitCode = await runStatus(manager);
 		expect(exitCode).toBe(1);
 	});
+});
+
+test("returns 1 on an unexpected server error", async () => {
+	writeConfig(tempDir, VALID_CONFIG);
+	mockFetch.mockResolvedValueOnce(
+		new Response(JSON.stringify({ error: "internal error" }), { status: 500 }),
+	);
+
+	const exitCode = await runStatus(createConfigManager(tempDir));
+	expect(exitCode).toBe(1);
+});
+
+test("command wrapper uses the isolated config home", async () => {
+	vi.stubEnv("HOME", tempDir);
+	vi.stubEnv("USERPROFILE", tempDir);
+	process.exitCode = undefined;
+	try {
+		const context = { args: {}, rawArgs: [], cmd: status } as unknown as Parameters<
+			NonNullable<typeof status.run>
+		>[0];
+		await status.run?.(context);
+	} finally {
+		vi.unstubAllEnvs();
+	}
+
+	const exitCode = process.exitCode;
+	process.exitCode = undefined;
+	expect(exitCode).toBe(1);
+	expect(mockFetch).not.toHaveBeenCalled();
 });

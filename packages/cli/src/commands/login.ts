@@ -1,4 +1,4 @@
-// bat-cli login — Browser-based OAuth login flow.
+// bat login — Browser-based OAuth login flow.
 // Opens browser → CF Access authenticates → Worker mints CLI token → redirect back.
 
 import { hostname } from "node:os";
@@ -84,9 +84,9 @@ export async function runLogin(
 	// Print next steps
 	info("");
 	info("Next steps:");
-	info("  bat-cli status              — verify connection");
-	info("  bat-cli agent list          — list registered agents");
-	info("  bat-cli agent create ...    — register a new agent");
+	info("  bat status              — verify connection");
+	info("  bat agent list          — list registered agents");
+	info("  bat agent create ...    — register a new agent");
 
 	return 0;
 }

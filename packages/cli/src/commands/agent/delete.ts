@@ -1,4 +1,4 @@
-// bat-cli agent delete — Delete an agent by ID.
+// bat agent delete — Delete an agent by ID.
 
 import type { ConfigManager } from "@nocoo/base-cli";
 import { defineCommand } from "@nocoo/base-cli";
@@ -17,7 +17,7 @@ export async function runAgentDelete(
 	agentId: string,
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -36,7 +36,7 @@ export async function runAgentDelete(
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof ApiError && err.status === 404) {
@@ -47,7 +47,7 @@ export async function runAgentDelete(
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Failed to delete agent: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Failed to delete agent: ${(err as Error).message}`);
 		return 1;
 	}
 }

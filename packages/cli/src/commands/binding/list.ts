@@ -1,4 +1,4 @@
-// bat-cli binding list — List all agent-asset bindings.
+// bat binding list — List all agent-asset bindings.
 
 import type { BindingItem } from "@bat/shared";
 import type { ConfigManager } from "@nocoo/base-cli";
@@ -15,7 +15,7 @@ import { error, info, table, warn } from "../../lib/output.js";
  */
 export async function runBindingList(manager: ConfigManager<BatCliConfig>): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -51,14 +51,14 @@ export async function runBindingList(manager: ConfigManager<BatCliConfig>): Prom
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof NetworkError) {
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Unexpected error: ${(err as Error).message}`);
 		return 1;
 	}
 }

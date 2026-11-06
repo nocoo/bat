@@ -1,4 +1,4 @@
-// bat-cli service — Service management commands.
+// bat service — Service management commands.
 // Subcommands: run, status, install, uninstall
 
 import { defineCommand } from "@nocoo/base-cli";

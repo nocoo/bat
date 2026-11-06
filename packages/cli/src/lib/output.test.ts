@@ -61,6 +61,14 @@ describe("table", () => {
 		expect(allOutput).toContain("Bob");
 	});
 
+	test("pads rows shorter than the headers", () => {
+		table(["A", "B"], [["only-one"], ["1", "2"]]);
+
+		const allOutput = consoleSpy.mock.calls.map((c) => c[0]).join("\n");
+		expect(allOutput).toContain("only-one");
+		expect(allOutput).toContain("1");
+	});
+
 	test("pads columns to widest value", () => {
 		table(["ID", "Name"], [["1", "LongName"]]);
 

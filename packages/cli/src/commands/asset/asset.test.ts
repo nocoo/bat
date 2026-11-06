@@ -1,4 +1,4 @@
-// Tests for bat-cli asset commands (list, create, update, delete, tags)
+// Tests for bat asset commands (list, create, update, delete, tags)
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -49,7 +49,7 @@ const MOCK_ASSET = {
 };
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-asset-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-asset-"));
 	mockFetch.mockReset();
 	vi.stubGlobal("fetch", mockFetch);
 });
@@ -662,6 +662,196 @@ describe("runAssetTags", () => {
 
 		const manager = createConfigManager(tempDir);
 		const exitCode = await runAssetTags(manager, "ast_abc", { tagIds: "999" });
+		expect(exitCode).toBe(1);
+	});
+});
+
+// --- shared error branches ---
+
+function writeIncompleteConfig(dir: string): void {
+	const manager = createConfigManager(dir);
+	manager.write({ worker_url: "https://bat-ingest.worker.hexly.ai" } as BatCliConfig);
+}
+
+const SERVER_ERROR = (): Response =>
+	new Response(JSON.stringify({ error: "internal error" }), { status: 500 });
+
+describe("asset list — formatting", () => {
+	test("formats missing provider and hostname", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify([{ ...MOCK_ASSET, provider: null, hostname: null }]), {
+				status: 200,
+			}),
+		);
+
+		const exitCode = await runAssetList(createConfigManager(tempDir));
+		expect(exitCode).toBe(0);
+	});
+});
+
+describe("asset list — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAssetList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAssetList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("asset create — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAssetCreate(createConfigManager(tempDir), {
+			type: "domain",
+			name: "example.com",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const exitCode = await runAssetCreate(createConfigManager(tempDir), {
+			type: "domain",
+			name: "example.com",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAssetCreate(createConfigManager(tempDir), {
+			type: "domain",
+			name: "example.com",
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("asset update — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAssetUpdate(createConfigManager(tempDir), "ast_abc", {
+			name: "new",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("sends host, subtype, provider and metadata", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(MOCK_ASSET), { status: 200 }));
+
+		const exitCode = await runAssetUpdate(createConfigManager(tempDir), "ast_abc", {
+			hostId: "hst_abc",
+			subtype: "storage",
+			provider: "AWS",
+			metadata: '{"region":"us-east-1"}',
+		});
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(init.body as string)).toStrictEqual({
+			host_id: "hst_abc",
+			subtype: "storage",
+			provider: "AWS",
+			metadata: { region: "us-east-1" },
+		});
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const exitCode = await runAssetUpdate(createConfigManager(tempDir), "ast_abc", {
+			name: "new",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAssetUpdate(createConfigManager(tempDir), "ast_abc", {
+			name: "new",
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("asset delete — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAssetDelete(createConfigManager(tempDir), "ast_abc");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAssetDelete(createConfigManager(tempDir), "ast_abc");
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("asset tags — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAssetTags(createConfigManager(tempDir), "ast_abc", {
+			tagIds: "1",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("clears tags with an empty tag-ids string", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(MOCK_ASSET), { status: 200 }));
+
+		const exitCode = await runAssetTags(createConfigManager(tempDir), "ast_abc", {
+			tagIds: "  ",
+		});
+		expect(exitCode).toBe(0);
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const exitCode = await runAssetTags(createConfigManager(tempDir), "ast_abc", {
+			tagIds: "1",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAssetTags(createConfigManager(tempDir), "ast_abc", {
+			tagIds: "1",
+		});
 		expect(exitCode).toBe(1);
 	});
 });

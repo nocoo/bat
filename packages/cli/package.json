@@ -1,26 +1,52 @@
 {
-	"name": "@bat/cli",
+	"name": "@nocoo/bat",
 	"version": "2.4.2",
-	"private": true,
+	"description": "bat CLI — manage agents, assets and bindings for bat.hexly.ai",
 	"type": "module",
 	"bin": {
-		"bat-cli": "./dist/bin/bat-cli.js"
+		"bat": "./dist/bat.js"
 	},
-	"main": "./dist/index.js",
-	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"LICENSE",
+		"README.md"
+	],
+	"engines": {
+		"node": ">=22"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
 	"scripts": {
-		"build": "tsc",
-		"dev": "bun run src/bin/bat-cli.ts",
+		"build": "rm -rf dist && bun build src/bat.ts --target node --outdir dist",
+		"dev": "bun run src/bat.ts",
 		"typecheck": "tsc --noEmit",
 		"test": "vitest run",
 		"test:coverage": "vitest run --coverage"
 	},
-	"dependencies": {
-		"@bat/shared": "workspace:*",
-		"@nocoo/base-cli": "^0.3.0"
+	"keywords": [
+		"bat",
+		"cli",
+		"monitoring",
+		"workstation"
+	],
+	"author": "nocoo",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/nocoo/bat.git",
+		"directory": "packages/cli"
+	},
+	"homepage": "https://github.com/nocoo/bat#readme",
+	"bugs": {
+		"url": "https://github.com/nocoo/bat/issues"
 	},
 	"devDependencies": {
+		"@bat/shared": "workspace:*",
+		"@nocoo/base-cli": "^0.3.0",
 		"@types/node": "26.6.6",
+		"@types/proper-lockfile": "4.1.4",
+		"proper-lockfile": "4.1.2",
 		"typescript": "^7.0.2",
 		"vitest": "5.0.5"
 	}

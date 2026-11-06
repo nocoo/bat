@@ -1,4 +1,4 @@
-// bat-cli status — Display connection status and config summary.
+// bat status — Display connection status and config summary.
 // Reads local config, verifies token by calling the Worker API.
 
 import type { ConfigManager } from "@nocoo/base-cli";
@@ -15,7 +15,7 @@ import { error, info, success, truncate, warn } from "../lib/output.js";
  */
 export async function runStatus(manager: ConfigManager<BatCliConfig>): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -41,14 +41,14 @@ export async function runStatus(manager: ConfigManager<BatCliConfig>): Promise<n
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof NetworkError) {
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Unexpected error: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Unexpected error: ${(err as Error).message}`);
 		return 1;
 	}
 }

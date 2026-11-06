@@ -1,4 +1,4 @@
-// bat-cli agent heartbeat — Send a heartbeat for agents on this installation.
+// bat agent heartbeat — Send a heartbeat for agents on this installation.
 // Reads source_key from config. Marks missing agents (in DB but not in payload).
 // Only "running" and "stopped" are valid heartbeat statuses.
 
@@ -68,7 +68,7 @@ export async function runAgentHeartbeat(
 	agentsArg: string,
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -101,14 +101,14 @@ export async function runAgentHeartbeat(
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof NetworkError) {
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Heartbeat failed: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Heartbeat failed: ${(err as Error).message}`);
 		return 1;
 	}
 }

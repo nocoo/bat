@@ -1,4 +1,4 @@
-// Tests for bat-cli binding commands (list, create, delete)
+// Tests for bat binding commands (list, create, delete)
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -41,7 +41,7 @@ const MOCK_BINDING = {
 };
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-binding-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-binding-"));
 	mockFetch.mockReset();
 	vi.stubGlobal("fetch", mockFetch);
 });
@@ -261,5 +261,93 @@ describe("runBindingDelete", () => {
 			assetId: "ast_xyz",
 		});
 		expect(exitCode).toBe(1);
+	});
+});
+
+// --- shared error branches ---
+
+function writeIncompleteConfig(dir: string): void {
+	const manager = createConfigManager(dir);
+	manager.write({ worker_url: "https://bat-ingest.worker.hexly.ai" } as BatCliConfig);
+}
+
+const SERVER_ERROR = (): Response =>
+	new Response(JSON.stringify({ error: "internal error" }), { status: 500 });
+
+describe("binding list — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runBindingList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runBindingList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("binding create — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runBindingCreate(createConfigManager(tempDir), {
+			agentId: "agt_abc",
+			assetId: "ast_xyz",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runBindingCreate(createConfigManager(tempDir), {
+			agentId: "agt_abc",
+			assetId: "ast_xyz",
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("binding delete — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runBindingDelete(createConfigManager(tempDir), {
+			agentId: "agt_abc",
+			assetId: "ast_xyz",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runBindingDelete(createConfigManager(tempDir), {
+			agentId: "agt_abc",
+			assetId: "ast_xyz",
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("binding list — formatting", () => {
+	test("formats a null agent nickname", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify([{ ...MOCK_BINDING, agent_nickname: null }]), { status: 200 }),
+		);
+
+		const exitCode = await runBindingList(createConfigManager(tempDir));
+		expect(exitCode).toBe(0);
 	});
 });

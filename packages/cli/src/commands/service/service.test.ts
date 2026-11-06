@@ -1,7 +1,7 @@
-// Tests for bat-cli service commands (run, status, install, uninstall)
+// Tests for bat service commands (run, status, install, uninstall)
 // and PID file utilities.
 
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -43,7 +43,7 @@ const VALID_CONFIG: BatCliConfig = {
 };
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-service-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-service-"));
 	mockFetch.mockReset();
 	vi.stubGlobal("fetch", mockFetch);
 });
@@ -63,7 +63,7 @@ function writeConfig(dir: string, config: BatCliConfig): void {
 describe("PID file utilities", () => {
 	test("getPidFilePath returns path in config dir", () => {
 		const path = getPidFilePath("/tmp/bat");
-		expect(path).toBe("/tmp/bat/bat-cli.pid");
+		expect(path).toBe("/tmp/bat/bat.pid");
 	});
 
 	test("writePidFile and readPidFile roundtrip", () => {
@@ -379,15 +379,15 @@ describe("escapeXml", () => {
 describe("generatePlist", () => {
 	test("generates valid plist XML", () => {
 		const plist = generatePlist({
-			label: "ai.hexly.bat-cli",
-			batCliPath: "/usr/local/bin/bat-cli",
+			label: "ai.hexly.bat",
+			batPath: "/usr/local/bin/bat",
 			agents: "a:running",
 			intervalSec: 60,
 			logPath: "/tmp/bat.log",
 		});
 
-		expect(plist).toContain("<string>ai.hexly.bat-cli</string>");
-		expect(plist).toContain("<string>/usr/local/bin/bat-cli</string>");
+		expect(plist).toContain("<string>ai.hexly.bat</string>");
+		expect(plist).toContain("<string>/usr/local/bin/bat</string>");
 		expect(plist).toContain("<string>service</string>");
 		expect(plist).toContain("<string>run</string>");
 		expect(plist).toContain("<string>a:running</string>");
@@ -398,8 +398,8 @@ describe("generatePlist", () => {
 
 	test("escapes XML special characters in agents", () => {
 		const plist = generatePlist({
-			label: "ai.hexly.bat-cli",
-			batCliPath: "/bin/bat-cli",
+			label: "ai.hexly.bat",
+			batPath: "/bin/bat",
 			agents: "a&b:running",
 			intervalSec: 60,
 			logPath: "/tmp/bat.log",
@@ -426,15 +426,15 @@ describe("runServiceInstall", () => {
 		const manager = createConfigManager(tempDir);
 		const exitCode = await runServiceInstall(manager, "a:running", {
 			plistDir,
-			batCliPath: "/usr/local/bin/bat-cli",
+			batPath: "/usr/local/bin/bat",
 		});
 		expect(exitCode).toBe(0);
 
-		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
 		expect(existsSync(plistPath)).toBe(true);
 
 		const content = readFileSync(plistPath, "utf-8");
-		expect(content).toContain("<string>/usr/local/bin/bat-cli</string>");
+		expect(content).toContain("<string>/usr/local/bin/bat</string>");
 		expect(content).toContain("<string>a:running</string>");
 	});
 
@@ -444,12 +444,12 @@ describe("runServiceInstall", () => {
 
 		const manager = createConfigManager(tempDir);
 		// Install first
-		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
+		await runServiceInstall(manager, "a:running", { plistDir, batPath: "/bin/bat" });
 
 		// Second install should fail
 		const exitCode = await runServiceInstall(manager, "a:running", {
 			plistDir,
-			batCliPath: "/bin/bat-cli",
+			batPath: "/bin/bat",
 		});
 		expect(exitCode).toBe(1);
 	});
@@ -461,11 +461,11 @@ describe("runServiceInstall", () => {
 		const manager = createConfigManager(tempDir);
 		const exitCode = await runServiceInstall(manager, "a:unknown", {
 			plistDir,
-			batCliPath: "/bin/bat-cli",
+			batPath: "/bin/bat",
 		});
 		expect(exitCode).toBe(1);
 
-		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
 		expect(existsSync(plistPath)).toBe(false);
 	});
 });
@@ -490,7 +490,7 @@ describe("runServiceUninstall", () => {
 
 		const manager = createConfigManager(tempDir);
 		// Install first
-		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
+		await runServiceInstall(manager, "a:running", { plistDir, batPath: "/bin/bat" });
 
 		// Track argv
 		const calls: { cmd: string; args: string[] }[] = [];
@@ -508,10 +508,10 @@ describe("runServiceUninstall", () => {
 		expect(calls[0].args[0]).toBe("bootout");
 		expect(calls[0].args[1]).toMatch(/^gui\/\d+$/);
 		// plistPath is a separate arg, not concatenated into a shell string
-		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat-cli.plist"));
+		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat.plist"));
 
 		// Verify plist removed
-		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
 		expect(existsSync(plistPath)).toBe(false);
 	});
 
@@ -521,7 +521,7 @@ describe("runServiceUninstall", () => {
 
 		writeConfig(tempDir, VALID_CONFIG);
 		const manager = createConfigManager(tempDir);
-		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
+		await runServiceInstall(manager, "a:running", { plistDir, batPath: "/bin/bat" });
 
 		const calls: { cmd: string; args: string[] }[] = [];
 		const trackingRunner: CommandRunner = (cmd: string, args: string[]) => {
@@ -532,7 +532,7 @@ describe("runServiceUninstall", () => {
 		expect(exitCode).toBe(0);
 
 		// plistPath with spaces stays as one arg, not split by shell
-		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat-cli.plist"));
+		expect(calls[0].args[2]).toBe(join(plistDir, "ai.hexly.bat.plist"));
 		expect(calls[0].args[2]).toContain("path with spaces");
 	});
 
@@ -541,7 +541,7 @@ describe("runServiceUninstall", () => {
 		const plistDir = join(tempDir, "LaunchAgents");
 
 		const manager = createConfigManager(tempDir);
-		await runServiceInstall(manager, "a:running", { plistDir, batCliPath: "/bin/bat-cli" });
+		await runServiceInstall(manager, "a:running", { plistDir, batPath: "/bin/bat" });
 
 		// Simulate "not loaded" error
 		const notLoadedRunner: CommandRunner = (_cmd, _args) => {
@@ -554,7 +554,7 @@ describe("runServiceUninstall", () => {
 		});
 		expect(exitCode).toBe(0);
 
-		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
 		expect(existsSync(plistPath)).toBe(false);
 	});
 
@@ -565,7 +565,7 @@ describe("runServiceUninstall", () => {
 		const manager = createConfigManager(tempDir);
 		await runServiceInstall(manager, "a:running", {
 			plistDir,
-			batCliPath: "/bin/bat-cli",
+			batPath: "/bin/bat",
 			runCommand: (_cmd, _args) => {
 				/* noop */
 			},
@@ -579,7 +579,281 @@ describe("runServiceUninstall", () => {
 		const exitCode = await runServiceUninstall(manager, { plistDir, runCommand: failRunner });
 		expect(exitCode).toBe(0);
 
-		const plistPath = join(plistDir, "ai.hexly.bat-cli.plist");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
 		expect(existsSync(plistPath)).toBe(false);
+	});
+});
+
+// --- remaining service branches ---
+
+describe("runServiceLoop — config, parse and signal branches", () => {
+	test("rejects config without credentials", async () => {
+		const manager = createConfigManager(tempDir);
+		manager.write({ worker_url: "https://bat-ingest.worker.hexly.ai" } as BatCliConfig);
+
+		const exitCode = await runServiceLoop(manager, "a:running");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects an entry with an empty match key", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const exitCode = await runServiceLoop(createConfigManager(tempDir), ":running");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("ignores a repeated abort notification", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const pidPath = join(tempDir, "repeated.pid");
+		mockFetch.mockImplementation(() =>
+			Promise.resolve(
+				new Response(JSON.stringify({ updated: 1, created: 0, missing: 0 }), { status: 200 }),
+			),
+		);
+
+		let notify: (() => void) | undefined;
+		const signal = {
+			aborted: false,
+			addEventListener: (_event: string, handler: () => void) => {
+				notify = handler;
+			},
+		} as unknown as AbortSignal;
+
+		const loop = runServiceLoop(createConfigManager(tempDir), "a:running", {
+			pidFilePath: pidPath,
+			pid: 44,
+			signal,
+		});
+		await new Promise((resolve) => setTimeout(resolve, 20));
+		notify?.();
+		notify?.();
+
+		await expect(loop).resolves.toBe(0);
+		expect(existsSync(pidPath)).toBe(false);
+	});
+
+	test("sends interval heartbeats until abort", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const pidPath = join(tempDir, "interval.pid");
+		mockFetch.mockImplementation(() =>
+			Promise.resolve(
+				new Response(JSON.stringify({ updated: 1, created: 0, missing: 0 }), { status: 200 }),
+			),
+		);
+
+		vi.useFakeTimers();
+		try {
+			const controller = new AbortController();
+			const loop = runServiceLoop(createConfigManager(tempDir), "a:running", {
+				pidFilePath: pidPath,
+				pid: 45,
+				signal: controller.signal,
+			});
+
+			await vi.advanceTimersByTimeAsync(0);
+			await vi.advanceTimersByTimeAsync(1000);
+			controller.abort();
+			await loop;
+		} finally {
+			vi.useRealTimers();
+		}
+
+		expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+		expect(existsSync(pidPath)).toBe(false);
+	});
+
+	test("production mode stops on SIGINT", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const pidPath = join(tempDir, "signal.pid");
+		mockFetch.mockImplementation(() =>
+			Promise.resolve(
+				new Response(JSON.stringify({ updated: 1, created: 0, missing: 0 }), { status: 200 }),
+			),
+		);
+
+		vi.useFakeTimers();
+		try {
+			const loop = runServiceLoop(createConfigManager(tempDir), "a:running", {
+				pidFilePath: pidPath,
+				pid: 46,
+			});
+
+			await vi.advanceTimersByTimeAsync(0);
+			await vi.advanceTimersByTimeAsync(1000);
+			process.emit("SIGINT");
+			await loop;
+		} finally {
+			vi.useRealTimers();
+		}
+
+		expect(mockFetch.mock.calls.length).toBeGreaterThanOrEqual(2);
+		expect(existsSync(pidPath)).toBe(false);
+	});
+});
+
+describe("runServiceUninstall — default runner", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	function installFakeLaunchctl(body: string): void {
+		const binDir = join(tempDir, "bin");
+		mkdirSync(binDir, { recursive: true });
+		writeFileSync(join(binDir, "launchctl"), `#!/bin/sh\n${body}\n`, { mode: 0o755 });
+		vi.stubEnv("PATH", `${binDir}:${process.env.PATH ?? ""}`);
+	}
+
+	test("warns with stderr when launchctl fails", async () => {
+		installFakeLaunchctl("echo 'boom' >&2\nexit 1");
+		const plistDir = join(tempDir, "LaunchAgents");
+		mkdirSync(plistDir, { recursive: true });
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
+		writeFileSync(plistPath, "plist");
+
+		const exitCode = await runServiceUninstall(createConfigManager(tempDir), { plistDir });
+
+		expect(exitCode).toBe(0);
+		expect(existsSync(plistPath)).toBe(false);
+	});
+
+	test("warns with exit code when launchctl writes no stderr", async () => {
+		installFakeLaunchctl("exit 3");
+		const plistDir = join(tempDir, "LaunchAgents");
+		mkdirSync(plistDir, { recursive: true });
+		writeFileSync(join(plistDir, "ai.hexly.bat.plist"), "plist");
+
+		const exitCode = await runServiceUninstall(createConfigManager(tempDir), { plistDir });
+
+		expect(exitCode).toBe(0);
+	});
+
+	test("returns 1 when the plist cannot be removed", async () => {
+		const plistDir = join(tempDir, "LaunchAgents");
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
+		mkdirSync(plistPath, { recursive: true });
+
+		const exitCode = await runServiceUninstall(createConfigManager(tempDir), {
+			plistDir,
+			runCommand: () => undefined,
+		});
+
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("runServiceInstall — config branch", () => {
+	test("rejects config without credentials", async () => {
+		const manager = createConfigManager(tempDir);
+		manager.write({ worker_url: "https://bat-ingest.worker.hexly.ai" } as BatCliConfig);
+
+		const exitCode = await runServiceInstall(manager, "a:running", {
+			plistDir: join(tempDir, "LaunchAgents"),
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("readPidFile — unreadable path", () => {
+	test("returns null when the path cannot be read", () => {
+		expect(readPidFile(tempDir)).toBeNull();
+	});
+});
+
+// --- remaining branch coverage ---
+
+describe("sendHeartbeat — unexpected API error", () => {
+	test("returns false on a server error", async () => {
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: "internal error" }), { status: 500 }),
+		);
+
+		const client = new (await import("../../lib/http.js")).HttpClient(
+			"https://bat-ingest.worker.hexly.ai",
+			"token",
+		);
+
+		const sent = await sendHeartbeat(client, {
+			source_key: "550e8400-e29b-41d4-a716-446655440000",
+			agents: [{ match_key: "a", status: "running" }],
+		});
+		expect(sent).toBe(false);
+	});
+});
+
+describe("runServiceInstall — plist branches", () => {
+	test("returns 1 when the plist already exists", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const plistDir = join(tempDir, "LaunchAgents");
+		mkdirSync(plistDir, { recursive: true });
+		writeFileSync(join(plistDir, "ai.hexly.bat.plist"), "plist");
+
+		const exitCode = await runServiceInstall(createConfigManager(tempDir), "a:running", {
+			plistDir,
+			batPath: "/bin/bat",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("creates the launch agents directory and falls back to the bat bin name", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const plistDir = join(tempDir, "nested", "LaunchAgents");
+		const argvPath = process.argv[1];
+		process.argv[1] = undefined as unknown as string;
+
+		try {
+			const exitCode = await runServiceInstall(createConfigManager(tempDir), "a:running", {
+				plistDir,
+			});
+			expect(exitCode).toBe(0);
+		} finally {
+			process.argv[1] = argvPath;
+		}
+
+		const plist = readFileSync(join(plistDir, "ai.hexly.bat.plist"), "utf-8");
+		expect(plist).toContain("<string>bat</string>");
+	});
+});
+
+describe("runServiceUninstall — launchctl success", () => {
+	test("unloads and removes the plist", async () => {
+		const binDir = join(tempDir, "bin");
+		mkdirSync(binDir, { recursive: true });
+		writeFileSync(join(binDir, "launchctl"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+		vi.stubEnv("PATH", `${binDir}:${process.env.PATH ?? ""}`);
+		const plistDir = join(tempDir, "LaunchAgents");
+		mkdirSync(plistDir, { recursive: true });
+		const plistPath = join(plistDir, "ai.hexly.bat.plist");
+		writeFileSync(plistPath, "plist");
+
+		try {
+			const exitCode = await runServiceUninstall(createConfigManager(tempDir), { plistDir });
+			expect(exitCode).toBe(0);
+			expect(existsSync(plistPath)).toBe(false);
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+});
+
+describe("runServiceInstall — default launch agents directory", () => {
+	test("installs into the per-user launch agents directory", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		const launchAgents = join(tempDir, "Library", "LaunchAgents");
+		mkdirSync(launchAgents, { recursive: true });
+		vi.stubEnv("HOME", tempDir);
+		vi.stubEnv("USERPROFILE", tempDir);
+
+		try {
+			const exitCode = await runServiceInstall(createConfigManager(tempDir), "a:running", {
+				batPath: "/bin/bat",
+			});
+			expect(exitCode).toBe(0);
+		} finally {
+			vi.unstubAllEnvs();
+		}
+
+		expect(existsSync(join(launchAgents, "ai.hexly.bat.plist"))).toBe(true);
 	});
 });

@@ -243,6 +243,83 @@ describe("HttpClient", () => {
 		});
 	});
 
+	describe("error body parsing", () => {
+		test("falls back to the HTTP status when the body has no error field", async () => {
+			mockFetch.mockResolvedValueOnce(mockResponse(500, { message: "nope" }));
+
+			const client = new HttpClient("https://bat.hexly.ai", "token");
+			await expect(client.get("/api/agents")).rejects.toThrow("HTTP 500");
+		});
+
+		test("falls back to the HTTP status when the body is not JSON", async () => {
+			mockFetch.mockResolvedValueOnce(
+				new Response("plain text", { status: 500, headers: { "Content-Type": "text/plain" } }),
+			);
+
+			const client = new HttpClient("https://bat.hexly.ai", "token");
+			await expect(client.get("/api/agents")).rejects.toThrow("HTTP 500");
+		});
+	});
+
+	describe("cancellation", () => {
+		test("keeps the timeout running while the body is read", async () => {
+			mockFetch.mockImplementationOnce((_url, init) => {
+				const signal = (init as RequestInit).signal as AbortSignal;
+				return Promise.resolve({
+					ok: true,
+					status: 200,
+					json: () =>
+						new Promise((_resolve, reject) => {
+							signal.addEventListener("abort", () => {
+								reject(new DOMException("Aborted", "AbortError"));
+							});
+						}),
+				} as unknown as Response);
+			});
+
+			const client = new HttpClient("https://bat.hexly.ai", "token", 5);
+			await expect(client.get("/api/agents")).rejects.toThrow("Request timeout after 5ms");
+		});
+
+		test("honours an external abort signal", async () => {
+			mockFetch.mockImplementationOnce((_url, init) => {
+				const signal = (init as RequestInit).signal as AbortSignal;
+				return new Promise((_resolve, reject) => {
+					signal.addEventListener("abort", () => {
+						reject(new DOMException("Aborted", "AbortError"));
+					});
+				});
+			});
+
+			const controller = new AbortController();
+			const client = new HttpClient("https://bat.hexly.ai", "token", 10_000, controller.signal);
+			const pending = client.get("/api/agents");
+			controller.abort();
+			await expect(pending).rejects.toThrow("Request aborted");
+		});
+
+		test("rejects immediately when the signal is already aborted", async () => {
+			mockFetch.mockImplementationOnce(async (_url, init) => {
+				expect((init as RequestInit).signal?.aborted).toBe(true);
+				throw new DOMException("Aborted", "AbortError");
+			});
+
+			const controller = new AbortController();
+			controller.abort();
+			const client = new HttpClient("https://bat.hexly.ai", "token", 10_000, controller.signal);
+			await expect(client.get("/api/agents")).rejects.toThrow("Request aborted");
+		});
+	});
+
+	describe("non-Error failures", () => {
+		test("wraps a thrown non-Error value as NetworkError", async () => {
+			mockFetch.mockRejectedValueOnce("boom");
+
+			const client = new HttpClient("https://bat.hexly.ai", "token");
+			await expect(client.get("/api/agents")).rejects.toThrow("Unknown network error");
+		});
+	});
+
 	describe("URL handling", () => {
 		test("strips trailing slash from base URL", async () => {
 			mockFetch.mockResolvedValueOnce(mockResponse(200, []));

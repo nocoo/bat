@@ -1,5 +1,6 @@
 // HTTP client for bat Worker API communication.
-// Wraps fetch with Bearer token auth, timeout, and typed error classes.
+// Wraps fetch with Bearer token auth, a timeout that covers the whole response
+// body, and an optional external abort signal.
 
 /** Network-level error (connection failed, timeout, DNS, etc.) */
 export class NetworkError extends Error {
@@ -36,17 +37,25 @@ const DEFAULT_TIMEOUT_MS = 30_000;
  *
  * All requests include `Authorization: Bearer <token>` when a token is set.
  * Non-2xx responses throw ApiError/AuthError; network failures throw NetworkError.
+ * The timeout covers reading the response body, not only the headers.
  */
 export class HttpClient {
 	private readonly baseUrl: string;
 	private readonly token: string | undefined;
 	private readonly timeoutMs: number;
+	private readonly signal: AbortSignal | undefined;
 
-	constructor(baseUrl: string, token?: string, timeoutMs = DEFAULT_TIMEOUT_MS) {
+	constructor(
+		baseUrl: string,
+		token?: string,
+		timeoutMs = DEFAULT_TIMEOUT_MS,
+		signal?: AbortSignal,
+	) {
 		// Strip trailing slash for clean path joining
 		this.baseUrl = baseUrl.replace(/\/$/, "");
 		this.token = token;
 		this.timeoutMs = timeoutMs;
+		this.signal = signal;
 	}
 
 	/** GET request */
@@ -86,7 +95,21 @@ export class HttpClient {
 		}
 
 		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), this.timeoutMs);
+		let timedOut = false;
+		const onExternalAbort = (): void => {
+			controller.abort();
+		};
+		if (this.signal) {
+			if (this.signal.aborted) {
+				controller.abort();
+			} else {
+				this.signal.addEventListener("abort", onExternalAbort, { once: true });
+			}
+		}
+		const timer = setTimeout(() => {
+			timedOut = true;
+			controller.abort();
+		}, this.timeoutMs);
 
 		try {
 			const init: RequestInit = {
@@ -99,8 +122,6 @@ export class HttpClient {
 			}
 
 			const res = await fetch(url, init);
-
-			clearTimeout(timer);
 
 			if (!res.ok) {
 				// Try to extract error message from JSON body
@@ -127,8 +148,6 @@ export class HttpClient {
 
 			return (await res.json()) as T;
 		} catch (err) {
-			clearTimeout(timer);
-
 			// Re-throw our own errors
 			if (err instanceof ApiError) {
 				throw err;
@@ -136,12 +155,18 @@ export class HttpClient {
 
 			if (err instanceof Error) {
 				if (err.name === "AbortError") {
-					throw new NetworkError(`Request timeout after ${this.timeoutMs}ms`);
+					if (timedOut) {
+						throw new NetworkError(`Request timeout after ${this.timeoutMs}ms`);
+					}
+					throw new NetworkError("Request aborted");
 				}
 				throw new NetworkError(err.message);
 			}
 
 			throw new NetworkError("Unknown network error");
+		} finally {
+			clearTimeout(timer);
+			this.signal?.removeEventListener("abort", onExternalAbort);
 		}
 	}
 }

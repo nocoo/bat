@@ -11,7 +11,7 @@
 		"dev:built": "bun scripts/environments/launcher.mjs --built",
 		"demo:reset": "bun scripts/environments/launcher.mjs --reset-demo",
 		"release": "bun scripts/release.ts",
-		"build": "turbo build --filter=@bat/ui",
+		"build": "turbo build --filter=@bat/ui --filter=@nocoo/bat",
 		"deploy": "turbo build --filter=@bat/ui && cd packages/worker && npx wrangler deploy --env production",
 		"typecheck": "turbo typecheck",
 		"lint": "biome check --error-on-warnings .",

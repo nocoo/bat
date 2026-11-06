@@ -5,7 +5,7 @@
 			"dependsOn": ["^build"],
 			"outputs": ["dist/**"]
 		},
-		"@bat/cli#build": {
+		"@nocoo/bat#build": {
 			"dependsOn": ["^build"],
 			"outputs": ["dist/**"]
 		},

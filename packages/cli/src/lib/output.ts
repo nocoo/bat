@@ -32,30 +32,17 @@ export function table(headers: string[], rows: string[][]): void {
 		return;
 	}
 
-	// Calculate column widths
-	const widths = headers.map((h, i) => {
-		let max = h.length;
-		for (const row of rows) {
-			const cell = row[i] ?? "";
-			if (cell.length > max) {
-				max = cell.length;
-			}
-		}
-		return max;
-	});
+	const columns = headers.map((header, index) => ({
+		header,
+		width: rows.reduce((max, row) => Math.max(max, (row[index] ?? "").length), header.length),
+	}));
 
-	// Header line
-	const headerLine = headers.map((h, i) => h.padEnd(widths[i] ?? 0)).join("  ");
-	console.log(pc.bold(headerLine));
+	console.log(pc.bold(columns.map((column) => column.header.padEnd(column.width)).join("  ")));
+	console.log(pc.dim(columns.map((column) => "─".repeat(column.width)).join("──")));
 
-	// Separator
-	const sepLine = widths.map((w) => "─".repeat(w)).join("──");
-	console.log(pc.dim(sepLine));
-
-	// Data rows
 	for (const row of rows) {
-		const line = row.map((cell, i) => cell.padEnd(widths[i] ?? 0)).join("  ");
-		console.log(line);
+		const line = columns.map((column, index) => (row[index] ?? "").padEnd(column.width));
+		console.log(line.join("  "));
 	}
 }
 

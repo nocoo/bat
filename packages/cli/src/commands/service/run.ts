@@ -1,4 +1,4 @@
-// bat-cli service run — Foreground heartbeat loop.
+// bat service run — Foreground heartbeat loop.
 // Sends periodic heartbeats at the configured interval.
 // Writes a PID file; cleans up on SIGINT/SIGTERM.
 
@@ -80,14 +80,14 @@ export async function sendHeartbeat(
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return false;
 		}
 		if (err instanceof NetworkError) {
 			warn(`Heartbeat failed (will retry): ${err.message}`);
 			return false;
 		}
-		warn(`Heartbeat failed (will retry): ${err instanceof Error ? err.message : String(err)}`);
+		warn(`Heartbeat failed (will retry): ${(err as Error).message}`);
 		return false;
 	}
 }
@@ -113,7 +113,7 @@ export async function runServiceLoop(
 	opts: ServiceLoopOptions = {},
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -204,9 +204,6 @@ export async function runServiceLoop(
 				let stopped = false;
 
 				const onSignal = () => {
-					if (stopped) {
-						return;
-					}
 					stopped = true;
 					if (timer !== null) {
 						clearInterval(timer);

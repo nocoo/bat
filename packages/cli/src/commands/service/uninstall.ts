@@ -1,4 +1,4 @@
-// bat-cli service uninstall — Remove the macOS launchd plist and bootout the service.
+// bat service uninstall — Remove the macOS launchd plist and bootout the service.
 // Tries launchctl bootout first, then removes the plist file.
 
 import { spawnSync } from "node:child_process";
@@ -45,7 +45,7 @@ export async function runServiceUninstall(
 		run("launchctl", ["bootout", `gui/${uid}`, plistPath]);
 		info("Service unloaded from launchd.");
 	} catch (err) {
-		const msg = err instanceof Error ? err.message : String(err);
+		const msg = (err as Error).message;
 		if (msg.includes("Could not find specified service") || msg.includes("No such process")) {
 			info("Service was not loaded in launchd (already stopped).");
 		} else {
@@ -59,7 +59,7 @@ export async function runServiceUninstall(
 		success(`Plist removed: ${plistPath}`);
 		return 0;
 	} catch (err) {
-		error(`Failed to remove plist: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Failed to remove plist: ${(err as Error).message}`);
 		return 1;
 	}
 }

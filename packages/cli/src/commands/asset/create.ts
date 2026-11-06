@@ -1,4 +1,4 @@
-// bat-cli asset create — Create a new asset.
+// bat asset create — Create a new asset.
 // Required: type (positional), name (positional).
 // Optional: --host-id, --subtype, --provider, --status, --metadata (JSON string).
 
@@ -29,7 +29,7 @@ export async function runAssetCreate(
 	},
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -108,14 +108,14 @@ export async function runAssetCreate(
 	} catch (err) {
 		if (err instanceof AuthError) {
 			error(`Authentication failed (${err.status}): ${err.message}`);
-			warn("Token may be revoked. Run 'bat-cli login' to re-authenticate.");
+			warn("Token may be revoked. Run 'bat login' to re-authenticate.");
 			return 1;
 		}
 		if (err instanceof NetworkError) {
 			error(`Cannot connect to Worker: ${err.message}`);
 			return 1;
 		}
-		error(`Failed to create asset: ${err instanceof Error ? err.message : String(err)}`);
+		error(`Failed to create asset: ${(err as Error).message}`);
 		return 1;
 	}
 }

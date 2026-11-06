@@ -1,5 +1,5 @@
-// bat-cli service install — Install a macOS launchd plist for the heartbeat service.
-// Creates ~/Library/LaunchAgents/ai.hexly.bat-cli.plist
+// bat service install — Install a macOS launchd plist for the heartbeat service.
+// Creates ~/Library/LaunchAgents/ai.hexly.bat.plist
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -9,28 +9,25 @@ import { defineCommand } from "@nocoo/base-cli";
 import type { BatCliConfig } from "../../lib/config.js";
 import { createConfigManager, getHeartbeatInterval, validateConfig } from "../../lib/config.js";
 import { error, info, success, warn } from "../../lib/output.js";
+import { escapeXml } from "../../lib/xml.js";
 import { parseAgentsArg } from "./run.js";
 
-const PLIST_LABEL = "ai.hexly.bat-cli";
-const LAUNCH_AGENTS_DIR = join(homedir(), "Library", "LaunchAgents");
+const PLIST_LABEL = "ai.hexly.bat";
 
 /**
- * Escape a string for safe embedding in XML text nodes.
+ * Get the per-user launchd directory. Resolved lazily so tests can isolate HOME.
  */
-export function escapeXml(str: string): string {
-	return str
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;")
-		.replace(/'/g, "&apos;");
+export function getLaunchAgentsDir(): string {
+	return join(homedir(), "Library", "LaunchAgents");
 }
+
+export { escapeXml } from "../../lib/xml.js";
 
 /**
  * Get the plist file path.
  */
 export function getPlistPath(dir?: string): string {
-	return join(dir ?? LAUNCH_AGENTS_DIR, `${PLIST_LABEL}.plist`);
+	return join(dir ?? getLaunchAgentsDir(), `${PLIST_LABEL}.plist`);
 }
 
 /**
@@ -39,7 +36,7 @@ export function getPlistPath(dir?: string): string {
  */
 export function generatePlist(opts: {
 	label: string;
-	batCliPath: string;
+	batPath: string;
 	agents: string;
 	intervalSec: number;
 	logPath: string;
@@ -52,7 +49,7 @@ export function generatePlist(opts: {
 	<string>${escapeXml(opts.label)}</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>${escapeXml(opts.batCliPath)}</string>
+		<string>${escapeXml(opts.batPath)}</string>
 		<string>service</string>
 		<string>run</string>
 		<string>${escapeXml(opts.agents)}</string>
@@ -80,10 +77,10 @@ export function generatePlist(opts: {
 export async function runServiceInstall(
 	manager: ConfigManager<BatCliConfig>,
 	agentsArg: string,
-	opts: { plistDir?: string; batCliPath?: string } = {},
+	opts: { plistDir?: string; batPath?: string } = {},
 ): Promise<number> {
 	if (!manager.exists()) {
-		error("Not configured — run 'bat-cli login' first.");
+		error("Not configured — run 'bat login' first.");
 		return 1;
 	}
 
@@ -102,11 +99,11 @@ export async function runServiceInstall(
 	}
 
 	const plistPath = getPlistPath(opts.plistDir);
-	const plistDir = opts.plistDir ?? LAUNCH_AGENTS_DIR;
+	const plistDir = opts.plistDir ?? getLaunchAgentsDir();
 
 	if (existsSync(plistPath)) {
 		warn(`Plist already exists: ${plistPath}`);
-		warn("Run 'bat-cli service uninstall' first to replace it.");
+		warn("Run 'bat service uninstall' first to replace it.");
 		return 1;
 	}
 
@@ -115,13 +112,13 @@ export async function runServiceInstall(
 		mkdirSync(plistDir, { recursive: true });
 	}
 
-	const batCliPath = opts.batCliPath ?? process.argv[1] ?? "bat-cli";
+	const batPath = opts.batPath ?? process.argv[1] ?? "bat";
 	const logPath = join(homedir(), ".config", "bat", "service.log");
 	const intervalSec = getHeartbeatInterval(config);
 
 	const plist = generatePlist({
 		label: PLIST_LABEL,
-		batCliPath,
+		batPath,
 		agents: agentsArg,
 		intervalSec,
 		logPath,

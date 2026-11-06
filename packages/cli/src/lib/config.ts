@@ -64,13 +64,13 @@ export function getHeartbeatInterval(config: BatCliConfig): number {
  */
 export function validateConfig(config: BatCliConfig): string | null {
 	if (!config.worker_url || typeof config.worker_url !== "string") {
-		return "worker_url is missing — run 'bat-cli login' first";
+		return "worker_url is missing — run 'bat login' first";
 	}
 	if (!config.api_key || typeof config.api_key !== "string") {
-		return "api_key is missing — run 'bat-cli login' first";
+		return "api_key is missing — run 'bat login' first";
 	}
 	if (!config.source_key || typeof config.source_key !== "string") {
-		return "source_key is missing — run 'bat-cli login' first";
+		return "source_key is missing — run 'bat login' first";
 	}
 	return null;
 }

@@ -1,4 +1,4 @@
-// bat-cli service status — Check if the heartbeat service is running.
+// bat service status — Check if the heartbeat service is running.
 
 import type { ConfigManager } from "@nocoo/base-cli";
 import { defineCommand } from "@nocoo/base-cli";

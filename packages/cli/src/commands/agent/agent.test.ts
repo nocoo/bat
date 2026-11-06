@@ -1,4 +1,4 @@
-// Tests for bat-cli agent commands (list, create, update, delete, heartbeat, tags)
+// Tests for bat agent commands (list, create, update, delete, heartbeat, tags)
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -52,7 +52,7 @@ const MOCK_AGENT = {
 };
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-agent-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-agent-"));
 	mockFetch.mockReset();
 	vi.stubGlobal("fetch", mockFetch);
 });
@@ -164,6 +164,16 @@ describe("runAgentCreate", () => {
 		expect(body.role).toBe("monitor");
 		expect(body.runtime_app).toBe("bat-probe");
 		expect(body.runtime_version).toBe("1.0.0");
+	});
+
+	test("formats a null nickname in the response", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ ...MOCK_AGENT, nickname: null }), { status: 201 }),
+		);
+
+		const exitCode = await runAgentCreate(createConfigManager(tempDir), { matchKey: "a" });
+		expect(exitCode).toBe(0);
 	});
 
 	test("omits optional fields when not provided", async () => {
@@ -778,5 +788,206 @@ describe("runAgentTags", () => {
 		});
 		expect(exitCode).toBe(1);
 		expect(mockFetch).not.toHaveBeenCalled();
+	});
+});
+
+// --- shared error branches ---
+
+function writeIncompleteConfig(dir: string): void {
+	const manager = createConfigManager(dir);
+	manager.write({ worker_url: "https://bat-ingest.worker.hexly.ai" } as BatCliConfig);
+}
+
+const SERVER_ERROR = (): Response =>
+	new Response(JSON.stringify({ error: "internal error" }), { status: 500 });
+
+describe("agent list — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("formats a null nickname", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify([{ ...MOCK_AGENT, nickname: null }]), { status: 200 }),
+		);
+
+		const exitCode = await runAgentList(createConfigManager(tempDir));
+		expect(exitCode).toBe(0);
+	});
+
+	test("formats a null last_seen_at", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify([{ ...MOCK_AGENT, last_seen_at: null }]), { status: 200 }),
+		);
+
+		const exitCode = await runAgentList(createConfigManager(tempDir));
+		expect(exitCode).toBe(0);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentList(createConfigManager(tempDir));
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("agent create — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentCreate(createConfigManager(tempDir), { matchKey: "a" });
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const exitCode = await runAgentCreate(createConfigManager(tempDir), { matchKey: "a" });
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentCreate(createConfigManager(tempDir), { matchKey: "a" });
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("agent update — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentUpdate(createConfigManager(tempDir), "agt_abc", {});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("sends role, runtime app and runtime version", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(new Response(JSON.stringify(MOCK_AGENT), { status: 200 }));
+
+		const exitCode = await runAgentUpdate(createConfigManager(tempDir), "agt_abc", {
+			role: "monitor",
+			runtimeApp: "bat-probe",
+			runtimeVersion: "1.2.3",
+		});
+		expect(exitCode).toBe(0);
+
+		const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+		expect(JSON.parse(init.body as string)).toStrictEqual({
+			role: "monitor",
+			runtime_app: "bat-probe",
+			runtime_version: "1.2.3",
+		});
+	});
+
+	test("returns 1 on auth error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ error: "Invalid API key" }), { status: 403 }),
+		);
+
+		const exitCode = await runAgentUpdate(createConfigManager(tempDir), "agt_abc", {
+			nickname: "x",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on network error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+		const exitCode = await runAgentUpdate(createConfigManager(tempDir), "agt_abc", {
+			nickname: "x",
+		});
+		expect(exitCode).toBe(1);
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentUpdate(createConfigManager(tempDir), "agt_abc", {
+			nickname: "x",
+		});
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("agent delete — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentDelete(createConfigManager(tempDir), "agt_abc");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentDelete(createConfigManager(tempDir), "agt_abc");
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("agent heartbeat — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentHeartbeat(createConfigManager(tempDir), "a:running");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("rejects an entry with an empty match key", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+
+		const exitCode = await runAgentHeartbeat(createConfigManager(tempDir), ":running");
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentHeartbeat(createConfigManager(tempDir), "a:running");
+		expect(exitCode).toBe(1);
+	});
+});
+
+describe("agent tags — config and error branches", () => {
+	test("rejects config without credentials", async () => {
+		writeIncompleteConfig(tempDir);
+
+		const exitCode = await runAgentTags(createConfigManager(tempDir), "agt_abc", {
+			tagIds: "1",
+		});
+		expect(exitCode).toBe(1);
+		expect(mockFetch).not.toHaveBeenCalled();
+	});
+
+	test("returns 1 on an unexpected server error", async () => {
+		writeConfig(tempDir, VALID_CONFIG);
+		mockFetch.mockResolvedValueOnce(SERVER_ERROR());
+
+		const exitCode = await runAgentTags(createConfigManager(tempDir), "agt_abc", {
+			tagIds: "1",
+		});
+		expect(exitCode).toBe(1);
 	});
 });

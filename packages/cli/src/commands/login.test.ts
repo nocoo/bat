@@ -1,4 +1,4 @@
-// Tests for bat-cli login command
+// Tests for bat login command
 
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { BatCliConfig } from "../lib/config.js";
 import { createConfigManager } from "../lib/config.js";
-import { runLogin } from "./login.js";
+import login, { runLogin } from "./login.js";
 
 // Mock @nocoo/base-cli login flow
 vi.mock("@nocoo/base-cli", async (importOriginal) => {
@@ -31,7 +31,7 @@ vi.mock("consola", () => ({
 let tempDir: string;
 
 beforeEach(() => {
-	tempDir = mkdtempSync(join(tmpdir(), "bat-cli-login-"));
+	tempDir = mkdtempSync(join(tmpdir(), "bat-login-"));
 	vi.clearAllMocks();
 });
 
@@ -113,6 +113,17 @@ describe("runLogin", () => {
 		expect(manager.exists()).toBe(false);
 	});
 
+	test("returns 1 when login fails without an error message", async () => {
+		const { performLogin } = await import("@nocoo/base-cli");
+		vi.mocked(performLogin).mockResolvedValue({ success: false });
+
+		const manager = createConfigManager(tempDir);
+		const exitCode = await runLogin(manager, "https://bat.hexly.ai");
+
+		expect(exitCode).toBe(1);
+		expect(manager.exists()).toBe(false);
+	});
+
 	test("returns 1 when no worker_url in response", async () => {
 		const { performLogin } = await import("@nocoo/base-cli");
 		const mockPerformLogin = vi.mocked(performLogin);
@@ -150,4 +161,28 @@ describe("runLogin", () => {
 		expect(callArgs?.tokenParam).toBe("api_key");
 		expect(callArgs?.timeoutMs).toBe(120_000);
 	});
+});
+
+test("command wrapper exits 1 when login does not complete", async () => {
+	const { performLogin } = await import("@nocoo/base-cli");
+	vi.mocked(performLogin).mockResolvedValue({ success: false, error: "timeout" });
+
+	vi.stubEnv("HOME", tempDir);
+
+	vi.stubEnv("USERPROFILE", tempDir);
+	process.exitCode = undefined;
+	try {
+		const context = {
+			args: { url: "https://bat.hexly.ai" },
+			rawArgs: [],
+			cmd: login,
+		} as unknown as Parameters<NonNullable<typeof login.run>>[0];
+		await login.run?.(context);
+	} finally {
+		vi.unstubAllEnvs();
+	}
+
+	const exitCode = process.exitCode;
+	process.exitCode = undefined;
+	expect(exitCode).toBe(1);
 });
