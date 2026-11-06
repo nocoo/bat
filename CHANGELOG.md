@@ -3,11 +3,13 @@
 ## v3.0.0
 
 ### Added
+
 - Expose workstation monitoring
 - Add workstation commands to bat cli
 - Define workstation report contracts
 
 ### Changed
+
 - Bump @cfworker/json-schema to 4.1.4 (#650)
 - Bump jose to ^6.2.14 (#649)
 - Bump @biomejs/biome to 2.6.4 (#648)
@@ -16,6 +18,7 @@
 - Bump wrangler to 4.156.2 (#642)
 
 ### Fixed
+
 - Preserve release dependency snapshots
 
 ## v2.4.1

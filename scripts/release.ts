@@ -17,7 +17,8 @@
  *   bun run release -- --dry-run # preview without side effects
  *
  * Env:
- *   Requires `gh` CLI authenticated for GitHub release creation.
+ *   Requires `gh` CLI authenticated: the release blocks on CI success for the
+ *   exact pushed commit and then creates the GitHub release.
  *   Requires `rg` (ripgrep) for stale version verification.
  */
 
@@ -73,7 +74,7 @@ interface Commit {
 	subject: string;
 }
 
-interface ChangelogSections {
+export interface ChangelogSections {
 	added: string[];
 	changed: string[];
 	fixed: string[];
@@ -111,12 +112,13 @@ interface RunResult {
 function run(
 	cmd: string,
 	args: string[],
-	opts?: { cwd?: string; inherit?: boolean },
+	opts?: { cwd?: string; inherit?: boolean; timeoutMs?: number },
 ): Promise<RunResult> {
 	return new Promise((resolve) => {
 		const child = spawn(cmd, args, {
 			cwd: opts?.cwd ?? PROJECT_ROOT,
 			stdio: opts?.inherit ? "inherit" : ["ignore", "pipe", "pipe"],
+			timeout: opts?.timeoutMs,
 		});
 
 		let stdout = "";
@@ -492,7 +494,7 @@ function capitalizeFirst(s: string): string {
 	return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function formatChangelogSection(version: string, sections: ChangelogSections): string {
+export function formatChangelogSection(version: string, sections: ChangelogSections): string {
 	const lines: string[] = [`## v${version}`];
 
 	const sectionOrder: [keyof ChangelogSections, string][] = [
@@ -507,6 +509,7 @@ function formatChangelogSection(version: string, sections: ChangelogSections): s
 		if (items.length > 0) {
 			lines.push("");
 			lines.push(`### ${heading}`);
+			lines.push("");
 			for (const item of items) {
 				lines.push(`- ${item}`);
 			}
@@ -560,6 +563,143 @@ export function buildStaleVersionArgs(version: string): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// CI gate before tagging
+// ---------------------------------------------------------------------------
+
+const CI_WORKFLOW = ".github/workflows/ci.yml";
+const CI_WORKFLOW_NAME = "CI";
+const CI_BRANCH = "main";
+const CI_RUN_FIELDS = "databaseId,headSha,headBranch,event,workflowName,status,conclusion";
+export const CI_REGISTRATION_TIMEOUT_MS = 5 * 60_000;
+export const CI_WATCH_TIMEOUT_MS = 60 * 60_000;
+export const CI_VIEW_TIMEOUT_MS = 30_000;
+const CI_POLL_MS = 10_000;
+
+export interface CiRunMetadata {
+	databaseId: number;
+	headSha: string;
+	headBranch: string;
+	event: string;
+	workflowName: string;
+	status: string;
+	conclusion: string;
+}
+
+export interface CiWaitDeps {
+	run: (args: string[], timeoutMs?: number) => Promise<RunResult>;
+	sleep: (ms: number) => Promise<void>;
+	now: () => number;
+}
+
+function parseCiRun(raw: string, source: string): CiRunMetadata {
+	try {
+		return JSON.parse(raw) as CiRunMetadata;
+	} catch {
+		throw new Error(`could not parse \`${source}\` output`);
+	}
+}
+
+function parseCiRuns(raw: string): CiRunMetadata[] {
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(raw);
+	} catch {
+		throw new Error("could not parse `gh run list` output");
+	}
+	if (!Array.isArray(parsed)) {
+		throw new Error("unexpected `gh run list` output");
+	}
+	return parsed as CiRunMetadata[];
+}
+
+/** Refuse to trust a run that is not the CI workflow push on main for this commit. */
+function assertCiRunIdentity(run: CiRunMetadata, sha: string): void {
+	if (
+		run.headSha !== sha ||
+		run.headBranch !== CI_BRANCH ||
+		run.event !== "push" ||
+		run.workflowName !== CI_WORKFLOW_NAME
+	) {
+		throw new Error(
+			`CI run ${run.databaseId} does not match the pushed commit (sha=${run.headSha}, branch=${run.headBranch}, event=${run.event}, workflow=${run.workflowName})`,
+		);
+	}
+}
+
+/**
+ * Block until the CI workflow for the exact pushed commit succeeds. The run is
+ * located by commit/event/branch, its metadata is re-verified, and any failed,
+ * cancelled, mismatched or timed-out run throws so the caller never tags
+ * unproven source.
+ */
+export async function waitForCiSuccess(
+	sha: string,
+	deps: CiWaitDeps,
+	timeouts: { registrationMs?: number; watchMs?: number; pollMs?: number } = {},
+): Promise<CiRunMetadata> {
+	const registrationMs = timeouts.registrationMs ?? CI_REGISTRATION_TIMEOUT_MS;
+	const watchMs = timeouts.watchMs ?? CI_WATCH_TIMEOUT_MS;
+	const pollMs = timeouts.pollMs ?? CI_POLL_MS;
+	const deadline = deps.now() + registrationMs;
+
+	let registered: CiRunMetadata | undefined;
+	while (registered === undefined) {
+		const remainingMs = Math.max(1, deadline - deps.now());
+		const listed = await deps.run(
+			[
+				"run",
+				"list",
+				"--workflow",
+				CI_WORKFLOW,
+				"--commit",
+				sha,
+				"--event",
+				"push",
+				"--branch",
+				CI_BRANCH,
+				"--limit",
+				"10",
+				"--json",
+				CI_RUN_FIELDS,
+			],
+			remainingMs,
+		);
+		if (listed.code !== 0) {
+			throw new Error(`\`gh run list\` failed (exit ${listed.code})`);
+		}
+		if (deps.now() >= deadline) {
+			throw new Error(`no CI run registered for commit ${sha} within ${registrationMs}ms`);
+		}
+		const [found] = parseCiRuns(listed.stdout);
+		if (found !== undefined) {
+			assertCiRunIdentity(found, sha);
+			registered = found;
+			break;
+		}
+		await deps.sleep(pollMs);
+	}
+
+	const id = String(registered.databaseId);
+	const watched = await deps.run(["run", "watch", id, "--exit-status"], watchMs);
+	if (watched.code !== 0) {
+		throw new Error(`CI run ${id} did not succeed (watch exit ${watched.code})`);
+	}
+
+	const viewed = await deps.run(["run", "view", id, "--json", CI_RUN_FIELDS], CI_VIEW_TIMEOUT_MS);
+	if (viewed.code !== 0) {
+		throw new Error(`could not verify CI run ${id} (exit ${viewed.code})`);
+	}
+	const final = parseCiRun(viewed.stdout, "gh run view");
+	assertCiRunIdentity(final, sha);
+	if (final.status !== "completed" || final.conclusion !== "success") {
+		throw new Error(
+			`CI run ${id} is ${final.status} with conclusion \`${final.conclusion}\`, expected success`,
+		);
+	}
+	return final;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -588,11 +728,12 @@ async function main(): Promise<void> {
 		"Detached HEAD — checkout a branch first",
 	);
 
-	// gh auth
+	// gh auth — required: the CI gate and GitHub release both depend on it
 	const ghResult = await run("gh", ["auth", "status"]);
-	const ghAuthed = ghResult.code === 0;
-	if (!ghAuthed) {
-		console.warn("⚠️  gh CLI is not authenticated — GitHub release will be skipped.");
+	if (ghResult.code !== 0) {
+		console.error("❌ gh CLI is not authenticated — cannot verify CI or create the release.");
+		console.error("   Run `gh auth login`, then retry. No tag was created.");
+		process.exit(1);
 	}
 
 	// Current version & bump
@@ -691,9 +832,7 @@ async function main(): Promise<void> {
 			process.exit(1);
 		}
 	}
-	if (ghAuthed) {
-		console.info("✅ GitHub CLI authenticated.");
-	}
+	console.info("✅ GitHub CLI authenticated.");
 
 	if (isDryRun) {
 		process.exit(0);
@@ -708,6 +847,24 @@ async function main(): Promise<void> {
 		console.error(`     gh release create v${newVersion} --title "v${newVersion}" --notes "..."`);
 		process.exit(1);
 	}
+
+	// CI gate: only tag source that CI proved on the exact pushed commit.
+	const headSha = await runOrDie("git", ["rev-parse", "HEAD"], "Failed to resolve pushed commit");
+	console.info(`⏳ Waiting for CI (${CI_WORKFLOW}) on ${headSha} ...`);
+	try {
+		await waitForCiSuccess(headSha, {
+			run: (args, timeoutMs) => run("gh", args, { timeoutMs }),
+			sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+			now: () => Date.now(),
+		});
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.error(`❌ CI gate failed for ${headSha}: ${message}`);
+		console.error(`   Tag v${newVersion} was NOT created. Fix CI, then rerun the release.`);
+		process.exit(1);
+	}
+	console.info("✅ CI passed for the pushed commit.");
+
 	const tagResult = await run("git", ["tag", "-a", `v${newVersion}`, "-m", `v${newVersion}`]);
 	if (tagResult.code !== 0) {
 		console.error(`❌ Failed to create tag v${newVersion}`);
@@ -726,35 +883,29 @@ async function main(): Promise<void> {
 	}
 
 	// GitHub Release
-	if (ghAuthed) {
-		const releaseResult = await run("gh", [
-			"release",
-			"create",
-			`v${newVersion}`,
-			"--title",
-			`v${newVersion}`,
-			"--notes",
-			changelogSection,
-		]);
+	const releaseResult = await run("gh", [
+		"release",
+		"create",
+		`v${newVersion}`,
+		"--title",
+		`v${newVersion}`,
+		"--notes",
+		changelogSection,
+	]);
 
-		if (releaseResult.code !== 0) {
-			console.error("⚠️  GitHub release creation failed (tag is pushed)");
-			console.error(
-				`   Create manually: gh release create v${newVersion} --title "v${newVersion}"`,
-			);
-		} else {
-			const releaseUrl = releaseResult.stdout.trim();
-			if (releaseUrl) {
-				console.info(`🔗 Release: ${releaseUrl}`);
-			}
+	if (releaseResult.code !== 0) {
+		console.error("⚠️  GitHub release creation failed (tag is pushed)");
+		console.error(`   Create manually: gh release create v${newVersion} --title "v${newVersion}"`);
+	} else {
+		const releaseUrl = releaseResult.stdout.trim();
+		if (releaseUrl) {
+			console.info(`🔗 Release: ${releaseUrl}`);
 		}
 	}
-	if (ghAuthed) {
-		const repoUrl = await run("gh", ["repo", "view", "--json", "url", "-q", ".url"]);
-		const repo = repoUrl.stdout.trim();
-		if (repo) {
-			console.info(`📦 Repository: ${repo}`);
-		}
+	const repoUrl = await run("gh", ["repo", "view", "--json", "url", "-q", ".url"]);
+	const repo = repoUrl.stdout.trim();
+	if (repo) {
+		console.info(`📦 Repository: ${repo}`);
 	}
 }
 

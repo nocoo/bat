@@ -47,6 +47,9 @@
 	"lint-staged": {
 		"*.{ts,tsx,js,jsx,json,css}": [
 			"biome check --error-on-warnings --no-errors-on-unmatched"
+		],
+		"CHANGELOG.md": [
+			"biome check --error-on-warnings --no-errors-on-unmatched"
 		]
 	},
 	"overrides": {

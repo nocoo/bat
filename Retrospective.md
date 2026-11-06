@@ -313,3 +313,11 @@ workspace version metadata and validate with a frozen install; keep real runtime
 constants in the scan while excluding test fixtures. Review also caught a nested
 dependency named `version` being mistaken for workspace metadata. Match direct
 members only and assert byte-for-byte preservation of nested dependencies.
+
+The first 3.0.0 candidate was blocked before deployment because generated
+CHANGELOG headings lacked the blank lines required by the current Markdown
+formatter. The staged-code hook had not checked that Markdown file. Validate
+generated release documents, and include CHANGELOG in the check-only staged gate.
+The script also pushed the tag before its exact commit's CI completed, causing
+release-source rejection. Wait for successful source proof before tagging; leave
+published tags immutable and use a patch release to recover a failed candidate.
