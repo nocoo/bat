@@ -30,6 +30,7 @@ describe("createD1Repositories", () => {
 			"aggregation",
 			"connect",
 			"connectProducts",
+			"workstations",
 		];
 		for (const k of expectedKeys) {
 			expect(repos).toHaveProperty(k);
@@ -78,7 +79,7 @@ describe("reposMiddleware", () => {
 			hasHosts: true,
 			hasMetrics: true,
 			hasAggregation: true,
-			keyCount: 17,
+			keyCount: 18,
 		});
 	});
 

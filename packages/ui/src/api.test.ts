@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
 	ApiError,
+	authorizeWorkstationAPI,
 	buildUrl,
 	deleteAPI,
 	deleteHostAPI,
+	deleteWorkstationAPI,
 	getAPI,
 	patchAPI,
 	postAPI,
@@ -153,5 +155,49 @@ describe("deleteHostAPI", () => {
 		nextResponse = () => new Response("forbidden", { status: 403 });
 		await expect(deleteHostAPI("host", "host")).rejects.toMatchObject({ status: 403 });
 		expect(calls).toHaveLength(1);
+	});
+});
+
+describe("workstation browser APIs", () => {
+	test("authorize posts the PKCE consent body with the same-origin management header", async () => {
+		nextResponse = () =>
+			Response.json({ redirect_url: "http://127.0.0.1:8787/callback?code=x" }, { status: 201 });
+		const input = {
+			installation_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			code_challenge: "B".repeat(43),
+			code_challenge_method: "S256" as const,
+			state: "state-0123456789abcdef",
+			callback: "http://127.0.0.1:8787/callback",
+			name: "Field laptop",
+		};
+		await expect(authorizeWorkstationAPI(input)).resolves.toMatchObject({
+			redirect_url: expect.any(String),
+		});
+		expect(calls[0]).toEqual({
+			url: "/api/workstation-auth/authorize",
+			init: {
+				method: "POST",
+				headers: { "Content-Type": "application/json", "X-Bat-Management": "1" },
+				body: JSON.stringify(input),
+				credentials: "same-origin",
+				cache: "no-store",
+				redirect: "error",
+			},
+		});
+	});
+
+	test("delete encodes the workstation ID and requires management confirmation", async () => {
+		nextResponse = () => Response.json({ ok: true });
+		await expect(deleteWorkstationAPI("workstation/id")).resolves.toEqual({ ok: true });
+		expect(calls[0]).toEqual({
+			url: "/api/workstations/workstation%2Fid",
+			init: {
+				method: "DELETE",
+				headers: { "X-Bat-Management": "1" },
+				credentials: "same-origin",
+				cache: "no-store",
+				redirect: "error",
+			},
+		});
 	});
 });

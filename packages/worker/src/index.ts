@@ -12,6 +12,7 @@ import {
 } from "./middleware/connect.js";
 import { entryControl } from "./middleware/entry-control.js";
 import { reposMiddleware } from "./middleware/repos.js";
+import { workstationKeyAuth, workstationNoStore } from "./middleware/workstation.js";
 import {
 	agentsCreateRoute,
 	agentsDeleteRoute,
@@ -104,6 +105,25 @@ import {
 	webhooksListRoute,
 	webhooksRegenerateRoute,
 } from "./routes/webhooks.js";
+import { workstationAuthorizeRoute, workstationExchangeRoute } from "./routes/workstation-auth.js";
+import {
+	monitoringWorkstationConnectivityRoute,
+	monitoringWorkstationMetricsRoute,
+	monitoringWorkstationRoute,
+	monitoringWorkstationsRoute,
+} from "./routes/workstation-monitoring.js";
+import {
+	workstationReportRoute,
+	workstationRevokeRoute,
+	workstationTargetsRoute,
+} from "./routes/workstation-probe.js";
+import {
+	workstationConnectivityRoute,
+	workstationDeleteRoute,
+	workstationDetailRoute,
+	workstationMetricsRoute,
+	workstationsListRoute,
+} from "./routes/workstations.js";
 import type { AppEnv } from "./types.js";
 
 const app = new Hono<AppEnv>();
@@ -130,6 +150,17 @@ app.use("*", async (c, next) => {
 app.use("/api/*", connectEnvelope);
 app.use("*", entryControl);
 app.use("*", accessAuth);
+// Workstation observations never cache, including errors.
+app.use("/api/workstation-auth", workstationNoStore);
+app.use("/api/workstation-auth/*", workstationNoStore);
+app.use("/api/workstation-probe", workstationNoStore);
+app.use("/api/workstation-probe/*", workstationNoStore);
+app.use("/api/workstations", workstationNoStore);
+app.use("/api/workstations/*", workstationNoStore);
+app.use("/api/monitoring/workstations", workstationNoStore);
+app.use("/api/monitoring/workstations/*", workstationNoStore);
+// Dedicated workstation key chain: batw_ only, exact probe paths.
+app.use("/api/workstation-probe/*", workstationKeyAuth);
 app.use("/api/*", apiKeyAuth);
 app.use("/api/*", (c, next) =>
 	isVersionedPath(c.req.path)
@@ -224,6 +255,23 @@ app.delete("/api/webhooks/:id", webhooksDeleteRoute);
 app.post("/api/webhooks/:id/regenerate", webhooksRegenerateRoute);
 app.get("/api/settings", settingsGetRoute);
 app.put("/api/settings", settingsPutRoute);
+
+// Workstations: enrollment, probe, browser reads and revocation
+app.post("/api/workstation-auth/authorize", workstationAuthorizeRoute);
+app.post("/api/workstation-auth/exchange", workstationExchangeRoute);
+app.get("/api/workstation-probe/targets", workstationTargetsRoute);
+// Deployment-wide monitoring lane for the external read key (BAT_READ_KEY).
+app.get("/api/monitoring/workstations", monitoringWorkstationsRoute);
+app.get("/api/monitoring/workstations/:id/metrics", monitoringWorkstationMetricsRoute);
+app.get("/api/monitoring/workstations/:id/connectivity", monitoringWorkstationConnectivityRoute);
+app.get("/api/monitoring/workstations/:id", monitoringWorkstationRoute);
+app.post("/api/workstation-probe/reports", workstationReportRoute);
+app.post("/api/workstation-probe/revoke", workstationRevokeRoute);
+app.get("/api/workstations", workstationsListRoute);
+app.get("/api/workstations/:id/metrics", workstationMetricsRoute);
+app.get("/api/workstations/:id/connectivity", workstationConnectivityRoute);
+app.get("/api/workstations/:id", workstationDetailRoute);
+app.delete("/api/workstations/:id", workstationDeleteRoute);
 
 // CLI auth and token management (require CF Access JWT — browser only)
 app.get("/api/auth/cli", cliAuthBridgeRoute);

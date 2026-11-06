@@ -62,17 +62,17 @@ systemctl status bat-probe
 
 机器入口按方法和路径放行请求，不是所有浏览器 API 的替代地址。自定义部署需要同步检查 `entry-control.ts`、`setup.ts`、`cli-auth.ts` 中的主机名判断和返回地址，配置浏览器 Access 与机器访问策略。
 
-`packages/cli` 是私有 workspace，没有对应的公开 npm 安装步骤。先 `bun run build` 构建 shared，再通过根 README 的源码命令使用 CLI。构建 CLI 本身可用 `bun turbo build --filter=@bat/cli`。
+`packages/cli` builds the public `@nocoo/bat` package with the sole `bat` executable. `bun run build` includes its self-contained Node.js bundle; `bun turbo build --filter=@nocoo/bat` builds just the CLI and shared prerequisite. npm publication is separate from Worker deployment. Before publication, use the source commands in the root README. Workstation functionality uses its own credentials and scheduler; see [Workstations](24-workstations.md).
 
 `login --url` 可以指定浏览器入口，回调会提供实际机器 API 地址。配置保存在 `~/.config/bat/config.json`，包括 `worker_url`、`api_key`、`source_key` 与可选心跳间隔。
 
-CLI 的 `agent`、`asset`、`binding` 提供管理操作。`service run` 接收 `match_key:running` 或 `match_key:stopped` 列表，重复发送这些状态，不读取目标进程状态。`service install` 为 macOS 写入 `~/Library/LaunchAgents/ai.hexly.bat-cli.plist`，并打印加载命令；它不执行 launchctl，也不安装 Linux Rust 探针。需要真实进程健康检测时，调用方应提供相应检测逻辑。
+CLI 的 `agent`、`asset`、`binding` 提供管理操作。`service run` 接收 `match_key:running` 或 `match_key:stopped` 列表，重复发送这些状态，不读取目标进程状态。`service install` 为 macOS 写入 `~/Library/LaunchAgents/ai.hexly.bat.plist`，并打印加载命令；它不执行 launchctl，也不安装 Linux Rust 探针。需要真实进程健康检测时，调用方应提供相应检测逻辑。
 
 ## 开发配置
 
 安装 Bun、Node.js 22.12+，探针编译使用当前 stable Rust。CI Rust job 跟踪 stable，探针镜像使用 `rust:1-alpine`；旧 README 的 Rust 1.85 不足以代表当前源码和依赖的完整要求。
 
-`bun run build` 构建 shared 和 UI，将网页产物写入 `packages/worker/static/`，不部署资源。
+`bun run build` builds shared, UI and CLI, writing the SPA to `packages/worker/static/` and the Node.js CLI to `packages/cli/dist/`. It does not deploy resources or register workstation tasks.
 
 The canonical entry is `bun run dev`: a local gateway on 7025 starts persistent
 Demo data, with Vite and native Wrangler on private ephemeral ports. The top-right

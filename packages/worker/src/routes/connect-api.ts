@@ -8,6 +8,7 @@ import {
 	CONNECT_UNSUPPORTED,
 	type ConnectOperation,
 } from "../domain/connect-operations.js";
+import { parseHistoryQuery } from "../domain/workstation-history.js";
 import {
 	auditEntry,
 	connectApiBaseUrl,
@@ -17,6 +18,10 @@ import {
 	nowSeconds,
 } from "../middleware/connect.js";
 import type { ConnectRequest } from "../repos/connect.js";
+import {
+	filterConnectivityHistory,
+	redactWorkstationRecord,
+} from "../services/connect-workstations.js";
 import type { AppEnv } from "../types.js";
 import {
 	agentsCreateRoute,
@@ -97,9 +102,25 @@ async function etag(c: Context<AppEnv>): Promise<string> {
 }
 
 async function pageServer(c: Context<AppEnv>): Promise<string> {
-	return (
-		c.var.connectServerId ?? fingerprint(JSON.stringify([...(c.var.connectServerIds ?? [])].sort()))
+	if (c.var.connectServerId) return c.var.connectServerId;
+	return fingerprint(
+		JSON.stringify({
+			servers: [...(c.var.connectServerIds ?? [])].sort(),
+			workstations: [...(c.var.connectWorkstationIds ?? [])].sort(),
+		}),
 	);
+}
+
+/** Connect history reads require an explicit, bounded window like server metrics. */
+function requireHistoryRange(c: Context<AppEnv>) {
+	const query = parseHistoryQuery(c.req.query(), nowSeconds());
+	if (!c.req.query("from") || !c.req.query("to") || !query)
+		throw new ConnectFault(
+			400,
+			"invalid_range",
+			"from/to must be Unix seconds with a positive window of at most 30 days; limit 1–100.",
+		);
+	return query;
 }
 
 interface PageInput {
@@ -192,6 +213,7 @@ async function page(c: Context<AppEnv>, operation: string, items: unknown[]) {
 					serverIds: c.var.connectServerIds,
 					...(c.var.connectServerIds?.length === 1 ? { serverId: c.var.connectServerIds[0] } : {}),
 				}),
+		workstationIds: c.var.connectWorkstationIds,
 	};
 }
 
@@ -202,12 +224,13 @@ function capabilities(c: Context<AppEnv>) {
 		productVersion: BAT_VERSION,
 		serverIds: c.var.connectServerIds,
 		...(c.var.connectServerIds?.length === 1 ? { serverId: c.var.connectServerIds[0] } : {}),
+		workstationIds: c.var.connectWorkstationIds,
 		scope: token?.scope,
 		permissions: token?.scope === "write" ? ["read", "write"] : ["read"],
 		baseUrl: connectApiBaseUrl(c),
 		openapi: "/api/v1/openapi.json",
 		authorization:
-			"A key can authorize multiple servers, and servers can have multiple keys. Every request checks the current selected servers, active hosts, issuer grants and target resource ownership. An empty set grants no server access. write includes read. Tokens cannot manage credentials or move resources across server paths.",
+			"A key can authorize multiple servers and multiple workstations. Every request checks the current selected servers, active hosts, workstation ownership or global-manager authority, and target resource ownership. Empty sets grant nothing. write includes read. Workstation access is read-only: enrollment, revocation and probe reports are never available through Connect. Connectivity inside workstation reads is limited to the key's currently authorized servers.",
 		operations: CONNECT_OPERATIONS.map((operation) => ({
 			...operation,
 			path: operation.path.replace(/:([A-Za-z]+)/g, "{$1}"),
@@ -225,6 +248,10 @@ function capabilities(c: Context<AppEnv>) {
 	});
 }
 
+function authorizedServerIds(c: Context<AppEnv>): Set<string> {
+	return new Set(c.var.connectServerIds ?? []);
+}
+
 const productHandlers: Record<string, ProductHandler> = {
 	"capabilities.get": capabilities,
 	"contract.get": (c) => c.json(connectOpenApi()),
@@ -239,6 +266,59 @@ const productHandlers: Record<string, ProductHandler> = {
 			}),
 		});
 		return hostsListRoute(c);
+	},
+	"workstations.list": async (c) => {
+		const authorized = new Set(c.var.connectWorkstationIds ?? []);
+		const servers = authorizedServerIds(c);
+		return c.json(
+			(await c.var.repos.workstations.list())
+				.filter((record) => authorized.has(record.id))
+				.map((record) => redactWorkstationRecord(record, servers)),
+		);
+	},
+	"workstation.get": async (c) => {
+		const record = await c.var.repos.workstations.get(c.var.connectWorkstationId ?? "");
+		if (!record) throw new ConnectFault(404, "not_found", "Workstation not found.");
+		return c.json({
+			data: redactWorkstationRecord(record, authorizedServerIds(c)),
+			requestId: c.var.connectRequestId,
+			workstationIds: c.var.connectWorkstationIds,
+		});
+	},
+	"workstation.metrics": async (c) => {
+		const query = requireHistoryRange(c);
+		const data = await c.var.repos.workstations.metrics(
+			c.var.connectWorkstationId ?? "",
+			query.from,
+			query.to,
+			query.limit,
+			query.offset,
+		);
+		return c.json({
+			data,
+			page: {
+				limit: query.limit,
+				offset: query.offset,
+				next_offset: data.length === query.limit ? query.offset + data.length : null,
+			},
+			requestId: c.var.connectRequestId,
+			workstationIds: c.var.connectWorkstationIds,
+		});
+	},
+	"workstation.connectivity": async (c) => {
+		const query = requireHistoryRange(c);
+		const targets = await c.var.repos.workstations.connectivity(
+			c.var.connectWorkstationId ?? "",
+			query.from,
+			query.to,
+			query.limit,
+		);
+		return c.json({
+			targets: filterConnectivityHistory(targets, authorizedServerIds(c)),
+			limit: query.limit,
+			requestId: c.var.connectRequestId,
+			workstationIds: c.var.connectWorkstationIds,
+		});
 	},
 	"server.get": hostDetailRoute,
 	"server.description.update": hostDescriptionPatchRoute,
@@ -434,7 +514,10 @@ async function invoke(c: Context<AppEnv>, operation: ConnectOperation): Promise<
 			response.status as 400,
 		);
 	}
-	if (["capabilities.get", "contract.get", "audit.list"].includes(operation.id))
+	if (
+		["capabilities.get", "contract.get", "audit.list"].includes(operation.id) ||
+		["workstation.get", "workstation.metrics", "workstation.connectivity"].includes(operation.id)
+	)
 		return c.json(value);
 	if (operation.list) {
 		const items = Array.isArray(value)
@@ -604,6 +687,12 @@ export function registerConnectApi(app: Hono<AppEnv>): void {
 		const serverId = /\/servers\/([^/]+)/.exec(path)?.[1];
 		if (serverId && !c.var.connectServerIds?.includes(decodeURIComponent(serverId)))
 			throw new ConnectFault(403, "server_mismatch", "This token does not authorize this server.");
+		if (/^\/api\/v1\/workstation/.test(path) && !["GET", "HEAD"].includes(c.req.method))
+			throw new ConnectFault(
+				501,
+				"not_supported",
+				"Workstation access is read-only. Enrollment, revocation and probe reports are not available to Connect tokens.",
+			);
 		if (
 			/^\/api\/v1\/(?:tokens|cli-tokens)(?:\/|$)/.test(path) ||
 			/\/execute$/.test(path) ||

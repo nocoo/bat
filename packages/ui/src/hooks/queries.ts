@@ -20,9 +20,14 @@ import type {
 	TagItem,
 	Tier2Snapshot,
 	WebhookConfig,
+	WorkstationConnectivityResponse,
+	WorkstationMetricsResponse,
+	WorkstationRecord,
 } from "@bat/shared";
 import useSWR, { type SWRConfiguration } from "swr";
+import useSWRInfinite from "swr/infinite";
 import { getAPI } from "../api";
+import { mergeMetricPages } from "../lib/workstation-format";
 
 // ---- Shared SWR configurations ------------------------------------------
 const POLL_30: SWRConfiguration = { refreshInterval: 30_000, keepPreviousData: true };
@@ -151,3 +156,83 @@ export function useEvents(hostId?: string, page = 1) {
 // ---- Settings ---------------------------------------------------------------
 export const useSettings = () =>
 	useSWR<SettingsResponse>("settings", () => getAPI<SettingsResponse>("/api/settings"), KEEP_PREV);
+
+// ---- Workstations -----------------------------------------------------------
+// The list and the detail snapshot share one cadence so a fresh report updates
+// public IP, connectivity, last-seen and the derived status together.
+export const useWorkstations = () =>
+	useSWR<WorkstationRecord[]>(
+		"workstations",
+		() => getAPI<WorkstationRecord[]>("/api/workstations"),
+		POLL_60,
+	);
+
+export const useWorkstation = (id: string | null) =>
+	useSWR<WorkstationRecord>(
+		id ? `workstation-${id}` : null,
+		() => getAPI<WorkstationRecord>(`/api/workstations/${id}`),
+		POLL_60,
+	);
+
+export const WORKSTATION_HISTORY_PAGE_SIZE = 100;
+
+/**
+ * Deliberate newest-first metric pages. Only the pages the operator asked for
+ * are fetched; each request stays at the shared 100 sample ceiling.
+ */
+export function useWorkstationMetricsPages(id: string | null, from: number, to: number) {
+	const response = useSWRInfinite<WorkstationMetricsResponse>(
+		(pageIndex, previousPage) => {
+			if (!id) return null;
+			if (previousPage && previousPage.page.next_offset === null) return null;
+			return [
+				`workstation-metrics-${id}-${from}-${to}`,
+				pageIndex * WORKSTATION_HISTORY_PAGE_SIZE,
+			] as const;
+		},
+		([, offset]) =>
+			getAPI<WorkstationMetricsResponse>(`/api/workstations/${id}/metrics`, {
+				from: String(from),
+				to: String(to),
+				limit: String(WORKSTATION_HISTORY_PAGE_SIZE),
+				offset: String(offset),
+			}),
+		{ refreshInterval: 60_000 },
+	);
+	const pages = response.data ?? [];
+	const newestPage = pages[0];
+	const olderPages = pages.slice(1);
+	return {
+		metrics: mergeMetricPages(
+			newestPage?.data ?? [],
+			olderPages
+				.slice()
+				.reverse()
+				.flatMap((page) => page.data),
+		),
+		newestCount: newestPage?.data.length ?? 0,
+		olderCount: olderPages.reduce((total, page) => total + page.data.length, 0),
+		hasOlder: pages.at(-1)?.page.next_offset !== null && pages.length > 0,
+		isLoading: response.isLoading && !response.data,
+		isLoadingOlder: response.isValidating && response.size > pages.length,
+		error: response.error,
+		loadOlder: () => void response.setSize(response.size + 1),
+	};
+}
+
+export const useWorkstationConnectivity = (
+	id: string | null,
+	from: number,
+	to: number,
+	limit = 100,
+) =>
+	useSWR<WorkstationConnectivityResponse>(
+		id ? `workstation-connectivity-${id}-${from}-${to}-${limit}` : null,
+		() =>
+			getAPI<WorkstationConnectivityResponse>(`/api/workstations/${id}/connectivity`, {
+				from: String(from),
+				to: String(to),
+				limit: String(limit),
+			}),
+		POLL_60,
+	);

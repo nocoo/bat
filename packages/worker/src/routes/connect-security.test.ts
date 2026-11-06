@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { D1ConnectRepository } from "../adapters/d1/connect.js";
 import { D1ConnectProductsRepository } from "../adapters/d1/connect-products.js";
 import { app } from "../index.js";
-import { connectFixture, SERVER_A, SERVER_B } from "../test-helpers/connect.js";
+import { connectFixture, SERVER_A, SERVER_B, WORKSTATION_A } from "../test-helpers/connect.js";
 
 vi.mock("jose", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("jose")>();
@@ -306,6 +306,75 @@ describe("Connect Access and request boundaries", () => {
 				f.env,
 			);
 		expect((await bearer()).status).toBe(200);
+
+		// A non-manager with only a server grant cannot select or manage
+		// workstations, and the entire configured set must stay manageable.
+		const wsCreated = await browser("/api/connect/tokens", "signed-manager", "POST", {
+			name: "Workstation reader",
+			scope: "read",
+			serverIds: [],
+			workstationIds: [WORKSTATION_A],
+		});
+		expect(wsCreated.status).toBe(201);
+		const wsRow = ((await wsCreated.json()) as { data: ConnectToken }).data;
+		expect(wsRow.workstationIds).toEqual([WORKSTATION_A]);
+		expect((await browser(`/api/connect/tokens/${wsRow.id}`, "signed-limited")).status).toBe(403);
+		const limitedKeys = (await (await browser("/api/connect/tokens", "signed-limited")).json()) as {
+			data: { id: string }[];
+		};
+		expect(limitedKeys.data.map((row) => row.id)).not.toContain(wsRow.id);
+		expect(
+			(
+				await browser("/api/connect/tokens", "signed-limited", "POST", {
+					name: "Denied workstation",
+					scope: "read",
+					serverIds: [SERVER_A],
+					workstationIds: [WORKSTATION_A],
+				})
+			).status,
+		).toBe(403);
+		const wsChallenge = (
+			(await (
+				await browser(
+					`/api/connect/tokens/${wsRow.id}/challenge`,
+					"signed-manager",
+					"POST",
+					{ action: "reveal" },
+					wsRow,
+				)
+			).json()) as { challenge: string }
+		).challenge;
+		const wsReveal = await browser(
+			`/api/connect/tokens/${wsRow.id}/reveal`,
+			"signed-manager",
+			"POST",
+			{ challenge: wsChallenge, confirmation: wsRow.name },
+			wsRow,
+		);
+		const wsSecret = ((await wsReveal.json()) as { token: string }).token;
+		const wsRead = await app.request(
+			"https://bat-ingest.worker.hexly.ai/api/v1/workstations",
+			{ headers: { Authorization: `Bearer ${wsSecret}` } },
+			f.env,
+		);
+		expect(wsRead.status).toBe(200);
+		const wsBody = (await wsRead.json()) as {
+			data: { id: string; latest_report: { connectivity: unknown[] } | null }[];
+			serverIds: string[];
+			workstationIds: string[];
+		};
+		expect(wsBody.workstationIds).toEqual([WORKSTATION_A]);
+		expect(wsBody.serverIds).toEqual([]);
+		expect(wsBody.data[0]?.latest_report?.connectivity).toEqual([]);
+		expect(
+			(
+				await app.request(
+					`https://bat-ingest.worker.hexly.ai/api/v1/workstations/${WORKSTATION_A}`,
+					{ method: "DELETE", headers: { Authorization: `Bearer ${wsSecret}` } },
+					f.env,
+				)
+			).status,
+		).toBe(403);
 		for (const [path, expected] of [
 			["/api/v1/capabilities", { baseUrl: discovery.apiBaseUrl }],
 			["/api/v1/openapi.json", { servers: [{ url: "https://bat-ingest.worker.hexly.ai" }] }],

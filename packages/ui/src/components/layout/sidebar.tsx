@@ -19,6 +19,7 @@ import {
 	Bell,
 	Database,
 	Download,
+	Laptop,
 	PanelLeft,
 	Plug,
 	ScrollText,
@@ -39,6 +40,7 @@ const NAV_GROUPS = [
 		label: "Monitoring",
 		items: [
 			{ href: "/hosts", label: "Hosts", icon: Server },
+			{ href: "/workstations", label: "Workstations", icon: Laptop },
 			{ href: "/alerts", label: "Alerts", icon: Bell },
 			{ href: "/events", label: "Events", icon: ScrollText },
 			{ href: "/tags", label: "Tags", icon: Tag },

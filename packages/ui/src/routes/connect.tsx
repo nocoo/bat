@@ -4,6 +4,7 @@ import {
 	type ConnectSensitiveAction,
 	type ConnectServer,
 	type ConnectToken,
+	type WorkstationRecord,
 } from "@bat/shared";
 import {
 	Badge,
@@ -41,12 +42,16 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useWorkstations } from "@/hooks";
 import {
 	connectDate,
 	connectExamples,
 	connectExpiryInput,
+	connectGrantLabel,
 	connectRequest,
+	connectTokenRequest,
 	connectTokenStatus,
+	connectWorkstationIds,
 } from "@/lib/connect";
 
 interface Action {
@@ -63,10 +68,10 @@ const actionDescriptions = {
 	reveal:
 		"This key grants access to its authorized servers. Confirm that your screen is private. The key hides after 30 seconds or when you leave this window.",
 	rotate:
-		"The current key stops working immediately. The replacement keeps the same authorized servers, scope and expiry. Reveal it again to update your agent.",
+		"The current key stops working immediately. The replacement keeps the same authorized servers, workstations, scope and expiry. Reveal it again to update your agent.",
 	revoke:
-		"This token stops working immediately. Agents using it will lose access to all its authorized servers. Revocation cannot be undone.",
-	edit: "Update the name, authorized servers, permissions and expiry. Changes take effect immediately; the key stays the same.",
+		"This token stops working immediately. Agents using it will lose access to all its authorized servers and workstations. Revocation cannot be undone.",
+	edit: "Update the name, authorized servers, authorized workstations, permissions and expiry. Changes take effect immediately; the key stays the same.",
 };
 
 function ServerSelection({
@@ -121,6 +126,61 @@ function ServerSelection({
 	);
 }
 
+function WorkstationSelection({
+	workstations,
+	workstationIds,
+	onChange,
+	disabled,
+}: {
+	workstations: WorkstationRecord[] | undefined;
+	workstationIds: string[];
+	onChange: (ids: string[]) => void;
+	disabled: boolean;
+}) {
+	const active = (workstations ?? []).filter((workstation) => !workstation.disabled);
+	const activeIds = new Set(active.map((workstation) => workstation.id));
+	const options: { id: string; name: string }[] = [
+		...active.map((workstation) => ({ id: workstation.id, name: workstation.name })),
+		...workstationIds
+			.filter((id) => !activeIds.has(id))
+			.map((id) => ({ id, name: "Unavailable workstation (this grant ends on save)" })),
+	];
+	return (
+		<Checkbox.Group
+			value={workstationIds}
+			onValueChange={(ids) => onChange([...ids].sort())}
+			disabled={disabled}
+		>
+			<Checkbox.Legend>Authorized workstations</Checkbox.Legend>
+			<p className="text-basalt-sm leading-relaxed text-basalt-muted-foreground">
+				Select the laptops and desktops this key may read. A workstation grant exposes only that
+				machine&apos;s capacity snapshot, and its connectivity stays limited to the servers this key
+				can also see. Workstation access is read-only.
+			</p>
+			<div className="max-h-44 space-y-3 overflow-y-auto p-1">
+				{options.map((workstation) => (
+					<Checkbox.Item key={workstation.id} value={workstation.id}>
+						<span className="min-w-0 break-all">
+							<span className="block text-basalt-base font-medium">{workstation.name}</span>
+							<span className="block font-mono text-basalt-sm text-basalt-muted-foreground">
+								{workstation.id}
+							</span>
+						</span>
+					</Checkbox.Item>
+				))}
+				{!options.length && (
+					<p className="p-2 text-basalt-base text-basalt-muted-foreground">
+						No workstations available to authorize.
+					</p>
+				)}
+			</div>
+			<p className="text-basalt-sm text-basalt-muted-foreground">
+				{workstationIds.length ? `${workstationIds.length} selected` : "No workstation access"}
+			</p>
+		</Checkbox.Group>
+	);
+}
+
 export function ConnectPage() {
 	const servers = useSWR<{ data: ConnectServer[]; apiBaseUrl: string }>(
 		"/api/connect/servers",
@@ -130,11 +190,13 @@ export function ConnectPage() {
 	const tokens = useSWR<{ data: ConnectToken[] }>(listUrl, connectRequest, {
 		refreshInterval: 30_000,
 	});
+	const workstations = useWorkstations();
 	const [creating, setCreating] = useState(false);
 	const [name, setName] = useState("");
 	const [scope, setScope] = useState<ConnectScope>("read");
 	const [expiry, setExpiry] = useState("");
 	const [serverIds, setServerIds] = useState<string[]>([]);
+	const [workstationIds, setWorkstationIds] = useState<string[]>([]);
 	const [action, setAction] = useState<Action | null>(null);
 	const [confirmation, setConfirmation] = useState("");
 	const [busy, setBusy] = useState(false);
@@ -181,20 +243,43 @@ export function ConnectPage() {
 		setError("");
 		setConfirmation(kind === "edit" ? token.name : "");
 		setServerIds(token.serverIds);
+		setWorkstationIds(connectWorkstationIds(token));
 		setScope(token.scope);
 		setExpiry(connectExpiryInput(token.expiresAt));
 		setAction({ token, kind });
 	}
 
 	function serverNames(ids: string[]) {
-		return ids.length
-			? ids
-					.map(
-						(id) =>
-							servers.data?.data.find((server) => server.id === id)?.name ?? `${id} (unavailable)`,
-					)
-					.join(", ")
-			: "No server access";
+		return connectGrantLabel(
+			ids,
+			(id) => servers.data?.data.find((server) => server.id === id)?.name ?? null,
+			"No server access",
+		);
+	}
+
+	function workstationNames(ids: string[]) {
+		return connectGrantLabel(
+			ids,
+			(id) => workstations.data?.find((workstation) => workstation.id === id)?.name ?? null,
+			"No workstation access",
+		);
+	}
+
+	/**
+	 * A workstation that is gone or disabled can never be granted again, so it is
+	 * not sent. While the list is still loading the selection is passed through
+	 * and the Worker remains the authority.
+	 */
+	function grantableWorkstationIds(ids: string[]) {
+		if (!workstations.data) {
+			return ids;
+		}
+		const active = new Set(
+			workstations.data
+				.filter((workstation) => !workstation.disabled)
+				.map((workstation) => workstation.id),
+		);
+		return ids.filter((id) => active.has(id));
 	}
 
 	async function copy(value: string, label: string) {
@@ -212,13 +297,20 @@ export function ConnectPage() {
 		try {
 			await connectRequest(listUrl, {
 				method: "POST",
-				body: { name, serverIds, scope, expiresAt: expiry ? new Date(expiry).toISOString() : null },
+				body: connectTokenRequest({
+					name,
+					serverIds,
+					workstationIds: grantableWorkstationIds(workstationIds),
+					scope,
+					expiresAt: expiry ? new Date(expiry).toISOString() : null,
+				}),
 			});
 			setCreating(false);
 			setName("");
 			setExpiry("");
 			setScope("read");
 			setServerIds([]);
+			setWorkstationIds([]);
 			setNotice("Token created. Reveal its key when you are ready to connect your agent.");
 			await tokens.mutate();
 		} catch (cause) {
@@ -238,15 +330,19 @@ export function ConnectPage() {
 			if (action.kind === "edit") {
 				await connectRequest(path, {
 					method: "PATCH",
-					body: {
+					body: connectTokenRequest({
 						name: confirmation,
 						serverIds,
+						workstationIds: grantableWorkstationIds(workstationIds),
 						scope,
 						// Preserve the original instant when local time is unchanged, including DST overlaps.
-						...(expiry === connectExpiryInput(action.token.expiresAt)
-							? {}
-							: { expiresAt: expiry ? new Date(expiry).toISOString() : null }),
-					},
+						expiresAt:
+							expiry === connectExpiryInput(action.token.expiresAt)
+								? action.token.expiresAt
+								: expiry
+									? new Date(expiry).toISOString()
+									: null,
+					}),
 					token: action.token,
 				});
 				setNotice(
@@ -292,6 +388,12 @@ export function ConnectPage() {
 				servers={servers.data?.data ?? []}
 				serverIds={serverIds}
 				onChange={setServerIds}
+				disabled={busy}
+			/>
+			<WorkstationSelection
+				workstations={workstations.data}
+				workstationIds={workstationIds}
+				onChange={setWorkstationIds}
 				disabled={busy}
 			/>
 			<Radio.Group
@@ -359,6 +461,7 @@ export function ConnectPage() {
 								setScope("read");
 								setExpiry("");
 								setServerIds([]);
+								setWorkstationIds([]);
 								setCreating(true);
 							}}
 							disabled={!servers.data || !tokens.data || !!loadError || busy}
@@ -411,7 +514,7 @@ export function ConnectPage() {
 									/>
 									<h3 className="font-medium">No tokens yet</h3>
 									<p className="mt-2 max-w-xs text-basalt-base text-basalt-muted-foreground">
-										Create a token and select its authorized servers.
+										Create a token and select its authorized servers and workstations.
 									</p>
 								</LayerCard.Body>
 							</LayerCard>
@@ -465,6 +568,29 @@ export function ConnectPage() {
 													</ul>
 												) : (
 													<p>No server access</p>
+												)}
+											</div>
+											<div className="space-y-2 text-basalt-sm">
+												<p className="text-basalt-muted-foreground">
+													Authorized workstations ({connectWorkstationIds(token).length})
+												</p>
+												{connectWorkstationIds(token).length ? (
+													<ul
+														className="flex flex-wrap gap-2"
+														aria-label={`Authorized workstations for ${token.name}`}
+													>
+														{connectWorkstationIds(token).map((id) => (
+															<li
+																key={id}
+																className="min-w-0 break-all rounded-md border border-basalt-border px-2 py-1"
+															>
+																<span className="block">{workstationNames([id])}</span>
+																<span className="font-mono text-basalt-muted-foreground">{id}</span>
+															</li>
+														))}
+													</ul>
+												) : (
+													<p>No workstation access</p>
 												)}
 											</div>
 											<dl className="grid grid-cols-1 gap-3 text-basalt-sm sm:grid-cols-3">
@@ -720,6 +846,9 @@ export function ConnectPage() {
 									</span>
 									<p className="mt-1 text-basalt-sm text-basalt-muted-foreground">
 										{serverNames(action.token.serverIds)}
+									</p>
+									<p className="mt-1 text-basalt-sm text-basalt-muted-foreground">
+										{workstationNames(connectWorkstationIds(action.token))}
 									</p>
 								</div>
 								<div className="space-y-2">

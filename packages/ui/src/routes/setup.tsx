@@ -45,7 +45,7 @@ export function SetupPage() {
 		<div className="space-y-basalt-layout max-w-3xl">
 			<PageHeader
 				title="Install Probe"
-				description="Deploy the monitoring probe on your Linux servers."
+				description="Deploy the monitoring probe on your Linux servers, or link a laptop with the bat CLI."
 			/>
 
 			{/* Prerequisites */}
@@ -102,6 +102,28 @@ export function SetupPage() {
 						Check that the probe service is running.
 					</p>
 					<CodeBlock title="Service status">systemctl status bat-probe</CodeBlock>
+				</LayerCard.Body>
+			</LayerCard>
+
+			<LayerCard id="workstations">
+				<LayerCard.Header>
+					<h2>Workstations</h2>
+				</LayerCard.Header>
+				<LayerCard.Body className="space-y-basalt-layout">
+					<p className="text-basalt-base text-basalt-muted-foreground">
+						A workstation is your own laptop or desktop. The CLI reports CPU, memory, disk and
+						interface addresses, and pings the servers your account can already see. It does not
+						install a remote shell or collect process lists and files.
+					</p>
+					<CodeBlock title="Install the bat CLI">npm install --global @nocoo/bat</CodeBlock>
+					<CodeBlock title="Link this machine">bat workstation login</CodeBlock>
+					<CodeBlock title="Install the ten minute schedule">bat workstation setup</CodeBlock>
+					<p className="text-basalt-sm text-basalt-muted-foreground">
+						<Code>bat workstation login</Code> opens a consent page in the browser. Approval returns
+						a one-time code to the CLI on this machine; the CLI exchanges it for a dedicated{" "}
+						<Code>batw_</Code> key. Run <Code>bat workstation status</Code> to inspect the local
+						profile without printing the credential.
+					</p>
 				</LayerCard.Body>
 			</LayerCard>
 

@@ -12,6 +12,7 @@ import {
 	unseal,
 	validateServerIds,
 	validateTokenInput,
+	validateWorkstationIds,
 } from "../domain/connect.js";
 import { connectManagementOpenApi } from "../domain/connect-contract.js";
 import {
@@ -58,19 +59,58 @@ async function managementAuthority(c: Context<AppEnv>) {
 	const principal = c.var.accessPrincipal ?? "";
 	const global = configuredManager(c.env.CONNECT_MANAGERS, principal);
 	const ids = new Set((await c.var.repos.connect.servers(principal, global)).map((row) => row.id));
-	return { principal, global, ids };
+	// Ownership or configured global manager, never a tenant-wide read for a
+	// regular principal. Recomputed per request so revocation is immediate.
+	// Managing an existing credential also covers disabled workstations: a key
+	// must stay revocable after one of its targets is disabled. New grants use
+	// the active set below.
+	const workstationIds = new Set(
+		(await c.var.repos.workstations.listManageableFor(principal, global)).map((row) => row.id),
+	);
+	const activeWorkstationIds = new Set(
+		(await c.var.repos.workstations.listAuthorizedFor(principal, global)).map((row) => row.id),
+	);
+	return { principal, global, ids, workstationIds, activeWorkstationIds };
 }
 
+/** A manager must cover the entire configured server and workstation set. */
 function canManage(
 	row: ConnectTokenRow,
 	authority: Awaited<ReturnType<typeof managementAuthority>>,
 ): boolean {
+	const configured = row.server_ids.length > 0 || row.workstation_ids.length > 0;
+	if (!configured) return row.owner === authority.principal;
 	return (
-		authority.global ||
-		(row.server_ids.length
-			? row.server_ids.every((id) => authority.ids.has(id))
-			: row.owner === authority.principal)
+		row.server_ids.every((id) => authority.ids.has(id)) &&
+		row.workstation_ids.every((id) => authority.workstationIds.has(id))
 	);
+}
+
+/**
+ * Existing grants may keep a now-disabled workstation; only *new* grants must
+ * resolve to an active workstation the actor can authorize.
+ */
+async function selectedWorkstations(
+	c: Context<AppEnv>,
+	value: unknown,
+	existing: readonly string[] = [],
+): Promise<string[]> {
+	const ids = validateWorkstationIds(value);
+	const authority = await managementAuthority(c);
+	for (const id of ids) {
+		const allowed = existing.includes(id)
+			? authority.workstationIds.has(id)
+			: authority.activeWorkstationIds.has(id);
+		if (!allowed)
+			throw new ConnectFault(
+				403,
+				"workstation_forbidden",
+				existing.includes(id)
+					? "A retained workstation must still be owned by you or managed globally."
+					: "Every newly added workstation must exist, be active, and be owned by you or managed globally.",
+			);
+	}
+	return ids;
 }
 
 async function selectedServers(c: Context<AppEnv>, value: unknown): Promise<string[]> {
@@ -156,16 +196,37 @@ export async function connectTokensListRoute(c: Context<AppEnv>) {
 export async function connectTokensCreateRoute(c: Context<AppEnv>) {
 	c.set("connectOperation", "management.tokens.create");
 	const body = await connectBody(c);
-	if (Object.keys(body).some((key) => !["name", "scope", "expiresAt", "serverIds"].includes(key)))
-		throw new ConnectFault(400, "invalid_field", "Use name, scope, expiresAt and serverIds.");
+	if (
+		Object.keys(body).some(
+			(key) => !["name", "scope", "expiresAt", "serverIds", "workstationIds"].includes(key),
+		)
+	)
+		throw new ConnectFault(
+			400,
+			"invalid_field",
+			"Use name, scope, expiresAt, serverIds and workstationIds.",
+		);
 	const authority = await managementAuthority(c);
-	if (!authority.global && !authority.ids.size)
-		throw new ConnectFault(403, "server_forbidden", "A product grant is required to create keys.");
+	if (!authority.global && !authority.ids.size && !authority.workstationIds.size)
+		throw new ConnectFault(
+			403,
+			"server_forbidden",
+			"A server or workstation grant is required to create keys.",
+		);
 	const legacyServer = c.req.param("serverId");
+	if (legacyServer && Object.hasOwn(body, "workstationIds"))
+		throw new ConnectFault(
+			400,
+			"invalid_field",
+			"Use /api/connect/tokens to grant workstations; the legacy server path is server-only.",
+		);
 	const serverIds = await selectedServers(
 		c,
 		Object.hasOwn(body, "serverIds") ? body.serverIds : legacyServer ? [legacyServer] : undefined,
 	);
+	const workstationIds = Object.hasOwn(body, "workstationIds")
+		? await selectedWorkstations(c, body.workstationIds)
+		: [];
 	if (legacyServer && !serverIds.includes(legacyServer))
 		throw new ConnectFault(
 			400,
@@ -178,6 +239,7 @@ export async function connectTokensCreateRoute(c: Context<AppEnv>) {
 		id: crypto.randomUUID(),
 		server_id: "",
 		server_ids: serverIds,
+		workstation_ids: workstationIds,
 		name: input.name,
 		scope: input.scope,
 		prefix: "",
@@ -210,15 +272,18 @@ export async function connectTokenRenameRoute(c: Context<AppEnv>) {
 	const body = await connectBody(c);
 	const allowed = c.req.param("serverId")
 		? ["name", "serverIds"]
-		: ["name", "serverIds", "scope", "expiresAt"];
+		: ["name", "serverIds", "workstationIds", "scope", "expiresAt"];
 	if (!Object.keys(body).length || Object.keys(body).some((key) => !allowed.includes(key)))
 		throw new ConnectFault(
 			400,
 			"invalid_field",
-			"Use name, serverIds, scope or expiresAt; scope and expiry changes require the canonical /api/connect/tokens endpoint.",
+			"Use name, serverIds, workstationIds, scope or expiresAt; scope and expiry changes require the canonical /api/connect/tokens endpoint.",
 		);
 	const previous = [...row.server_ids];
+	const previousWorkstations = [...row.workstation_ids];
 	if (Object.hasOwn(body, "serverIds")) row.server_ids = await selectedServers(c, body.serverIds);
+	if (Object.hasOwn(body, "workstationIds"))
+		row.workstation_ids = await selectedWorkstations(c, body.workstationIds, previousWorkstations);
 	// A co-manager must not grant servers outside the issuer's current authority.
 	const issuerGlobal = configuredManager(c.env.CONNECT_MANAGERS, row.owner);
 	const issuerServers = new Set(
@@ -229,6 +294,21 @@ export async function connectTokenRenameRoute(c: Context<AppEnv>) {
 			403,
 			"server_forbidden",
 			"The key issuer must also be authorized for every added server.",
+		);
+	const issuerWorkstations = new Set(
+		(await c.var.repos.workstations.listAuthorizedFor(row.owner, issuerGlobal)).map(
+			(entry) => entry.id,
+		),
+	);
+	if (
+		row.workstation_ids.some(
+			(id) => !previousWorkstations.includes(id) && !issuerWorkstations.has(id),
+		)
+	)
+		throw new ConnectFault(
+			403,
+			"workstation_forbidden",
+			"The key issuer must also be authorized for every added workstation.",
 		);
 	const input = validateTokenInput(
 		{

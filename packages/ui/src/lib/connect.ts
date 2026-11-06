@@ -1,4 +1,4 @@
-import type { ConnectToken } from "@bat/shared";
+import type { ConnectScope, ConnectToken } from "@bat/shared";
 import { environmentUrl } from "../environment";
 
 export async function connectRequest<T>(
@@ -22,6 +22,50 @@ export async function connectRequest<T>(
 			body?.error?.message ?? "Connect is unavailable. Reload the page to check your session.",
 		);
 	return body as T;
+}
+
+/** Stable, sorted grant list; an empty list grants nothing. */
+export function connectGrantIds(ids: readonly string[]): string[] {
+	return [...new Set(ids)].sort();
+}
+
+/** A token may carry workstation grants only, server grants only, or both. */
+export function connectTokenRequest(input: {
+	name: string;
+	serverIds: readonly string[];
+	workstationIds: readonly string[];
+	scope: ConnectScope;
+	expiresAt: string | null;
+}): {
+	name: string;
+	serverIds: string[];
+	workstationIds: string[];
+	scope: ConnectScope;
+	expiresAt: string | null;
+} {
+	return {
+		name: input.name,
+		serverIds: connectGrantIds(input.serverIds),
+		workstationIds: connectGrantIds(input.workstationIds),
+		scope: input.scope,
+		expiresAt: input.expiresAt,
+	};
+}
+
+/** Workstation grants of a token; the field is required on every current record. */
+export function connectWorkstationIds(token: ConnectToken): string[] {
+	return connectGrantIds(token.workstationIds);
+}
+
+export function connectGrantLabel(
+	ids: readonly string[],
+	nameFor: (id: string) => string | null,
+	emptyLabel: string,
+): string {
+	if (ids.length === 0) {
+		return emptyLabel;
+	}
+	return ids.map((id) => nameFor(id) ?? `${id} (unavailable)`).join(", ");
 }
 
 export function connectTokenStatus(

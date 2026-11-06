@@ -261,3 +261,46 @@ check only compared the outer grid bounds, so it missed the defect. Review
 caught it before push. Bind the grid to the IOPS axis and verify that every
 interior left-axis tick has an aligned horizontal grid line. The new assertion
 failed against the original build before the binding fix.
+
+## 2026-11-06 - Keep workstation contracts and installs bounded
+
+The first shared-contract draft silently changed endpoint paths, omitted the
+agreed report history, and accepted non-loopback HTTPS callbacks. Coordination
+caught these differences before Worker integration. Freeze the endpoint and
+permission matrix before parallel coding, and test loopback boundaries for every
+accepted scheme. A genuine measured zero-millisecond RTT is valid; only missing
+measurements must be null.
+
+A temporary mirror install also populated hundreds of mirror tarball URLs in
+`bun.lock`. The generated install-only changes were restored, retaining only the
+reviewed CLI workspace rename. Verify the lockfile contains no mirror URLs before
+staging, rather than trusting the temporary registry setting to leave it clean.
+
+The Rust bootstrap executable initially failed because it had been renamed to
+`bat-rustup-init`; rustup dispatches by executable basename. Keep the official
+`rustup-init` name inside a task-specific directory, verify its published checksum,
+and install without modifying the user's shell startup files.
+
+## 2026-11-07 - Verify lifecycle invariants across client and Worker
+
+High unit coverage did not prove the initial workstation lifecycle was safe.
+Review found that same-second code replay could rotate a valid credential,
+duplicate or late reports could refresh the latest state, and opaque error text
+could bypass Connect's server filtering. Bind mutations to a successful consume
+nonce, order snapshots by sample time, and test the complete filtered response.
+Exercise revocation, retries and schedule rollback through failure paths rather
+than asserting only successful status codes.
+
+The first cross-package L2 assertion also assumed its operator could discover
+only its own fixture host. A full suite correctly returned all authorized hosts.
+Assert the exact discovered target set and the persisted report, without deleting
+other fixtures or weakening authorization checks. Package smoke tests should use
+the documented informational status exit code instead of assuming missing login
+is always a command error.
+
+Mixed Bun resolver installs left mismatched Vitest peer links. Reinstall only
+this task's generated node_modules from the frozen lock with pinned Bun before
+final evidence; never treat an alternate runner path as the permanent fix.
+Freeze agent edits and alternate-runner invocations before coordinator hooks:
+the first commit correctly failed when concurrent runners repopulated incompatible
+transform caches. Clear only the task-owned cache and rerun the canonical command.

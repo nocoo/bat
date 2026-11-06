@@ -28,6 +28,13 @@ function createTestApp() {
 	app.put("/api/tags/:id", (c) => c.json({ status: "ok" }));
 	app.delete("/api/tags/:id", (c) => c.json({ status: "ok" }));
 	app.post("/api/webhooks", (c) => c.json({ status: "ok" }));
+	// Workstation machine + browser routes
+	app.post("/api/workstation-auth/exchange", (c) => c.json({ status: "ok" }));
+	app.post("/api/workstation-auth/authorize", (c) => c.json({ status: "ok" }));
+	app.get("/api/workstation-probe/targets", (c) => c.json({ status: "ok" }));
+	app.post("/api/workstation-probe/reports", (c) => c.json({ status: "ok" }));
+	app.get("/api/workstations", (c) => c.json({ status: "ok" }));
+	app.delete("/api/workstations/:id", (c) => c.json({ status: "ok" }));
 	app.delete("/api/webhooks/:id", (c) => c.json({ status: "ok" }));
 
 	// CLI asset routes
@@ -208,6 +215,30 @@ describe("entryControl middleware", () => {
 			expect(res.status).toBe(403);
 			const body = await res.json();
 			expect(body.error).toBe("Route not allowed on machine endpoint");
+		});
+
+		test("allows the workstation probe and exchange paths", async () => {
+			const app = createTestApp();
+			for (const [method, path] of [
+				["POST", "/api/workstation-auth/exchange"],
+				["GET", "/api/workstation-probe/targets"],
+				["POST", "/api/workstation-probe/reports"],
+			] as const) {
+				const res = await app.request(path, { method, headers: { host: machineHost } });
+				expect(res.status).toBe(200);
+			}
+		});
+
+		test("blocks browser workstation enrollment and reads", async () => {
+			const app = createTestApp();
+			for (const [method, path] of [
+				["POST", "/api/workstation-auth/authorize"],
+				["GET", "/api/workstations"],
+				["DELETE", "/api/workstations/ws-1"],
+			] as const) {
+				const res = await app.request(path, { method, headers: { host: machineHost } });
+				expect(res.status).toBe(403);
+			}
 		});
 
 		test("blocks GET /api/hosts (browser route)", async () => {

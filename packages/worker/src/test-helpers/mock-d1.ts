@@ -418,6 +418,11 @@ export function createMockD1(connectVersion: 28 | 29 = 29): D1Database {
 
 	if (connectVersion === 29)
 		db.exec(readFileSync(resolve(__dirname, "../../migrations/0030_host_deletion.sql"), "utf-8"));
+	// Workstation tables are independent of the Connect migration ladder.
+	db.exec(readFileSync(resolve(__dirname, "../../migrations/0031_workstations.sql"), "utf-8"));
+	db.exec(
+		readFileSync(resolve(__dirname, "../../migrations/0032_connect_workstations.sql"), "utf-8"),
+	);
 	return {
 		prepare(sql: string): D1PreparedStatement {
 			return new MockD1PreparedStatement(db, sql);

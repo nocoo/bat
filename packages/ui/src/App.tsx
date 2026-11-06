@@ -1,7 +1,7 @@
 import { LinkProvider, ThemeProvider, TooltipProvider } from "@nocoo/basalt";
 import { AccentProvider } from "@nocoo/basalt/providers/accent";
 import type { ComponentPropsWithRef } from "react";
-import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Link, Navigate, Outlet, Route, Routes } from "react-router";
 import { SWRConfig } from "swr";
 import { AppShell } from "./components/layout";
 import {
@@ -14,6 +14,9 @@ import {
 	SetupPage,
 	TagsPage,
 	WebhooksPage,
+	WorkstationDetailPage,
+	WorkstationLoginPage,
+	WorkstationsPage,
 } from "./routes";
 
 function AppLink({
@@ -34,6 +37,14 @@ function AppLink({
 	return <Link to={href} {...props} />;
 }
 
+function ShellLayout() {
+	return (
+		<AppShell>
+			<Outlet />
+		</AppShell>
+	);
+}
+
 export function App() {
 	return (
 		<ThemeProvider defaultTheme="system" storageKey="theme">
@@ -47,11 +58,14 @@ export function App() {
 							}}
 						>
 							<BrowserRouter>
-								<AppShell>
-									<Routes>
+								<Routes>
+									<Route path="/workstation-login" element={<WorkstationLoginPage />} />
+									<Route element={<ShellLayout />}>
 										<Route path="/" element={<Navigate to="/hosts" replace={true} />} />
 										<Route path="/hosts" element={<HostsPage />} />
 										<Route path="/hosts/:id" element={<HostDetailPage />} />
+										<Route path="/workstations" element={<WorkstationsPage />} />
+										<Route path="/workstations/:id" element={<WorkstationDetailPage />} />
 										<Route path="/alerts" element={<AlertsPage />} />
 										<Route path="/events" element={<EventsPage />} />
 										<Route path="/tags" element={<TagsPage />} />
@@ -59,8 +73,8 @@ export function App() {
 										<Route path="/settings/data" element={<DataRetentionPage />} />
 										<Route path="/setup" element={<SetupPage />} />
 										<Route path="/connect" element={<ConnectPage />} />
-									</Routes>
-								</AppShell>
+									</Route>
+								</Routes>
 							</BrowserRouter>
 						</SWRConfig>
 					</TooltipProvider>

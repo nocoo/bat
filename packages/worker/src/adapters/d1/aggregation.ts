@@ -18,6 +18,7 @@ import {
 } from "../../domain/aggregation.js";
 import type { AggregationRepository } from "../../repos/types.js";
 import { D1SettingsRepository } from "./settings.js";
+import { D1WorkstationsRepository } from "./workstations.js";
 
 const RAW_COLUMNS_SELECT = `cpu_usage_pct, cpu_iowait, cpu_steal, cpu_load1, cpu_load5, cpu_load15,
        mem_total, mem_available, mem_used_pct,
@@ -350,5 +351,9 @@ WHERE h.is_active = 1 AND EXISTS (
 	async runScheduledMaintenance(nowSeconds: number): Promise<void> {
 		const retentionDays = await new D1SettingsRepository(this.db).getRetentionDays();
 		await this.purgeOldData(nowSeconds, retentionDays);
+		await new D1WorkstationsRepository(this.db).purgeOlderThan(
+			nowSeconds - retentionDays * 86_400,
+			nowSeconds,
+		);
 	}
 }

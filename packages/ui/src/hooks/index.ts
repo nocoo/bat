@@ -19,6 +19,11 @@ export {
 	useSetup,
 	useTags,
 	useWebhooks,
+	useWorkstation,
+	useWorkstationConnectivity,
+	useWorkstationMetricsPages,
+	useWorkstations,
 } from "./queries";
 export { useDeleteHost } from "./use-delete-host";
+export { useDeleteWorkstation } from "./use-delete-workstation";
 export { useIsMobile } from "./use-mobile";

@@ -32,6 +32,34 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		list: true,
 	},
 	{
+		id: "workstations.list",
+		method: "GET",
+		path: `${root}/workstations`,
+		summary:
+			"List only the key's currently authorized workstations (an empty set returns an empty list)",
+		list: true,
+	},
+	{
+		id: "workstation.get",
+		method: "GET",
+		path: `${root}/workstations/:workstationId`,
+		summary:
+			"Read-only workstation snapshot; embedded connectivity is limited to the key's authorized servers",
+	},
+	{
+		id: "workstation.metrics",
+		method: "GET",
+		path: `${root}/workstations/:workstationId/metrics`,
+		summary:
+			"Workstation capacity history (from/to Unix seconds, maximum window 30 days, limit 1–100)",
+	},
+	{
+		id: "workstation.connectivity",
+		method: "GET",
+		path: `${root}/workstations/:workstationId/connectivity`,
+		summary: "Reachability history for the key's currently authorized servers only",
+	},
+	{
 		id: "server.get",
 		method: "GET",
 		path: server,
@@ -435,6 +463,24 @@ export const CONNECT_UNSUPPORTED = [
 		feature: "host.delete_or_retire",
 		reason:
 			"Host deletion and re-registration require the Access-protected dashboard. Connect DELETE on a server returns 501.",
+	},
+	{
+		feature: "workstation.enrollment",
+		reason:
+			"Workstation enrollment and key rotation require the Access-protected workstation login with PKCE; Connect Bearer requests return 501.",
+		operation: "workstations.enroll",
+	},
+	{
+		feature: "workstation.revoke",
+		reason:
+			"Workstation revocation requires the Access-protected dashboard with a same-origin confirmation. Connect DELETE on a workstation returns 501.",
+		operation: "workstations.delete",
+	},
+	{
+		feature: "workstation.probe_report",
+		reason:
+			"Reports are accepted only from a workstation's dedicated batw_ key. Connect Bearer requests cannot submit workstation reports even with write scope.",
+		operation: "workstations.report",
 	},
 	{
 		feature: "remote_shell_or_software_install",

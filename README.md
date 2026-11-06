@@ -38,11 +38,11 @@ interval = 30
 
 `worker_url` 需要 HTTPS，loopback 开发地址除外；间隔不能低于 10 秒。Setup API 只返回地址，不提供 write key。发布流程上传探针二进制和校验文件，没有发布可直接使用的一键安装脚本。
 
-资产 CLI 是仓库内的私有 workspace 包。完成下节的依赖安装和构建后，可从源码运行：
+CLI 包名为 `@nocoo/bat`，命令为 `bat`，构建生成无需 Bun 的 Node.js 产物。npm 发布单独执行；发布前可从源码运行：
 
 ```bash
-bun packages/cli/src/bin/bat-cli.ts login
-bun packages/cli/src/bin/bat-cli.ts agent list
+bun packages/cli/src/bat.ts login
+bun packages/cli/src/bat.ts agent list
 ```
 
 CLI 登录通过浏览器回调保存资产范围的 token。它的心跳服务定期发送用户传入的 `running` / `stopped` 状态，不检测进程是否真的运行；macOS 的 `service install` 生成 launchd plist，仍需另行加载。Linux 指标采集使用 Rust 探针。
@@ -59,7 +59,7 @@ bun run build
 cargo build --release --locked --manifest-path probe/Cargo.toml
 ```
 
-`build` 构建共享包和 UI，SPA 写入 `packages/worker/static/`。`packages/shared/` 保存类型与规则，`packages/worker/` 是 API 和数据层，`packages/ui/` 是网页，`packages/cli/` 管理资产，`probe/` 是 Rust 采集端。
+`build` 构建共享包、UI 和 CLI，SPA 写入 `packages/worker/static/`，CLI 写入 `packages/cli/dist/`。`packages/shared/` 保存类型与规则，`packages/worker/` 是 API 和数据层，`packages/ui/` 是网页，`packages/cli/` 管理资产，`probe/` 是 Rust 采集端。
 
 Local development starts persistent synthetic Demo data. The local-only Demo / E2E / Prod control selects an isolated native runtime; only explicit Prod selection requires Access service credentials. See [local environments](docs/23-local-environments.md).
 

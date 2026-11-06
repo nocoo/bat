@@ -31,16 +31,27 @@ const object = (properties: Record<string, Schema>, required: string[] = []): Sc
 const enumString = (...values: string[]): Schema => ({ type: "string", enum: values });
 const ref = (name: string): Schema => ({ $ref: `#/components/schemas/${name}` });
 const array = (items: Schema): Schema => ({ type: "array", items });
+const integer = { type: "integer" };
+const nullableNumber = { type: ["number", "null"] };
+const nullableInteger = { type: ["integer", "null"] };
 const serverIds = {
 	...array({ ...string, minLength: 1, maxLength: 256 }),
 	maxItems: CONNECT_LIMITS.serversPerToken,
 	description:
 		"Explicit canonical server IDs. Duplicates are normalized. [] grants no server access; it never means all servers.",
 };
+const workstationIds = {
+	...array({ ...string, format: "uuid" }),
+	maxItems: CONNECT_LIMITS.workstationsPerToken,
+	uniqueItems: true,
+	description:
+		"Explicit workstation UUIDs. Duplicates are normalized. [] grants no workstation access; it never means all workstations. Workstation access is read-only and connectivity stays limited to serverIds.",
+};
 const tokenFields = {
 	name: { ...string, minLength: 1, maxLength: 64 },
 	scope: enumString("read", "write"),
 	serverIds,
+	workstationIds,
 	expiresAt: {
 		...nullableString,
 		format: "date-time",
@@ -80,12 +91,172 @@ const assetFields = {
 	metadata,
 };
 
+const workstationReport = object(
+	{
+		report_id: string,
+		started_at: integer,
+		finished_at: integer,
+		sample_window_ms: integer,
+		cli_version: string,
+		hostname: string,
+		os: string,
+		arch: string,
+		uptime_seconds: integer,
+		cpu: object({ model: string, count: integer, usage_pct: nullableNumber }, [
+			"model",
+			"count",
+			"usage_pct",
+		]),
+		mem: object({ total_bytes: integer, available_bytes: integer, used_pct: { type: "number" } }, [
+			"total_bytes",
+			"available_bytes",
+			"used_pct",
+		]),
+		disk: array(
+			object(
+				{
+					mount: string,
+					total_bytes: integer,
+					available_bytes: integer,
+					used_pct: { type: "number" },
+				},
+				["mount", "total_bytes", "available_bytes", "used_pct"],
+			),
+		),
+		network: object(
+			{
+				interfaces: array(
+					object(
+						{
+							name: string,
+							addresses: array(
+								object(
+									{
+										address: string,
+										family: { type: "integer", enum: [4, 6] },
+										internal: { type: "boolean" },
+									},
+									["address", "family", "internal"],
+								),
+							),
+						},
+						["name", "addresses"],
+					),
+				),
+			},
+			["interfaces"],
+		),
+		connectivity: array(
+			object(
+				{
+					server_id: string,
+					address: string,
+					family: { type: "integer", enum: [4, 6] },
+					sent: integer,
+					received: integer,
+					rtts_ms: { type: "array", items: nullableNumber, minItems: 3, maxItems: 3 },
+					status: enumString(
+						"reachable",
+						"partial",
+						"timeout",
+						"unreachable",
+						"error",
+						"unsupported",
+					),
+				},
+				["server_id", "address", "family", "sent", "received", "rtts_ms", "status"],
+			),
+		),
+		collection_errors: array(string),
+		targets_error: nullableString,
+		received_at: integer,
+	},
+	[
+		"report_id",
+		"started_at",
+		"finished_at",
+		"sample_window_ms",
+		"cli_version",
+		"hostname",
+		"os",
+		"arch",
+		"uptime_seconds",
+		"cpu",
+		"mem",
+		"disk",
+		"network",
+		"connectivity",
+		"collection_errors",
+		"targets_error",
+		"received_at",
+	],
+);
+
+const workstationConnectivityPoint = object(
+	{
+		received_at: integer,
+		received: integer,
+		rtt_avg_ms: nullableNumber,
+		rtt_min_ms: nullableNumber,
+		rtt_max_ms: nullableNumber,
+		status: enumString("reachable", "partial", "timeout", "unreachable", "error", "unsupported"),
+	},
+	["received_at", "received", "rtt_avg_ms", "rtt_min_ms", "rtt_max_ms", "status"],
+);
+
 export const CONNECT_SCHEMAS: Record<string, Schema> = {
 	...DTO_SCHEMAS,
+	WorkstationReport: workstationReport,
+	WorkstationRecord: object(
+		{
+			id: string,
+			owner: string,
+			name: string,
+			created_at: integer,
+			last_seen_at: nullableInteger,
+			public_ip: nullableString,
+			disabled: { type: "boolean" },
+			latest_report: { anyOf: [ref("WorkstationReport"), { type: "null" }] },
+		},
+		["id", "owner", "name", "created_at", "last_seen_at", "public_ip", "disabled", "latest_report"],
+	),
+	WorkstationMetricPoint: object(
+		{
+			received_at: integer,
+			started_at: integer,
+			finished_at: integer,
+			cpu_usage_pct: nullableNumber,
+			mem_used_pct: { type: "number" },
+			mem_total_bytes: integer,
+			mem_available_bytes: integer,
+			uptime_seconds: integer,
+		},
+		[
+			"received_at",
+			"started_at",
+			"finished_at",
+			"cpu_usage_pct",
+			"mem_used_pct",
+			"mem_total_bytes",
+			"mem_available_bytes",
+			"uptime_seconds",
+		],
+	),
+	WorkstationConnectivity: object(
+		{
+			server_id: string,
+			address: string,
+			family: { type: "integer", enum: [4, 6] },
+			data: array(ref("WorkstationConnectivityPoint")),
+		},
+		["server_id", "address", "family", "data"],
+	),
+	WorkstationConnectivityPoint: workstationConnectivityPoint,
 	ConnectToken: object(
 		{
 			...tokenFields,
 			serverIds: { ...serverIds, uniqueItems: true },
+			workstationIds: { ...workstationIds, uniqueItems: true },
 			serverId: {
 				...string,
 				deprecated: true,
@@ -103,6 +274,7 @@ export const CONNECT_SCHEMAS: Record<string, Schema> = {
 			"name",
 			"scope",
 			"serverIds",
+			"workstationIds",
 			"prefix",
 			"createdAt",
 			"lastUsedAt",
@@ -384,6 +556,10 @@ const responseTypes: Record<string, string> = {
 	"capabilities.get": "Capabilities",
 	"contract.get": "OpenApi",
 	"servers.list": "HostOverviewItem",
+	"workstations.list": "WorkstationRecord",
+	"workstation.get": "WorkstationRecord",
+	"workstation.metrics": "WorkstationMetricPoint",
+	"workstation.connectivity": "WorkstationConnectivity",
 	"server.get": "HostDetailItem",
 	"metrics.list": "MetricsQueryResponse",
 	"tier2.get": "Tier2Snapshot",
@@ -426,9 +602,58 @@ const responseTypes: Record<string, string> = {
 	"requests.get": "RequestStatus",
 };
 
+const pageEnvelope = (data: Schema): Schema =>
+	object({ data, requestId: string, workstationIds: array(string) }, [
+		"data",
+		"requestId",
+		"workstationIds",
+	]);
+
 export function connectResponseSchema(operation: ConnectOperation): Schema {
 	if (operation.id === "capabilities.get" || operation.id === "contract.get")
 		return ref(responseTypes[operation.id] as string);
+	if (operation.id === "workstations.list")
+		return object(
+			{
+				data: array(ref("WorkstationRecord")),
+				page: object(
+					{ limit: { type: "integer", minimum: 1, maximum: 100 }, nextCursor: nullableString },
+					["limit", "nextCursor"],
+				),
+				requestId: string,
+				serverIds: array(string),
+				workstationIds: array(string),
+			},
+			["data", "page", "requestId", "serverIds", "workstationIds"],
+		);
+	if (operation.id === "workstation.get") return pageEnvelope(ref("WorkstationRecord"));
+	if (operation.id === "workstation.metrics")
+		return object(
+			{
+				data: array(ref("WorkstationMetricPoint")),
+				page: object(
+					{
+						limit: { type: "integer", minimum: 1, maximum: 100 },
+						offset: { type: "integer", minimum: 0 },
+						next_offset: nullableInteger,
+					},
+					["limit", "offset", "next_offset"],
+				),
+				requestId: string,
+				workstationIds: array(string),
+			},
+			["data", "page", "requestId", "workstationIds"],
+		);
+	if (operation.id === "workstation.connectivity")
+		return object(
+			{
+				targets: array(ref("WorkstationConnectivity")),
+				limit: { type: "integer", minimum: 1, maximum: 100 },
+				requestId: string,
+				workstationIds: array(string),
+			},
+			["targets", "limit", "requestId", "workstationIds"],
+		);
 	let data = ref(responseTypes[operation.id] ?? "Envelope");
 	if (operation.id === "maintenance.get") data = { anyOf: [data, { type: "null" }] };
 	if (operation.list || operation.id === "hostTags.replace") data = array(data);
@@ -486,6 +711,18 @@ export function connectOpenApi() {
 				{ name: "from", in: "query", required: true, schema: { type: "integer", minimum: 0 } },
 				{ name: "to", in: "query", required: true, schema: { type: "integer", minimum: 0 } },
 			);
+		if (operation.id === "workstation.metrics" || operation.id === "workstation.connectivity")
+			parameters.push(
+				{ name: "from", in: "query", required: true, schema: { type: "integer", minimum: 0 } },
+				{ name: "to", in: "query", required: true, schema: { type: "integer", minimum: 0 } },
+				{
+					name: "limit",
+					in: "query",
+					schema: { type: "integer", minimum: 1, maximum: 100, default: 100 },
+				},
+			);
+		if (operation.id === "workstation.metrics")
+			parameters.push({ name: "offset", in: "query", schema: { type: "integer", minimum: 0 } });
 		if (operation.id === "monitoring.alerts")
 			parameters.push(
 				{ name: "severity", in: "query", schema: enumString("critical", "warning", "info") },
@@ -567,7 +804,7 @@ export function connectOpenApi() {
 			title: "Bat Connect API",
 			version: BAT_VERSION,
 			description:
-				"Many-to-many key/server authorization. A key selects an explicit server set; a server can have multiple keys. Empty means no server access. Authorization, issuer grants and host activity are checked on every request. Each resource path remains confined to its selected server, even when the key authorizes others. write includes read. HEAD is supported for every GET. All responses are no-store. No browser CORS; cookies and legacy keys never authenticate v1. Runtime observation payloads retain Bat's existing extensible DTO fields.",
+				"Many-to-many key/server and key/workstation authorization. A key selects an explicit server set and an explicit workstation set; each can have multiple keys. Empty means no access for that kind. Authorization, issuer grants and host activity are checked on every request. Each resource path remains confined to its selected server, even when the key authorizes others. write includes read. HEAD is supported for every GET. All responses are no-store. No browser CORS; cookies and legacy keys never authenticate v1. Runtime observation payloads retain Bat's existing extensible DTO fields.",
 		},
 		servers: [{ url: CONNECT_API_ORIGIN }],
 		paths,
@@ -736,7 +973,7 @@ export function connectManagementOpenApi() {
 			title: "Bat Connect Key Management",
 			version: BAT_VERSION,
 			description:
-				"Requires verified Cloudflare Access plus product authority over every configured server. Empty keys require their owner or a global manager. All selected servers must be active and authorized; additions must also be within the issuer's authority. Expiry defaults to never. Changes take effect on the next Bearer request. Bearer tokens cannot call management endpoints. Legacy /servers/{serverId}/tokens routes remain compatible, with singleton creation when serverIds is omitted; scope/expiry edits use canonical routes.",
+				"Requires verified Cloudflare Access plus product authority over every configured server and workstation. Keys may also carry an explicit workstationIds set for read-only workstation access, and a workstation-only key is valid with serverIds: []. Existing keys stay server-only until explicitly edited; workstation additions must also be within the issuer's authority. Empty keys require their owner or a global manager. All selected servers and workstations must be active and authorized. Expiry defaults to never. Changes take effect on the next Bearer request. Bearer tokens cannot call management endpoints. Legacy /servers/{serverId}/tokens routes remain compatible and server-only, with singleton creation when serverIds is omitted; scope/expiry/workstation edits use canonical routes.",
 		},
 		servers: [{ url: "https://bat.hexly.ai" }],
 		paths,

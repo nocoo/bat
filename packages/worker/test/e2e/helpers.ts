@@ -1,3 +1,5 @@
+import { importJWK, type JWK, SignJWT } from "jose";
+
 // Shared helpers for L2 per-route test files. globalSetup (test/e2e/global-setup.ts)
 // boots wrangler dev once and exposes BASE / keys via env vars before test files
 // are evaluated, so plain top-level `process.env.*` reads work here.
@@ -24,6 +26,28 @@ export function writeHeaders(): Record<string, string> {
 export function readHeaders(): Record<string, string> {
 	return {
 		Authorization: `Bearer ${READ_KEY}`,
+	};
+}
+
+/** Sign a browser Access JWT with the local fixture key (no remote credentials). */
+export async function accessJwt(email = "operator@example.test"): Promise<string> {
+	const key = await importJWK(JSON.parse(requireEnv("BAT_E2E_ACCESS_KEY")) as JWK, "RS256");
+	return new SignJWT({ email, name: "Morgan Chen" })
+		.setProtectedHeader({ alg: "RS256", kid: requireEnv("BAT_E2E_ACCESS_KID") })
+		.setIssuer(requireEnv("BAT_E2E_ACCESS_ISSUER"))
+		.setAudience(requireEnv("BAT_E2E_ACCESS_AUDIENCE"))
+		.setIssuedAt()
+		.setExpirationTime("2h")
+		.sign(key);
+}
+
+/** Same-origin browser confirmation headers used by Access-protected mutations. */
+export async function browserHeaders(email?: string): Promise<Record<string, string>> {
+	return {
+		"Cf-Access-Jwt-Assertion": await accessJwt(email),
+		Origin: BASE,
+		"X-Bat-Management": "1",
+		"Content-Type": "application/json",
 	};
 }
 

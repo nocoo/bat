@@ -20,6 +20,7 @@ import { D1SettingsRepository } from "./settings.js";
 import { D1TagsRepository } from "./tags.js";
 import { D1Tier2Repository } from "./tier2.js";
 import { D1WebhooksRepository } from "./webhooks.js";
+import { D1WorkstationsRepository } from "./workstations.js";
 
 /**
  * Build the D1-backed `Repositories` bundle. Adapter constructors are
@@ -45,5 +46,6 @@ export function createD1Repositories(db: D1Database): Repositories {
 		tier2: new D1Tier2Repository(db),
 		cliTokens: new D1CliTokensRepository(db),
 		aggregation: new D1AggregationRepository(db),
+		workstations: new D1WorkstationsRepository(db),
 	};
 }

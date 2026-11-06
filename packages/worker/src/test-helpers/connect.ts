@@ -8,6 +8,75 @@ import { createMockD1 } from "./mock-d1.js";
 
 export const SERVER_A = "connect-server-a";
 export const SERVER_B = "connect-server-b";
+export const WORKSTATION_A = "11111111-1111-4111-8111-111111111111";
+export const WORKSTATION_B = "22222222-2222-4222-8222-222222222222";
+const WORKSTATION_OWNER = "email:operator@example.test";
+
+function workstationPayload(reportId: string, uptime = 86_400) {
+	const now = Math.floor(Date.now() / 1000);
+	return {
+		report_id: reportId,
+		started_at: now - 10,
+		finished_at: now,
+		sample_window_ms: 10_000,
+		cli_version: "2.5.0",
+		hostname: "fixture-workstation",
+		os: "macOS 15.2",
+		arch: "arm64",
+		uptime_seconds: uptime,
+		cpu: { model: "Apple M3 Pro", count: 12, usage_pct: 12.5 },
+		mem: { total_bytes: 36_000_000_000, available_bytes: 12_000_000_000, used_pct: 66.7 },
+		disk: [
+			{
+				mount: "/",
+				total_bytes: 994_662_584_320,
+				available_bytes: 397_284_917_248,
+				used_pct: 60.1,
+			},
+		],
+		network: {
+			interfaces: [
+				{ name: "en0", addresses: [{ address: "192.168.1.20", family: 4, internal: false }] },
+			],
+		},
+		connectivity: [
+			{
+				server_id: SERVER_A,
+				address: "8.8.8.8",
+				family: 4,
+				sent: 3,
+				received: 3,
+				rtts_ms: [8, 9, 10],
+				status: "reachable",
+			},
+			{
+				server_id: SERVER_B,
+				address: "8.8.4.4",
+				family: 4,
+				sent: 3,
+				received: 0,
+				rtts_ms: [null, null, null],
+				status: "timeout",
+			},
+		],
+		collection_errors: ["ping 8.8.4.4 failed", `target ${SERVER_B} unreachable`],
+		targets_error: `target ${SERVER_B} unreachable`,
+	};
+}
+
+function insertWorkstation(
+	db: D1Database,
+	id: string,
+	installation: string,
+	name: string,
+	tokenHash: string,
+): D1PreparedStatement {
+	return db
+		.prepare(
+			"INSERT INTO workstations(id, owner, installation_id, name, created_at, disabled, token_hash, token_prefix) VALUES (?,?,?,?,unixepoch(),0,?,?)",
+		)
+		.bind(id, WORKSTATION_OWNER, installation, name, tokenHash, `${tokenHash.slice(0, 8)}…`);
+}
 
 export async function connectFixture() {
 	const identity = await fixtureIdentity();
@@ -62,6 +131,71 @@ export async function connectFixture() {
 			"INSERT INTO agent_asset_bindings(agent_id,asset_id) VALUES ('agt_a','ast_a'),('agt_b','ast_b')",
 		)
 		.run();
+	// Workstation fixtures use fixed UUIDs so types stay strict in tests.
+	await db.batch([
+		insertWorkstation(
+			db,
+			WORKSTATION_A,
+			"11111111-1111-4111-8111-11111111111a",
+			"Fixture laptop",
+			"fixture-ws-a",
+		),
+		insertWorkstation(
+			db,
+			WORKSTATION_B,
+			"22222222-2222-4222-8222-22222222222b",
+			"Foreign laptop",
+			"fixture-ws-b",
+		),
+	]);
+	const fixtureReportId = "33333333-3333-4333-8333-333333333333";
+	const fixtureNow = Math.floor(Date.now() / 1000);
+	await db
+		.prepare(
+			"INSERT INTO workstation_reports(report_id, workstation_id, body_hash, received_at, started_at, finished_at, cpu_usage_pct, mem_used_pct, mem_total_bytes, mem_available_bytes, uptime_seconds, payload) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+		)
+		.bind(
+			fixtureReportId,
+			WORKSTATION_A,
+			"fixture-body",
+			fixtureNow,
+			fixtureNow - 10,
+			fixtureNow,
+			12.5,
+			66.7,
+			36_000_000_000,
+			12_000_000_000,
+			86_400,
+			JSON.stringify(workstationPayload(fixtureReportId)),
+		)
+		.run();
+	await db
+		.prepare(
+			"INSERT INTO workstation_connectivity(report_id, workstation_id, received_at, server_id, address, family, sent, received, rtts, status) VALUES (?,?,?,?,?,?,?,?,?,?),(?,?,?,?,?,?,?,?,?,?)",
+		)
+		.bind(
+			fixtureReportId,
+			WORKSTATION_A,
+			fixtureNow,
+			SERVER_A,
+			"8.8.8.8",
+			4,
+			3,
+			3,
+			"[8,9,10]",
+			"reachable",
+			fixtureReportId,
+			WORKSTATION_A,
+			fixtureNow,
+			SERVER_B,
+			"8.8.4.4",
+			4,
+			3,
+			0,
+			"[null,null,null]",
+			"timeout",
+		)
+		.run();
 
 	const management = (
 		path: string,
@@ -91,6 +225,7 @@ export async function connectFixture() {
 		scope: ConnectScope = "write",
 		serverId: string | string[] = SERVER_A,
 		expiresAt: string | null = null,
+		workstationIds: string[] = [],
 	) {
 		const path = "/api/connect/tokens";
 		const serverIds = typeof serverId === "string" ? [serverId] : serverId;
@@ -99,6 +234,7 @@ export async function connectFixture() {
 			scope,
 			expiresAt,
 			serverIds,
+			workstationIds,
 		});
 		if (created.status !== 201)
 			throw new Error(
@@ -154,6 +290,7 @@ export async function connectFixture() {
 		const selectedServer = params.serverId ?? SERVER_A;
 		const values = {
 			serverId: selectedServer,
+			workstationId: params.workstationId ?? WORKSTATION_A,
 			id: id.startsWith("agents.")
 				? "agt_a"
 				: id.startsWith("assets.")
@@ -173,6 +310,8 @@ export async function connectFixture() {
 		);
 		if (id === "metrics.list")
 			path += `?from=${Math.floor(Date.now() / 1000) - 3600}&to=${Math.floor(Date.now() / 1000)}`;
+		if (id === "workstation.metrics" || id === "workstation.connectivity")
+			path += `?from=${Math.floor(Date.now() / 1000) - 3600}&to=${Math.floor(Date.now() / 1000)}&limit=10`;
 		let etag = "";
 		if (operation.method !== "GET")
 			etag =

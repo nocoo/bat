@@ -1,3 +1,4 @@
+import type { WorkstationAuthorizeInput, WorkstationAuthorizeResult } from "@bat/shared";
 import { environmentUrl } from "./environment";
 // MVVM "Model" layer — thin fetch wrapper around the Worker /api/* routes.
 //
@@ -71,3 +72,11 @@ export const deleteHostAPI = (id: string, confirmHostId: string): Promise<{ ok: 
 		body: { confirm_host_id: confirmHostId },
 		management: true,
 	});
+
+export const authorizeWorkstationAPI = (
+	input: WorkstationAuthorizeInput,
+): Promise<WorkstationAuthorizeResult> =>
+	request("POST", "/api/workstation-auth/authorize", { body: input, management: true });
+
+export const deleteWorkstationAPI = (id: string): Promise<{ ok: true }> =>
+	request("DELETE", `/api/workstations/${encodeURIComponent(id)}`, { management: true });

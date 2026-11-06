@@ -33,6 +33,7 @@ import type {
 } from "@bat/shared";
 import type { ConnectRepository } from "./connect.js";
 import type { ConnectProductsRepository } from "./connect-products.js";
+import type { WorkstationsRepository } from "./workstations.js";
 
 /**
  * Host inventory + read/write surface. Powers the host overview/detail/
@@ -767,8 +768,9 @@ export interface AggregationRepository {
 		nowSeconds: number,
 		retentionDays: import("@bat/shared").RetentionDays,
 	): Promise<void>;
-	/** Scheduled cron entry point: reads `retention_days` from settings
-	 *  then calls `purgeOldData`. */
+	/** Scheduled cron entry point: reads `retention_days` from settings,
+	 *  calls `purgeOldData`, then purges workstation report history with the
+	 *  same window. */
 	runScheduledMaintenance(nowSeconds: number): Promise<void>;
 }
 
@@ -790,4 +792,5 @@ export interface Repositories {
 	tier2: Tier2Repository;
 	cliTokens: CliTokensRepository;
 	aggregation: AggregationRepository;
+	workstations: WorkstationsRepository;
 }

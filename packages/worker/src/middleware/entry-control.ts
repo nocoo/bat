@@ -17,6 +17,13 @@ const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> 
 	{ method: "POST", path: "/api/events" },
 	// Machine read routes (Uptime Kuma)
 	{ method: "GET", path: "/api/monitoring", prefix: true },
+	// Workstation enrollment exchange and probe routes (dedicated batw_ keys).
+	// The browser consent POST /api/workstation-auth/authorize stays Access-only
+	// and is deliberately absent here.
+	{ method: "POST", path: "/api/workstation-auth/exchange" },
+	{ method: "GET", path: "/api/workstation-probe/targets" },
+	{ method: "POST", path: "/api/workstation-probe/reports" },
+	{ method: "POST", path: "/api/workstation-probe/revoke" },
 	// Public routes
 	{ method: "GET", path: "/api/live" },
 	{ method: "GET", path: "/api/me" },

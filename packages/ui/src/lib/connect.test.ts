@@ -4,14 +4,19 @@ import {
 	connectDate,
 	connectExamples,
 	connectExpiryInput,
+	connectGrantIds,
+	connectGrantLabel,
 	connectRequest,
+	connectTokenRequest,
 	connectTokenStatus,
+	connectWorkstationIds,
 } from "./connect";
 
 const token: ConnectToken = {
 	id: "example",
 	name: "Example",
 	serverIds: ["server", "second-server"],
+	workstationIds: [],
 	scope: "read",
 	prefix: "masked",
 	version: 2,
@@ -107,5 +112,64 @@ describe("Connect client privacy and metadata", () => {
 		expect(connectExpiryInput("2026-12-31T20:15:37.000Z")).toBe("2027-01-01T04:15:37");
 		offset.mockReturnValue(300);
 		expect(connectExpiryInput("2027-01-01T02:00:00.000Z")).toBe("2026-12-31T21:00");
+	});
+});
+
+describe("Connect grant sets", () => {
+	test("grant ids are unique and sorted", () => {
+		expect(connectGrantIds(["b", "a", "a"])).toEqual(["a", "b"]);
+		expect(connectGrantIds([])).toEqual([]);
+	});
+
+	test("a workstation-only request keeps serverIds empty and lists workstation ids", () => {
+		expect(
+			connectTokenRequest({
+				name: "Workstation only",
+				serverIds: [],
+				workstationIds: ["ws-2", "ws-1"],
+				scope: "read",
+				expiresAt: null,
+			}),
+		).toEqual({
+			name: "Workstation only",
+			serverIds: [],
+			workstationIds: ["ws-1", "ws-2"],
+			scope: "read",
+			expiresAt: null,
+		});
+	});
+
+	test("a mixed request carries both grant sets explicitly", () => {
+		expect(
+			connectTokenRequest({
+				name: "Mixed",
+				serverIds: ["pw-host-alpha"],
+				workstationIds: ["ws-1"],
+				scope: "write",
+				expiresAt: "2026-12-01T00:00:00.000Z",
+			}),
+		).toEqual({
+			name: "Mixed",
+			serverIds: ["pw-host-alpha"],
+			workstationIds: ["ws-1"],
+			scope: "write",
+			expiresAt: "2026-12-01T00:00:00.000Z",
+		});
+	});
+
+	test("workstation grants are read from the required array", () => {
+		expect(connectWorkstationIds(token)).toEqual([]);
+		expect(connectWorkstationIds({ ...token, workstationIds: ["ws-1", "ws-1"] })).toEqual(["ws-1"]);
+	});
+
+	test("grant labels name known ids and mark unavailable ones", () => {
+		const names = new Map([["ws-1", "Field laptop"]]);
+		expect(connectGrantLabel([], () => null, "No workstation access")).toBe(
+			"No workstation access",
+		);
+		expect(connectGrantLabel(["ws-1"], (id) => names.get(id) ?? null, "none")).toBe("Field laptop");
+		expect(connectGrantLabel(["ws-9"], (id) => names.get(id) ?? null, "none")).toBe(
+			"ws-9 (unavailable)",
+		);
 	});
 });

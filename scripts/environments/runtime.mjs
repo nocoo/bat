@@ -117,6 +117,8 @@ export function localConfig(path, identity, owner) {
 			CONNECT_MANAGERS: "email:operator@example.test",
 			// Browser suites share one operator; keep the per-minute management budget from flaking them.
 			CONNECT_MANAGEMENT_RATE_LIMIT: "6000",
+			// Workstation suites issue several reports per minute per key.
+			WORKSTATION_RATE_LIMIT: "6000",
 			BAT_WRITE_KEY: identity.writeKey,
 			BAT_READ_KEY: identity.readKey,
 			CONNECT_TOKEN_KEYS: JSON.stringify({

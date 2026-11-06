@@ -284,6 +284,16 @@ export async function connectBearer(c: Context<AppEnv>, next: Next) {
 	);
 	const serverIds = row.server_ids.filter((id) => permitted.has(id));
 	c.set("connectServerIds", serverIds);
+	// Workstation grants are recomputed on every request: ownership or a
+	// configured global manager, restricted to active workstations. Disabling or
+	// deleting a workstation revokes access without a cache flush.
+	const permittedWorkstations = new Set(
+		(await c.var.repos.workstations.listAuthorizedFor(row.owner, globalManager)).map(
+			(workstation) => workstation.id,
+		),
+	);
+	const workstationIds = row.workstation_ids.filter((id) => permittedWorkstations.has(id));
+	c.set("connectWorkstationIds", workstationIds);
 	// Wildcard middleware runs before Hono exposes the endpoint's named params.
 	const encodedServer = /^\/api\/v1\/servers\/([^/]+)(?:\/|$)/.exec(c.req.path)?.[1];
 	let requestedServer: string | undefined;
@@ -298,6 +308,20 @@ export async function connectBearer(c: Context<AppEnv>, next: Next) {
 			403,
 			"server_mismatch",
 			"This token does not currently authorize this server. Use an ID from GET /servers.",
+		);
+	const encodedWorkstation = /^\/api\/v1\/workstations\/([^/]+)(?:\/|$)/.exec(c.req.path)?.[1];
+	let requestedWorkstation: string | undefined;
+	try {
+		requestedWorkstation = encodedWorkstation ? decodeURIComponent(encodedWorkstation) : undefined;
+	} catch {
+		throw new ConnectFault(400, "invalid_id", "Workstation ID must be valid URL-encoded text.");
+	}
+	if (requestedWorkstation) c.set("connectWorkstationId", requestedWorkstation);
+	if (requestedWorkstation && !workstationIds.includes(requestedWorkstation))
+		throw new ConnectFault(
+			403,
+			"workstation_mismatch",
+			"This token does not currently authorize this workstation. Use an ID from GET /workstations.",
 		);
 	const writing = !["GET", "HEAD"].includes(c.req.method);
 	if (writing && row.scope !== "write")

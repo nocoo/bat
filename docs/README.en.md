@@ -38,11 +38,11 @@ interval = 30
 
 `worker_url` requires HTTPS except for loopback development URLs. The interval must be at least 10 seconds. The Setup API returns only the URL, not a write key. Releases upload probe binaries and checksums, without a ready-to-use installation script.
 
-The asset CLI is a private workspace package. After installing dependencies and building as described below, run it from source:
+The CLI package is `@nocoo/bat`, with the `bat` executable and a self-contained Node.js build. npm publication is a separate step. Before publication, run it from source:
 
 ```bash
-bun packages/cli/src/bin/bat-cli.ts login
-bun packages/cli/src/bin/bat-cli.ts agent list
+bun packages/cli/src/bat.ts login
+bun packages/cli/src/bat.ts agent list
 ```
 
 Browser login saves a token scoped to assets. The heartbeat service periodically submits the supplied `running` or `stopped` status; it does not inspect whether a process is actually running. On macOS, `service install` writes a launchd plist that must be loaded separately. Linux metric collection uses the Rust probe.
@@ -59,7 +59,7 @@ bun run build
 cargo build --release --locked --manifest-path probe/Cargo.toml
 ```
 
-`build` builds the shared package and UI, writing the SPA to `packages/worker/static/`. `packages/shared/` contains types and rules, `packages/worker/` contains API and data access, `packages/ui/` is the dashboard, `packages/cli/` manages assets, and `probe/` contains the Rust collector.
+`build` builds the shared package, UI and CLI, writing the SPA to `packages/worker/static/` and the CLI to `packages/cli/dist/`. `packages/shared/` contains types and rules, `packages/worker/` contains API and data access, `packages/ui/` is the dashboard, `packages/cli/` manages assets, and `probe/` contains the Rust collector.
 
 Local development defaults to persistent Demo data through a gateway on 7025:
 

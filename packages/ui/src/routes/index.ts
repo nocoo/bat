@@ -7,3 +7,6 @@ export { HostsPage } from "./hosts";
 export { SetupPage } from "./setup";
 export { TagsPage } from "./tags";
 export { WebhooksPage } from "./webhooks";
+export { WorkstationDetailPage } from "./workstation-detail";
+export { WorkstationLoginPage } from "./workstation-login";
+export { WorkstationsPage } from "./workstations";

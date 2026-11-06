@@ -2,6 +2,7 @@
 
 import type { ConnectTokenRow } from "./domain/connect.js";
 import type { Repositories } from "./repos/types.js";
+import type { WorkstationRow } from "./repos/workstations.js";
 
 export type Bindings = Pick<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_KEY"> &
 	Partial<Omit<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_KEY">> & {
@@ -19,6 +20,8 @@ export type Bindings = Pick<Cloudflare.Env, "DB" | "BAT_WRITE_KEY" | "BAT_READ_K
 		CONNECT_MANAGERS?: string;
 		/** Local development/E2E only: per-minute management request limit override. Ignored in production. */
 		CONNECT_MANAGEMENT_RATE_LIMIT?: string;
+		/** Local development/E2E only: workstation per-key limit override. Ignored in production. */
+		WORKSTATION_RATE_LIMIT?: string;
 		/** Internal execution state, overwritten at the public Worker entry. Never a request header. */
 		CONNECT_COORDINATED?: boolean;
 	};
@@ -28,9 +31,16 @@ export type Variables = {
 	// Set by accessAuth middleware when JWT signature is verified
 	accessAuthenticated?: boolean;
 	accessPrincipal?: string;
+	/** Set by workstationKeyAuth for the probe routes. */
+	workstation?: WorkstationRow;
+	/** SHA-256 digest of the presented workstation key. */
+	workstationTokenHash?: string;
 	connectToken?: ConnectTokenRow;
 	connectServerId?: string;
 	connectServerIds?: string[];
+	/** Effective workstation read grants for the current request. */
+	connectWorkstationIds?: string[];
+	connectWorkstationId?: string;
 	connectRequestId?: string;
 	connectOperation?: string;
 	connectErrorCode?: string;

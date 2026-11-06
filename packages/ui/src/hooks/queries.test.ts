@@ -43,6 +43,9 @@ import {
 	useSetup,
 	useTags,
 	useWebhooks,
+	useWorkstation,
+	useWorkstationConnectivity,
+	useWorkstations,
 } from "./queries";
 
 beforeEach(() => {
@@ -216,6 +219,47 @@ describe("query hooks — keys, configs, and fetcher routes", () => {
 
 	test("useHostTier2(null) suspends fetch with null key", () => {
 		renderHook(() => useHostTier2(null));
+		expect(lastCall().key).toBeNull();
+	});
+
+	test("useWorkstations → key 'workstations', polls every 60s", async () => {
+		renderHook(() => useWorkstations());
+		const c = lastCall();
+		expect(c.key).toBe("workstations");
+		expect(c.config).toMatchObject({ refreshInterval: 60_000, keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/workstations");
+	});
+
+	test("useWorkstation polls the detail snapshot and keeps the previous record", async () => {
+		renderHook(() => useWorkstation("ws-1"));
+		const c = lastCall();
+		expect(c.key).toBe("workstation-ws-1");
+		expect(c.config).toMatchObject({ refreshInterval: 60_000, keepPreviousData: true });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/workstations/ws-1");
+	});
+
+	test("useWorkstation(null) suspends the detail fetch", () => {
+		renderHook(() => useWorkstation(null));
+		expect(lastCall().key).toBeNull();
+	});
+
+	test("useWorkstationConnectivity keys the target window and limit", async () => {
+		renderHook(() => useWorkstationConnectivity("ws-1", 100, 200, 50));
+		const c = lastCall();
+		expect(c.key).toBe("workstation-connectivity-ws-1-100-200-50");
+		expect(c.config).toMatchObject({ refreshInterval: 60_000 });
+		await c.fetcher?.();
+		expect(getAPIMock).toHaveBeenCalledWith("/api/workstations/ws-1/connectivity", {
+			from: "100",
+			to: "200",
+			limit: "50",
+		});
+	});
+
+	test("workstation connectivity suspends when the id is null", () => {
+		renderHook(() => useWorkstationConnectivity(null, 100, 200));
 		expect(lastCall().key).toBeNull();
 	});
 

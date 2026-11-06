@@ -19,10 +19,13 @@ Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](
 - `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
 - Keep MVVM boundaries and thin routes. Route/page scan hits are structural evidence, not assertion quality.
 - Use Bun, not pnpm. Release through the existing script and CD; laptop `bun run deploy` / `wrangler deploy` would race CD. Probe fleet upgrades remain manual.
+- `packages/cli` builds the public `@nocoo/bat` package with only the `bat` executable. Workstation commands use isolated credentials below `~/.config/bat/workstation/`; assets credentials and the original heartbeat service remain separate. npm installation never registers tasks or collects data.
+- Workstations are not server hosts. Dedicated `batw_` credentials can only discover authorized public targets, submit their own observations and revoke themselves. Enrollment uses Access consent plus one-use PKCE codes. Connect workstation grants are explicit, and connectivity reads require both workstation and target-server authorization.
+- Workstation schedules run a bounded one-shot probe every ten minutes in the current user's session. Never test by registering actual tasks or changing ACLs in the real home directory. Automated fixtures use temporary stores and fake command executors; native scheduler acceptance remains separately authorized.
 
 ## Setup and commands
 
-TypeScript 7, Bun 1.3.11/Turbo, Hono Worker, Vite SPA; Rust probe lane with cargo, clippy, rustfmt and cargo-llvm-cov; D1 `bat-db`, optional production `BAT_KV` and a Connect coordinator Durable Object. `packages/shared/` and `packages/worker/` hold types and Worker/API/SPA assets; `packages/ui/`, `packages/cli/` and `probe/` hold the dashboard, CLI and Rust agent.
+TypeScript 7, Bun 1.3.11/Turbo, Hono Worker, Vite SPA; Rust probe lane with cargo, clippy, rustfmt and cargo-llvm-cov; D1 `bat-db`, optional production `BAT_KV` and a Connect coordinator Durable Object. `packages/shared/` and `packages/worker/` hold types and Worker/API/SPA assets; `packages/ui/`, `packages/cli/` and `probe/` hold the dashboard, public Node.js CLI and Rust agent. The root build includes the bundled CLI; its runtime needs Node.js 22+ rather than Bun.
 
 Run from the root after a frozen Bun install. Rust coverage needs `cargo-llvm-cov` and LLVM tools; nightly preserves existing `coverage(off)` annotations. Browser tests need Chromium in `packages/ui`.
 

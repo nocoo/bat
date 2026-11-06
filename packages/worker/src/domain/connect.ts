@@ -1,4 +1,4 @@
-import { CONNECT_LIMITS, type ConnectScope, type ConnectToken } from "@bat/shared";
+import { CONNECT_LIMITS, type ConnectScope, type ConnectToken, isUuid } from "@bat/shared";
 
 export class ConnectFault extends Error {
 	constructor(
@@ -30,6 +30,8 @@ export interface ConnectTokenRow {
 	/** Immutable legacy AEAD context only; authorization uses server_ids. */
 	server_id: string;
 	server_ids: string[];
+	/** Explicit workstation read grants; [] means no workstation access. */
+	workstation_ids: string[];
 	name: string;
 	scope: ConnectScope;
 	prefix: string;
@@ -176,6 +178,7 @@ export function tokenMetadata(row: ConnectTokenRow): ConnectToken {
 	return {
 		id: row.id,
 		serverIds: row.server_ids,
+		workstationIds: row.workstation_ids,
 		...(row.server_ids.length === 1 ? { serverId: row.server_ids[0] } : {}),
 		name: row.name,
 		scope: row.scope,
@@ -209,6 +212,21 @@ export function validateServerIds(value: unknown): string[] {
 			"serverIds must be an array of up to 100 canonical server IDs; [] grants no server access.",
 		);
 	return [...new Set(value as string[])].sort();
+}
+
+/** Workstation grants use canonical UUIDs; [] grants no workstation access. */
+export function validateWorkstationIds(value: unknown): string[] {
+	if (
+		!Array.isArray(value) ||
+		value.length > CONNECT_LIMITS.workstationsPerToken ||
+		value.some((id) => typeof id !== "string" || !isUuid(id))
+	)
+		throw new ConnectFault(
+			400,
+			"invalid_workstations",
+			"workstationIds must be an array of up to 100 workstation UUIDs; [] grants no workstation access.",
+		);
+	return [...new Set((value as string[]).map((id) => id.toLowerCase()))].sort();
 }
 
 export function validateTokenInput(

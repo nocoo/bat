@@ -59,6 +59,11 @@ test.describe("Host detail page", () => {
 		await expect(back).toHaveAttribute("href", "/hosts");
 		for (const width of [1280, 390]) {
 			await page.setViewportSize({ width, height: 900 });
+			// The shell resolves its responsive layout after the viewport change;
+			// measure only once the back control has moved to the current column.
+			await expect
+				.poll(async () => (await back.boundingBox())?.x ?? Number.POSITIVE_INFINITY)
+				.toBeLessThan(width === 390 ? 100 : 400);
 			const button = await back.boundingBox();
 			const heading = await title.boundingBox();
 			const description = await page

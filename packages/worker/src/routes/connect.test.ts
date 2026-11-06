@@ -55,8 +55,10 @@ describe("Connect authentication and server authority", () => {
 	test("all supported read resources are discoverable and bounded to the server", async () => {
 		const f = await connectFixture();
 		const read = await f.mint("read");
+		// Workstation reads have their own authorization set (own tests); a
+		// server-only key must never gain workstation access implicitly.
 		for (const operation of CONNECT_OPERATIONS.filter(
-			(op) => op.method === "GET" && op.id !== "requests.get",
+			(op) => op.method === "GET" && op.id !== "requests.get" && !op.id.startsWith("workstation"),
 		)) {
 			const response = await f.call(operation.id, read.secret);
 			expect(response.status, operation.id).toBe(200);

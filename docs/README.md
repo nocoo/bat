@@ -38,3 +38,4 @@ Historical design documents moved to `archive/`:
 - `19-edge-dashboard-migration.md` — Migration plan from Next.js to edge
 
 - [Local environments](23-local-environments.md): Demo/E2E/Prod lifecycle, fixtures, commands and verification.
+- [Workstations](24-workstations.md): Access/PKCE enrollment, hash-only `batw_` keys, probe targets and idempotent reports, bounded history, derived status.

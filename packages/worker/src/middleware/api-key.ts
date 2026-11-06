@@ -11,6 +11,7 @@ import { isConnectPath } from "../domain/connect.js";
 import { lookupToken, rememberToken } from "../lib/cli-token-cache.js";
 import type { AppEnv } from "../types.js";
 import { isMachineEndpoint } from "./entry-control.js";
+import { isWorkstationPath } from "./workstation.js";
 
 /** Routes that require no authentication */
 const PUBLIC_ROUTES = ["/api/live", "/api/me"];
@@ -133,6 +134,9 @@ export async function apiKeyAuth(c: Context<AppEnv>, next: Next) {
 	// Connect has its own authentication. Static keys, CLI tokens and Access
 	// sessions must never short-circuit the v1 Bearer permission checks.
 	if (isConnectPath(path)) return next();
+	// Workstations have a dedicated chain: batw_ keys for the probe routes and
+	// Access + PKCE for enrollment. Static keys and CLI tokens must not reach it.
+	if (isWorkstationPath(path)) return next();
 	const host =
 		c.env?.ENVIRONMENT === "production" ? new URL(c.req.url).hostname : c.req.header("host") || "";
 

@@ -2,17 +2,23 @@ import { CONNECT_LIMITS, type ConnectSensitiveAction, type ConnectServer } from 
 import { ConnectFault, type ConnectTokenRow } from "../../domain/connect.js";
 import type { ConnectAudit, ConnectRepository, ConnectRequest } from "../../repos/connect.js";
 
-type StoredToken = Omit<ConnectTokenRow, "server_ids"> & { server_ids: string };
+type StoredToken = Omit<ConnectTokenRow, "server_ids" | "workstation_ids"> & {
+	server_ids: string;
+	workstation_ids: string;
+};
 type StoredAudit = Omit<ConnectAudit, "server_ids" | "previous_server_ids"> & {
 	server_ids: string;
 	previous_server_ids: string | null;
 };
 const tokenSelect = `SELECT t.*, (SELECT json_group_array(server_id) FROM
-  (SELECT server_id FROM connect_token_servers WHERE token_id = t.id ORDER BY server_id)) AS server_ids
+  (SELECT server_id FROM connect_token_servers WHERE token_id = t.id ORDER BY server_id)) AS server_ids,
+  (SELECT json_group_array(workstation_id) FROM
+  (SELECT workstation_id FROM connect_token_workstations WHERE token_id = t.id ORDER BY workstation_id)) AS workstation_ids
   FROM connect_tokens t`;
 const tokenRow = (row: StoredToken): ConnectTokenRow => ({
 	...row,
 	server_ids: JSON.parse(row.server_ids),
+	workstation_ids: JSON.parse(row.workstation_ids),
 });
 const auditRow = (row: StoredAudit): ConnectAudit => ({
 	...row,
@@ -100,6 +106,7 @@ export class D1ConnectRepository implements ConnectRepository {
 				),
 			this.auditStatement(audit, true),
 			this.grantsStatement(row, audit.id),
+			this.workstationGrantsStatement(row, audit.id),
 		]);
 		return (results[0]?.meta.changes ?? 0) === 1;
 	}
@@ -137,7 +144,13 @@ export class D1ConnectRepository implements ConnectRepository {
 					`DELETE FROM connect_token_servers WHERE token_id = ? AND server_id NOT IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
 				)
 				.bind(row.id, JSON.stringify(row.server_ids), audit.id),
+			this.db
+				.prepare(
+					`DELETE FROM connect_token_workstations WHERE token_id = ? AND workstation_id NOT IN (SELECT value FROM json_each(?)) AND EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
+				)
+				.bind(row.id, JSON.stringify(row.workstation_ids), audit.id),
 			this.grantsStatement(row, audit.id),
+			this.workstationGrantsStatement(row, audit.id),
 		]);
 		if ((results[0]?.meta.changes ?? 0) === 1) return true;
 		const current = await this.token(row.id);
@@ -152,6 +165,14 @@ export class D1ConnectRepository implements ConnectRepository {
 				`INSERT OR IGNORE INTO connect_token_servers(token_id, server_id) SELECT ?, value FROM json_each(?) WHERE EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
 			)
 			.bind(row.id, JSON.stringify(row.server_ids), auditId);
+	}
+
+	private workstationGrantsStatement(row: ConnectTokenRow, auditId: string): D1PreparedStatement {
+		return this.db
+			.prepare(
+				`INSERT OR IGNORE INTO connect_token_workstations(token_id, workstation_id) SELECT ?, value FROM json_each(?) WHERE EXISTS (SELECT 1 FROM connect_audit WHERE id = ?)`,
+			)
+			.bind(row.id, JSON.stringify(row.workstation_ids), auditId);
 	}
 
 	async touchToken(id: string, now: number): Promise<void> {

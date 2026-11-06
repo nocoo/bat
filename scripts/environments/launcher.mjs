@@ -294,6 +294,15 @@ if (import.meta.main) {
 				worker: runtime.locked?.runtime.base,
 				writeKey: runtime.locked?.runtime.identity.writeKey,
 				readKey: runtime.locked?.runtime.identity.readKey,
+				// Local Access fixture: tenants sign their own browser JWTs so
+				// Access-protected routes are exercised without remote credentials.
+				access: {
+					privateKey: runtime.locked?.runtime.identity.privateKey,
+					issuer: "https://bat-fixture.invalid",
+					audience: runtime.locked?.runtime.owner,
+					kid: runtime.locked?.runtime.owner,
+					manager: "email:operator@example.test",
+				},
 			}),
 			{ mode: 0o600 },
 		);
