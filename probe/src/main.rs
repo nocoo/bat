@@ -9,6 +9,7 @@ mod rate;
 mod sender;
 
 use std::collections::HashMap;
+use std::future::Future;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -26,6 +27,11 @@ use tokio::time::MissedTickBehavior;
 const PROBE_VERSION: &str = env!("CARGO_PKG_VERSION");
 const ECHO_HOST: &str = "echo.nocoo.cloud";
 const ECHO_URL: &str = "https://echo.nocoo.cloud/api/ip";
+/// Budget for one complete echo refresh: DNS plus both family lookups.
+const ECHO_LOOKUP_BUDGET: Duration = Duration::from_secs(15);
+/// Upper bound for a single family lookup, always bounded by what is left of the
+/// refresh budget.
+const ECHO_FAMILY_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[tokio::main(flavor = "current_thread")]
 #[allow(clippy::too_many_lines)]
@@ -58,11 +64,11 @@ async fn main() {
 
     // Public IP via echo service — shared state updated every 1h
     let public_ips: Arc<Mutex<PublicIps>> = Arc::new(Mutex::new(PublicIps::default()));
-    // Fetch initial public IPs before first identity send (15s timeout to avoid blocking startup)
-    if let Ok(ips) = tokio::time::timeout(Duration::from_secs(15), fetch_public_ips()).await
-        && !ips.is_empty()
-    {
-        *public_ips.lock().await = ips;
+    // Fetch initial public IPs before the first identity send. The lookup is
+    // bounded internally so a slow family cannot delay startup.
+    let initial = fetch_public_ips().await;
+    if !initial.is_empty() {
+        *public_ips.lock().await = initial;
     }
 
     tracing::info!(
@@ -608,44 +614,73 @@ async fn collect_tier2(host_id: &str, include_disk_deep: bool) -> payload::Tier2
 
 /// Fetch the public address of every family the echo service can be reached on.
 ///
-/// The echo host is resolved once per request family and the request is pinned to
-/// that address, so SNI and `Host` stay intact while the connection family is
-/// chosen explicitly. The returned literal is classified by parsing it, never by
-/// the address that was pinned.
+/// The echo host is resolved once and both families are asked concurrently, each
+/// bounded. Whatever answered is kept: a family that is missing (no AAAA record),
+/// slow or unreachable never discards the other one, and the whole call stays
+/// inside [`ECHO_LOOKUP_BUDGET`] including DNS.
 #[cfg_attr(coverage_nightly, coverage(off))]
 async fn fetch_public_ips() -> PublicIps {
-    let mut ips = PublicIps::default();
+    let started = tokio::time::Instant::now();
 
-    let addrs = match resolve_echo_addrs().await {
-        Ok(addrs) => addrs,
-        Err(e) => {
+    let addrs = match tokio::time::timeout(ECHO_LOOKUP_BUDGET, resolve_echo_addrs()).await {
+        Ok(Ok(addrs)) => addrs,
+        Ok(Err(e)) => {
             tracing::warn!(error = %e, "failed to resolve echo service host");
-            return ips;
+            return PublicIps::default();
+        }
+        Err(_) => {
+            tracing::warn!("echo service host resolution exceeded the lookup budget");
+            return PublicIps::default();
         }
     };
 
-    for family in [IpFamily::V4, IpFamily::V6] {
-        let Some(addr) = addrs
-            .iter()
-            .copied()
-            .find(|addr| addr.is_ipv4() == matches!(family, IpFamily::V4))
-        else {
-            tracing::debug!(?family, "echo service host has no address for family");
-            continue;
-        };
+    let remaining = ECHO_LOOKUP_BUDGET.saturating_sub(started.elapsed());
+    lookup_families(&addrs, remaining.min(ECHO_FAMILY_TIMEOUT), fetch_echo_ip).await
+}
 
-        let Some(literal) = fetch_echo_ip(addr).await else {
-            continue;
-        };
+/// Ask both families concurrently and keep whatever answered.
+async fn lookup_families<F, Fut>(addrs: &[SocketAddr], budget: Duration, lookup: F) -> PublicIps
+where
+    F: Fn(SocketAddr) -> Fut + Copy,
+    Fut: Future<Output = Option<String>>,
+{
+    let (v4, v6) = tokio::join!(
+        lookup_family(addrs, IpFamily::V4, budget, lookup),
+        lookup_family(addrs, IpFamily::V6, budget, lookup),
+    );
 
-        match orchestrate::classify_ip_literal(&literal) {
-            Some(IpFamily::V4) => ips.v4 = Some(literal),
-            Some(IpFamily::V6) => ips.v6 = Some(literal),
-            None => tracing::warn!(%literal, "echo service returned a non-IP literal"),
+    let mut ips = PublicIps::default();
+    for observed in v4.into_iter().chain(v6) {
+        match orchestrate::classify_ip_literal(&observed) {
+            Some(IpFamily::V4) => ips.v4 = Some(observed),
+            Some(IpFamily::V6) => ips.v6 = Some(observed),
+            None => tracing::warn!(%observed, "echo service returned a non-IP literal"),
         }
     }
-
     ips
+}
+
+/// Ask the echo service over one family, using the first address of that family.
+async fn lookup_family<F, Fut>(
+    addrs: &[SocketAddr],
+    family: IpFamily,
+    budget: Duration,
+    lookup: F,
+) -> Option<String>
+where
+    F: Fn(SocketAddr) -> Fut + Copy,
+    Fut: Future<Output = Option<String>>,
+{
+    let addr = addrs
+        .iter()
+        .copied()
+        .find(|addr| addr.is_ipv4() == matches!(family, IpFamily::V4))?;
+
+    let Ok(literal) = tokio::time::timeout(budget, lookup(addr)).await else {
+        tracing::debug!(?family, "echo lookup exceeded its budget");
+        return None;
+    };
+    literal
 }
 
 /// Resolve the echo service host to its socket addresses.
@@ -698,6 +733,138 @@ async fn fetch_echo_ip(addr: SocketAddr) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ECHO_V4: SocketAddr = SocketAddr::new(
+        std::net::IpAddr::V4(std::net::Ipv4Addr::new(203, 0, 113, 1)),
+        443,
+    );
+    const ECHO_V6: SocketAddr = SocketAddr::new(
+        std::net::IpAddr::V6(std::net::Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+        443,
+    );
+
+    fn identity_for(ips: PublicIps) -> payload::IdentityPayload {
+        orchestrate::build_identity_payload(
+            PROBE_VERSION,
+            "host-1",
+            "host",
+            "os",
+            "kernel",
+            "arch",
+            "cpu",
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            ips,
+        )
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lookup_families_keeps_the_family_that_answers() {
+        let budget = Duration::from_secs(5);
+        let ips = lookup_families(&[ECHO_V4, ECHO_V6], budget, |addr| async move {
+            if addr.is_ipv4() {
+                // Behaves like a black-holed IPv4 path.
+                tokio::time::sleep(Duration::from_secs(600)).await;
+                return None;
+            }
+            Some("2001:db8::2".to_string())
+        })
+        .await;
+
+        assert_eq!(
+            ips,
+            PublicIps {
+                v4: None,
+                v6: Some("2001:db8::2".to_string()),
+            }
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn partial_lookup_reaches_the_identity_payload() {
+        let ips = lookup_families(
+            &[ECHO_V4, ECHO_V6],
+            Duration::from_secs(5),
+            |addr| async move {
+                if addr.is_ipv4() {
+                    tokio::time::sleep(Duration::from_secs(600)).await;
+                    return None;
+                }
+                Some("2001:db8::2".to_string())
+            },
+        )
+        .await;
+
+        let identity = identity_for(ips);
+        assert_eq!(identity.public_ip_v4, None);
+        assert_eq!(identity.public_ip_v6, Some("2001:db8::2".to_string()));
+        // The preferred address falls back to the family that answered.
+        assert_eq!(identity.public_ip, Some("2001:db8::2".to_string()));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lookup_families_skips_absent_families_without_waiting() {
+        let ips = lookup_families(&[ECHO_V4], Duration::from_secs(5), |_addr| async move {
+            Some("203.0.113.7".to_string())
+        })
+        .await;
+
+        assert_eq!(
+            ips,
+            PublicIps {
+                v4: Some("203.0.113.7".to_string()),
+                v6: None,
+            }
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lookup_families_reports_nothing_when_both_time_out() {
+        let ips = lookup_families(
+            &[ECHO_V4, ECHO_V6],
+            Duration::from_secs(5),
+            |_addr| async move {
+                tokio::time::sleep(Duration::from_secs(600)).await;
+                None
+            },
+        )
+        .await;
+
+        assert!(ips.is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lookup_families_ignores_non_ip_literals() {
+        let ips = lookup_families(
+            &[ECHO_V4, ECHO_V6],
+            Duration::from_secs(5),
+            |_addr| async move { Some("not-an-address".to_string()) },
+        )
+        .await;
+
+        assert!(ips.is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn lookup_families_never_exceeds_the_budget() {
+        let budget = Duration::from_secs(5);
+        let started = tokio::time::Instant::now();
+        let _ = lookup_families(&[ECHO_V4, ECHO_V6], budget, |_addr| async move {
+            tokio::time::sleep(Duration::from_secs(600)).await;
+            None
+        })
+        .await;
+
+        assert!(started.elapsed() <= budget);
+    }
 
     #[tokio::test]
     async fn delay_behavior_skips_missed_ticks() {
