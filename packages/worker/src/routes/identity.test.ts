@@ -308,6 +308,32 @@ describe("POST /api/identity", () => {
 		expect(row?.public_ip_v6).toBe("2001:db8::2");
 	});
 
+	test("a stale probe preference never contradicts the stored families", async () => {
+		// Double stack observed first.
+		await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.42",
+			public_ip_v4: "203.0.113.42",
+			public_ip_v6: "2001:db8::2",
+		});
+		// IPv4 becomes unreachable: only IPv6 is re-observed, while the probe keeps
+		// sending its own preferred address.
+		await post(app, {
+			...makePayload(),
+			public_ip: "2001:db8::9",
+			public_ip_v6: "2001:db8::9",
+		});
+
+		const row = await db
+			.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.public_ip).toBe("203.0.113.42");
+		expect(row?.public_ip_v4).toBe("203.0.113.42");
+		expect(row?.public_ip_v6).toBe("2001:db8::9");
+	});
+
 	test("probe_version stored in hosts table", async () => {
 		const res = await post(app, {
 			...makePayload(),

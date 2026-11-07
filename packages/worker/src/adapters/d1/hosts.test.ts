@@ -604,6 +604,51 @@ describe("D1HostsRepository", () => {
 				public_ip_v6: "2001:db8::2",
 			});
 		});
+		test("public_ip is derived from the stored families, not from the wire preference", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", {
+				public_ip: "203.0.113.1",
+				public_ip_v4: "203.0.113.1",
+				public_ip_v6: "2001:db8::2",
+			});
+			// The IPv4 path fails: only IPv6 is re-observed, and the probe still sends
+			// its own (now stale) preferred address.
+			await repo.updateInventory("h1", {
+				public_ip: "2001:db8::9",
+				public_ip_v6: "2001:db8::9",
+			});
+
+			const row = await db
+				.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string; public_ip_v4: string; public_ip_v6: string }>();
+			expect(row).toEqual({
+				public_ip: "203.0.113.1",
+				public_ip_v4: "203.0.113.1",
+				public_ip_v6: "2001:db8::9",
+			});
+		});
+		test("public_ip falls back to IPv6 when no IPv4 was ever observed", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", {
+				public_ip_v4: null,
+				public_ip_v6: "2001:db8::2",
+			});
+			const row = await db
+				.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string }>();
+			expect(row?.public_ip).toBe("2001:db8::2");
+		});
+		test("a payload without family observations keeps writing the wire public_ip", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", { public_ip: "198.51.100.7" });
+			const row = await db
+				.prepare("SELECT public_ip, public_ip_v4 FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string; public_ip_v4: string | null }>();
+			expect(row).toEqual({ public_ip: "198.51.100.7", public_ip_v4: null });
+		});
 		test("empty fields → no-op", async () => {
 			await seedHost(db, "h1", "h1.example.com", { cpu_logical: 4 });
 			await repo.updateInventory("h1", {});

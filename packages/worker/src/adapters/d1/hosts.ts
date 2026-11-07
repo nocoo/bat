@@ -273,6 +273,10 @@ ON CONFLICT(host_id) DO UPDATE SET
 	}
 
 	async updateInventory(hostId: string, fields: HostInventoryUpdate): Promise<void> {
+		// A per-family observation makes the stored families the source of truth:
+		// `public_ip` is re-derived from them below, so a probe whose own preference
+		// went stale can never contradict what was actually observed.
+		const derivesPreferred = "public_ip_v4" in fields || "public_ip_v6" in fields;
 		const clauses: string[] = [];
 		const values: unknown[] = [];
 		if ("cpu_logical" in fields) {
@@ -307,7 +311,7 @@ ON CONFLICT(host_id) DO UPDATE SET
 			clauses.push("boot_mode = ?");
 			values.push(fields.boot_mode);
 		}
-		if ("public_ip" in fields) {
+		if ("public_ip" in fields && !derivesPreferred) {
 			clauses.push("public_ip = ?");
 			values.push(fields.public_ip);
 		}
@@ -322,10 +326,23 @@ ON CONFLICT(host_id) DO UPDATE SET
 		if (clauses.length === 0) {
 			return;
 		}
-		await this.db
+		const update = this.db
 			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
-			.bind(...values, hostId)
-			.run();
+			.bind(...values, hostId);
+		if (!derivesPreferred) {
+			await update.run();
+			return;
+		}
+		// One batch: the derived column reads the families written by the same
+		// transaction, and a family that was absent keeps its stored value.
+		await this.db.batch([
+			update,
+			this.db
+				.prepare(
+					"UPDATE hosts SET public_ip = COALESCE(public_ip_v4, public_ip_v6) WHERE host_id = ?",
+				)
+				.bind(hostId),
+		]);
 	}
 
 	async updateTier2Inventory(hostId: string, fields: HostTier2Inventory): Promise<void> {
