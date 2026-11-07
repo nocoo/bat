@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.4.1
+
+### Fixed
+
+- Resolve ping absolutely and give cron a usable PATH
+
 ## v3.4.0
 
 ### Added
