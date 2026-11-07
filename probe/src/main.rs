@@ -661,11 +661,18 @@ async fn resolve_echo_addrs() -> std::io::Result<Vec<SocketAddr>> {
 }
 
 /// Ask the echo service which public address it sees, using a pinned connection.
+///
+/// The connection is pinned to `addr`, so nothing may re-route it: an environment
+/// proxy would tunnel through its own resolver and a redirect would follow a
+/// location on whatever family that host resolves to. Both are disabled here and
+/// here only — the probe's Worker client keeps its normal behaviour.
 #[cfg_attr(coverage_nightly, coverage(off))]
 async fn fetch_echo_ip(addr: SocketAddr) -> Option<String> {
     let client = sender::client_builder()
         .timeout(Duration::from_secs(10))
         .resolve(ECHO_HOST, addr)
+        .no_proxy()
+        .redirect(reqwest::redirect::Policy::none())
         .build()
         .ok()?;
 
