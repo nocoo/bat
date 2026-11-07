@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.2.0
+
+### Added
+
+- Enroll a workstation without a browser on that machine
+
 ## v3.1.3
 
 ### Added
