@@ -5,8 +5,8 @@ import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Check } from "lucide-react";
 import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
+import { SkeletonCard } from "@/components/layout/page-skeleton";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useSettings } from "@/hooks";
 
 function retentionLabel(days: RetentionDays): string {
@@ -45,12 +45,13 @@ export function DataRetentionPage() {
 	);
 
 	return isLoading && !settings ? (
-		<LayerCard>
-			<LayerCard.Body className="py-6 space-y-4">
-				<Skeleton className="h-8 w-48" />
-				<Skeleton className="h-20 w-full" />
-			</LayerCard.Body>
-		</LayerCard>
+		<div className="space-y-basalt-layout">
+			<PageHeader
+				title="Data Retention"
+				description="Data outside this window is permanently deleted hourly."
+			/>
+			<SkeletonCard lines={2} />
+		</div>
 	) : error && !settings ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />

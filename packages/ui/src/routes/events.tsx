@@ -13,8 +13,8 @@ import {
 import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
-import { Skeleton } from "@/components/ui/skeleton";
 import { EVENTS_PAGE_SIZE, useEvents, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
 import { chart } from "@/lib/palette";
@@ -123,8 +123,8 @@ export function EventsPage() {
 				</LayerCard>
 			) : isLoading && data === undefined ? (
 				<>
-					<Skeleton className="h-24 w-full" />
-					<Skeleton className="h-64 w-full" />
+					<SkeletonSummary />
+					<SkeletonTable rows={6} columns={5} />
 				</>
 			) : (
 				<>

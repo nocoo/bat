@@ -13,7 +13,7 @@ import {
 import { AlertTriangle, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonCard, SkeletonTable } from "@/components/layout/page-skeleton";
 import { useHosts, useSetup, useWebhooks } from "@/hooks";
 import {
 	buildCurlCommand,
@@ -77,13 +77,14 @@ export function WebhooksPage() {
 	);
 
 	return isLoading && !webhooks ? (
-		<LayerCard>
-			<LayerCard.Body className="py-6 space-y-4">
-				{Array.from({ length: 3 }, (_, i) => (
-					<Skeleton key={`wh-skeleton-${i.toString()}`} className="h-12 w-full" />
-				))}
-			</LayerCard.Body>
-		</LayerCard>
+		<div className="space-y-basalt-layout">
+			<PageHeader
+				title="Webhooks"
+				description="Configure webhook tokens for hosts to send events via POST /api/events."
+			/>
+			<SkeletonCard lines={2} />
+			<SkeletonTable rows={3} columns={4} />
+		</div>
 	) : error && !webhooks ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />

@@ -7,7 +7,11 @@ import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "@/api";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+	SkeletonChartCard,
+	SkeletonHeaderCard,
+	SkeletonRail,
+} from "@/components/layout/page-skeleton";
 import { CapacityChart } from "@/components/workstation/capacity-chart";
 import { DetailHeader, rangeWindowLabel } from "@/components/workstation/detail-header";
 import { MachinePanel, NetworkPanel } from "@/components/workstation/machine-panel";
@@ -256,10 +260,15 @@ export function WorkstationDetailPage() {
 	if (!record) {
 		return (
 			<div className="space-y-basalt-layout">
-				<Skeleton className="h-8 w-56" />
+				<SkeletonHeaderCard />
 				<div className="grid gap-basalt-layout xl:grid-cols-[minmax(0,1fr)_19rem]">
-					<Skeleton className="h-72 w-full" />
-					<Skeleton className="h-72 w-full" />
+					<div className="min-w-0 space-y-basalt-layout">
+						<SkeletonChartCard />
+						<SkeletonChartCard height="h-72" />
+					</div>
+					<div className="min-w-0 space-y-basalt-layout">
+						<SkeletonRail cards={3} />
+					</div>
 				</div>
 			</div>
 		);

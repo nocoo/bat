@@ -7,7 +7,7 @@ import {
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { AlertTriangle, Terminal } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SkeletonCard } from "@/components/layout/page-skeleton";
 import { useSetup } from "@/hooks";
 
 export function SetupPage() {
@@ -28,10 +28,13 @@ export function SetupPage() {
 	const uninstallCmd = `curl -fsSL ${installScriptUrl} | bash -s -- --uninstall`;
 
 	return isLoading && !config ? (
-		<div className="space-y-4">
-			<Skeleton className="h-8 w-48" />
-			<Skeleton className="h-32 w-full" />
-			<Skeleton className="h-32 w-full" />
+		<div className="space-y-basalt-layout">
+			<PageHeader
+				title="Install Probe"
+				description="Deploy the monitoring probe on your Linux servers, or link a laptop with the bat CLI."
+			/>
+			<SkeletonCard lines={4} />
+			<SkeletonCard lines={3} />
 		</div>
 	) : error && !config ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">

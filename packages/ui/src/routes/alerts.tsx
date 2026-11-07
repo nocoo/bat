@@ -12,8 +12,8 @@ import {
 } from "@nocoo/basalt/components/table";
 import { AlertTriangle, Bell } from "lucide-react";
 import { Link } from "react-router";
+import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
 import { chart } from "@/lib/palette";
@@ -137,8 +137,8 @@ export function AlertsPage() {
 				</LayerCard>
 			) : isLoading && alerts === undefined ? (
 				<>
-					<Skeleton className="h-24 w-full" />
-					<Skeleton className="h-64 w-full" />
+					<SkeletonSummary />
+					<SkeletonTable rows={5} columns={6} />
 				</>
 			) : (
 				<>

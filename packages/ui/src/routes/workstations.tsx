@@ -5,8 +5,8 @@ import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { Laptop, Terminal } from "lucide-react";
 import { Link } from "react-router";
+import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
-import { Skeleton } from "@/components/ui/skeleton";
 import { WorkstationTable } from "@/components/workstation/workstation-table";
 import { useWorkstations } from "@/hooks";
 import { chart } from "@/lib/palette";
@@ -101,9 +101,12 @@ export function WorkstationsPage() {
 	if (isLoading && data === undefined) {
 		return (
 			<div className="space-y-basalt-layout" data-testid="workstations-page">
-				<PageHeader title="Workstations" description="Loading your enrolled machines." />
-				<Skeleton className="h-24 w-full" />
-				<Skeleton className="h-64 w-full" />
+				<PageHeader
+					title="Workstations"
+					description="Your laptops and desktops, reporting capacity and reachability from outside the fleet."
+				/>
+				<SkeletonSummary />
+				<SkeletonTable rows={4} columns={7} />
 			</div>
 		);
 	}

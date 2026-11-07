@@ -13,9 +13,9 @@ import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { HostTable } from "@/components/host/host-table";
+import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
 import { chart } from "@/lib/palette";
@@ -47,15 +47,6 @@ function sortHosts(hosts: HostOverviewItem[], key: SortKey): HostOverviewItem[] 
 				return 0;
 		}
 	});
-}
-
-function HostsLoading() {
-	return (
-		<div className="space-y-basalt-layout">
-			<Skeleton className="h-24 w-full" />
-			<Skeleton className="h-80 w-full" />
-		</div>
-	);
 }
 
 function HostsError({ message }: { message: string }) {
@@ -147,7 +138,14 @@ export function HostsPage() {
 	const now = Math.floor(Date.now() / 1000);
 
 	return isLoading && !hosts ? (
-		<HostsLoading />
+		<div className="space-y-basalt-layout" data-testid="hosts-page">
+			<PageHeader
+				title="Hosts"
+				description="Monitored servers and real-time infrastructure status."
+			/>
+			<SkeletonSummary />
+			<SkeletonTable rows={8} columns={7} />
+		</div>
 	) : error && !hosts ? (
 		<HostsError message={error.message} />
 	) : !hosts || hosts.length === 0 ? (

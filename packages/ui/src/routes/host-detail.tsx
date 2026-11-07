@@ -23,10 +23,10 @@ import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
+import { SkeletonChartCard, SkeletonRail } from "@/components/layout/page-skeleton";
 import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { StatusBadge } from "@/components/status-badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { CopyableAddress } from "@/components/workstation/copyable-address";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
 import { formatLastSeen, formatMemory, formatUptime } from "@/lib/host-card-format";
@@ -240,18 +240,13 @@ export function HostDetailPage() {
 
 			{/* Metrics — simplified for now */}
 			{metricsLoading && !metricsResponse ? (
-				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
-					<div className="space-y-4">
-						{Array.from({ length: 4 }, (_, i) => (
-							<LayerCard key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
-								<Skeleton className="h-64 w-full" />
-							</LayerCard>
-						))}
+				<div className="grid gap-basalt-layout lg:grid-cols-[minmax(0,1fr)_22rem]">
+					<div className="min-w-0 space-y-basalt-layout">
+						<SkeletonChartCard />
+						<SkeletonChartCard />
 					</div>
-					<div className="space-y-4">
-						<LayerCard className="p-4 md:p-5">
-							<Skeleton className="h-32 w-full" />
-						</LayerCard>
+					<div className="min-w-0 space-y-basalt-layout">
+						<SkeletonRail cards={2} />
 					</div>
 				</div>
 			) : metricsResponse ? (

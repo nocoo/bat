@@ -12,8 +12,8 @@ import {
 import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
+import { SkeletonCard, SkeletonTable } from "@/components/layout/page-skeleton";
 import { TagChip } from "@/components/tag-chip";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useTags } from "@/hooks";
 import { getSwatchColor } from "@/lib/palette";
 import { validateTagName } from "@/lib/webhooks-format";
@@ -85,13 +85,14 @@ export function TagsPage() {
 	);
 
 	return isLoading && !tags ? (
-		<LayerCard>
-			<LayerCard.Body className="py-6 space-y-4">
-				{Array.from({ length: 5 }, (_, i) => (
-					<Skeleton key={`tag-skeleton-${i.toString()}`} className="h-8 w-full" />
-				))}
-			</LayerCard.Body>
-		</LayerCard>
+		<div className="space-y-basalt-layout">
+			<PageHeader
+				title="Tags"
+				description="Labels and categorization rules for grouping monitored hosts."
+			/>
+			<SkeletonCard lines={3} />
+			<SkeletonTable rows={4} columns={4} />
+		</div>
 	) : error && !tags ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
 			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
