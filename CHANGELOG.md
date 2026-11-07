@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.4.0
+
+### Added
+
+- Add `bat workstation detail` and tidy dialogs and skeletons
+
+### Changed
+
+- Say what the assets profile is for in doctor
+
 ## v3.3.0
 
 ### Added
