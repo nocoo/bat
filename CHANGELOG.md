@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1.3
+
+### Added
+
+- Put the workstation CLI steps behind a dialog on the list page
+
+### Removed
+
+- Drop the retired CLI package name
+
 ## v3.1.2
 
 ### Fixed
