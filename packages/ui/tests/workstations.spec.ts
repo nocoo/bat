@@ -77,40 +77,48 @@ test.describe("Workstations list", () => {
 });
 
 test.describe("Workstation detail", () => {
-	test("shows public IP, machine facts, capacity, interfaces and three real pings", async ({
-		page,
-	}) => {
+	test("identity, copyable address, vitals, machine facts and target rows", async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, "clipboard", {
+				configurable: true,
+				value: { writeText: async () => undefined },
+			});
+		});
 		await page.goto(`/workstations/${fieldLaptop}`);
+
 		await expect(page.getByRole("heading", { name: "Field laptop", exact: true })).toBeVisible();
 		await expect(page.getByTestId("workstation-public-ip")).toHaveText("203.0.113.24");
+		await page.getByRole("button", { name: /Copy public address 203\.0\.113\.24/ }).click();
+		await expect(page.getByRole("button", { name: /Copy public address/ })).toContainText("Copied");
 
-		const machine = page.getByTestId("workstation-detail");
-		await expect(machine.getByText("field-laptop", { exact: true })).toBeVisible();
-		await expect(machine.getByText("macOS 15.5", { exact: true })).toBeVisible();
-		await expect(machine.getByText("aarch64", { exact: true })).toBeVisible();
-		await expect(machine.getByText("10d 0h", { exact: true })).toBeVisible();
-		await expect(machine.getByText("CPU · 12 threads", { exact: true })).toBeVisible();
-		await expect(machine.getByText("24.6%", { exact: true })).toBeVisible();
+		const detail = page.getByTestId("workstation-detail");
+		await expect(detail.getByText("CPU", { exact: true }).first()).toBeVisible();
+		await expect(detail.getByText("24.6%", { exact: true }).first()).toBeVisible();
+		await expect(detail.getByText("Reachable", { exact: true }).first()).toBeVisible();
+		await expect(detail.getByText("RTT p95", { exact: true })).toBeVisible();
+		await expect(detail.getByText("10d 0h", { exact: true }).first()).toBeVisible();
 
-		await expect(machine.getByText("en0", { exact: true })).toBeVisible();
-		await expect(machine.getByText("192.168.1.24", { exact: true })).toBeVisible();
-		await expect(machine.getByText("fe80::1c2d:3e4f:5a6b:7c8d", { exact: true })).toBeVisible();
-		await expect(machine.getByText("internal", { exact: true })).toBeVisible();
+		await expect(detail.getByText("field-laptop", { exact: true })).toBeVisible();
+		await expect(detail.getByText("macOS 15.5 · aarch64", { exact: true })).toBeVisible();
+		await expect(detail.getByText("Apple M3 Pro · 12 threads", { exact: true })).toBeVisible();
+		await expect(detail.getByText("email:operator@example.test", { exact: true })).toBeVisible();
+		await expect(detail.getByText("en0", { exact: true })).toBeVisible();
+		await expect(detail.getByText("192.168.1.24", { exact: true })).toBeVisible();
 
-		const connectivity = page.getByRole("table", { name: "Connectivity targets", exact: true });
-		const alpha = connectivity.getByRole("row").filter({ hasText: "alpha.test.local" });
+		const targets = page.getByRole("table", { name: "Reachability targets", exact: true });
+		const alpha = targets.getByRole("row").filter({ hasText: "alpha.test.local" });
 		await expect(
 			alpha.getByRole("link", { name: "alpha.test.local", exact: true }),
 		).toHaveAttribute("href", "/hosts/f0d3fd30");
-		await expect(alpha.getByText("0 ms", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("0.4 ms", { exact: true }).first()).toBeVisible();
-		await expect(alpha.getByText("0%", { exact: true })).toBeVisible();
-		const beta = connectivity.getByRole("row").filter({ hasText: "beta.test.local" });
-		await expect(beta.getByText("Partial", { exact: true })).toBeVisible();
-		await expect(beta.getByText("33.3%", { exact: true })).toBeVisible();
-		await expect(beta.getByText("41.3 ms", { exact: true })).toBeVisible();
-		await expect(beta.getByText("—", { exact: true }).first()).toBeVisible();
-		await expect(machine.getByTestId("workstation-report-errors")).toContainText(
+		await expect(alpha).toContainText("203.0.113.10");
+		await expect(alpha).toContainText("Reachable");
+		await expect(alpha).toContainText("0.4 ms");
+		await expect(alpha).toContainText("0%");
+		const beta = targets.getByRole("row").filter({ hasText: "beta.test.local" });
+		await expect(beta).toContainText("Partial");
+		await expect(beta).toContainText("33.3%");
+
+		await expect(detail.getByTestId("workstation-report-errors")).toContainText(
 			"statfs(/Volumes/Archive) permission denied",
 		);
 		await expect(
@@ -120,44 +128,37 @@ test.describe("Workstation detail", () => {
 		).toBeVisible();
 	});
 
-	test("history labels samples, windows and the deliberate 100 sample page", async ({ page }) => {
+	test("the window selector refetches the metrics range", async ({ page }) => {
+		const ranges: string[] = [];
+		await page.route("**/api/workstations/*/metrics?*", async (route) => {
+			ranges.push(new URL(route.request().url()).search);
+			await route.continue();
+		});
 		await page.goto(`/workstations/${fieldLaptop}`);
-		const history = page.getByTestId("workstation-history");
-		await expect(
-			history.getByText(
-				"Each point is one report sample at its receipt time, not a ten-minute average.",
-			),
-		).toBeVisible();
-		await expect(history.getByText("Last 24 hours · 100 samples", { exact: true })).toBeVisible();
-		await expect(
-			history.getByText(
-				"The newest 100 samples are loaded. Older samples in this window are not loaded.",
-				{ exact: true },
-			),
-		).toBeVisible();
-		await expect(
-			history
-				.getByRole("group", { name: "Workstation CPU and memory history", exact: true })
-				.first(),
-		).toBeVisible();
-
-		const target = history.getByRole("combobox", { name: "Connectivity target", exact: true });
-		await expect(target).toContainText("alpha.test.local");
-		await target.click();
-		await page.getByRole("option", { name: "beta.test.local", exact: true }).click();
-		await expect(
-			history
-				.getByRole("group", { name: "Selected target round-trip time history", exact: true })
-				.first(),
-		).toBeVisible();
-
-		await history.getByRole("button", { name: "Load 100 older samples", exact: true }).click();
-		await expect(history.getByText("Last 24 hours · 120 samples", { exact: true })).toBeVisible();
-
 		const window = page.getByRole("radiogroup", { name: "History window", exact: true });
 		await expect(window.getByRole("radio", { name: "24h", exact: true })).toBeChecked();
+		await expect(page.getByTestId("workstation-detail")).toContainText("24 hours");
+
 		await window.getByRole("radio", { name: "6h", exact: true }).click();
 		await expect(window.getByRole("radio", { name: "6h", exact: true })).toBeChecked();
+		await expect(page.getByTestId("workstation-detail")).toContainText("6 hours");
+		await expect.poll(() => ranges.some((search) => /to=\d+/.test(search))).toBe(true);
+	});
+
+	test("selecting a target on the legend focuses it and exposes its loss axis", async ({
+		page,
+	}) => {
+		await page.goto(`/workstations/${fieldLaptop}`);
+		const legend = page.getByRole("list", { name: "Reachability targets", exact: true });
+		const beta = legend.getByRole("button", { name: /beta\.test\.local/ });
+		await expect(beta).toHaveAttribute("aria-pressed", "false");
+		await beta.click();
+		await expect(beta).toHaveAttribute("aria-pressed", "true");
+		await expect(page.getByText("beta.test.local loss", { exact: false })).toHaveCount(0);
+		const alpha = legend.getByRole("button", { name: /alpha\.test\.local/ });
+		await alpha.click();
+		await expect(alpha).toHaveAttribute("aria-pressed", "true");
+		await expect(beta).toHaveAttribute("aria-pressed", "false");
 	});
 
 	test("the foreground detail snapshot refreshes public IP, connectivity and state", async ({
@@ -214,16 +215,37 @@ test.describe("Workstation detail", () => {
 		await page.goto(`/workstations/${id}`);
 		await expect(page.getByTestId("workstation-public-ip")).toHaveText("203.0.113.200");
 		await expect(page.getByTestId("workstation-status")).toHaveAttribute("data-status", "stale");
-		const connectivity = page.getByRole("table", { name: "Connectivity targets", exact: true });
-		const alpha = connectivity.getByRole("row").filter({ hasText: "alpha.test.local" });
-		await expect(alpha.getByText("Timeout", { exact: true })).toBeVisible();
+		const targets = page.getByRole("table", { name: "Reachability targets", exact: true });
+		const alpha = targets.getByRole("row").filter({ hasText: "alpha.test.local" });
+		await expect(alpha).toContainText("Timeout");
 
 		await page.clock.runFor(61_000);
 		await expect(page.getByTestId("workstation-public-ip")).toHaveText("203.0.113.201");
 		await expect(page.getByTestId("workstation-status")).toHaveAttribute("data-status", "recent");
-		await expect(alpha.getByText("Reachable", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("0 ms", { exact: true })).toBeVisible();
+		await expect(alpha).toContainText("Reachable");
 		expect(calls).toBeGreaterThanOrEqual(2);
+	});
+
+	test("the topology draws one hub for every target and mirrors the legend focus", async ({
+		page,
+	}) => {
+		await page.goto(`/workstations/${fieldLaptop}`);
+		const graph = page.locator(".basalt-topology");
+		await expect(graph).toBeVisible();
+		await expect(graph.locator(".react-flow__node")).toHaveCount(3);
+		await expect(graph.locator(".react-flow__edge")).toHaveCount(2);
+		await expect(graph.getByText("Field laptop", { exact: true })).toBeVisible();
+		await expect(graph.getByText("beta.test.local", { exact: true })).toBeVisible();
+
+		await graph.getByText("beta.test.local", { exact: true }).click();
+		const legend = page.getByRole("list", { name: "Reachability targets", exact: true });
+		await expect(legend.getByRole("button", { name: /beta\.test\.local/ })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(
+			page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+		).resolves.toBe(true);
 	});
 
 	test("stale and ICMP failures stay informational and honest", async ({ page }) => {
@@ -235,14 +257,13 @@ test.describe("Workstation detail", () => {
 			/no report for more than 30 minutes/i,
 		);
 
-		const connectivity = page.getByRole("table", { name: "Connectivity targets", exact: true });
-		const alpha = connectivity.getByRole("row").filter({ hasText: "alpha.test.local" });
-		await expect(alpha.getByText("Unreachable", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("100%", { exact: true })).toBeVisible();
-		const beta = connectivity.getByRole("row").filter({ hasText: "beta.test.local" });
-		await expect(beta.getByText("Error", { exact: true })).toBeVisible();
-		// A local collector failure is not a network observation: the loss cell stays empty.
-		await expect(beta.getByRole("cell").nth(6)).toHaveText("—");
+		const targets = page.getByRole("table", { name: "Reachability targets", exact: true });
+		const alpha = targets.getByRole("row").filter({ hasText: "alpha.test.local" });
+		await expect(alpha).toContainText("Unreachable");
+		const beta = targets.getByRole("row").filter({ hasText: "beta.test.local" });
+		await expect(beta).toContainText("Local error");
+		// A local collector failure is not a network observation: packet loss stays empty.
+		await expect(beta.getByRole("cell").nth(5)).toHaveText("—");
 		await expect(page.getByTestId("workstation-report-errors")).toContainText(
 			"target discovery failed: connect token expired",
 		);
@@ -256,14 +277,17 @@ test.describe("Workstation detail", () => {
 		await page.goto(`/workstations/${newLaptop}`);
 		await expect(page.getByRole("heading", { name: "New laptop", exact: true })).toBeVisible();
 		await expect(page.getByTestId("workstation-public-ip")).toHaveText("No public IP observed");
-		await expect(page.getByText("No report yet", { exact: true })).toBeVisible();
+		const detail = page.getByTestId("workstation-detail");
+		await expect(detail.getByText("No report yet", { exact: true }).first()).toBeVisible();
 		await expect(
-			page.getByText("No capacity data until the first report.", { exact: true }),
+			detail.getByText("No connectivity targets in the latest report.", { exact: true }).first(),
 		).toBeVisible();
-		await expect(page.getByText("No interface addresses reported.", { exact: true })).toBeVisible();
 		await expect(
-			page.getByText("No connectivity targets in the latest report.", { exact: true }),
+			detail.getByText("No interface addresses reported.", { exact: true }),
 		).toBeVisible();
+		await expect(detail.getByText("RTT p95", { exact: true })).toBeVisible();
+		await expect(detail.getByText("—", { exact: true }).first()).toBeVisible();
+		await expect(detail.getByText("0%", { exact: true })).toHaveCount(0);
 	});
 
 	test("unknown workstations render a not-found state", async ({ page }) => {
@@ -275,9 +299,7 @@ test.describe("Workstation detail", () => {
 		await expect(page).toHaveURL("/workstations");
 	});
 
-	test("mobile keyboard navigation opens the drawer, target selector and history", async ({
-		page,
-	}) => {
+	test("mobile keyboard navigation opens the drawer and focuses a target", async ({ page }) => {
 		await page.setViewportSize({ width: 390, height: 844 });
 		await page.goto("/workstations");
 		const menu = page.getByRole("button", { name: "Open navigation menu", exact: true });
@@ -290,19 +312,11 @@ test.describe("Workstation detail", () => {
 		await expect(drawer).toBeHidden();
 		await page.getByRole("link", { name: "Field laptop", exact: true }).click();
 
-		const history = page.getByTestId("workstation-history");
-		const target = history.getByRole("combobox", { name: "Connectivity target", exact: true });
-		await target.focus();
+		const legend = page.getByRole("list", { name: "Reachability targets", exact: true });
+		const beta = legend.getByRole("button", { name: /beta\.test\.local/ });
+		await beta.focus();
 		await page.keyboard.press("Enter");
-		const betaOption = page.getByRole("option", { name: "beta.test.local", exact: true });
-		await expect(betaOption).toBeVisible();
-		await page.keyboard.press("ArrowDown");
-		await expect(betaOption).toBeFocused();
-		await page.keyboard.press("Enter");
-		await expect(target).toContainText("beta.test.local");
-		await expect(
-			history.getByRole("button", { name: "Load 100 older samples", exact: true }),
-		).toBeVisible();
+		await expect(beta).toHaveAttribute("aria-pressed", "true");
 		await expect(
 			page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
 		).resolves.toBe(true);

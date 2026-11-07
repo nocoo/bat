@@ -3,7 +3,6 @@
 // (no fabricated 0%) unit-testable.
 
 import type {
-	WorkstationConnectivity,
 	WorkstationConnectivityPoint,
 	WorkstationConnectivityStatus,
 	WorkstationMetricPoint,
@@ -71,14 +70,6 @@ export function connectivityHistoryLoss(point: WorkstationConnectivityPoint): nu
 	});
 }
 
-export function rttAverage(rtts: readonly (number | null)[]): number | null {
-	const answered = rtts.filter((rtt): rtt is number => rtt !== null && Number.isFinite(rtt));
-	if (answered.length === 0) {
-		return null;
-	}
-	return answered.reduce((total, rtt) => total + rtt, 0) / answered.length;
-}
-
 export function formatUptime(seconds: number | null | undefined): string {
 	if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
 		return "—";
@@ -129,12 +120,6 @@ export function workstationCollectionErrors(record: WorkstationRecord): string[]
 	return record.latest_report?.collection_errors ?? [];
 }
 
-export function connectivityRows(
-	report: WorkstationRecord["latest_report"],
-): WorkstationConnectivity[] {
-	return report?.connectivity ?? [];
-}
-
 export function mergeMetricPages(
 	newest: readonly WorkstationMetricPoint[],
 	older: readonly WorkstationMetricPoint[],
@@ -155,8 +140,4 @@ export function describeHistory(summary: HistorySummary): { label: string; note:
 				? `Loaded ${loaded} samples; older samples may remain in this window.`
 				: `The newest ${summary.newestCount} samples are loaded. Older samples in this window are not loaded.`,
 	};
-}
-
-export function connectivityWindowLabel(limit: number): string {
-	return `Newest ${limit} samples per target`;
 }

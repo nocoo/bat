@@ -104,3 +104,42 @@
 		animation: none;
 	}
 }
+
+/* React Flow ships a light default for its nodes, controls and attribution.
+   The topology keeps Basalt surfaces instead, in both themes. */
+.basalt-topology .react-flow__node {
+	width: auto;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-size: inherit;
+	box-shadow: none;
+}
+
+.basalt-topology .react-flow__controls {
+	overflow: hidden;
+	border-radius: var(--basalt-radius-md);
+	box-shadow: var(--basalt-shadow-card, none);
+	background: var(--basalt-card);
+}
+
+.basalt-topology .react-flow__controls-button {
+	background: var(--basalt-card);
+	border-bottom: 1px solid var(--basalt-border);
+	color: var(--basalt-foreground);
+	fill: currentColor;
+}
+
+.basalt-topology .react-flow__controls-button:hover {
+	background: var(--basalt-hover);
+}
+
+.basalt-topology .react-flow__attribution {
+	background: transparent;
+	color: var(--basalt-muted-foreground);
+}
+
+.basalt-topology .react-flow__attribution a {
+	color: inherit;
+}

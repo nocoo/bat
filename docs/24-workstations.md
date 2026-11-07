@@ -233,6 +233,33 @@ with `retention_days`, exactly like metrics and events.
   `unsupported` honestly instead of a `0` percentage or `0 ms`. UI and CLI work is a separate phase;
   this document fixes their contract.
 
+## Detail page
+
+`/workstations/{id}` puts the machine first and the links under it:
+
+- **Header card.** Name with the derived status, one system line, the history
+  window and the delete action, then a five-cell grid: the copyable public
+  address, CPU, memory, reachable targets and P95 round-trip time, each with its
+  window trend. A refused clipboard write says so instead of claiming success.
+- **Left column.** `Load` overlays CPU and memory on the percentage axis with
+  uptime in days on a second axis; `Reachability` draws one line per target and
+  puts the focused target's packet loss on a second 0-100 % axis; `Targets`
+  lists last, P50, P95, loss and a per-target trend, each row linking to the
+  server host detail.
+- **Right rail.** Machine inventory from the latest report, utilisation rings,
+  the newest-result donut and the interface list. Nothing is fabricated when the
+  report is missing: the rings and readings show a dash.
+- **Topology.** A hub-and-spoke graph of this workstation and every authorized
+  server, built on React Flow (`@xyflow/react`). Colour identifies the target,
+  the badge carries the ICMP result, answering links carry a travelling pulse,
+  and `prefers-reduced-motion` stops it. Selecting a node mirrors the chart
+  legend's focus. The table above stays the exact, accessible record; the graph
+  is an overview, not a second source.
+
+Charts are composed with Recharts plus the shared Basalt chart config so the
+second axes, tooltips and legend typography stay consistent with the rest of the
+dashboard.
+
 ## Verification
 
 - Unit: `packages/worker/src/**/workstation*.test.ts` (pure helpers, D1 adapter over the mock,

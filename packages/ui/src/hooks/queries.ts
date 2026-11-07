@@ -217,6 +217,7 @@ export function useWorkstationMetricsPages(id: string | null, from: number, to: 
 		isLoadingOlder: response.isValidating && response.size > pages.length,
 		error: response.error,
 		loadOlder: () => void response.setSize(response.size + 1),
+		mutate: () => void response.mutate(),
 	};
 }
 

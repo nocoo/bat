@@ -6,8 +6,6 @@ import type {
 import { describe, expect, test } from "vitest";
 import {
 	connectivityHistoryLoss,
-	connectivityRows,
-	connectivityWindowLabel,
 	describeHistory,
 	formatLoss,
 	formatPercent,
@@ -16,7 +14,6 @@ import {
 	latestOs,
 	mergeMetricPages,
 	rootDiskUsedPct,
-	rttAverage,
 	workstationCollectionErrors,
 	workstationLastSeen,
 	workstationStatusLabel,
@@ -110,13 +107,6 @@ describe("workstation formatters", () => {
 		expect(connectivityHistoryLoss(point("unsupported", 0))).toBeNull();
 	});
 
-	test("average ignores only null, so a zero sample still counts", () => {
-		expect(rttAverage([0, 0.4, 0.7])).toBeCloseTo(0.3667, 4);
-		expect(rttAverage([42.5, null, 40.1])).toBeCloseTo(41.3, 4);
-		expect(rttAverage([null, null, null])).toBeNull();
-		expect(rttAverage([])).toBeNull();
-	});
-
 	test("uptime distinguishes just-booted zero from missing data", () => {
 		expect(formatUptime(0)).toBe("0s");
 		expect(formatUptime(45)).toBe("45s");
@@ -144,7 +134,6 @@ describe("workstation formatters", () => {
 	test("record accessors stay honest for a workstation without a report", () => {
 		expect(latestOs(record())).toBe("macOS 15.5");
 		expect(latestOs(record({ latest_report: null }))).toBeNull();
-		expect(connectivityRows(record({ latest_report: null }).latest_report)).toEqual([]);
 		expect(workstationCollectionErrors(record())).toEqual(["disk collector denied"]);
 		expect(workstationCollectionErrors(record({ latest_report: null }))).toEqual([]);
 	});
@@ -213,9 +202,5 @@ describe("history summaries", () => {
 				hasOlderBeyond: false,
 			}),
 		).toEqual({ label: "Last hour · 1 sample", note: null });
-	});
-
-	test("connectivity labels the server-side per-target cap", () => {
-		expect(connectivityWindowLabel(100)).toBe("Newest 100 samples per target");
 	});
 });
