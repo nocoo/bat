@@ -9,6 +9,7 @@ mod rate;
 mod sender;
 
 use std::collections::HashMap;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -16,11 +17,14 @@ use std::time::Duration;
 use collectors::cpu::CpuJiffies;
 use collectors::network::NetCounters;
 use collectors::top_processes::PrevProcStat;
+use orchestrate::IpFamily;
+use payload::PublicIps;
 use sender::Sender;
 use tokio::sync::Mutex;
 use tokio::time::MissedTickBehavior;
 
 const PROBE_VERSION: &str = env!("CARGO_PKG_VERSION");
+const ECHO_HOST: &str = "echo.nocoo.cloud";
 const ECHO_URL: &str = "https://echo.nocoo.cloud/api/ip";
 
 #[tokio::main(flavor = "current_thread")]
@@ -53,10 +57,12 @@ async fn main() {
     let cpu_count = collectors::cpu::read_cpu_count().unwrap_or(1);
 
     // Public IP via echo service — shared state updated every 1h
-    let public_ip: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    // Fetch initial public IP before first identity send (15s timeout to avoid blocking startup)
-    if let Ok(Some(ip)) = tokio::time::timeout(Duration::from_secs(15), fetch_public_ip()).await {
-        *public_ip.lock().await = Some(ip);
+    let public_ips: Arc<Mutex<PublicIps>> = Arc::new(Mutex::new(PublicIps::default()));
+    // Fetch initial public IPs before first identity send (15s timeout to avoid blocking startup)
+    if let Ok(ips) = tokio::time::timeout(Duration::from_secs(15), fetch_public_ips()).await
+        && !ips.is_empty()
+    {
+        *public_ips.lock().await = ips;
     }
 
     tracing::info!(
@@ -74,7 +80,7 @@ async fn main() {
     let mut sigterm =
         tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()).unwrap();
 
-    let identity_payload = build_identity_payload(&host_id, &public_ip).await;
+    let identity_payload = build_identity_payload(&host_id, &public_ips).await;
     tokio::select! {
         result = sender.post("/api/identity", &identity_payload) => {
             if let Err(e) = result {
@@ -193,7 +199,7 @@ async fn main() {
 
                 // Periodic identity re-send
                 if identity_timer.elapsed() >= identity_interval {
-                    let id_payload = build_identity_payload(&host_id, &public_ip).await;
+                    let id_payload = build_identity_payload(&host_id, &public_ips).await;
                     tokio::select! {
                         result = sender.post("/api/identity", &id_payload) => {
                             if let Err(e) = result {
@@ -230,10 +236,11 @@ async fn main() {
 
                 // Periodic public IP refresh via echo service (1h)
                 if echo_timer.elapsed() >= echo_interval {
-                    let pip = Arc::clone(&public_ip);
+                    let pips = Arc::clone(&public_ips);
                     tokio::spawn(async move {
-                        if let Some(ip) = fetch_public_ip().await {
-                            *pip.lock().await = Some(ip);
+                        let ips = fetch_public_ips().await;
+                        if !ips.is_empty() {
+                            *pips.lock().await = ips;
                         }
                     });
                     echo_timer = tokio::time::Instant::now();
@@ -452,7 +459,7 @@ fn collect_metrics(
 #[cfg_attr(coverage_nightly, coverage(off))]
 async fn build_identity_payload(
     host_id: &str,
-    public_ip: &Arc<Mutex<Option<String>>>,
+    public_ips: &Arc<Mutex<PublicIps>>,
 ) -> payload::IdentityPayload {
     let hostname = collectors::identity::read_hostname().unwrap_or_else(|_| "unknown".into());
     let os = collectors::identity::read_os_release().unwrap_or_else(|_| "unknown".into());
@@ -490,7 +497,7 @@ async fn build_identity_payload(
 
     let boot_mode = Some(collectors::inventory::detect_boot_mode());
 
-    let pip = public_ip.lock().await.clone();
+    let pip = public_ips.lock().await.clone();
 
     orchestrate::build_identity_payload(
         PROBE_VERSION,
@@ -599,19 +606,73 @@ async fn collect_tier2(host_id: &str, include_disk_deep: bool) -> payload::Tier2
     )
 }
 
-/// Fetch public IP from the echo service.
-/// Returns `None` on any error (timeout, parse failure, network issue).
+/// Fetch the public address of every family the echo service can be reached on.
+///
+/// The echo host is resolved once per request family and the request is pinned to
+/// that address, so SNI and `Host` stay intact while the connection family is
+/// chosen explicitly. The returned literal is classified by parsing it, never by
+/// the address that was pinned.
 #[cfg_attr(coverage_nightly, coverage(off))]
-async fn fetch_public_ip() -> Option<String> {
+async fn fetch_public_ips() -> PublicIps {
+    let mut ips = PublicIps::default();
+
+    let addrs = match resolve_echo_addrs().await {
+        Ok(addrs) => addrs,
+        Err(e) => {
+            tracing::warn!(error = %e, "failed to resolve echo service host");
+            return ips;
+        }
+    };
+
+    for family in [IpFamily::V4, IpFamily::V6] {
+        let Some(addr) = addrs
+            .iter()
+            .copied()
+            .find(|addr| addr.is_ipv4() == matches!(family, IpFamily::V4))
+        else {
+            tracing::debug!(?family, "echo service host has no address for family");
+            continue;
+        };
+
+        let Some(literal) = fetch_echo_ip(addr).await else {
+            continue;
+        };
+
+        match orchestrate::classify_ip_literal(&literal) {
+            Some(IpFamily::V4) => ips.v4 = Some(literal),
+            Some(IpFamily::V6) => ips.v6 = Some(literal),
+            None => tracing::warn!(%literal, "echo service returned a non-IP literal"),
+        }
+    }
+
+    ips
+}
+
+/// Resolve the echo service host to its socket addresses.
+#[cfg_attr(coverage_nightly, coverage(off))]
+async fn resolve_echo_addrs() -> std::io::Result<Vec<SocketAddr>> {
+    tokio::task::spawn_blocking(|| {
+        (ECHO_HOST, 443u16)
+            .to_socket_addrs()
+            .map(std::iter::Iterator::collect)
+    })
+    .await
+    .map_err(std::io::Error::other)?
+}
+
+/// Ask the echo service which public address it sees, using a pinned connection.
+#[cfg_attr(coverage_nightly, coverage(off))]
+async fn fetch_echo_ip(addr: SocketAddr) -> Option<String> {
     let client = sender::client_builder()
         .timeout(Duration::from_secs(10))
+        .resolve(ECHO_HOST, addr)
         .build()
         .ok()?;
 
     let resp = match client.get(ECHO_URL).send().await {
         Ok(r) => r,
         Err(e) => {
-            tracing::warn!(error = %e, "failed to fetch public IP from echo service");
+            tracing::warn!(error = %e, %addr, "failed to fetch public IP from echo service");
             return None;
         }
     };

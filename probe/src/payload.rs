@@ -353,8 +353,27 @@ pub struct IdentityPayload {
     pub disks: Option<Vec<BlockDevice>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub boot_mode: Option<String>,
+    /// Preferred public address: IPv4 first, IPv6 as fallback.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub public_ip: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_ip_v4: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_ip_v6: Option<String>,
+}
+
+/// Public addresses of the probing host, one entry per IP family.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PublicIps {
+    pub v4: Option<String>,
+    pub v6: Option<String>,
+}
+
+impl PublicIps {
+    /// True when neither family has been observed.
+    pub const fn is_empty(&self) -> bool {
+        self.v4.is_none() && self.v6.is_none()
+    }
 }
 
 // --- Tier 2 payload types ---
@@ -672,6 +691,8 @@ mod tests {
             disks: Some(vec![]),
             boot_mode: Some("uefi".into()),
             public_ip: Some("203.0.113.1".into()),
+            public_ip_v4: Some("203.0.113.1".into()),
+            public_ip_v6: Some("2001:db8::2".into()),
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -694,6 +715,8 @@ mod tests {
         assert!(json["disks"].as_array().unwrap().is_empty());
         assert_eq!(json["boot_mode"], "uefi");
         assert_eq!(json["public_ip"], "203.0.113.1");
+        assert_eq!(json["public_ip_v4"], "203.0.113.1");
+        assert_eq!(json["public_ip_v6"], "2001:db8::2");
     }
 
     #[test]
@@ -717,6 +740,8 @@ mod tests {
             disks: None,
             boot_mode: None,
             public_ip: None,
+            public_ip_v4: None,
+            public_ip_v6: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();
@@ -730,6 +755,8 @@ mod tests {
         assert!(!obj.contains_key("disks"));
         assert!(!obj.contains_key("boot_mode"));
         assert!(!obj.contains_key("public_ip"));
+        assert!(!obj.contains_key("public_ip_v4"));
+        assert!(!obj.contains_key("public_ip_v6"));
     }
 
     #[test]
@@ -1251,6 +1278,8 @@ mod tests {
             disks: None,
             boot_mode: None,
             public_ip: None,
+            public_ip_v4: None,
+            public_ip_v6: None,
         };
 
         let json: serde_json::Value = serde_json::to_value(&payload).unwrap();

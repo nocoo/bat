@@ -6,12 +6,33 @@ use crate::collectors::cpu::CpuJiffies;
 use crate::collectors::network::NetCounters;
 use crate::payload::{
     ConntrackMetrics, CpuMetrics, DiskIoMetric, DiskMetric, FdMetrics, IdentityPayload, MemMetrics,
-    MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, SnmpMetrics, SocketMetrics,
+    MetricsPayload, NetMetric, NetstatMetrics, PsiMetrics, PublicIps, SnmpMetrics, SocketMetrics,
     SoftnetMetrics, SwapMetrics, TcpMetrics, Tier2DetectedSoftware, Tier2DiscoveredWebsite,
     Tier2DiskDeep, Tier2Docker, Tier2DockerContainer, Tier2DockerImages, Tier2FailedService,
     Tier2LargeFile, Tier2ListeningPort, Tier2Payload, Tier2Ports, Tier2Security, Tier2Software,
     Tier2Systemd, Tier2TopDir, Tier2Websites, TopProcess, UdpMetrics,
 };
+
+/// IP family of a public address literal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IpFamily {
+    V4,
+    V6,
+}
+
+/// Classify an address literal by parsing it as an IP address.
+pub fn classify_ip_literal(literal: &str) -> Option<IpFamily> {
+    match literal.trim().parse::<std::net::IpAddr>() {
+        Ok(std::net::IpAddr::V4(_)) => Some(IpFamily::V4),
+        Ok(std::net::IpAddr::V6(_)) => Some(IpFamily::V6),
+        Err(_) => None,
+    }
+}
+
+/// Preferred public address: IPv4 first, IPv6 as fallback.
+pub fn preferred_public_ip(ips: &PublicIps) -> Option<String> {
+    ips.v4.clone().or_else(|| ips.v6.clone())
+}
 
 /// Compute CPU usage delta from optional previous and current jiffies.
 pub fn compute_cpu_delta(prev: Option<&CpuJiffies>, curr: Option<&CpuJiffies>) -> (f64, f64, f64) {
@@ -600,7 +621,7 @@ pub fn build_identity_payload(
     net_interfaces: Option<Vec<NetInterface>>,
     disks: Option<Vec<BlockDevice>>,
     boot_mode: Option<String>,
-    public_ip: Option<String>,
+    public_ips: PublicIps,
 ) -> IdentityPayload {
     IdentityPayload {
         probe_version: probe_version.to_string(),
@@ -620,7 +641,9 @@ pub fn build_identity_payload(
         net_interfaces,
         disks,
         boot_mode,
-        public_ip,
+        public_ip: preferred_public_ip(&public_ips),
+        public_ip_v4: public_ips.v4,
+        public_ip_v6: public_ips.v6,
     }
 }
 
@@ -828,7 +851,10 @@ mod tests {
             Some(vec![]),
             Some(vec![]),
             Some("uefi".to_string()),
-            Some("203.0.113.1".to_string()),
+            PublicIps {
+                v4: Some("203.0.113.1".to_string()),
+                v6: Some("2001:db8::2".to_string()),
+            },
         );
         assert_eq!(p.probe_version, "0.2.0");
         assert_eq!(p.host_id, "host-1");
@@ -848,12 +874,31 @@ mod tests {
         assert!(p.disks.unwrap().is_empty());
         assert_eq!(p.boot_mode, Some("uefi".to_string()));
         assert_eq!(p.public_ip, Some("203.0.113.1".to_string()));
+        assert_eq!(p.public_ip_v4, Some("203.0.113.1".to_string()));
+        assert_eq!(p.public_ip_v6, Some("2001:db8::2".to_string()));
     }
 
     #[test]
     fn build_identity_payload_empty_fields() {
         let p = build_identity_payload(
-            "", "", "", "", "", "", "", 0, 0, None, None, None, None, None, None, None, None, None,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            0,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            PublicIps::default(),
         );
         assert_eq!(p.host_id, "");
         assert_eq!(p.hostname, "");
@@ -868,6 +913,61 @@ mod tests {
         assert_eq!(p.disks, None);
         assert_eq!(p.boot_mode, None);
         assert_eq!(p.public_ip, None);
+        assert_eq!(p.public_ip_v4, None);
+        assert_eq!(p.public_ip_v6, None);
+    }
+
+    #[test]
+    fn classify_ip_literal_families() {
+        assert_eq!(classify_ip_literal("203.0.113.1"), Some(IpFamily::V4));
+        assert_eq!(classify_ip_literal("2001:db8::2"), Some(IpFamily::V6));
+        assert_eq!(classify_ip_literal("::1"), Some(IpFamily::V6));
+        assert_eq!(classify_ip_literal(" 203.0.113.1 "), Some(IpFamily::V4));
+        assert_eq!(classify_ip_literal("not-an-ip"), None);
+        assert_eq!(classify_ip_literal(""), None);
+        assert_eq!(classify_ip_literal("999.1.1.1"), None);
+    }
+
+    #[test]
+    fn preferred_public_ip_prefers_v4() {
+        let ips = PublicIps {
+            v4: Some("203.0.113.1".to_string()),
+            v6: Some("2001:db8::2".to_string()),
+        };
+        assert_eq!(preferred_public_ip(&ips), Some("203.0.113.1".to_string()));
+    }
+
+    #[test]
+    fn preferred_public_ip_falls_back_to_v6() {
+        let ips = PublicIps {
+            v4: None,
+            v6: Some("2001:db8::2".to_string()),
+        };
+        assert_eq!(preferred_public_ip(&ips), Some("2001:db8::2".to_string()));
+    }
+
+    #[test]
+    fn preferred_public_ip_without_any_family() {
+        assert_eq!(preferred_public_ip(&PublicIps::default()), None);
+    }
+
+    #[test]
+    fn public_ips_is_empty() {
+        assert!(PublicIps::default().is_empty());
+        assert!(
+            !PublicIps {
+                v4: Some("203.0.113.1".to_string()),
+                v6: None,
+            }
+            .is_empty()
+        );
+        assert!(
+            !PublicIps {
+                v4: None,
+                v6: Some("2001:db8::2".to_string()),
+            }
+            .is_empty()
+        );
     }
 
     #[test]
