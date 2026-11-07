@@ -2,13 +2,15 @@
 // clipboard is optional in embedded browsers, so a refused copy says so instead
 // of pretending it worked.
 //
-// The address never truncates: it wraps inside the available width, so a long
-// IPv6 literal stays readable and fully selectable. Callers that render it in a
-// narrow column cap the type size instead of clipping the value.
+// The address never truncates: it wraps inside the available width at its own
+// separators, so a long IPv6 literal stays readable and fully selectable while
+// remaining one exact address. Callers that render it in a narrow column cap
+// the type size instead of clipping the value.
 
 import { Button } from "@nocoo/basalt";
 import { Check, Copy, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
+import { IpLiteral } from "@/components/ip-literal";
 
 type CopyState = "idle" | "copied" | "failed";
 
@@ -66,13 +68,13 @@ export function CopyableAddress({
 					</span>
 				)}
 				<span
-					className={`min-w-0 break-all font-mono ${sizeClassName} font-semibold tabular-nums`}
+					className={`min-w-0 wrap-anywhere font-mono ${sizeClassName} font-semibold tabular-nums`}
 					data-testid={testId}
 				>
 					{value === null ? (
 						<span className="text-basalt-muted-foreground">{emptyText}</span>
 					) : (
-						value
+						<IpLiteral value={value} />
 					)}
 				</span>
 			</div>

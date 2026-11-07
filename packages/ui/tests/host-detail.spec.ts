@@ -11,6 +11,26 @@ async function lineCount(locator: Locator): Promise<number> {
 	});
 }
 
+/** Every text segment of a literal element, with its rendered line-box count. */
+async function literalSegmentsOf(locator: Locator): Promise<{ text: string; rects: number }[]> {
+	return locator.evaluate((element) => {
+		const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+		const segments: { text: string; rects: number }[] = [];
+		let node = walker.nextNode();
+		while (node) {
+			const text = node.textContent ?? "";
+			// The middle dot is the separator between literals, not part of one.
+			if (text !== "" && text.trim() !== "·") {
+				const range = document.createRange();
+				range.selectNodeContents(node);
+				segments.push({ text, rects: range.getClientRects().length });
+			}
+			node = walker.nextNode();
+		}
+		return segments;
+	});
+}
+
 test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
 	const betaHid = "4c494cde";
@@ -200,6 +220,20 @@ test.describe("Host detail page", () => {
 		expect(await v6.evaluate((element) => getComputedStyle(element).textOverflow)).not.toBe(
 			"ellipsis",
 		);
+		const style = await v6.evaluate((element) => {
+			const computed = getComputedStyle(element);
+			return { overflowWrap: computed.overflowWrap, wordBreak: computed.wordBreak };
+		});
+		expect(style.overflowWrap).toBe("anywhere");
+		expect(style.wordBreak).toBe("normal");
+		// The literal is split at its separators only: every segment stays on one
+		// line and the concatenation is still exactly the address.
+		const segments = await literalSegmentsOf(v6);
+		expect(segments.map((segment) => segment.text).join("")).toBe(publicIpv6);
+		expect(segments).toHaveLength(8);
+		for (const segment of segments) {
+			expect(segment.rects).toBe(1);
+		}
 	});
 
 	test("the family label and the copy control stay on the first line of a wrapped literal", async ({
@@ -256,6 +290,13 @@ test.describe("Host detail page", () => {
 		});
 		await expect(page.getByText("Public IPv6", { exact: true })).toBeVisible();
 		await expect(page.getByText("Public IP", { exact: true })).toHaveCount(0);
+
+		const row = page.getByText("Public IPv6", { exact: true }).locator("..").locator("span").last();
+		const segments = await literalSegmentsOf(row);
+		expect(segments.map((segment) => segment.text).join("")).toBe(publicIpv6);
+		for (const segment of segments) {
+			expect(segment.rects).toBe(1);
+		}
 	});
 
 	test("interface addresses render one entry per interface", async ({ page }) => {
@@ -266,15 +307,19 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText("eth0", { exact: true })).toBeVisible();
 		await expect(page.getByText("eth1", { exact: true })).toBeVisible();
 		await expect(page.getByText("10.0.1.10", { exact: true })).toBeVisible();
-		await expect(page.getByText(interfaceIpv6, { exact: true })).toBeVisible();
+		await expect(
+			page.getByTestId("host-interface-addresses-eth0").getByText(interfaceIpv6, {
+				exact: true,
+			}),
+		).toBeVisible();
 	});
 
-	test("interface rows use the address-row anatomy and wrap a long IPv6 at rail and narrow widths", async ({
+	test("interface literals are separated by a middle dot, right-aligned and wrapped at their separators", async ({
 		page,
 	}) => {
 		for (const viewport of [
 			{ width: 1440, height: 1000 },
-			{ width: 390, height: 900 },
+			{ width: 900, height: 1000 },
 		]) {
 			await page.setViewportSize(viewport);
 			await page.goto(`/hosts/${alphaHid}`);
@@ -300,23 +345,38 @@ test.describe("Host detail page", () => {
 				),
 			).toBeLessThanOrEqual(1);
 
-			const literal = page.getByText(interfaceIpv6, { exact: true });
-			await expect(literal).toBeVisible();
-			expect(
-				await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-			).toBe(true);
-			expect(await lineCount(literal)).toBeGreaterThan(1);
-			const style = await literal.evaluate((element) => {
-				const computed = getComputedStyle(element);
-				return { wordBreak: computed.wordBreak, textOverflow: computed.textOverflow };
-			});
-			expect(style.wordBreak).toBe("break-all");
-			expect(style.textOverflow).not.toBe("ellipsis");
-			// The whole row stays inside the card: the literal wraps, it never leaves.
-			expect(
-				(await addresses.evaluate((element) => element.getBoundingClientRect().right)) <=
-					(await row.evaluate((element) => element.getBoundingClientRect().right)) + 1,
-			).toBe(true);
+			// A visible middle dot separates the literals, so their count is legible.
+			const literals = ((await addresses.textContent()) ?? "")
+				.split("·")
+				.map((part) => part.trim());
+			expect(literals).toEqual([
+				"10.0.1.10",
+				"203.0.113.10",
+				interfaceIpv6,
+				"fe80::5054:ff:fe12:3456",
+			]);
+
+			for (const address of literals) {
+				const literal = addresses.getByText(address, { exact: true });
+				await expect(literal).toBeVisible();
+				expect(
+					await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+				).toBe(true);
+				const segments = await literalSegmentsOf(literal);
+				// Nothing is inserted into the literal and every segment stays whole.
+				expect(segments.map((segment) => segment.text).join("")).toBe(address);
+				for (const segment of segments) {
+					expect(segment.rects).toBe(1);
+				}
+			}
+
+			// In the narrow rail the 39 character literal wraps; at 900 it fits on one
+			// line. Neither case may clip or ellipsize.
+			if (viewport.width === 1440) {
+				expect(
+					await lineCount(addresses.getByText(interfaceIpv6, { exact: true })),
+				).toBeGreaterThan(1);
+			}
 			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 				true,
 			);

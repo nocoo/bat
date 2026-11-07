@@ -2,10 +2,13 @@
 //
 // The rows use the same anatomy as the Public IPv4/IPv6 rows in the same card:
 // the interface name on the left, its literals right-aligned in monospace. A
-// long literal wraps inside the column instead of truncating, so the card stays
-// one readable list at rail width.
+// middle dot separates the literals so their count and boundaries stay legible;
+// each literal wraps at its own separators inside the column instead of
+// truncating. Only families that were observed appear in the row.
 
 import type { NetInterfaceDTO } from "@bat/shared";
+import { Fragment } from "react";
+import { IpLiteral } from "@/components/ip-literal";
 
 export function HostInterfaceAddresses({
 	interfaces,
@@ -29,12 +32,15 @@ export function HostInterfaceAddresses({
 					<span className="shrink-0 text-basalt-muted-foreground">{entry.iface}</span>
 					<span
 						data-testid={`host-interface-addresses-${entry.iface}`}
-						className="flex min-w-0 flex-wrap justify-end gap-x-basalt-space-sm text-right font-mono tabular-nums"
+						className="min-w-0 wrap-anywhere text-right font-mono tabular-nums"
 					>
-						{[...entry.ipv4, ...entry.ipv6].map((address) => (
-							<span key={address} className="min-w-0 break-all">
-								{address}
-							</span>
+						{[...entry.ipv4, ...entry.ipv6].map((address, index) => (
+							<Fragment key={address}>
+								{index > 0 && <span className="text-basalt-muted-foreground"> · </span>}
+								<span className="wrap-anywhere">
+									<IpLiteral value={address} />
+								</span>
+							</Fragment>
 						))}
 					</span>
 				</div>
