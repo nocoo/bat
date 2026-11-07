@@ -10,15 +10,20 @@
 // and Connect Bearer keys cannot enroll or re-key a workstation.
 
 import {
+	formatPairingCode,
+	normalizePairingCode,
 	validateWorkstationAuthorize,
 	validateWorkstationLoginExchange,
+	validateWorkstationPairStart,
 	WORKSTATION_AUTH_CODE_TTL_SECONDS,
+	WORKSTATION_PAIRING_TTL_SECONDS,
 	WORKSTATION_RATE_LIMITS,
 } from "@bat/shared";
 import type { Context } from "hono";
 import { machineOrigin, rateLimit } from "../domain/workstation-history.js";
 import {
 	generateAuthCode,
+	generatePairingCode,
 	generateWorkstationToken,
 	hashSecret,
 	pkceChallenge,
@@ -79,6 +84,8 @@ export async function workstationAuthorizeRoute(c: Context<AppEnv>) {
 		created_at: now,
 		expires_at: now + WORKSTATION_AUTH_CODE_TTL_SECONDS,
 		consumed_at: null,
+		pairing_hash: null,
+		approved_at: null,
 	});
 	const redirect = new URL(parsed.value.callback);
 	redirect.searchParams.set("code", code);
@@ -146,4 +153,87 @@ export async function workstationExchangeRoute(c: Context<AppEnv>) {
 		token,
 		worker_url: machineOrigin(c.env.ENVIRONMENT, new URL(c.req.url).origin),
 	});
+}
+
+/**
+ * Start a headless pairing. No Access session is involved: the machine only
+ * receives a short code and keeps the full PKCE code locally. Nothing is
+ * enrolled until an operator approves the short code in the dashboard.
+ */
+export async function workstationPairStartRoute(c: Context<AppEnv>) {
+	const body = await readWorkstationBody(c);
+	if (!body.ok) {
+		return c.json({ error: body.error }, body.status);
+	}
+	const parsed = validateWorkstationPairStart(body.value);
+	if (!parsed.ok) {
+		return c.json({ error: parsed.error }, 400);
+	}
+	const now = nowSeconds();
+	const limit = rateLimit(
+		c.env.ENVIRONMENT,
+		c.env.WORKSTATION_RATE_LIMIT,
+		WORKSTATION_RATE_LIMITS.exchangePerTenMinutes,
+	);
+	if (
+		!(await c.var.repos.workstations.rate(`pair:${parsed.value.installation_id}`, limit, 600, now))
+	) {
+		return c.json({ error: "Too many enrollment attempts. Retry later." }, 429);
+	}
+	const code = generateAuthCode();
+	const pairing = generatePairingCode();
+	const expiresAt = now + WORKSTATION_PAIRING_TTL_SECONDS;
+	await c.var.repos.workstations.createCode({
+		code_hash: await hashSecret(code),
+		// The owner is stamped by the approving Access principal, never by the machine.
+		owner: "",
+		installation_id: parsed.value.installation_id,
+		challenge: parsed.value.code_challenge,
+		name: parsed.value.name,
+		created_at: now,
+		expires_at: expiresAt,
+		consumed_at: null,
+		pairing_hash: await hashSecret(pairing),
+		approved_at: null,
+	});
+	return c.json(
+		{
+			pairing_code: formatPairingCode(pairing),
+			code,
+			name: parsed.value.name,
+			expires_at: expiresAt,
+		},
+		201,
+	);
+}
+
+/** Poll one pairing's status. The short code is the only credential here. */
+export async function workstationPairStatusRoute(
+	c: Context<AppEnv, "/api/workstation-auth/pair/:code">,
+) {
+	const normalized = normalizePairingCode(c.req.param("code"));
+	if (normalized === null) {
+		return c.json({ error: "pairing code must be eight characters" }, 400);
+	}
+	const hash = await hashSecret(normalized);
+	const now = nowSeconds();
+	const limit = rateLimit(
+		c.env.ENVIRONMENT,
+		c.env.WORKSTATION_RATE_LIMIT,
+		WORKSTATION_RATE_LIMITS.pairStatusPerTenMinutes,
+	);
+	if (!(await c.var.repos.workstations.rate(`pair-status:${hash}`, limit, 600, now))) {
+		return c.json({ error: "Too many status checks. Retry later." }, 429);
+	}
+	const row = await c.var.repos.workstations.getCodeByPairing(hash);
+	if (!row) {
+		return c.json({ error: "Unknown pairing code" }, 404);
+	}
+	const status =
+		row.approved_at !== null || row.consumed_at !== null
+			? "approved"
+			: row.expires_at <= now
+				? "expired"
+				: "pending";
+	return c.json({ status, name: row.name, expires_at: row.expires_at });
 }

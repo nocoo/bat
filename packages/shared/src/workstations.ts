@@ -26,12 +26,19 @@ export const WORKSTATION_RATE_LIMITS = {
 	reportsPerMinute: 2,
 	targetsPerMinute: 6,
 	exchangePerTenMinutes: 5,
+	/** Headless pairing polls every few seconds for up to five minutes. */
+	pairStatusPerTenMinutes: 120,
 } as const;
 
 export const WORKSTATION_HISTORY_MAX_LIMIT = 100;
 export const WORKSTATION_HISTORY_MAX_WINDOW_SECONDS = 2_592_000;
 export const WORKSTATION_HISTORY_DEFAULT_WINDOW_SECONDS = 86_400;
 export const WORKSTATION_AUTH_CODE_TTL_SECONDS = 300;
+/** A headless pairing code lives as long as a PKCE code. */
+export const WORKSTATION_PAIRING_TTL_SECONDS = 300;
+/** Crockford-style alphabet: no I, L, O, U, 0 or 1, so it survives dictation. */
+export const WORKSTATION_PAIRING_ALPHABET = "ABCDEFGHJKMNPQRSTVWXYZ23456789";
+export const WORKSTATION_PAIRING_LENGTH = 8;
 
 /** Field-level bounds. Arrays and strings are bounded before any nested work. */
 export const WORKSTATION_LIMITS = {
@@ -1243,4 +1250,130 @@ export function validateWorkstationAuthorize(
 			name,
 		},
 	};
+}
+
+// --- Headless pairing ------------------------------------------------------
+//
+// `bat workstation login --headless` posts a PKCE challenge and a display name
+// to the ingest host, receives an eight character pairing code and prints it.
+// An operator approves that code in the dashboard with an Access session. The
+// exchange refuses a pairing code that has not been approved.
+
+export interface WorkstationPairStartInput {
+	installation_id: string;
+	name: string;
+	code_challenge: string;
+}
+
+export interface WorkstationPairStartOutput {
+	/** Short code the operator types in the dashboard. */
+	pairing_code: string;
+	/** Full PKCE code the CLI keeps and exchanges once approved. */
+	code: string;
+	name: string;
+	expires_at: number;
+}
+
+export type WorkstationPairStatus = "pending" | "approved" | "expired";
+
+export interface WorkstationPairStatusOutput {
+	status: WorkstationPairStatus;
+	name: string;
+	expires_at: number;
+}
+
+export function normalizePairingCode(input: string): string | null {
+	const compact = input.replace(/[\s-]/g, "").toUpperCase();
+	if (compact.length !== WORKSTATION_PAIRING_LENGTH) {
+		return null;
+	}
+	for (const character of compact) {
+		if (!WORKSTATION_PAIRING_ALPHABET.includes(character)) {
+			return null;
+		}
+	}
+	return compact;
+}
+
+/** `ABCD-EFGH`, the form shown to a human. */
+export function formatPairingCode(code: string): string {
+	const normalized = normalizePairingCode(code);
+	if (normalized === null) {
+		return code;
+	}
+	return `${normalized.slice(0, 4)}-${normalized.slice(4)}`;
+}
+
+export function isPairingCode(input: string): boolean {
+	return normalizePairingCode(input) !== null;
+}
+
+export function validateWorkstationName(input: unknown): ValidationResult<string> {
+	const name = readString("name", input, WORKSTATION_NAME_MAX_LENGTH);
+	if (!name.ok) {
+		return name;
+	}
+	if (name.value.trim() === "") {
+		return fail("name must not be blank");
+	}
+	return { ok: true, value: name.value.trim() };
+}
+
+const PAIR_START_KEYS = ["installation_id", "name", "code_challenge"] as const;
+const PAIR_APPROVE_KEYS = ["pairing_code"] as const;
+const RENAME_KEYS = ["name"] as const;
+
+export function validateWorkstationPairStart(
+	input: unknown,
+): ValidationResult<WorkstationPairStartInput> {
+	const root = readObject("pair", input, PAIR_START_KEYS);
+	if (!root.ok) {
+		return root;
+	}
+	const installationId = readUuid("installation_id", root.value.installation_id);
+	if (!installationId.ok) {
+		return installationId;
+	}
+	const name = validateWorkstationName(root.value.name);
+	if (!name.ok) {
+		return name;
+	}
+	const challenge = root.value.code_challenge;
+	if (typeof challenge !== "string" || !isPkceS256Challenge(challenge)) {
+		return fail("code_challenge must be a 43 character base64url S256 digest");
+	}
+	return {
+		ok: true,
+		value: {
+			installation_id: installationId.value,
+			name: name.value,
+			code_challenge: challenge,
+		},
+	};
+}
+
+export function validateWorkstationPairApprove(
+	input: unknown,
+): ValidationResult<{ pairing_code: string }> {
+	const root = readObject("pair approve", input, PAIR_APPROVE_KEYS);
+	if (!root.ok) {
+		return root;
+	}
+	const code = root.value.pairing_code;
+	if (typeof code !== "string" || normalizePairingCode(code) === null) {
+		return fail("pairing_code must be eight characters of A-Z 2-9 (dashes allowed)");
+	}
+	return { ok: true, value: { pairing_code: normalizePairingCode(code) as string } };
+}
+
+export function validateWorkstationRename(input: unknown): ValidationResult<{ name: string }> {
+	const root = readObject("rename", input, RENAME_KEYS);
+	if (!root.ok) {
+		return root;
+	}
+	const name = validateWorkstationName(root.value.name);
+	if (!name.ok) {
+		return name;
+	}
+	return { ok: true, value: { name: name.value } };
 }

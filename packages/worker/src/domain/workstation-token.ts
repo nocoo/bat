@@ -1,7 +1,11 @@
 // Workstation credential helpers. Keys are dedicated `batw_` values carrying
 // 256 random bits; D1 only ever stores the SHA-256 digest.
 
-import { WORKSTATION_TOKEN_BYTES } from "@bat/shared";
+import {
+	WORKSTATION_PAIRING_ALPHABET,
+	WORKSTATION_PAIRING_LENGTH,
+	WORKSTATION_TOKEN_BYTES,
+} from "@bat/shared";
 import { hashToken } from "./cli-token.js";
 
 const encoder = new TextEncoder();
@@ -20,6 +24,19 @@ export function generateWorkstationToken(): string {
 /** One-time authorization codes are opaque to the CLI; only their digest is stored. */
 export function generateAuthCode(): string {
 	return base64url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+/**
+ * Eight characters from the dictation-safe alphabet: 32^8 ≈ 2^40. A human types
+ * it in the dashboard once, and approval still requires an Access session.
+ */
+export function generatePairingCode(): string {
+	const bytes = crypto.getRandomValues(new Uint8Array(WORKSTATION_PAIRING_LENGTH));
+	let code = "";
+	for (const byte of bytes) {
+		code += WORKSTATION_PAIRING_ALPHABET[byte % WORKSTATION_PAIRING_ALPHABET.length];
+	}
+	return code;
 }
 
 export async function hashSecret(value: string): Promise<string> {

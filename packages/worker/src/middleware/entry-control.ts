@@ -21,6 +21,10 @@ const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> 
 	// The browser consent POST /api/workstation-auth/authorize stays Access-only
 	// and is deliberately absent here.
 	{ method: "POST", path: "/api/workstation-auth/exchange" },
+	// Headless pairing: the machine starts a code and polls its status. Approval
+	// stays a browser POST /api/workstations/pair with an Access session.
+	{ method: "POST", path: "/api/workstation-auth/pair" },
+	{ method: "GET", path: "/api/workstation-auth/pair", prefix: true },
 	{ method: "GET", path: "/api/workstation-probe/targets" },
 	{ method: "POST", path: "/api/workstation-probe/reports" },
 	{ method: "POST", path: "/api/workstation-probe/revoke" },
@@ -39,7 +43,7 @@ function isCliMachineRoute(path: string): boolean {
 	return CLI_MACHINE_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 }
 
-function isAllowedMachineRoute(method: string, path: string): boolean {
+export function isAllowedMachineRoute(method: string, path: string): boolean {
 	if (isVersionedPath(path)) return true; // Authenticated exclusively by connectBearer.
 	// CLI asset routes: any method, prefix match (auth delegated to apiKeyAuth)
 	if (isCliMachineRoute(path)) {

@@ -13,6 +13,9 @@ import {
 
 export interface LoginCommandDeps {
 	loopbackUrl?: string;
+	/** Headless mode: claim the name here, then approve the printed code in the UI. */
+	headless?: boolean;
+	name?: string;
 }
 
 /** Windows ACL restriction runs only for an explicit login, never in tests. */
@@ -31,10 +34,15 @@ export async function runLoginCommand(deps: LoginCommandDeps = {}): Promise<numb
 		const paths = getWorkstationPaths();
 		const origins = resolveOrigins(deps.loopbackUrl);
 		const store = storeDepsFor(process.platform);
+		if (deps.headless === true && (deps.name ?? "").trim() === "") {
+			error("Headless login needs --name so the workstation is identifiable before approval.");
+			return 1;
+		}
 		const { exitCode, report } = await runWorkstationLogin({
 			paths,
 			origins,
 			...(store ? { store } : {}),
+			...(deps.headless === true ? { headless: { name: (deps.name ?? "").trim() } } : {}),
 		});
 		if (exitCode !== 0 || !report) {
 			return exitCode;
@@ -56,10 +64,20 @@ export default defineCommand({
 			type: "string",
 			description: "Loopback Worker origin for local acceptance (never production)",
 		},
+		headless: {
+			type: "boolean",
+			description: "Print a five minute pairing code instead of opening a browser",
+		},
+		name: {
+			type: "string",
+			description: "Display name claimed by a headless pairing",
+		},
 	},
 	async run({ args }) {
 		process.exitCode = await runLoginCommand({
 			...(args["loopback-url"] ? { loopbackUrl: args["loopback-url"] } : {}),
+			...(args.headless ? { headless: true } : {}),
+			...(typeof args.name === "string" ? { name: args.name } : {}),
 		});
 	},
 });

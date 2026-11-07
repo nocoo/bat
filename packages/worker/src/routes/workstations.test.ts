@@ -7,7 +7,12 @@ import { app as publicApp } from "../index";
 import { workstationKeyAuth } from "../middleware/workstation";
 import { createMockD1 } from "../test-helpers/mock-d1";
 import type { AppEnv, Bindings } from "../types";
-import { workstationAuthorizeRoute, workstationExchangeRoute } from "./workstation-auth";
+import {
+	workstationAuthorizeRoute,
+	workstationExchangeRoute,
+	workstationPairStartRoute,
+	workstationPairStatusRoute,
+} from "./workstation-auth";
 import {
 	workstationReportRoute,
 	workstationRevokeRoute,
@@ -18,6 +23,8 @@ import {
 	workstationDeleteRoute,
 	workstationDetailRoute,
 	workstationMetricsRoute,
+	workstationPairApproveRoute,
+	workstationRenameRoute,
 	workstationsListRoute,
 } from "./workstations";
 
@@ -71,6 +78,10 @@ function harness(envOverrides: Partial<Bindings> = {}, access = true): Harness {
 	app.use("/api/workstation-probe/*", workstationKeyAuth);
 	app.post("/api/workstation-auth/authorize", workstationAuthorizeRoute);
 	app.post("/api/workstation-auth/exchange", workstationExchangeRoute);
+	app.post("/api/workstation-auth/pair", workstationPairStartRoute);
+	app.get("/api/workstation-auth/pair/:code", workstationPairStatusRoute);
+	app.post("/api/workstations/pair", workstationPairApproveRoute);
+	app.patch("/api/workstations/:id", workstationRenameRoute);
 	app.get("/api/workstation-probe/targets", workstationTargetsRoute);
 	app.post("/api/workstation-probe/reports", workstationReportRoute);
 	app.post("/api/workstation-probe/revoke", workstationRevokeRoute);
@@ -1346,4 +1357,170 @@ describe("workstation observation responses never cache", () => {
 
 afterEach(() => {
 	vi.restoreAllMocks();
+});
+
+describe("headless pairing", () => {
+	const management = { "X-Bat-Management": "1" };
+
+	test("starts a pairing without Access and approves it with a session", async () => {
+		const h = harness();
+		const started = await h.request("/api/workstation-auth/pair", {
+			method: "POST",
+			body: {
+				installation_id: INSTALLATION,
+				name: "Headless laptop",
+				code_challenge: await pkceChallenge(VERIFIER),
+			},
+		});
+		expect(started.status).toBe(201);
+		const pair = (await started.json()) as {
+			pairing_code: string;
+			code: string;
+			name: string;
+			expires_at: number;
+		};
+		expect(pair.pairing_code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+		expect(pair.name).toBe("Headless laptop");
+		expect(pair.expires_at).toBeGreaterThan(nowSeconds());
+
+		const pending = await h.request(`/api/workstation-auth/pair/${pair.pairing_code}`);
+		expect(pending.status).toBe(200);
+		expect(((await pending.json()) as { status: string }).status).toBe("pending");
+
+		const approved = await h.request("/api/workstations/pair", {
+			method: "POST",
+			body: { pairing_code: pair.pairing_code },
+			headers: management,
+		});
+		expect(approved.status).toBe(200);
+		expect(((await approved.json()) as { name: string }).name).toBe("Headless laptop");
+
+		const again = await h.request("/api/workstations/pair", {
+			method: "POST",
+			body: { pairing_code: pair.pairing_code },
+			headers: management,
+		});
+		expect(again.status).toBe(409);
+
+		const status = await h.request(`/api/workstation-auth/pair/${pair.pairing_code}`);
+		expect(((await status.json()) as { status: string }).status).toBe("approved");
+
+		const exchanged = await h.request("/api/workstation-auth/exchange", {
+			method: "POST",
+			body: { code: pair.code, code_verifier: VERIFIER, installation_id: INSTALLATION },
+		});
+		expect(exchanged.status).toBe(200);
+		const credential = (await exchanged.json()) as { token: string; workstation_id: string };
+		expect(credential.token.startsWith("batw_")).toBe(true);
+
+		const rows = await h.request("/api/workstations");
+		const list = (await rows.json()) as Array<{ name: string; owner: string }>;
+		expect(list).toHaveLength(1);
+		expect(list[0]).toMatchObject({ name: "Headless laptop", owner: OWNER });
+	});
+
+	test("refuses the exchange until the pairing is approved", async () => {
+		const h = harness();
+		const started = await h.request("/api/workstation-auth/pair", {
+			method: "POST",
+			body: {
+				installation_id: INSTALLATION,
+				name: "Pending laptop",
+				code_challenge: await pkceChallenge(VERIFIER),
+			},
+		});
+		const pair = (await started.json()) as { code: string };
+		const exchanged = await h.request("/api/workstation-auth/exchange", {
+			method: "POST",
+			body: { code: pair.code, code_verifier: VERIFIER, installation_id: INSTALLATION },
+		});
+		expect(exchanged.status).toBe(401);
+	});
+
+	test("rejects approval without an Access session or another origin", async () => {
+		const h = harness();
+		const started = await h.request("/api/workstation-auth/pair", {
+			method: "POST",
+			body: {
+				installation_id: INSTALLATION,
+				name: "Guarded",
+				code_challenge: await pkceChallenge(VERIFIER),
+			},
+		});
+		const pair = (await started.json()) as { pairing_code: string };
+
+		// A machine-shaped client has no Access session at all.
+		const noAccess = harness({}, false);
+		const denied = await noAccess.request("/api/workstations/pair", {
+			method: "POST",
+			body: { pairing_code: pair.pairing_code },
+			headers: { ...management, Cookie: "CF_Authorization=forged" },
+		});
+		expect(denied.status).toBe(403);
+
+		const wrongOrigin = await h.request("/api/workstations/pair", {
+			method: "POST",
+			body: { pairing_code: pair.pairing_code },
+			headers: { Origin: "https://evil.example" },
+		});
+		expect(wrongOrigin.status).toBe(403);
+	});
+
+	test("expired and unknown pairing codes stay distinguishable", async () => {
+		const h = harness();
+		const started = await h.request("/api/workstation-auth/pair", {
+			method: "POST",
+			body: {
+				installation_id: INSTALLATION,
+				name: "Short lived",
+				code_challenge: await pkceChallenge(VERIFIER),
+			},
+		});
+		const pair = (await started.json()) as { pairing_code: string };
+		const unknown = await h.request("/api/workstation-auth/pair/AAAA-BBBB");
+		expect(unknown.status).toBe(404);
+		const malformed = await h.request("/api/workstation-auth/pair/nope");
+		expect(malformed.status).toBe(400);
+
+		await h.db
+			.prepare("UPDATE workstation_codes SET expires_at = ?")
+			.bind(nowSeconds() - 1)
+			.run();
+		const status = await h.request(`/api/workstation-auth/pair/${pair.pairing_code}`);
+		expect(((await status.json()) as { status: string }).status).toBe("expired");
+		const approve = await h.request("/api/workstations/pair", {
+			method: "POST",
+			body: { pairing_code: pair.pairing_code },
+			headers: management,
+		});
+		expect(approve.status).toBe(410);
+	});
+
+	test("owners and managers may rename, strangers may not", async () => {
+		const h = harness();
+		const enrolled = await h.enroll();
+		const renamed = await h.request(`/api/workstations/${enrolled.id}`, {
+			method: "PATCH",
+			body: { name: "Renamed laptop" },
+			headers: management,
+		});
+		expect(renamed.status).toBe(200);
+		expect(((await renamed.json()) as { name: string }).name).toBe("Renamed laptop");
+
+		const blank = await h.request(`/api/workstations/${enrolled.id}`, {
+			method: "PATCH",
+			body: { name: "   " },
+			headers: management,
+		});
+		expect(blank.status).toBe(400);
+
+		const stranger = harness({ CONNECT_MANAGERS: "email:manager@example.test" });
+		const token = await stranger.enroll();
+		const forbidden = await stranger.request(`/api/workstations/${token.id}`, {
+			method: "PATCH",
+			body: { name: "Hijacked" },
+			headers: { ...management, "Test-Principal": OTHER_OWNER },
+		});
+		expect(forbidden.status).toBe(403);
+	});
 });

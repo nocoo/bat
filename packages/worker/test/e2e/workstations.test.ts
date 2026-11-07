@@ -84,6 +84,22 @@ async function exchange(code: string) {
 	});
 }
 
+async function pairStart(installation: string, name: string) {
+	return fetch(`${BASE}/api/workstation-auth/pair`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			installation_id: installation,
+			name,
+			code_challenge: challenge(VERIFIER),
+		}),
+	});
+}
+
+async function pairStatus(pairingCode: string) {
+	return fetch(`${BASE}/api/workstation-auth/pair/${pairingCode}`);
+}
+
 describe("L2: workstations", () => {
 	test("enrollment, probe, history and revocation over real HTTP", async () => {
 		const serverId = `e2e-ws-${uuid().slice(0, 8)}`;
@@ -524,5 +540,72 @@ describe("L2: workstations", () => {
 			headers: readHeaders(),
 		});
 		expect(exchangeWithoutKey.status).toBe(401);
+	});
+});
+
+describe("L2: headless pairing", () => {
+	test("pair, approve, exchange, rename over real HTTP", async () => {
+		const installation = uuid();
+		const started = await pairStart(installation, "Headless e2e laptop");
+		expect(started.status).toBe(201);
+		const pair = (await started.json()) as {
+			pairing_code: string;
+			code: string;
+			name: string;
+			expires_at: number;
+		};
+		expect(pair.pairing_code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+		expect(pair.name).toBe("Headless e2e laptop");
+
+		// The machine may poll before approval, and the exchange must refuse.
+		const pending = await pairStatus(pair.pairing_code);
+		expect(((await pending.json()) as { status: string }).status).toBe("pending");
+		const early = await fetch(`${BASE}/api/workstation-auth/exchange`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				code: pair.code,
+				code_verifier: VERIFIER,
+				installation_id: installation,
+			}),
+		});
+		expect(early.status).toBe(401);
+
+		const approved = await fetch(`${BASE}/api/workstations/pair`, {
+			method: "POST",
+			headers: { ...managementHeaders(), ...(await browserHeaders()) },
+			body: JSON.stringify({ pairing_code: pair.pairing_code }),
+		});
+		expect(approved.status).toBe(200);
+		expect(((await approved.json()) as { name: string }).name).toBe("Headless e2e laptop");
+
+		const afterApproval = await pairStatus(pair.pairing_code);
+		expect(((await afterApproval.json()) as { status: string }).status).toBe("approved");
+
+		const exchanged = await fetch(`${BASE}/api/workstation-auth/exchange`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				code: pair.code,
+				code_verifier: VERIFIER,
+				installation_id: installation,
+			}),
+		});
+		expect(exchanged.status).toBe(200);
+		const credential = (await exchanged.json()) as { workstation_id: string; token: string };
+		expect(credential.token.startsWith("batw_")).toBe(true);
+
+		const renamed = await fetch(`${BASE}/api/workstations/${credential.workstation_id}`, {
+			method: "PATCH",
+			headers: { ...managementHeaders(), ...(await browserHeaders()) },
+			body: JSON.stringify({ name: "Renamed headless laptop" }),
+		});
+		expect(renamed.status).toBe(200);
+		expect(((await renamed.json()) as { name: string }).name).toBe("Renamed headless laptop");
+
+		const detail = await fetch(`${BASE}/api/workstations/${credential.workstation_id}`, {
+			headers: await browserHeaders(),
+		});
+		expect(((await detail.json()) as { name: string }).name).toBe("Renamed headless laptop");
 	});
 });

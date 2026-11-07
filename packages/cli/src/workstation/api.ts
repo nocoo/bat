@@ -3,11 +3,18 @@
 // host extracted from browser callback data.
 
 import {
+	isPairingCode,
 	isUuid,
 	isWorkstationToken,
+	normalizePairingCode,
 	validateWorkstationLoginExchange,
+	validateWorkstationPairStart,
 	validateWorkstationTargetsResponse,
 	type WorkstationLoginExchangeInput,
+	type WorkstationPairStartInput,
+	type WorkstationPairStartOutput,
+	type WorkstationPairStatus,
+	type WorkstationPairStatusOutput,
 	type WorkstationReportInput,
 	type WorkstationTargetsResponse,
 } from "@bat/shared";
@@ -169,4 +176,77 @@ export async function revokeWorkstationKey(
 		}
 		throw err;
 	}
+}
+
+/**
+ * Start a headless pairing. The machine keeps the returned PKCE `code` locally
+ * and prints only the short `pairing_code` for an operator to approve.
+ */
+export async function startPairing(
+	origins: WorkstationOrigins,
+	input: WorkstationPairStartInput,
+	options: RequestOptions = {},
+): Promise<WorkstationPairStartOutput> {
+	const validated = validateWorkstationPairStart(input);
+	if (!validated.ok) {
+		throw new Error(`invalid pairing request: ${validated.error}`);
+	}
+	const client = new HttpClient(
+		origins.machine,
+		undefined,
+		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+		options.signal,
+	);
+	const raw = await client.post<unknown>("/api/workstation-auth/pair", validated.value);
+	if (typeof raw !== "object" || raw === null) {
+		throw new Error("pairing start returned no object");
+	}
+	const record = raw as Record<string, unknown>;
+	if (typeof record.pairing_code !== "string" || !isPairingCode(record.pairing_code)) {
+		throw new Error("pairing start returned no valid pairing_code");
+	}
+	if (typeof record.code !== "string" || record.code.length < 32) {
+		throw new Error("pairing start returned no valid exchange code");
+	}
+	if (typeof record.expires_at !== "number" || !Number.isFinite(record.expires_at)) {
+		throw new Error("pairing start returned no expiry");
+	}
+	return {
+		pairing_code: record.pairing_code,
+		code: record.code,
+		name: typeof record.name === "string" ? record.name : "",
+		expires_at: record.expires_at,
+	};
+}
+
+/** Poll one pairing. The short code is the only credential, so it travels alone. */
+export async function pairingStatus(
+	origins: WorkstationOrigins,
+	pairingCode: string,
+	options: RequestOptions = {},
+): Promise<WorkstationPairStatusOutput> {
+	const normalized = normalizePairingCode(pairingCode);
+	if (normalized === null) {
+		throw new Error("invalid pairing code");
+	}
+	const client = new HttpClient(
+		origins.machine,
+		undefined,
+		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+		options.signal,
+	);
+	const raw = await client.get<unknown>(`/api/workstation-auth/pair/${normalized}`);
+	if (typeof raw !== "object" || raw === null) {
+		throw new Error("pairing status returned no object");
+	}
+	const record = raw as Record<string, unknown>;
+	const status = record.status;
+	if (status !== "pending" && status !== "approved" && status !== "expired") {
+		throw new Error("pairing status returned an unknown state");
+	}
+	return {
+		status: status as WorkstationPairStatus,
+		name: typeof record.name === "string" ? record.name : "",
+		expires_at: typeof record.expires_at === "number" ? record.expires_at : 0,
+	};
 }

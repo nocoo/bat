@@ -4,9 +4,11 @@
 // These routes are never registered on the machine endpoint.
 
 import type { SparklinePoint, WorkstationListItem } from "@bat/shared";
+import { validateWorkstationPairApprove, validateWorkstationRename } from "@bat/shared";
 import type { Context } from "hono";
 import { configuredManager } from "../domain/connect.js";
 import { parseHistoryQuery } from "../domain/workstation-history.js";
+import { hashSecret } from "../domain/workstation-token.js";
 import type { AppEnv } from "../types.js";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
@@ -131,4 +133,82 @@ export async function workstationDeleteRoute(c: Context<AppEnv, "/api/workstatio
 	}
 	await c.var.repos.workstations.delete(row.id, row.installation_id);
 	return c.json({ ok: true });
+}
+
+async function managementPrincipal(c: Context<AppEnv>): Promise<string | null> {
+	if (c.get("accessAuthenticated") !== true) {
+		return null;
+	}
+	const principal = c.var.accessPrincipal;
+	if (!principal?.startsWith("email:")) {
+		return null;
+	}
+	const sameOrigin =
+		c.req.header("Origin") === new URL(c.req.url).origin &&
+		c.req.header("X-Bat-Management") === "1";
+	return sameOrigin ? principal : null;
+}
+
+/**
+ * Approve a headless pairing. The machine never sees this response; approval
+ * only stamps the owner and the approved marker so its exchange can proceed.
+ */
+export async function workstationPairApproveRoute(c: Context<AppEnv>) {
+	const principal = await managementPrincipal(c);
+	if (principal === null) {
+		return c.json(
+			{ error: "Approval requires a same-origin Access session with an email principal" },
+			403,
+		);
+	}
+	const body = await c.req.json().catch(() => null);
+	const parsed = validateWorkstationPairApprove(body);
+	if (!parsed.ok) {
+		return c.json({ error: parsed.error }, 400);
+	}
+	const now = Math.floor(Date.now() / 1000);
+	const pairingHash = await hashSecret(parsed.value.pairing_code);
+	const row = await c.var.repos.workstations.getCodeByPairing(pairingHash);
+	if (!row) {
+		return c.json({ error: "Pairing code is unknown" }, 404);
+	}
+	if (row.consumed_at !== null || row.approved_at !== null) {
+		return c.json({ error: "Pairing code was already used" }, 409);
+	}
+	if (row.expires_at <= now) {
+		return c.json({ error: "Pairing code has expired" }, 410);
+	}
+	const approved = await c.var.repos.workstations.approvePairing(pairingHash, principal, now);
+	if (!approved) {
+		return c.json({ error: "Pairing code was already used or expired" }, 409);
+	}
+	return c.json({ ok: true, name: row.name, installation_id: row.installation_id });
+}
+
+/** Rename a workstation the caller owns or manages. */
+export async function workstationRenameRoute(c: Context<AppEnv, "/api/workstations/:id">) {
+	const principal = await managementPrincipal(c);
+	if (principal === null) {
+		return c.json(
+			{ error: "Renaming requires a same-origin Access session with an email principal" },
+			403,
+		);
+	}
+	const body = await c.req.json().catch(() => null);
+	const parsed = validateWorkstationRename(body);
+	if (!parsed.ok) {
+		return c.json({ error: parsed.error }, 400);
+	}
+	const id = c.req.param("id");
+	const record = await c.var.repos.workstations.get(id);
+	if (!record) {
+		return c.json({ error: "Workstation not found" }, 404);
+	}
+	const manager = configuredManager(c.env.CONNECT_MANAGERS, principal);
+	if (record.owner !== principal && !manager) {
+		return c.json({ error: "Only the owner or a global manager may rename this workstation" }, 403);
+	}
+	await c.var.repos.workstations.rename(id, parsed.value.name);
+	const updated = await c.var.repos.workstations.get(id);
+	return c.json(updated);
 }

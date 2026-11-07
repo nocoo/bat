@@ -1,4 +1,8 @@
-import type { WorkstationAuthorizeInput, WorkstationAuthorizeResult } from "@bat/shared";
+import type {
+	WorkstationAuthorizeInput,
+	WorkstationAuthorizeResult,
+	WorkstationRecord,
+} from "@bat/shared";
 import { environmentUrl } from "./environment";
 // MVVM "Model" layer — thin fetch wrapper around the Worker /api/* routes.
 //
@@ -80,3 +84,17 @@ export const authorizeWorkstationAPI = (
 
 export const deleteWorkstationAPI = (id: string): Promise<{ ok: true }> =>
 	request("DELETE", `/api/workstations/${encodeURIComponent(id)}`, { management: true });
+
+export const approveWorkstationPairAPI = (
+	pairingCode: string,
+): Promise<{ ok: true; name: string; installation_id: string }> =>
+	request("POST", "/api/workstations/pair", {
+		body: { pairing_code: pairingCode },
+		management: true,
+	});
+
+export const renameWorkstationAPI = (id: string, name: string): Promise<WorkstationRecord> =>
+	request("PATCH", `/api/workstations/${encodeURIComponent(id)}`, {
+		body: { name },
+		management: true,
+	});

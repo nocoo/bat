@@ -34,6 +34,9 @@ export interface WorkstationCodeRow {
 	created_at: number;
 	expires_at: number;
 	consumed_at: number | null;
+	/** Headless pairing: short code digest, and the approval marker. */
+	pairing_hash: string | null;
+	approved_at: number | null;
 }
 
 export interface WorkstationServerTarget {
@@ -87,6 +90,12 @@ export interface WorkstationsRepository {
 	getById(id: string): Promise<WorkstationRow | null>;
 	getCode(codeHash: string): Promise<WorkstationCodeRow | null>;
 	createCode(row: WorkstationCodeRow): Promise<void>;
+	/** Headless pairing lookup by the short code digest. */
+	getCodeByPairing(pairingHash: string): Promise<WorkstationCodeRow | null>;
+	/** Approve a pending pairing: stamps owner and approved_at exactly once. */
+	approvePairing(pairingHash: string, owner: string, now: number): Promise<boolean>;
+	/** Rename a workstation the caller may manage. */
+	rename(id: string, name: string): Promise<boolean>;
 	/**
 	 * Atomic PKCE consumption + rotation + registration. The code is consumed
 	 * only once; the workstation row is created or its key rotated in the same

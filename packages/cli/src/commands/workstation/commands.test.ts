@@ -517,3 +517,20 @@ describe("logout command", () => {
 		expect(process.exitCode).toBe(0);
 	});
 });
+
+describe("workstation login --headless", () => {
+	test("requires a name before contacting the server", async () => {
+		const home = mkdtempSync(join(tmpdir(), "bat-ws-headless-cmd-"));
+		try {
+			const exit = await runLoginCommand({ headless: true });
+			expect(exit).toBe(1);
+		} finally {
+			rmSync(home, { recursive: true, force: true });
+		}
+	});
+
+	test("rejects a blank name", async () => {
+		const exit = await runLoginCommand({ headless: true, name: "   " });
+		expect(exit).toBe(1);
+	});
+});

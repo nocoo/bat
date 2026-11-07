@@ -7,6 +7,7 @@ import { WORKSTATION_LIMITS } from "@bat/shared";
 import { openBrowser, performLogin } from "@nocoo/base-cli";
 import { error, info, success } from "../lib/output.js";
 import { exchangeLogin } from "./api.js";
+import { performHeadlessLogin } from "./headless.js";
 import type { WorkstationOrigins } from "./origins.js";
 import {
 	ensureInstallationId,
@@ -35,6 +36,14 @@ export function consentHostname(value: string = osHostname()): string {
 	const cleaned = value.replace(/[\r\n\0]/g, "").trim();
 	return (cleaned || "unknown").slice(0, WORKSTATION_LIMITS.hostname);
 }
+
+/** Emits the pairing instructions; the command layer keeps output formatting. */
+export type HeadlessAnnouncer = (text: {
+	code: string;
+	url: string;
+	name: string;
+	expiresAt: number;
+}) => void;
 
 export interface LoginDeps {
 	paths: WorkstationPaths;
@@ -113,13 +122,26 @@ export interface LoginReport {
 }
 
 export async function runWorkstationLogin(
-	deps: LoginDeps,
+	deps: LoginDeps & { headless?: { name: string; announce?: HeadlessAnnouncer } },
 ): Promise<{ exitCode: number; report?: LoginReport }> {
 	info(`Dashboard: ${deps.origins.dashboard}`);
 	info(`Ingest: ${deps.origins.machine}`);
-	info("Opening browser for workstation authorization...");
+	if (deps.headless === undefined) {
+		info("Opening browser for workstation authorization...");
+	} else {
+		info(`Headless pairing for "${deps.headless.name}" — no browser on this machine.`);
+	}
 
-	const outcome = await performWorkstationLogin(deps);
+	const outcome =
+		deps.headless === undefined
+			? await performWorkstationLogin(deps)
+			: await performHeadlessLogin({
+					paths: deps.paths,
+					origins: deps.origins,
+					name: deps.headless.name,
+					...(deps.store ? { store: deps.store } : {}),
+					...(deps.headless.announce ? { announce: deps.headless.announce } : {}),
+				});
 	if (!outcome) {
 		return { exitCode: 1 };
 	}

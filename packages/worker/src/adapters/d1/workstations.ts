@@ -101,10 +101,37 @@ export class D1WorkstationsRepository implements WorkstationsRepository {
 			.first<WorkstationCodeRow>();
 	}
 
+	async getCodeByPairing(pairingHash: string): Promise<WorkstationCodeRow | null> {
+		return this.db
+			.prepare("SELECT * FROM workstation_codes WHERE pairing_hash = ?")
+			.bind(pairingHash)
+			.first<WorkstationCodeRow>();
+	}
+
+	async approvePairing(pairingHash: string, owner: string, now: number): Promise<boolean> {
+		// One approval per pairing, and only while it is unexpired and unconsumed.
+		const result = await this.db
+			.prepare(
+				`UPDATE workstation_codes SET owner = ?, approved_at = ?
+WHERE pairing_hash = ? AND approved_at IS NULL AND consumed_at IS NULL AND expires_at > ?`,
+			)
+			.bind(owner, now, pairingHash, now)
+			.run();
+		return (result.meta?.changes ?? 0) === 1;
+	}
+
+	async rename(id: string, name: string): Promise<boolean> {
+		const result = await this.db
+			.prepare("UPDATE workstations SET name = ? WHERE id = ?")
+			.bind(name, id)
+			.run();
+		return (result.meta?.changes ?? 0) === 1;
+	}
+
 	async createCode(row: WorkstationCodeRow): Promise<void> {
 		await this.db
 			.prepare(
-				"INSERT INTO workstation_codes(code_hash, owner, installation_id, challenge, name, created_at, expires_at, consumed_at) VALUES (?,?,?,?,?,?,?,NULL)",
+				"INSERT INTO workstation_codes(code_hash, owner, installation_id, challenge, name, created_at, expires_at, consumed_at, pairing_hash, approved_at) VALUES (?,?,?,?,?,?,?,NULL,?,?)",
 			)
 			.bind(
 				row.code_hash,
@@ -114,6 +141,8 @@ export class D1WorkstationsRepository implements WorkstationsRepository {
 				row.name,
 				row.created_at,
 				row.expires_at,
+				row.pairing_hash,
+				row.approved_at,
 			)
 			.run();
 	}
@@ -134,7 +163,7 @@ export class D1WorkstationsRepository implements WorkstationsRepository {
 		const results = await this.db.batch([
 			this.db
 				.prepare(
-					"UPDATE workstation_codes SET consumed_at = ?, consume_nonce = ? WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ?",
+					"UPDATE workstation_codes SET consumed_at = ?, consume_nonce = ? WHERE code_hash = ? AND consumed_at IS NULL AND expires_at > ? AND (pairing_hash IS NULL OR approved_at IS NOT NULL)",
 				)
 				.bind(params.now, nonce, params.codeHash, params.now),
 			this.db

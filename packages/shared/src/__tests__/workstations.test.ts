@@ -2,17 +2,23 @@
 import { describe, expect, test } from "vitest";
 import {
 	computeWorkstationStatus,
+	formatPairingCode,
 	ipFamily,
 	isIpv4,
 	isIpv6,
+	isPairingCode,
 	isPkceCodeVerifier,
 	isPkceS256Challenge,
 	isPublicIp,
 	isUuid,
 	isWorkstationCallbackUrl,
 	isWorkstationToken,
+	normalizePairingCode,
 	validateWorkstationAuthorize,
 	validateWorkstationLoginExchange,
+	validateWorkstationPairApprove,
+	validateWorkstationPairStart,
+	validateWorkstationRename,
 	validateWorkstationReport,
 	validateWorkstationTargetsResponse,
 	WORKSTATION_AUTH_CODE_TTL_SECONDS,
@@ -131,6 +137,7 @@ describe("workstation protocol constants", () => {
 			reportsPerMinute: 2,
 			targetsPerMinute: 6,
 			exchangePerTenMinutes: 5,
+			pairStatusPerTenMinutes: 120,
 		});
 	});
 
@@ -1570,5 +1577,78 @@ describe("validateWorkstationAuthorize", () => {
 				callback: "https://127.0.0.1:8765/callback",
 			}).ok,
 		).toBe(true);
+	});
+});
+
+describe("headless pairing contracts", () => {
+	const challenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM";
+	const installation = "3f2504e0-4f89-41d3-9a0c-0305e82c3301";
+
+	test("pairing codes survive dictation and normalise", () => {
+		expect(normalizePairingCode("abcd-2345")).toBe("ABCD2345");
+		expect(normalizePairingCode(" ABCD 2345 ")).toBe("ABCD2345");
+		expect(formatPairingCode("ABCD2345")).toBe("ABCD-2345");
+		expect(isPairingCode("ABCD-2345")).toBe(true);
+	});
+
+	test("rejects ambiguous characters and wrong lengths", () => {
+		expect(normalizePairingCode("ABCD1234")).toBeNull(); // 0/1/I/L/O/U are excluded
+		expect(normalizePairingCode("ABCDO234")).toBeNull();
+		expect(normalizePairingCode("ABCD234")).toBeNull();
+		expect(normalizePairingCode("ABCD23456")).toBeNull();
+		expect(formatPairingCode("nonsense")).toBe("nonsense");
+	});
+
+	test("validates a pairing start", () => {
+		const ok = validateWorkstationPairStart({
+			installation_id: installation,
+			name: "Headless laptop",
+			code_challenge: challenge,
+		});
+		expect(ok.ok).toBe(true);
+		expect(
+			validateWorkstationPairStart({
+				installation_id: "nope",
+				name: "x",
+				code_challenge: challenge,
+			}).ok,
+		).toBe(false);
+		expect(
+			validateWorkstationPairStart({
+				installation_id: installation,
+				name: "   ",
+				code_challenge: challenge,
+			}).ok,
+		).toBe(false);
+		expect(
+			validateWorkstationPairStart({
+				installation_id: installation,
+				name: "x",
+				code_challenge: "short",
+			}).ok,
+		).toBe(false);
+		expect(
+			validateWorkstationPairStart({
+				installation_id: installation,
+				name: "x",
+				code_challenge: challenge,
+				extra: 1,
+			}).ok,
+		).toBe(false);
+	});
+
+	test("validates approval and rename payloads", () => {
+		expect(validateWorkstationPairApprove({ pairing_code: "abcd-2345" })).toEqual({
+			ok: true,
+			value: { pairing_code: "ABCD2345" },
+		});
+		expect(validateWorkstationPairApprove({ pairing_code: "nope" }).ok).toBe(false);
+		expect(validateWorkstationRename({ name: " Desk laptop " })).toEqual({
+			ok: true,
+			value: { name: "Desk laptop" },
+		});
+		expect(validateWorkstationRename({ name: "" }).ok).toBe(false);
+		expect(validateWorkstationRename({ name: "x".repeat(65) }).ok).toBe(false);
+		expect(validateWorkstationRename({ name: "ok", id: "extra" }).ok).toBe(false);
 	});
 });

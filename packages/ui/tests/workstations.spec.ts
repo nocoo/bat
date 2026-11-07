@@ -57,6 +57,57 @@ test.describe("Workstations list", () => {
 		await expect(page.getByRole("alert")).toHaveCount(0);
 	});
 
+	test("the pair dialog approves a headless code and reports the machine", async ({ page }) => {
+		let body: unknown;
+		let management = "";
+		await page.route("**/api/workstations/pair", async (route) => {
+			body = route.request().postDataJSON();
+			management = route.request().headers()["x-bat-management"] ?? "";
+			await route.fulfill({
+				json: { ok: true, name: "Headless laptop", installation_id: fieldLaptop },
+			});
+		});
+		await page.goto("/workstations");
+		await page.getByRole("button", { name: "Pair", exact: true }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Pairing code").fill("abcd-2345");
+		await dialog.getByRole("button", { name: "Approve", exact: true }).click();
+		await expect(dialog.getByText("Approved Headless laptop")).toBeVisible();
+		expect(body).toEqual({ pairing_code: "ABCD-2345" });
+		expect(management).toBe("1");
+	});
+
+	test("a rejected pairing code explains why", async ({ page }) => {
+		await page.route("**/api/workstations/pair", (route) =>
+			route.fulfill({ status: 410, json: { error: "expired" } }),
+		);
+		await page.goto("/workstations");
+		await page.getByRole("button", { name: "Pair", exact: true }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Pairing code").fill("ABCD-2345");
+		await dialog.getByRole("button", { name: "Approve", exact: true }).click();
+		await expect(dialog.getByRole("alert")).toContainText("expired");
+	});
+
+	test("the detail header renames a workstation through the management route", async ({ page }) => {
+		let body: unknown;
+		await page.route(`**/api/workstations/${fieldLaptop}`, async (route) => {
+			if (route.request().method() !== "PATCH") {
+				await route.continue();
+				return;
+			}
+			body = route.request().postDataJSON();
+			await route.fulfill({ json: { id: fieldLaptop, name: "Desk laptop" } });
+		});
+		await page.goto(`/workstations/${fieldLaptop}`);
+		await page.getByRole("button", { name: "Rename Field laptop", exact: true }).click();
+		const dialog = page.getByRole("dialog");
+		await dialog.getByLabel("Workstation name").fill("Desk laptop");
+		await dialog.getByRole("button", { name: "Save name", exact: true }).click();
+		await expect(page.getByRole("dialog")).toBeHidden();
+		expect(body).toEqual({ name: "Desk laptop" });
+	});
+
 	test("the CLI setup dialog walks through enrollment with copyable commands", async ({ page }) => {
 		await page.goto("/workstations");
 		await page.getByRole("button", { name: "CLI setup", exact: true }).click();

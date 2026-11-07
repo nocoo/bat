@@ -3,7 +3,12 @@
 import { Hono } from "hono";
 import { describe, expect, test } from "vitest";
 import type { AppEnv } from "../types.js";
-import { entryControl, isLocalhost, isMachineEndpoint } from "./entry-control.js";
+import {
+	entryControl,
+	isAllowedMachineRoute,
+	isLocalhost,
+	isMachineEndpoint,
+} from "./entry-control.js";
 
 // Helper to create a test app with entry control middleware
 function createTestApp() {
@@ -432,5 +437,18 @@ describe("entryControl middleware", () => {
 			});
 			expect(res.status).toBe(200);
 		});
+	});
+});
+
+describe("workstation pairing routes on the machine endpoint", () => {
+	test("the pair start and status paths are machine routes", () => {
+		expect(isAllowedMachineRoute("POST", "/api/workstation-auth/pair")).toBe(true);
+		expect(isAllowedMachineRoute("GET", "/api/workstation-auth/pair/ABCD-2345")).toBe(true);
+	});
+
+	test("browser approval and rename stay off the machine endpoint", () => {
+		expect(isAllowedMachineRoute("POST", "/api/workstations/pair")).toBe(false);
+		expect(isAllowedMachineRoute("PATCH", "/api/workstations/abc")).toBe(false);
+		expect(isAllowedMachineRoute("POST", "/api/workstation-auth/authorize")).toBe(false);
 	});
 });

@@ -49,6 +49,28 @@ machine hostname. There is **no GET mint path**: the consent step is a same-orig
 
 ## Enrollment
 
+Two paths reach the same exchange. The browser path keeps the human session on
+the machine; the headless path keeps it on any other device.
+
+- **Browser consent.** `bat workstation login` opens `/workstation-login`; the
+  consent POST mints the PKCE code and redirects to the CLI loopback listener.
+- **Headless pairing.** `bat workstation login --headless --name "Desk laptop"`
+  posts the display name and PKCE challenge to `POST /api/workstation-auth/pair`
+  on the ingest host without any Access session, receives an eight character
+  pairing code (Crockford-style alphabet, `ABCD-2345`) and the full PKCE code,
+  prints the short code and polls `GET /api/workstation-auth/pair/{code}`. An
+  operator approves it in the dashboard (`POST /api/workstations/pair`, Access
+  session, same-origin management header), which stamps `owner` and
+  `approved_at`. The exchange refuses any pairing row that was never approved, so
+  the short code alone cannot enroll anything. Codes live
+  `WORKSTATION_PAIRING_TTL_SECONDS` (300 s) and work once; the poll is limited to
+  `pairStatusPerTenMinutes`.
+
+`PATCH /api/workstations/{id}` renames a workstation for its owner or a global
+manager. It changes the display name only, never the enrollment, key or history.
+
+
+
 `POST /api/workstation-auth/authorize` requires a verified Access session whose principal is
 `email:<address>`; service principals are refused. It also requires `Origin` equal to the request
 origin and `X-Bat-Management: 1`. The body is `WorkstationAuthorizeInput`:

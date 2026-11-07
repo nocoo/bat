@@ -105,7 +105,12 @@ import {
 	webhooksListRoute,
 	webhooksRegenerateRoute,
 } from "./routes/webhooks.js";
-import { workstationAuthorizeRoute, workstationExchangeRoute } from "./routes/workstation-auth.js";
+import {
+	workstationAuthorizeRoute,
+	workstationExchangeRoute,
+	workstationPairStartRoute,
+	workstationPairStatusRoute,
+} from "./routes/workstation-auth.js";
 import {
 	monitoringWorkstationConnectivityRoute,
 	monitoringWorkstationMetricsRoute,
@@ -122,6 +127,8 @@ import {
 	workstationDeleteRoute,
 	workstationDetailRoute,
 	workstationMetricsRoute,
+	workstationPairApproveRoute,
+	workstationRenameRoute,
 	workstationsListRoute,
 } from "./routes/workstations.js";
 import type { AppEnv } from "./types.js";
@@ -259,6 +266,10 @@ app.put("/api/settings", settingsPutRoute);
 // Workstations: enrollment, probe, browser reads and revocation
 app.post("/api/workstation-auth/authorize", workstationAuthorizeRoute);
 app.post("/api/workstation-auth/exchange", workstationExchangeRoute);
+app.patch("/api/workstations/:id", workstationRenameRoute);
+app.post("/api/workstations/pair", workstationPairApproveRoute);
+app.post("/api/workstation-auth/pair", workstationPairStartRoute);
+app.get("/api/workstation-auth/pair/:code", workstationPairStatusRoute);
 app.get("/api/workstation-probe/targets", workstationTargetsRoute);
 // Deployment-wide monitoring lane for the external read key (BAT_READ_KEY).
 app.get("/api/monitoring/workstations", monitoringWorkstationsRoute);

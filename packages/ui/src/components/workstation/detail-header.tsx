@@ -11,6 +11,7 @@ import { Link } from "react-router";
 import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { CopyableAddress } from "@/components/workstation/copyable-address";
+import { WorkstationRenameDialog } from "@/components/workstation/workstation-rename-dialog";
 import { WorkstationStatusBadge } from "@/components/workstation-status-badge";
 import { chart } from "@/lib/palette";
 import {
@@ -126,6 +127,7 @@ export function DetailHeader({
 								{record.name}
 							</h1>
 							<WorkstationStatusBadge status={status} size="md" />
+							<WorkstationRenameDialog workstation={record} />
 						</div>
 						<p className="line-clamp-1 text-basalt-sm text-basalt-muted-foreground">{system}</p>
 					</div>
