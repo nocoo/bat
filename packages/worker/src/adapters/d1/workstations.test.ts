@@ -529,7 +529,7 @@ describe("D1WorkstationsRepository", () => {
 			expect(await repo.rate("reports:one", 2, 60, NOW + 60)).toBe(true);
 		});
 
-		test("lists only active servers with public addresses", async () => {
+		test("lists only active servers with a public IPv4 address", async () => {
 			const insert = (hostId: string, publicIp: string | null, active = 1) =>
 				db
 					.prepare(
@@ -573,18 +573,14 @@ describe("D1WorkstationsRepository", () => {
 				"srv-teredo",
 				"srv-unknown",
 			]);
+			// IPv6 targets are never proposed: a reachable v6 host would only be
+			// reported as a timeout on an IPv4-only path.
 			expect(targets).toEqual([
 				{
 					server_id: "srv-public",
 					name: "srv-public.example.com",
 					address: "8.8.8.8",
 					family: 4,
-				},
-				{
-					server_id: "srv-v6",
-					name: "srv-v6.example.com",
-					address: "2001:4860:4860::8888",
-					family: 6,
 				},
 			]);
 			expect(await repo.listServerTargets([])).toEqual([]);

@@ -118,20 +118,18 @@ installation ID or the key. Re-enrollment keeps the installation ID, keeps the w
 `GET /api/workstation-probe/targets` returns
 `{ data: [{ server_id, name, address, family }], interval_seconds: 600, ping_count: 3 }`. Targets are
 computed on every request from the owner's current authority (`connect.servers(owner, manager)`) and
-only include active servers with a **globally routable unicast** address. `isPublicIp` validates the
-whole literal with the shared IPv6 parser before any range decision. IPv6 must be global unicast
-(`2000::/3`) minus the IANA special-purpose blocks inside it: `2001::/23` (Teredo, benchmark
-`2001:2::/48`, ORCHID/ORCHIDv2, AMPR and peers), `2001:db8::/32`, `3fff::/20` documentation and
-`2002::/16` 6to4; translation forms (6to4, Teredo, NAT64) are excluded entirely, so an embedded
-private IPv4 can never surface. IPv4 rejects private, loopback, link-local, CGNAT, multicast,
-reserved, IETF-assignment, benchmark and documentation ranges. A literal such as
-`2001:4860:4860::8888]/foo` is invalid, not public. The list is capped at 100. A key can never widen its own target set, and target addresses are
-never client supplied.
+only include active servers with a **globally routable unicast IPv4** address. That is deliberate: a
+workstation probe is an IPv4 reachability check, so an IPv6-only host is skipped instead of being
+reported as a timeout on a path that cannot work, and every target carries `family: 4`.
+`isPublicIp` validates the whole literal before any range decision and rejects private, loopback,
+link-local, CGNAT, multicast, reserved, IETF-assignment, benchmark and documentation ranges; a literal
+such as `203.0.113.10]/foo` is invalid, not public. The list is capped at 100. A key can never widen
+its own target set, and target addresses are never client supplied.
 
-Fixtures use real public literals such as `8.8.8.8` and `2001:4860:4860::8888`; no test performs a
-network call. Documentation ranges (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`,
-`2001:db8::/32`) are deliberately non-public, and a target-list test proves bad literals are dropped
-while good neighbours survive.
+Fixtures use real public literals such as `8.8.8.8` and, to prove they are skipped,
+`2001:4860:4860::8888`; no test performs a network call. Documentation ranges (`192.0.2.0/24`,
+`198.51.100.0/24`, `203.0.113.0/24`, `2001:db8::/32`) are deliberately non-public, and a target-list
+test proves bad literals are dropped while good neighbours survive.
 
 `POST /api/workstation-probe/reports` reads at most 64 KiB within five seconds using the shared body
 reader, then validates the payload strictly (unknown keys rejected, no coercion) and verifies that

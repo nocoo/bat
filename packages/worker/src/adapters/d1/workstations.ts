@@ -528,11 +528,17 @@ ORDER BY h.host_id ASC`,
 			)
 			.bind(JSON.stringify(serverIds))
 			.all<{ host_id: string; hostname: string; public_ip: string | null }>();
+		// Workstation probes are IPv4 only: an IPv6-only host is skipped rather
+		// than reported as a timeout, and a v6 literal can never widen the target set.
 		const targets: WorkstationServerTarget[] = [];
 		for (const row of results) {
-			if (row.public_ip === null || !isPublicIp(row.public_ip)) continue;
-			const family = isIpv4(row.public_ip) ? 4 : 6;
-			targets.push({ server_id: row.host_id, name: row.hostname, address: row.public_ip, family });
+			if (row.public_ip === null || !isIpv4(row.public_ip) || !isPublicIp(row.public_ip)) continue;
+			targets.push({
+				server_id: row.host_id,
+				name: row.hostname,
+				address: row.public_ip,
+				family: 4,
+			});
 		}
 		return targets;
 	}

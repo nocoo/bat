@@ -660,6 +660,7 @@ describe("workstation targets and reports", () => {
 		]);
 		const response = await h.request("/api/workstation-probe/targets", { headers: auth(token) });
 		expect(response.status).toBe(200);
+		// srv-02 is IPv6 only; workstation probes are IPv4, so it is not offered.
 		expect(await response.json()).toEqual({
 			data: [
 				{
@@ -667,12 +668,6 @@ describe("workstation targets and reports", () => {
 					name: "srv-01.example.com",
 					address: "8.8.8.8",
 					family: 4,
-				},
-				{
-					server_id: "srv-02",
-					name: "srv-02.example.com",
-					address: "2001:4860:4860::8888",
-					family: 6,
 				},
 			],
 			interval_seconds: 600,
