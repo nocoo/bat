@@ -50,6 +50,8 @@ systemctl status bat-probe
 
 探针基本指标默认每 30 秒采集，身份信息定期更新；扩展采集约每 30 分钟执行，其中深度磁盘扫描间隔更长。软件、Docker、systemd 和站点发现依赖目标机现有命令、配置文件和权限。探针还尝试从 `https://echo.nocoo.cloud/api/ip` 取得公网地址，该地址写在源码中；请求失败时保留可用的本地采集流程。
 
+CLI 自带两项运维命令：`bat doctor` 只读自检（运行时、assets profile 与 token、workstation 凭据与 ingest 可达性、调度注册、探针锁、最近一次上报写入；`--offline` 跳过网络检查，`--json` 输出机器可读结果，只有失败项才返回非零）；`bat update` 先查 npmjs、再查腾讯镜像，安装也按同一顺序回退。
+
 ## 认证与 CLI
 
 | 用途                    | 凭据与入口                                            |

@@ -6,9 +6,11 @@ import { defineCommand } from "@nocoo/base-cli";
 import agent from "./commands/agent/index.js";
 import asset from "./commands/asset/index.js";
 import binding from "./commands/binding/index.js";
+import doctor from "./commands/doctor.js";
 import login from "./commands/login.js";
 import service from "./commands/service/index.js";
 import status from "./commands/status.js";
+import update from "./commands/update.js";
 
 export const main = defineCommand({
 	meta: {
@@ -19,6 +21,8 @@ export const main = defineCommand({
 	subCommands: {
 		login,
 		status,
+		doctor,
+		update,
 		agent,
 		asset,
 		binding,

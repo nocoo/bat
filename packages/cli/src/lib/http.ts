@@ -44,18 +44,22 @@ export class HttpClient {
 	private readonly token: string | undefined;
 	private readonly timeoutMs: number;
 	private readonly signal: AbortSignal | undefined;
+	private readonly fetchImpl: typeof fetch;
 
 	constructor(
 		baseUrl: string,
 		token?: string,
 		timeoutMs = DEFAULT_TIMEOUT_MS,
 		signal?: AbortSignal,
+		/** Injected for tests and for callers that already hold a fetch. */
+		fetchImpl: typeof fetch = fetch,
 	) {
 		// Strip trailing slash for clean path joining
 		this.baseUrl = baseUrl.replace(/\/$/, "");
 		this.token = token;
 		this.timeoutMs = timeoutMs;
 		this.signal = signal;
+		this.fetchImpl = fetchImpl;
 	}
 
 	/** GET request */
@@ -121,7 +125,7 @@ export class HttpClient {
 				init.body = JSON.stringify(body);
 			}
 
-			const res = await fetch(url, init);
+			const res = await this.fetchImpl(url, init);
 
 			if (!res.ok) {
 				// Try to extract error message from JSON body

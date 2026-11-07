@@ -31,6 +31,8 @@ export interface RequestOptions {
 	signal?: AbortSignal;
 	/** Timeout for the whole request, body read included. */
 	timeoutMs?: number;
+	/** Injected for tests that must not touch the network. */
+	fetchImpl?: typeof fetch;
 }
 
 /** Exchange a PKCE authorization code for a workstation credential. */
@@ -88,6 +90,7 @@ export async function fetchTargets(
 		token,
 		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
 		options.signal,
+		options.fetchImpl,
 	);
 	const raw = await client.get<unknown>("/api/workstation-probe/targets");
 	const parsed = validateWorkstationTargetsResponse(raw);
@@ -167,6 +170,7 @@ export async function revokeWorkstationKey(
 		token,
 		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
 		options.signal,
+		options.fetchImpl,
 	);
 	try {
 		await client.post<unknown>("/api/workstation-probe/revoke");

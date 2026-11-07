@@ -19,6 +19,8 @@ describe("main command tree", () => {
 		expect(Object.keys(main.subCommands ?? {})).toStrictEqual([
 			"login",
 			"status",
+			"doctor",
+			"update",
 			"agent",
 			"asset",
 			"binding",

@@ -27,6 +27,19 @@ retention setting; workstation probes do not collect process lists or create ser
 The two profiles never share credential files or tokens. They use separately configured API origins;
 a workstation login does not overwrite the assets profile.
 
+## Self-check and upgrade
+
+```bash
+bat doctor [--offline] [--json]   # runtime, profiles, token, schedule, recent report
+bat update [--check]              # upgrade from npm, falling back to the Tencent mirror
+```
+
+`doctor` is read-only. A failing check exits non-zero; a warning (optional
+profile, unknown version, stale log, held probe lock) does not. `--offline`
+skips the registry, token and reachability probes instead of guessing.
+`update` resolves the newest published version from npmjs first and the mirror
+second, and attempts the install in that same order.
+
 ## Asset commands
 
 ```bash
