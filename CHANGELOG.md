@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.4.2
+
+### Added
+
+- Probe workstations over IPv4 only
+
 ## v3.4.1
 
 ### Fixed
