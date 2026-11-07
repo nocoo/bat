@@ -117,7 +117,7 @@ export function DetailHeader({
 
 	return (
 		<LayerCard padding="none">
-			<div className="flex flex-wrap items-center justify-between gap-x-basalt-layout gap-y-basalt-space-card-sm px-basalt-card py-basalt-space-card-sm">
+			<div className="flex flex-wrap items-center justify-between gap-x-basalt-layout gap-y-basalt-space-card-sm px-basalt-card py-basalt-layout">
 				<div className="flex min-w-0 items-center gap-basalt-space-md">
 					<Button
 						asChild={true}
@@ -129,7 +129,7 @@ export function DetailHeader({
 							<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
 						</Link>
 					</Button>
-					<div className="min-w-0 space-y-basalt-space-xs">
+					<div className="min-w-0 space-y-basalt-space-md">
 						<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-lg">
 							<h1 className="text-basalt-3xl font-semibold text-basalt-foreground">
 								{record.name}

@@ -84,7 +84,9 @@ function AppShellInner({ children }: AppShellProps) {
 			<AppMain>
 				<AppHeader
 					density="compact"
-					breadcrumbs={breadcrumbs}
+					// Below md the trail cannot shrink and would paint over the actions;
+					// the page title in the content identifies the route instead.
+					breadcrumbs={isMobile === true ? undefined : breadcrumbs}
 					leading={
 						showHamburger ? (
 							<HeaderTooltip label="Open navigation menu">
