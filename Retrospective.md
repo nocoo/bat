@@ -331,3 +331,11 @@ retain receipt timestamps as relative ages, and build target metadata from both
 latest reports and history. Audit the serialized result against source identifiers
 before staging; never expose raw captures or reversible mapping tables to model
 contexts, CI or the checked-in fixture catalog.
+
+The first Demo loader copied connectivity-history objects into report payloads,
+losing the protocol's `sent` count and hiding loss percentages. Docker start ages
+also survived inside nested JSON. Test the returned API DTOs, not just row counts:
+compare payload and relational observations, traverse nested timestamps, and keep
+captured packet tuples distinct from aggregate-equivalent history reconstruction.
+Block forbidden production requests before dispatch in offline captures, and fix
+only the capture page clock when comparing two time-windowed charts.

@@ -13,7 +13,7 @@ Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](
 ## Project invariants
 
 - One Worker serves API and SPA. Browser host `bat.hexly.ai` uses Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
-- Daily local gateway 7025 (`bat.dev.hexly.ai`) starts Demo by default. Only explicit Prod selection uses the production Access proxy. Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway.
+- Daily local gateway 7025 (`bat.dev.hexly.ai`) starts Demo by default using the checked-in, de-identified observation catalog in `scripts/environments/fixtures/recorded.json`. Server aliases share one workload template; the focused automated catalog stays synthetic. Only explicit Prod selection uses the production Access proxy. Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway.
 - L2/L3 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
 - Apply production D1 migrations before code that needs new columns. Preserve migration data with copy/rename rather than destructive table replacement; the E2E harness discovers numbered migrations automatically.
 - `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
@@ -78,7 +78,7 @@ Install restores Husky. Hooks must stay check-only; never use `--no-verify` on c
 
 | Lane      | Resource                                             | Boundary                                                            |
 | --------- | ---------------------------------------------------- | ------------------------------------------------------------------- |
-| Daily dev | Gateway 7025; `.wrangler/environments/demo`          | Persistent synthetic CRUD; explicit Prod access only                |
+| Daily dev | Gateway 7025; `.wrangler/environments/demo`          | Persistent offline-fixture CRUD; explicit Prod access only          |
 | L2        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Automated lock, fresh identity, owned D1 cleanup                    |
 | L3        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
 

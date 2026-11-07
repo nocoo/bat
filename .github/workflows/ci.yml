@@ -39,7 +39,9 @@ jobs:
       install-policy: "blocked"
       timeout-minutes: 15
       pre-command: "bun run build"
-      command: "bun turbo test:e2e --filter=@bat/worker"
+      command: |
+        bun turbo test:e2e --filter=@bat/worker
+        bun run test:environments
 
   l3-playwright:
     name: "L3 Playwright E2E"
@@ -51,7 +53,9 @@ jobs:
       browser-working-directory: "packages/ui"
       timeout-minutes: 20
       pre-command: "bun run build"
-      command: "bun run test:e2e:pw"
+      command: |
+        bun run test:e2e:pw
+        bun run capture:environments
       artifact-name: playwright-report
       artifact-path: "packages/ui/playwright-report/"
 

@@ -1,7 +1,34 @@
 import assert from "node:assert/strict";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { launch } from "./launcher.mjs";
+import { readRecordedRecording, SERVER_ALIASES } from "./recorded-demo.mjs";
 import { createRuntime, productionConfig, removeOwned, storageRoot } from "./runtime.mjs";
+
+const near = (actual, expected) =>
+	actual === null && expected === null
+		? true
+		: Number.isFinite(actual) && Number.isFinite(expected) && Math.abs(actual - expected) < 1e-6;
+
+const hostsProjection = (detail) => ({
+	os: detail.os,
+	kernel: detail.kernel,
+	arch: detail.arch,
+	cpu_model: detail.cpu_model,
+	cpu_logical: detail.cpu_logical,
+	cpu_physical: detail.cpu_physical,
+	mem_total_bytes: detail.mem_total_bytes,
+	swap_total_bytes: detail.swap_total_bytes,
+	virtualization: detail.virtualization,
+	disks: detail.disks,
+	boot_mode: detail.boot_mode,
+	timezone: detail.timezone,
+	dns_resolvers: detail.dns_resolvers,
+	dns_search: detail.dns_search,
+	boot_time: detail.boot_time,
+	last_seen: detail.last_seen,
+	top_processes_json: detail.top_processes_json,
+	top_processes_ts: detail.top_processes_ts,
+});
 
 const app = await launch({ built: true, port: 0, initial: "e2e", dataset: "demo" });
 try {
@@ -36,10 +63,159 @@ try {
 		).status,
 		403,
 	);
+
+	const recording = readRecordedRecording();
+	const latest = recording.workstation.detail.latest_report;
+	const anchor = runtime.anchor;
 	const hosts = await (await fetch(`${prefix}/api/hosts`)).json();
-	assert.equal(hosts.length, 3);
-	const detail = await (await fetch(`${prefix}/api/hosts/f0d3fd30`)).json();
-	assert.equal(JSON.parse(detail.top_processes_json)[0].name, "postgres");
+	assert.equal(hosts.length, 8);
+	assert.equal(new Set(hosts.map((host) => host.host_id)).size, 8);
+	assert.equal(new Set(hosts.map((host) => host.hid)).size, 8);
+	assert.equal(new Set(hosts.map((host) => host.hostname)).size, 8);
+	for (const host of hosts) {
+		assert.equal(host.hostname.endsWith(".example.test"), true);
+		assert.notEqual(host.host_id, "demo-offline");
+	}
+	assert.deepEqual(
+		hosts.map((host) => host.host_id).sort(),
+		SERVER_ALIASES.map((alias) => alias.host_id).sort(),
+	);
+
+	const details = [];
+	const rawHistory = [];
+	const hourlyHistory = [];
+	const tier2History = [];
+	for (const host of hosts) {
+		const detailResponse = await fetch(`${prefix}/api/hosts/${host.hid}`);
+		assert.equal(detailResponse.status, 200);
+		const detail = await detailResponse.json();
+		assert.equal(detail.host_id, host.host_id);
+		assert.equal(JSON.parse(detail.top_processes_json).length, 50);
+		details.push(detail);
+
+		const raw = await (
+			await fetch(`${prefix}/api/hosts/${host.host_id}/metrics?from=${anchor - 3600}&to=${anchor}`)
+		).json();
+		assert.equal(raw.resolution, "raw");
+		assert.equal(raw.data.length, 120);
+		rawHistory.push(raw.data);
+
+		const hourly = await (
+			await fetch(
+				`${prefix}/api/hosts/${host.host_id}/metrics?from=${anchor - 172800}&to=${anchor}`,
+			)
+		).json();
+		assert.equal(hourly.resolution, "hourly");
+		assert.equal(hourly.data.length, 24);
+		hourlyHistory.push(hourly.data);
+
+		const tier2Response = await fetch(`${prefix}/api/hosts/${host.host_id}/tier2`);
+		assert.equal(tier2Response.status, 200);
+		tier2History.push(await tier2Response.json());
+	}
+	const template = hostsProjection(details[0]);
+	for (const detail of details.slice(1)) assert.deepEqual(hostsProjection(detail), template);
+	assert.equal(new Set(details.map((detail) => detail.public_ip)).size, 8);
+	for (const history of rawHistory.slice(1)) assert.deepEqual(history, rawHistory[0]);
+	for (const history of hourlyHistory.slice(1)) assert.deepEqual(history, hourlyHistory[0]);
+	for (const tier2 of tier2History.slice(1)) {
+		assert.deepEqual({ ...tier2, host_id: null }, { ...tier2History[0], host_id: null });
+	}
+
+	const workstations = await (await fetch(`${prefix}/api/workstations`)).json();
+	assert.equal(workstations.length, 1);
+	const workstation = workstations[0];
+	assert.equal(workstation.id, "00000000-0000-4000-8000-000000000001");
+	assert.equal(workstation.owner, "email:operator@example.test");
+	assert.equal(
+		workstation.latest_report.report_id,
+		recording.workstation.detail.latest_report.report_id,
+	);
+	assert.equal(
+		workstation.latest_report.started_at,
+		anchor - recording.workstation.detail.latest_report.started_at_age_seconds,
+	);
+	assert.equal(workstation.latest_report.connectivity.length, 8);
+	for (const entry of workstation.latest_report.connectivity) {
+		const alias = SERVER_ALIASES.find((candidate) => candidate.host_id === entry.server_id);
+		assert.ok(alias);
+		const captured = recording.workstation.detail.latest_report.connectivity.find(
+			(candidate) => candidate.server_id === alias.server_id,
+		);
+		assert.deepEqual(entry.rtts_ms, captured.rtts_ms);
+		assert.equal(entry.sent, captured.sent);
+		assert.equal(entry.received, captured.received);
+		assert.equal(entry.status, captured.status);
+	}
+
+	const metrics = await (
+		await fetch(
+			`${prefix}/api/workstations/${workstation.id}/metrics?from=${anchor - 86400}&to=${anchor}&limit=100`,
+		)
+	).json();
+	const capturedMetrics = [...recording.workstation.metrics.data].sort(
+		(left, right) => right.received_at_age_seconds - left.received_at_age_seconds,
+	);
+	assert.equal(metrics.data.length, capturedMetrics.length);
+	for (const [index, point] of metrics.data.entries()) {
+		const captured = capturedMetrics[index];
+		assert.equal(point.received_at, anchor - captured.received_at_age_seconds);
+		assert.equal(point.cpu_usage_pct, captured.cpu_usage_pct);
+		assert.equal(point.mem_used_pct, captured.mem_used_pct);
+		assert.equal(point.mem_total_bytes, captured.mem_total_bytes);
+		assert.equal(point.uptime_seconds, captured.uptime_seconds);
+	}
+
+	const connectivity = await (
+		await fetch(
+			`${prefix}/api/workstations/${workstation.id}/connectivity?from=${anchor - 86400}&to=${anchor}&limit=100`,
+		)
+	).json();
+	assert.equal(connectivity.targets.length, 8);
+	const hostsById = new Map(hosts.map((host) => [host.host_id, host]));
+	for (const target of connectivity.targets) {
+		const host = hostsById.get(target.server_id);
+		assert.ok(host);
+		assert.equal(target.address, host.public_ip);
+		assert.equal(target.data.length, 4);
+		const captured = recording.workstation.connectivity.targets.find(
+			(candidate) =>
+				SERVER_ALIASES.find((alias) => alias.host_id === target.server_id)?.server_id ===
+				candidate.server_id,
+		);
+		for (const [index, point] of target.data.entries()) {
+			const source = captured.data[index];
+			assert.equal(point.received_at, anchor - source.received_at_age_seconds);
+			assert.equal(point.status, source.status);
+			const isLatest = source.received_at_age_seconds === latest.received_at_age_seconds;
+			if (source.received === 0) {
+				assert.equal(point.rtt_avg_ms, null);
+				assert.equal(point.rtt_min_ms, null);
+				assert.equal(point.rtt_max_ms, null);
+			} else if (isLatest) {
+				assert.equal(point.rtt_avg_ms, source.rtt_avg_ms);
+				assert.equal(point.rtt_min_ms, source.rtt_min_ms);
+				assert.equal(point.rtt_max_ms, source.rtt_max_ms);
+			} else {
+				assert.equal(near(point.rtt_avg_ms, source.rtt_avg_ms), true);
+				assert.equal(point.rtt_min_ms, source.rtt_min_ms);
+				assert.equal(point.rtt_max_ms, source.rtt_max_ms);
+			}
+		}
+		const latestPoint = target.data.at(-1);
+		const capturedLatest = captured.data.at(-1);
+		assert.equal(latestPoint.received_at, anchor - capturedLatest.received_at_age_seconds);
+		if (capturedLatest.received === 0) {
+			assert.equal(latestPoint.rtt_avg_ms, null);
+			assert.equal(latestPoint.rtt_min_ms, null);
+			assert.equal(latestPoint.rtt_max_ms, null);
+		} else {
+			assert.equal(latestPoint.rtt_avg_ms, capturedLatest.rtt_avg_ms);
+			assert.equal(latestPoint.rtt_min_ms, capturedLatest.rtt_min_ms);
+			assert.equal(latestPoint.rtt_max_ms, capturedLatest.rtt_max_ms);
+		}
+	}
+
 	assert.throws(() => removeOwned(runtime.path, runtime.owner), /running/);
 	const prod = productionConfig(),
 		local = JSON.parse(readFileSync(`${runtime.path}/wrangler.json`, "utf8"));
@@ -66,7 +242,7 @@ try {
 	const switched = await select("e2e", first.id);
 	assert.equal((await switched.json()).id, first.id);
 	console.log(
-		"PASS: real catalog, authentication, ownership guard, parallel E2E stores, config parity, real settings CRUD",
+		"PASS: real recorded catalog (8 aliases, one workstation), authentication, ownership guard, parallel E2E stores, config parity, real settings CRUD",
 	);
 } finally {
 	await app.close();

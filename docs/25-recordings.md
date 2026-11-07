@@ -17,8 +17,9 @@ instead of synthetic shapes. The raw capture never enters this repository.
 4. Only the sanitized recording is checked in, and only as development fixture
    data. Automated L2/L3 lanes keep their fully synthetic fixtures.
 
-Raw captures are never read by CI, tests or agents. Tests use hand-written
-synthetic payloads with deliberate canary strings.
+Raw captures are never read by CI, tests or agents. Sanitizer tests use
+hand-written synthetic payloads with deliberate canary strings; loader tests use
+a temporary SQLite database built from the checked-in sanitized recording.
 
 ## Input contract
 
@@ -118,17 +119,75 @@ generic messages; their presence is preserved rather than fabricated away.
 ## Tests
 
 ```sh
-bun test scripts/environments/recordings.test.mjs
+bun test scripts/environments/recordings.test.mjs scripts/environments/recorded-demo.test.mjs
 ```
 
-The suite covers unknown keys, embedded JSON tables, malicious nested fields,
+The sanitizer suite covers unknown keys, embedded JSON tables, malicious nested fields,
 free-form commands, canary tokens, source ids, reserved address ranges, MACs,
 time rebasing, null/failure preservation and cross-references between detail,
-history, tier 2, workstation and targets.
+history, tier 2, workstation and targets. The loader suite applies every
+production migration to `:memory:`, seeds the recording at two anchors, and
+checks alias sharing, reserved identities, SQL column mapping, NULL maxima,
+zero/null preservation, one workstation, eight target links, exact latest RTTs,
+reconstructed older aggregates, fail-closed validation and the unchanged focused
+catalog.
 
 ## Local Demo loading
 
-The recording is consumed only by the local environment loader for the default
-Demo catalog. The existing `pw-host-alpha` and `pw-host-beta` ids remain reserved
-for capture scripts, focused and E2E fixtures stay synthetic, and no scheduling,
-deployment or production API code is involved.
+`scripts/environments/recorded-demo.mjs` is the only consumer that turns a
+recording into SQL. It validates `schema_version: 1`, every required section and
+the eight logical target ids before emitting anything, so a malformed recording
+fails closed instead of seeding a partial store. It is offline: no sanitizer,
+raw capture, production token or remote binding is read.
+
+The default Demo catalog (fixture version 3) seeds fresh owned stores only:
+
+- `server-01` and `server-02` keep the reserved `pw-host-alpha` and
+  `pw-host-beta` ids used by capture routes; `server-03`..`server-08` use
+  `demo-server-03`..`demo-server-08`. Hostnames are `alpha.example.test`,
+  `beta.example.test` and `server-03.example.test`..`server-08.example.test`.
+- All eight aliases share the single captured server template: CPU and memory
+  inventory, disks, 120 raw points, 24 hourly points, one tier 2 snapshot, the
+  process snapshot and network/disk history are identical. Host identity,
+  hostname, public documentation address and interface addresses are synthetic
+  per alias. Public addresses come from the recorded target list and match the
+  workstation connectivity rows.
+- Raw points map only to real `metrics_raw` columns. `disk`, `net` and
+  `disk_io` become their JSON columns. Computed raw aliases such as
+  `net_rx_bytes_avg`, maxima, and `sample_count` do not exist in `metrics_raw`
+  and are not invented.
+- Hourly points map captured averages to the real aggregate columns
+  (`cpu_usage_pct` to `cpu_usage_avg`, `mem_available` to `mem_available_min`,
+  `swap_used` to `swap_used_max`, `uptime_seconds` to `uptime_min`, and so on).
+  Aggregate maxima that the hourly API never exposed stay `NULL`; hourly disk
+  I/O aggregates are also `NULL` because the sanitized shape does not retain
+  them. Known `ext_json` signals are rebuilt from the captured values only.
+- The Demo catalog has one workstation with the canonical recorded id
+  `00000000-0000-4000-8000-000000000001`. Its credential columns contain a
+  locally derived, non-usable fixture hash and the `batw_fixture` prefix, never
+  a captured key.
+- Four report points come from the captured metric history. The newest report
+  stores the complete captured payload, including its exact three-value RTT
+  tuples, zeros, nulls and genuine failure statuses. The three older reports
+  store the captured scalar metric columns and connectivity rows.
+- Older connectivity history only exposes `received`, `status`,
+  `rtt_avg_ms`, `rtt_min_ms` and `rtt_max_ms`. Their three-packet storage order
+  was never captured. The loader rebuilds a tuple that preserves those
+  aggregates (a timeout stays three nulls; one or two replies keep the reported
+  count) and its origin is documented here rather than presenting it as the
+  original packet order. Older payload copies retain the captured scalar
+  metrics and omit inventory sections that were not captured per point.
+
+Every `*_age_seconds` value becomes `anchor - age`; absolute source epochs are
+never stored. The anchor is the fresh store's initialization epoch, so Demo
+history is a snapshot that ages naturally until an explicit reset. No replay
+daemon, keepalive, synthetic freshness clock or auto-reset is involved, and
+normal persistent Demo CRUD is unchanged. The isolated capture fixes only its
+Playwright page clock to the runtime anchor for deterministic host comparisons;
+it does not change the Demo runtime clock or seeded ages.
+
+The focused synthetic catalog (`alpha.test.local`, `beta.test.local`, four
+synthetic workstations) remains byte-for-byte independent and continues to feed
+the automated L2/L3 suites. The recorded catalog is exercised by the isolated
+rich Demo acceptance (`verify.mjs`, `capture.mjs`), not by focused Playwright
+fixtures.

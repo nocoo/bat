@@ -18,6 +18,7 @@ bun run demo:reset
 bun turbo test:e2e --filter=@bat/worker
 bun run test:e2e:pw
 bun run test:environments
+bun run test:environments:unit
 bun run capture:environments
 ```
 
@@ -89,53 +90,78 @@ Offline authentication regression: `bun test scripts/environments/production.tes
 
 ## Fixture matrix and evidence
 
-Catalog version 2 uses a recorded UTC epoch anchor, stable host/tag IDs, reserved
-documentation IPs and example.test domains. Focused fixtures preserve two hosts;
-rich Demo adds full snapshots, 120 historical samples per active host, offline and
-inactive inventory, related assets/agents, maintenance and a scoped Connect key.
-History is a snapshot and naturally ages; explicit reset regenerates its anchor.
-Application authentication uses real current time.
+Catalog version 3 seeds rich Demo from the audited recording described in
+[recordings](25-recordings.md). Eight server aliases share one captured template
+(`pw-host-alpha`, `pw-host-beta`, `demo-server-03`..`demo-server-08`), use
+`example.test` names and reserved documentation addresses, and expose 120 raw
+samples, 24 hourly samples, one tier 2 snapshot and the captured process snapshot
+per alias. One recorded workstation links to all eight targets with four report
+samples; its latest RTT tuples are captured exactly, while older history keeps
+only reconstructed aggregate-equivalent tuples. Related agent/asset binding and a
+scoped Connect key use `pw-host-alpha`. History is a snapshot and naturally ages;
+explicit reset regenerates its anchor. Application authentication uses real
+current time. Focused automation keeps its synthetic `alpha.test.local` and
+`beta.test.local` hosts and four synthetic workstations.
 
-| Feature / route          | Prepared fixture or scenario                                                                                                     | Executed evidence                                                                                                    | Visual review                                   |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Hosts, sorting/filtering | Critical alpha, healthy beta, offline archive; inactive standby; three colored tags                                              | L3 hosts, filter, navigation; rich catalog assertions                                                                | Desktop list                                    |
-| Host detail and charts   | CPU/memory/network history, inventory, descriptions, disk capacity                                                               | L3 detail; real description update L2                                                                                | Desktop detail and charts                       |
-| Tier 3 charts/processes  | PSI pressure, disk I/O, TCP connections, PostgreSQL process snapshot                                                             | Native fixture/API assertion and capture                                                                             | Process table and disk/TCP charts               |
-| Tier 2 detail            | Ports, SSH/firewall/fail2ban, failed backup service, running/exited containers, disk files, Nginx/PostgreSQL, TLS/plain websites | Rich native seeding; L2 tier2 read/write                                                                             | Lower detail sections not individually reviewed |
-| Alerts                   | Warning memory and critical disk records                                                                                         | L2 alerts, L3 alert table and navigation                                                                             | Summary on detail                               |
-| Tags                     | production/staging/us-east; matching and nonmatching hosts                                                                       | L3 create/rename/delete/filter; draft cancellation                                                                   | List chips                                      |
-| Webhooks and events      | Synthetic deploy/config events and local webhook token                                                                           | L2 validation/rate limits/CRUD; L3 generate and display                                                              | Not separately reviewed                         |
-| Retention settings       | Default 7 days; supported 1/30 day changes                                                                                       | L2/L3 real API persistence and invalid-value rejection                                                               | Not separately reviewed                         |
-| Connect                  | Demo read-only inventory grant; focused create/reveal/rotate/revoke/scopes and conflicts                                         | L2 native DO/DB; L3 desktop/mobile and delayed response boundary                                                     | Existing L3 assertions; no new reviewed capture |
-| Agent/asset/binding/map  | Catalog builder, edge gateway and relationship                                                                                   | Rich real API seed; L2 CRUD, heartbeat, relationships                                                                | API-only; no dashboard route                    |
-| CLI authorization        | Scoped CLI token issue/list/revoke scenarios                                                                                     | L2 normal JWT/key boundaries; CLI unit suite                                                                         | CLI has no visual surface                       |
-| Setup and account        | Actual local URLs, synthetic avatar and email                                                                                    | L3 setup; L2 me/profile parser                                                                                       | Avatar/name on list                             |
-| Errors and permissions   | Invalid signatures/claims/keys, read key denied write, missing routes, bad inputs                                                | Real verifier unit test, L2/L3, native environment checks                                                            | Error states asserted; no separate capture      |
-| Environment control      | Explicit/manual E2E, fresh reentry, expired URLs, cancelled draft                                                                | Local Chromium interaction script; hosted/preference unit checks; automated server lock and CI capability assertions | Top-right segmented control                     |
-| Uploads/documents/export | Not offered by this dashboard                                                                                                    | N/A                                                                                                                  | N/A                                             |
+| Feature / route          | Prepared fixture or scenario                                                                                                        | Executed evidence                                                                                                    | Visual review                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| Hosts, sorting/filtering | Eight active recorded aliases sharing one template; alpha/beta ids reserved for capture routes; synthetic `example.test` identities | Rich Demo API assertions over eight distinct ids and equal templates                                                 | Desktop list                                    |
+| Host detail and charts   | Captured CPU/memory/network/disk history, inventory and disk capacity                                                               | Rich Demo raw/hourly deep equality; focused L3 detail; real description update L2                                    | Desktop detail and charts                       |
+| Tier 3 charts/processes  | Captured PSI pressure, disk I/O, TCP connections and process snapshot, replicated per alias                                         | Loader SQLite assertions plus rich Demo API/capture equality                                                         | Process table and disk/TCP charts               |
+| Tier 2 detail            | Captured ports, SSH/firewall/fail2ban, systemd, Docker inventory, disk files, software and websites, replicated per alias           | Loader SQLite assertions; L2 tier2 read/write                                                                        | Lower detail sections not individually reviewed |
+| Alerts                   | Not seeded by the recorded catalog; focused fixtures keep their synthetic alerts                                                    | L2 alerts, focused L3 alert table and navigation                                                                     | Focused detail summary                          |
+| Tags                     | Recording contains no host tags; focused fixtures keep production/staging/us-east                                                   | Focused L3 create/rename/delete/filter; draft cancellation                                                           | Focused list chips                              |
+| Webhooks and events      | Not seeded by the recorded catalog; focused fixtures keep deploy/config events and a local webhook token                            | Focused L2 validation/rate limits/CRUD; L3 generate and display                                                      | Not separately reviewed                         |
+| Retention settings       | Default 7 days; supported 1/30 day changes                                                                                          | L2/L3 real API persistence and invalid-value rejection                                                               | Not separately reviewed                         |
+| Connect                  | Demo read-only inventory grant; focused create/reveal/rotate/revoke/scopes and conflicts                                            | L2 native DO/DB; L3 desktop/mobile and delayed response boundary                                                     | Existing L3 assertions; no new reviewed capture |
+| Agent/asset/binding/map  | Catalog builder, edge gateway and relationship on `pw-host-alpha`                                                                   | Rich real API seed; L2 CRUD, heartbeat, relationships                                                                | API-only; no dashboard route                    |
+| Workstations             | One recorded workstation, canonical id, four report samples and eight connectivity targets                                          | Rich Demo API deep equality, chart/process equality and browser acceptance                                           | Desktop list and detail                         |
+| CLI authorization        | Scoped CLI token issue/list/revoke scenarios                                                                                        | L2 normal JWT/key boundaries; CLI unit suite                                                                         | CLI has no visual surface                       |
+| Setup and account        | Actual local URLs, synthetic avatar and email                                                                                       | L3 setup; L2 me/profile parser                                                                                       | Avatar/name on list                             |
+| Errors and permissions   | Invalid signatures/claims/keys, read key denied write, missing routes, bad inputs, genuine timeout targets                          | Real verifier unit test, L2/L3, native environment checks                                                            | Error states asserted; no separate capture      |
+| Environment control      | Explicit/manual E2E, fresh reentry, expired URLs, cancelled draft                                                                   | Local Chromium interaction script; hosted/preference unit checks; automated server lock and CI capability assertions | Top-right segmented control                     |
+| Uploads/documents/export | Not offered by this dashboard                                                                                                       | N/A                                                                                                                  | N/A                                             |
 
-Rich catalog assertion verifies native seeding, not every possible UI state.
-Focused L2/L3 scenarios supply additional action/permission coverage.
+Rich catalog assertions verify recorded seeding on fresh isolated stores, not
+every possible UI state. Focused L2/L3 scenarios use their own synthetic fixtures
+and supply the additional action/permission coverage.
 The external boundary fixture does not prove Cloudflare Access login or live
 internet behavior. Native Linux probe system acceptance remains separate from
 Rust unit/coverage checks.
 
 ## Capture evidence
 
-`bun run capture:environments` uses rich data in disposable locked E2E storage,
-a fresh Chromium profile, 1440 × 1000 viewport, en-US locale and UTC timezone.
-It can run alongside daily Demo. Captures are ignored under
-`artifacts/environments/automated/`: hosts.png, detail.png, processes.png and manifest.json.
+`bun run capture:environments` uses the recorded rich catalog in disposable
+locked E2E storage, a fresh Chromium profile, 1440 × 1000 viewport, en-US locale
+and UTC timezone. It can run alongside daily Demo. Captures are ignored under
+`artifacts/environments/automated/`: hosts.png, detail.png, processes.png,
+workstations.png, workstation-detail.png, workstation-history.png,
+workstation-host-alpha.png, workstation-host-beta.png and manifest.json.
+
+The rich run waits for the workstation's eight connectivity rows and CPU/memory
+history, then clicks the alpha and beta server links. It asserts distinct routes
+and loaded headers while the captured chart geometry and process rows stay equal.
+A browser route guard aborts and records any request to `bat.hexly.ai` or
+`bat-ingest.worker.hexly.ai` before it leaves the browser; it never intercepts
+or stubs local API traffic, so only the local offline fixture can satisfy the
+page. The capture page fixes its browser clock to the isolated runtime anchor so
+both clicked server host details quantize the same minute for chart comparison.
+That fixed clock is test-page only; the Demo Worker/runtime clock, seeded ages,
+persistent CRUD and snapshot aging remain real.
+
 For manual switching acceptance, stop the daily Demo launcher and run
 `bun run test:environments:ui`; this writes the sibling manual capture set and
 exercises switching through persistent Demo without resetting its data.
-The manifest records application revision, fixture version, anchor and routes. The host detail route is
-the actual hashed route `/hosts/f0d3fd30`.
+The manifest records application revision, fixture version, anchor and routes:
+the home page, the actual hashed host route `/hosts/f0d3fd30`, `/workstations`,
+`/workstations/00000000-0000-4000-8000-000000000001` and both clicked host routes.
+The default focused Playwright command is unchanged and does not use this
+capture path.
 
-The list/detail captures were opened and reviewed: loaded synthetic avatar,
-correct control placement, distinct host states, readable labels and real charts.
-Full-page capture follows the application's scroll container, so the detail
-capture covers its initial viewport rather than every lower panel.
+The list/detail captures show the synthetic avatar, correct control placement,
+eight equal-template hosts with distinct identities, readable labels and real
+charts. Full-page capture follows the application's scroll container, so the
+detail capture covers its initial viewport rather than every lower panel.
 
 For an automated capture with the control hidden, use:
 
