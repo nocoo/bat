@@ -3,7 +3,6 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { formatLoss } from "../../packages/ui/src/lib/workstation-format.ts";
 import { fixtureSql } from "./fixtures.mjs";
 import {
 	readRecordedRecording,
@@ -296,9 +295,17 @@ describe("recorded Demo SQL catalog", () => {
 		}
 		const alpha = payload.connectivity.find((entry) => entry.server_id === "pw-host-alpha");
 		const beta = payload.connectivity.find((entry) => entry.server_id === "pw-host-beta");
-		expect(formatLoss(alpha)).toBe("0%");
-		expect(formatLoss(beta)).toBe("100%");
-		expect(formatLoss({ status: "partial", sent: 3, received: 1 })).toBe("66.7%");
+		// Local packet loss, matching the UI rule that a collector failure is not
+		// an observation. Kept here so the fixture suite never imports app code.
+		const loss = ({ status, sent, received }) => {
+			if (status === "error" || status === "unsupported") {
+				return null;
+			}
+			return (Math.round(((sent - received) / sent) * 1000) / 10).toString();
+		};
+		expect(loss(alpha)).toBe("0");
+		expect(loss(beta)).toBe("100");
+		expect(loss({ status: "partial", sent: 3, received: 1 })).toBe("66.7");
 
 		const older = db
 			.query("SELECT report_id,payload FROM workstation_reports ORDER BY received_at ASC LIMIT 1")
