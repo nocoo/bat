@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.1.2
+
+### Fixed
+
+- Build the probe manifest after the JS setup step
+
 ## v3.1.1
 
 ### Added
