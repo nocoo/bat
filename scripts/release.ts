@@ -540,6 +540,19 @@ function updateChangelog(newSection: string): void {
 
 // Test-only files legitimately keep historical version literals as fixtures;
 // runtime sources hard-coding the old version must still fail the release.
+/**
+ * `openapi: "3.1.0"` is the OpenAPI specification version, not the app version.
+ * It is a constant of the standard, so it must never count as a stale app
+ * version even when a release happens to share that number.
+ */
+export function withoutOpenApiSpecifiers(report: string): string {
+	return report
+		.split("\n")
+		.filter((line) => !/\bopenapi:\s*(?:\{\s*const:\s*)?["']\d+\.\d+\.\d+["']/.test(line))
+		.join("\n")
+		.trim();
+}
+
 const STALE_VERSION_GLOBS = [
 	"*.ts",
 	"*.tsx",
@@ -798,9 +811,10 @@ async function main(): Promise<void> {
 
 	const rgResult = await run("rg", buildStaleVersionArgs(currentVersion));
 
-	if (rgResult.code === 0 && rgResult.stdout.trim()) {
+	const staleReport = withoutOpenApiSpecifiers(rgResult.stdout ?? "");
+	if (rgResult.code === 0 && staleReport) {
 		console.error(`❌ Found stale version "${currentVersion}" in source files:`);
-		console.error(rgResult.stdout.trim());
+		console.error(staleReport);
 		if (isDryRun) {
 			console.warn("   [dry-run] Stale versions detected but continuing.");
 		} else {

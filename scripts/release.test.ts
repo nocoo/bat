@@ -15,6 +15,7 @@ import {
 	syncBunLockWorkspaceVersions,
 	versionedWorkspaceDirs,
 	waitForCiSuccess,
+	withoutOpenApiSpecifiers,
 } from "./release.ts";
 
 const REPO_ROOT = resolve(import.meta.dirname, "..");
@@ -439,5 +440,23 @@ describe("waitForCiSuccess", () => {
 		});
 
 		await expect(waitForCiSuccess(SHA, deps)).rejects.toThrow(/conclusion `cancelled`/);
+	});
+});
+
+describe("withoutOpenApiSpecifiers", () => {
+	test("drops the OpenAPI standard version and keeps real app-version hits", () => {
+		const report = [
+			'packages/worker/src/domain/connect-contract.ts:\t\topenapi: { const: "3.1.0" },',
+			'packages/worker/src/domain/connect-contract.ts:\topenapi: "3.1.0",',
+			'packages/ui/src/routes/about.tsx:const version = "3.1.0";',
+		].join("\n");
+		expect(withoutOpenApiSpecifiers(report)).toBe(
+			'packages/ui/src/routes/about.tsx:const version = "3.1.0";',
+		);
+	});
+
+	test("returns an empty string when only specifiers matched", () => {
+		expect(withoutOpenApiSpecifiers('a.ts:\topenapi: "3.1.0",')).toBe("");
+		expect(withoutOpenApiSpecifiers("")).toBe("");
 	});
 });
