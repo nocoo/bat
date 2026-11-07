@@ -229,9 +229,9 @@ with `retention_days`, exactly like metrics and events.
 - The deployment-wide monitoring lane (`BAT_READ_KEY`, `/api/monitoring/workstations…`) can read
   workstation snapshots and history for external monitors. `BAT_WRITE_KEY`, asset-scoped CLI tokens
   and Access sessions without a key cannot use that lane, and Connect keys cannot use it either.
-- CLI: package `@nocoo/bat` with bin `bat` replaces the private `@bat/cli` / `bat-cli` name. Workstation
-  commands live under `bat workstation` with an isolated config and credential store, a stable random
-  installation UUID, and the same loopback `/callback` contract.
+- CLI: the public package is `@nocoo/bat` with the `bat` executable; there is no separate CLI
+  package. Workstation commands live under `bat workstation` with an isolated config and credential
+  store, a stable random installation UUID, and the same loopback `/callback` contract.
 - UI: `/workstation-login` under Access handles the incoming PKCE query, posts to
   `/api/workstation-auth/authorize` with the consent fields and redirects to the returned
   `redirect_url`. Workstation selection in the Connect token manager is a later UI phase; the
