@@ -57,6 +57,31 @@ test.describe("Workstations list", () => {
 		await expect(page.getByRole("alert")).toHaveCount(0);
 	});
 
+	test("the CLI setup dialog walks through enrollment with copyable commands", async ({ page }) => {
+		await page.goto("/workstations");
+		await page.getByRole("button", { name: "CLI setup", exact: true }).click();
+		const dialog = page.getByRole("dialog");
+		await expect(dialog.getByRole("heading", { name: "Add a workstation" })).toBeVisible();
+
+		for (const command of [
+			"npm install --global @nocoo/bat",
+			"bat workstation login",
+			"bat workstation probe",
+			"bat workstation setup",
+			"bat workstation setup --backend cron",
+			"bat workstation status",
+			"bat workstation setup --remove",
+			"bat workstation logout",
+		]) {
+			await expect(dialog.getByText(command, { exact: true })).toBeVisible();
+		}
+		await expect(dialog.getByRole("button", { name: "Copy code", exact: true })).toHaveCount(8);
+		await expect(dialog.getByText("/usr/sbin/cron", { exact: true })).toBeVisible();
+
+		await page.keyboard.press("Escape");
+		await expect(dialog).toBeHidden();
+	});
+
 	test("a failed list request shows the honest error and retry action", async ({ page }) => {
 		await page.route("**/api/workstations", (route) =>
 			route.fulfill({ status: 500, json: { error: "fixture outage" } }),

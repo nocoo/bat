@@ -7,6 +7,7 @@ import { Laptop, Terminal } from "lucide-react";
 import { Link } from "react-router";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
+import { WorkstationSetupDialog } from "@/components/workstation/workstation-setup-dialog";
 import { WorkstationTable } from "@/components/workstation/workstation-table";
 import { useWorkstations } from "@/hooks";
 import { chart } from "@/lib/palette";
@@ -116,11 +117,7 @@ export function WorkstationsPage() {
 			<PageHeader
 				title="Workstations"
 				description="Your laptops and desktops, reporting capacity and reachability from outside the fleet."
-				actions={
-					<Button asChild={true} variant="outline" size="sm">
-						<Link to="/setup#workstations">Setup guide</Link>
-					</Button>
-				}
+				actions={<WorkstationSetupDialog />}
 			/>
 
 			{records.length === 0 ? (
