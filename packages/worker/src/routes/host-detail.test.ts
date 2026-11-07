@@ -42,6 +42,8 @@ async function insertHost(
 		dnsResolvers: string;
 		dnsSearch: string;
 		publicIp: string;
+		publicIpV4: string;
+		publicIpV6: string;
 		probeVersion: string;
 	}>,
 ) {
@@ -51,9 +53,9 @@ async function insertHost(
 			`INSERT INTO hosts (host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, is_active,
        cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
        virtualization, net_interfaces, disks, boot_mode,
-       timezone, dns_resolvers, dns_search, public_ip, probe_version)
+       timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6, probe_version)
 VALUES (?, ?, 'Ubuntu 24.04', '6.8.0', 'x86_64', 'AMD EPYC', ?, ?, 1,
-       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -72,6 +74,8 @@ VALUES (?, ?, 'Ubuntu 24.04', '6.8.0', 'x86_64', 'AMD EPYC', ?, ?, 1,
 			opts?.dnsResolvers ?? null,
 			opts?.dnsSearch ?? null,
 			opts?.publicIp ?? null,
+			opts?.publicIpV4 ?? null,
+			opts?.publicIpV6 ?? null,
 			opts?.probeVersion ?? null,
 		)
 		.run();
@@ -168,6 +172,8 @@ describe("GET /api/hosts/:id", () => {
 		expect(body.net_interfaces).toBeNull();
 		expect(body.disks).toBeNull();
 		expect(body.public_ip).toBeNull();
+		expect(body.public_ip_v4).toBeNull();
+		expect(body.public_ip_v6).toBeNull();
 		expect(body.probe_version).toBeNull();
 	});
 
@@ -179,6 +185,22 @@ describe("GET /api/hosts/:id", () => {
 
 		const body = (await res.json()) as HostDetailItem;
 		expect(body.public_ip).toBe("203.0.113.42");
+	});
+
+	test("public address families returned in detail response", async () => {
+		await insertHost(db, "host-ip-families", {
+			publicIp: "203.0.113.42",
+			publicIpV4: "203.0.113.42",
+			publicIpV6: "2001:db8::2",
+		});
+
+		const res = await get(app, "host-ip-families");
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as HostDetailItem;
+		expect(body.public_ip).toBe("203.0.113.42");
+		expect(body.public_ip_v4).toBe("203.0.113.42");
+		expect(body.public_ip_v6).toBe("2001:db8::2");
 	});
 
 	test("probe_version returned in detail response", async () => {

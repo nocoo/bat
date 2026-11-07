@@ -988,6 +988,12 @@
 			"public_ip": {
 				"type": ["string", "null"]
 			},
+			"public_ip_v4": {
+				"type": ["string", "null"]
+			},
+			"public_ip_v6": {
+				"type": ["string", "null"]
+			},
 			"probe_version": {
 				"type": ["string", "null"]
 			},
@@ -1145,6 +1151,8 @@
 			"mem_total_bytes",
 			"virtualization",
 			"public_ip",
+			"public_ip_v4",
+			"public_ip_v6",
 			"probe_version",
 			"cpu_load1",
 			"swap_used_pct",
@@ -1409,6 +1417,12 @@
 				"type": "string"
 			},
 			"public_ip": {
+				"type": "string"
+			},
+			"public_ip_v4": {
+				"type": "string"
+			},
+			"public_ip_v6": {
 				"type": "string"
 			}
 		},

@@ -468,6 +468,8 @@ function buildIdentity(hostId: string, hostname: string): Record<string, unknown
 		virtualization: "kvm",
 		boot_mode: "uefi",
 		public_ip: "203.0.113.1",
+		public_ip_v4: "203.0.113.1",
+		public_ip_v6: "2001:db8::1",
 		net_interfaces: [
 			{ iface: "eth0", mac: "aa:bb:cc:00:00:01", ipv4: ["10.0.0.1"], ipv6: [], speed_mbps: 1000 },
 		],

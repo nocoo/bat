@@ -21,7 +21,12 @@ export interface IdentityPayload {
 	net_interfaces?: NetInterfaceDTO[];
 	disks?: BlockDeviceDTO[];
 	boot_mode?: string;
+	/** Preferred public address: IPv4 first, IPv6 as fallback. */
 	public_ip?: string;
+	/** Public IPv4 literal, absent when the host reported none. */
+	public_ip_v4?: string;
+	/** Public IPv6 literal, absent when the host reported none. */
+	public_ip_v6?: string;
 }
 
 /** Network interface identity (from probe identity payload) */
@@ -66,6 +71,8 @@ export interface HostRow {
 	dns_resolvers: string | null; // JSON text
 	dns_search: string | null; // JSON text
 	public_ip: string | null;
+	public_ip_v4: string | null;
+	public_ip_v6: string | null;
 	probe_version: string | null;
 	description: string | null;
 }

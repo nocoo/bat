@@ -21,12 +21,21 @@ export class D1EventsRepository implements EventsRepository {
 			.first<WebhookConfigRow>();
 	}
 
-	async getHostPublicIp(hostId: string): Promise<string | null> {
+	async getHostPublicIps(hostId: string): Promise<string[]> {
 		const row = await this.db
-			.prepare("SELECT public_ip FROM hosts WHERE host_id = ?")
+			.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
 			.bind(hostId)
-			.first<{ public_ip: string | null }>();
-		return row?.public_ip ?? null;
+			.first<{
+				public_ip: string | null;
+				public_ip_v4: string | null;
+				public_ip_v6: string | null;
+			}>();
+		if (!row) {
+			return [];
+		}
+		return [row.public_ip, row.public_ip_v4, row.public_ip_v6].filter(
+			(ip): ip is string => ip !== null,
+		);
 	}
 
 	async checkRateLimit(configId: number, rateLimit: number, nowSeconds: number): Promise<boolean> {

@@ -514,6 +514,8 @@ function sanitizeDetail(ctx, value) {
 		mem_total_bytes: integer(value.mem_total_bytes),
 		virtualization: oneOf(value.virtualization, VIRTUALIZATIONS),
 		public_ip: ctx.ip(value.public_ip),
+		public_ip_v4: ctx.ip(value.public_ip_v4),
+		public_ip_v6: ctx.ip(value.public_ip_v6),
 		probe_version: sanitizeVersion(value.probe_version),
 		cpu_load1: finite(value.cpu_load1),
 		swap_used_pct: finite(value.swap_used_pct),

@@ -149,6 +149,8 @@ export interface HostInventoryUpdate {
 	disks?: unknown;
 	boot_mode?: string | null;
 	public_ip?: string | null;
+	public_ip_v4?: string | null;
+	public_ip_v6?: string | null;
 }
 
 /** Optional fields touched by `POST /api/tier2` slow-drift inventory merge. */
@@ -211,6 +213,8 @@ export interface HostDetailRow {
 	dns_resolvers: string | null;
 	dns_search: string | null;
 	public_ip: string | null;
+	public_ip_v4: string | null;
+	public_ip_v6: string | null;
 	description: string | null;
 	maintenance_start: string | null;
 	maintenance_end: string | null;
@@ -353,9 +357,11 @@ export interface AlertActiveJoinedRow {
 export interface EventsRepository {
 	/** Look up an active webhook config by token. */
 	findActiveWebhookByToken(token: string): Promise<WebhookConfigRow | null>;
-	/** Read a host's `public_ip` for the ingest IP-match check. Cross-domain
-	 *  read kept here to keep the ingest path's SQL inside `adapters/d1/`. */
-	getHostPublicIp(hostId: string): Promise<string | null>;
+	/** Read a host's stored public addresses for the ingest IP-match check.
+	 *  Returns every address the host registered (preferred + per family).
+	 *  Cross-domain read kept here to keep the ingest path's SQL inside
+	 *  `adapters/d1/`. */
+	getHostPublicIps(hostId: string): Promise<string[]>;
 	/** Sliding-window rate limiter. Returns true when the call is within
 	 *  the configured per-minute limit. */
 	checkRateLimit(configId: number, rateLimit: number, nowSeconds: number): Promise<boolean>;

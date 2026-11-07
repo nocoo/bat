@@ -21,6 +21,8 @@
 			"mem_total_bytes": 1137889280,
 			"virtualization": "kvm",
 			"public_ip": "203.0.113.1",
+			"public_ip_v4": "203.0.113.1",
+			"public_ip_v6": "2001:db8::1",
 			"probe_version": "2.0.6",
 			"cpu_load1": 0.12,
 			"swap_used_pct": 4.9459075670848645,

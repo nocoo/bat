@@ -426,6 +426,9 @@ export function createMockD1(connectVersion: 28 | 29 = 29): D1Database {
 	db.exec(
 		readFileSync(resolve(__dirname, "../../migrations/0033_workstation_pairing.sql"), "utf-8"),
 	);
+	db.exec(
+		readFileSync(resolve(__dirname, "../../migrations/0034_public_ip_families.sql"), "utf-8"),
+	);
 	return {
 		prepare(sql: string): D1PreparedStatement {
 			return new MockD1PreparedStatement(db, sql);

@@ -587,6 +587,23 @@ describe("D1HostsRepository", () => {
 				.first<{ public_ip: string | null }>();
 			expect(row?.public_ip).toBeNull();
 		});
+		test("public address families stored in their own columns", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", {
+				public_ip: "203.0.113.1",
+				public_ip_v4: "203.0.113.1",
+				public_ip_v6: "2001:db8::2",
+			});
+			const row = await db
+				.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string; public_ip_v4: string; public_ip_v6: string }>();
+			expect(row).toEqual({
+				public_ip: "203.0.113.1",
+				public_ip_v4: "203.0.113.1",
+				public_ip_v6: "2001:db8::2",
+			});
+		});
 		test("empty fields → no-op", async () => {
 			await seedHost(db, "h1", "h1.example.com", { cpu_logical: 4 });
 			await repo.updateInventory("h1", {});

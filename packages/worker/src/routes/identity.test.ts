@@ -270,6 +270,44 @@ describe("POST /api/identity", () => {
 		expect(row?.public_ip).toBe("203.0.113.42");
 	});
 
+	test("public_ip_v4 and public_ip_v6 merged when present in payload", async () => {
+		const res = await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.42",
+			public_ip_v4: "203.0.113.42",
+			public_ip_v6: "2001:db8::2",
+		});
+		expect(res.status).toBe(204);
+
+		const row = await db
+			.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.public_ip).toBe("203.0.113.42");
+		expect(row?.public_ip_v4).toBe("203.0.113.42");
+		expect(row?.public_ip_v6).toBe("2001:db8::2");
+	});
+
+	test("absent public_ip families leave the stored columns untouched", async () => {
+		await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.42",
+			public_ip_v4: "203.0.113.42",
+			public_ip_v6: "2001:db8::2",
+		});
+		await post(app, { ...makePayload(), public_ip: "203.0.113.43" });
+
+		const row = await db
+			.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first<Record<string, unknown>>();
+
+		expect(row?.public_ip).toBe("203.0.113.43");
+		expect(row?.public_ip_v4).toBe("203.0.113.42");
+		expect(row?.public_ip_v6).toBe("2001:db8::2");
+	});
+
 	test("probe_version stored in hosts table", async () => {
 		const res = await post(app, {
 			...makePayload(),

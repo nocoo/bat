@@ -10,6 +10,7 @@ import { D1WebhooksRepository } from "./webhooks";
 
 const HOST_A = "host-a";
 const HOST_B = "host-b";
+const HOST_C = "host-c";
 const NOW = 1_730_000_000;
 
 async function seedHosts(db: D1Database) {
@@ -24,6 +25,12 @@ async function seedHosts(db: D1Database) {
 			"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
 		)
 		.bind(HOST_B, "b.example.com", NOW, null)
+		.run();
+	await db
+		.prepare(
+			"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip, public_ip_v4, public_ip_v6) VALUES (?, ?, ?, 1, ?, ?, ?)",
+		)
+		.bind(HOST_C, "c.example.com", NOW, "203.0.113.9", "203.0.113.9", "2001:db8::2")
 		.run();
 }
 
@@ -57,15 +64,22 @@ describe("D1EventsRepository", () => {
 		});
 	});
 
-	describe("getHostPublicIp", () => {
+	describe("getHostPublicIps", () => {
 		test("returns the registered IP", async () => {
-			expect(await repo.getHostPublicIp(HOST_A)).toBe("1.2.3.4");
+			expect(await repo.getHostPublicIps(HOST_A)).toEqual(["1.2.3.4"]);
 		});
-		test("returns null when host has no public_ip", async () => {
-			expect(await repo.getHostPublicIp(HOST_B)).toBeNull();
+		test("returns every family the host registered", async () => {
+			expect(await repo.getHostPublicIps(HOST_C)).toEqual([
+				"203.0.113.9",
+				"203.0.113.9",
+				"2001:db8::2",
+			]);
 		});
-		test("returns null when host does not exist", async () => {
-			expect(await repo.getHostPublicIp("missing")).toBeNull();
+		test("returns empty list when host has no public_ip", async () => {
+			expect(await repo.getHostPublicIps(HOST_B)).toEqual([]);
+		});
+		test("returns empty list when host does not exist", async () => {
+			expect(await repo.getHostPublicIps("missing")).toEqual([]);
 		});
 	});
 

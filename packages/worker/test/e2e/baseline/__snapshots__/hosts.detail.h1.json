@@ -49,6 +49,8 @@
   "os": "Ubuntu 24.04 LTS",
   "probe_version": null,
   "public_ip": "203.0.113.1",
+  "public_ip_v4": "203.0.113.1",
+  "public_ip_v6": "2001:db8::1",
   "status": "critical",
   "swap_total_bytes": 2000000000,
   "swap_used_pct": 5,

@@ -59,6 +59,12 @@ export function pickInventoryFields(body: Record<string, unknown>): HostInventor
 	if ("public_ip" in body) {
 		fields.public_ip = body.public_ip as string | null;
 	}
+	if ("public_ip_v4" in body) {
+		fields.public_ip_v4 = body.public_ip_v4 as string | null;
+	}
+	if ("public_ip_v6" in body) {
+		fields.public_ip_v6 = body.public_ip_v6 as string | null;
+	}
 	return fields;
 }
 

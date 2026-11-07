@@ -93,6 +93,10 @@ export interface HostOverviewItem {
 export interface HostDetailItem extends HostOverviewItem {
 	description: string | null;
 	probe_version: string | null;
+	/** Public IPv4 literal, null when the host never reported one. */
+	public_ip_v4: string | null;
+	/** Public IPv6 literal, null when the host never reported one. */
+	public_ip_v6: string | null;
 	swap_total_bytes: number | null;
 	boot_mode: string | null;
 	timezone: string | null;

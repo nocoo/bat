@@ -10,6 +10,9 @@ import { eventsListRoute } from "./events-list";
 
 const HOST = "host-a";
 const PUBLIC_IP = "1.2.3.4";
+const FAMILY_HOST = "host-c";
+const FAMILY_IPV4 = "203.0.113.9";
+const FAMILY_IPV6 = "2001:db8::2";
 const NOW = 1_730_000_000;
 
 function mount(db: D1Database): Hono<AppEnv> {
@@ -30,6 +33,15 @@ async function seedHost(db: D1Database, hostId: string, publicIp: string | null)
 			"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
 		)
 		.bind(hostId, `${hostId}.example.com`, NOW, publicIp)
+		.run();
+}
+
+async function seedFamilyHost(db: D1Database) {
+	await db
+		.prepare(
+			"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip, public_ip_v4, public_ip_v6) VALUES (?, ?, ?, 1, ?, ?, ?)",
+		)
+		.bind(FAMILY_HOST, `${FAMILY_HOST}.example.com`, NOW, FAMILY_IPV4, FAMILY_IPV4, FAMILY_IPV6)
 		.run();
 }
 
@@ -104,6 +116,27 @@ describe("POST /api/events (ingest)", () => {
 
 	test("403 when source IP doesn't match host public_ip", async () => {
 		const token = await createToken(db, HOST);
+		const res = await app.request(ingestReq(token, "9.9.9.9", { title: "x", body: {} }));
+		expect(res.status).toBe(403);
+	});
+
+	test("204 when source IP matches the host IPv4 family address", async () => {
+		await seedFamilyHost(db);
+		const token = await createToken(db, FAMILY_HOST);
+		const res = await app.request(ingestReq(token, FAMILY_IPV4, { title: "x", body: {} }));
+		expect(res.status).toBe(204);
+	});
+
+	test("204 when source IP matches the host IPv6 family address", async () => {
+		await seedFamilyHost(db);
+		const token = await createToken(db, FAMILY_HOST);
+		const res = await app.request(ingestReq(token, FAMILY_IPV6, { title: "x", body: {} }));
+		expect(res.status).toBe(204);
+	});
+
+	test("403 when source IP matches neither stored family", async () => {
+		await seedFamilyHost(db);
+		const token = await createToken(db, FAMILY_HOST);
 		const res = await app.request(ingestReq(token, "9.9.9.9", { title: "x", body: {} }));
 		expect(res.status).toBe(403);
 	});

@@ -61,6 +61,8 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		mem_total_bytes: host.mem_total_bytes,
 		virtualization: host.virtualization,
 		public_ip: host.public_ip,
+		public_ip_v4: host.public_ip_v4,
+		public_ip_v6: host.public_ip_v6,
 		probe_version: host.probe_version,
 		cpu_load1: metrics?.cpu_load1 ?? null,
 		swap_used_pct: metrics?.swap_used_pct ?? null,

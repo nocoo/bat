@@ -80,7 +80,14 @@ describe("pickInventoryFields", () => {
 		expect(pickInventoryFields({ public_ip: null })).toEqual({ public_ip: null });
 	});
 
-	test("all 9 inventory keys are picked when present", () => {
+	test("picks the per-family public addresses independently", () => {
+		expect(pickInventoryFields({ public_ip_v4: "203.0.113.1", public_ip_v6: null })).toEqual({
+			public_ip_v4: "203.0.113.1",
+			public_ip_v6: null,
+		});
+	});
+
+	test("all 11 inventory keys are picked when present", () => {
 		const body = {
 			cpu_logical: 1,
 			cpu_physical: 1,
@@ -91,8 +98,10 @@ describe("pickInventoryFields", () => {
 			disks: [],
 			boot_mode: "",
 			public_ip: "",
+			public_ip_v4: "",
+			public_ip_v6: "",
 		};
-		expect(Object.keys(pickInventoryFields(body))).toHaveLength(9);
+		expect(Object.keys(pickInventoryFields(body))).toHaveLength(11);
 	});
 });
 

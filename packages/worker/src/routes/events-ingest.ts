@@ -1,6 +1,6 @@
 // POST /api/events — receive events from external webhooks
 // Auth: Bearer <webhook_token> (not BAT_WRITE_KEY)
-// IP validation: CF-Connecting-IP must match host's public_ip
+// IP validation: CF-Connecting-IP must match one of the host's public addresses
 import {
 	EVENT_BODY_MAX_BYTES,
 	EVENT_TAG_MAX_LENGTH,
@@ -85,20 +85,21 @@ export async function eventsIngestRoute(c: Context<AppEnv>) {
 		return c.json({ error: "Invalid webhook token" }, 403);
 	}
 
-	// 2. IP validation: CF-Connecting-IP must match host's public_ip
+	// 2. IP validation: CF-Connecting-IP must match one of the host's
+	//    registered public addresses (preferred address or any family).
 	// Only trust CF-Connecting-IP (injected by Cloudflare, cannot be spoofed).
 	// X-Forwarded-For is client-controlled and must NOT be used as fallback.
 	const sourceIp = c.req.header("CF-Connecting-IP");
 	if (!sourceIp) {
 		return c.json({ error: "Missing CF-Connecting-IP header" }, 400);
 	}
-	const publicIp = await c.var.repos.events.getHostPublicIp(config.host_id);
+	const publicIps = await c.var.repos.events.getHostPublicIps(config.host_id);
 
-	if (!publicIp) {
+	if (publicIps.length === 0) {
 		return c.json({ error: "Host has no public IP registered" }, 403);
 	}
 
-	if (sourceIp !== publicIp) {
+	if (!publicIps.includes(sourceIp)) {
 		return c.json({ error: "Source IP does not match host" }, 403);
 	}
 

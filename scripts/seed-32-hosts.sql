@@ -26,12 +26,12 @@ INSERT OR REPLACE INTO tags (id, name, color) VALUES (20, 'backup', 9);
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-web-01', 'web-01.prod.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'AMD EPYC 7763 64-Core', 1787871367, 1789006398, 1789002815,
     1, 16, 8, 34359738368, 8589934592, 'kvm',
-    '104.21.45.12', '2.1.2', 'Core server deployed for web-01',
+    '104.21.45.12', '104.21.45.12', '2.1.2', 'Core server deployed for web-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["104.21.45.12"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1135048}]', 1789006385
   );
@@ -238,12 +238,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-web-02', 'web-02.prod.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'AMD EPYC 7763 64-Core', 1786482039, 1789006412, 1789002815,
     1, 16, 8, 34359738368, 8589934592, 'kvm',
-    '104.21.45.13', '2.1.2', 'Core server deployed for web-02',
+    '104.21.45.13', '104.21.45.13', '2.1.2', 'Core server deployed for web-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["104.21.45.13"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2524376}]', 1789006385
   );
@@ -450,12 +450,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-web-03', 'web-03.prod.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'Intel Xeon Platinum 8375C', 1787430563, 1789006403, 1789002815,
     1, 8, 4, 17179869184, 4294967296, 'kvm',
-    '172.67.182.90', '2.1.2', 'Core server deployed for web-03',
+    '172.67.182.90', '172.67.182.90', '2.1.2', 'Core server deployed for web-03',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["172.67.182.90"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1575852}]', 1789006385
   );
@@ -664,12 +664,12 @@ INSERT OR REPLACE INTO alert_states (host_id, rule_id, severity, value, triggere
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-backend-01', 'backend-01.prod.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Gold 6338', 1786960304, 1789006405, 1789002815,
     1, 32, 16, 68719476736, 17179869184, 'vmware',
-    '198.51.100.10', '2.1.1', 'Core server deployed for api-01',
+    '198.51.100.10', '198.51.100.10', '2.1.1', 'Core server deployed for api-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.10"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2046111}]', 1789006385
   );
@@ -876,12 +876,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-backend-02', 'backend-02.prod.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Gold 6338', 1786856955, 1789006400, 1789002815,
     1, 32, 16, 68719476736, 17179869184, 'vmware',
-    '198.51.100.11', '2.1.1', 'Core server deployed for api-02',
+    '198.51.100.11', '198.51.100.11', '2.1.1', 'Core server deployed for api-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":32212254720,"used_pct":94.2},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.11"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":88.5,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2149460}]', 1789006385
   );
@@ -1092,12 +1092,12 @@ INSERT OR REPLACE INTO alert_states (host_id, rule_id, severity, value, triggere
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-worker-01', 'worker-01.prod.hexly.ai', 'Arch Linux', '6.10.8-arch1-1', 'x86_64', 'AMD Ryzen 9 7950X', 1787665023, 1789006398, 1789002815,
     1, 32, 16, 67108864000, 33554432000, 'bare-metal',
-    '140.82.112.4', '2.1.2', 'Core server deployed for worker-01',
+    '140.82.112.4', '140.82.112.4', '2.1.2', 'Core server deployed for worker-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["140.82.112.4"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1341392}]', 1789006385
   );
@@ -1304,12 +1304,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-worker-02', 'worker-02.prod.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'Ampere Altra Q80-30', 1787780193, 1789006401, 1789002815,
     1, 64, 64, 137438953472, 17179869184, 'kvm',
-    '140.82.112.5', '2.1.2', 'Core server deployed for worker-02',
+    '140.82.112.5', '140.82.112.5', '2.1.2', 'Core server deployed for worker-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["140.82.112.5"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1226222}]', 1789006385
   );
@@ -1516,12 +1516,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-gateway', 'edge-gw.prod.hexly.ai', 'Alpine Linux 3.20.2', '6.6.47-0-virt', 'x86_64', 'Intel Xeon E5-2680 v4', 1786824323, 1789006414, 1789002815,
     1, 4, 2, 4294967296, 0, 'kvm',
-    '192.0.2.1', '2.1.2', 'Core server deployed for edge-gw',
+    '192.0.2.1', '192.0.2.1', '2.1.2', 'Core server deployed for edge-gw',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.1"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2182092}]', 1789006385
   );
@@ -1728,12 +1728,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-db-master', 'postgres-primary.db.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'AMD EPYC 9654 96-Core', 1787704724, 1789006395, 1789002815,
     1, 64, 32, 274877906944, 34359738368, 'bare-metal',
-    '10.0.1.10', '2.1.2', 'Core server deployed for postgres-primary',
+    '10.0.1.10', '10.0.1.10', '2.1.2', 'Core server deployed for postgres-primary',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.1.10"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1301691}]', 1789006385
   );
@@ -1940,12 +1940,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-db-replica-1', 'postgres-replica-01.db.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'AMD EPYC 9654 96-Core', 1787683153, 1789006409, 1789002815,
     1, 64, 32, 274877906944, 34359738368, 'bare-metal',
-    '10.0.1.11', '2.1.2', 'Core server deployed for postgres-replica-01',
+    '10.0.1.11', '10.0.1.11', '2.1.2', 'Core server deployed for postgres-replica-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.1.11"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1323262}]', 1789006385
   );
@@ -2152,12 +2152,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-db-replica-2', 'postgres-replica-02.db.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'AMD EPYC 7763 64-Core', 1787135670, 1789006405, 1789002815,
     1, 32, 16, 137438953472, 17179869184, 'kvm',
-    '10.0.1.12', '2.1.0', 'Core server deployed for postgres-replica-02',
+    '10.0.1.12', '10.0.1.12', '2.1.0', 'Core server deployed for postgres-replica-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.1.12"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1870745}]', 1789006385
   );
@@ -2366,12 +2366,12 @@ INSERT OR REPLACE INTO alert_states (host_id, rule_id, severity, value, triggere
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-redis-01', 'redis-cluster-01.cache.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Platinum 8280', 1788019559, 1789006407, 1789002815,
     1, 16, 8, 68719476736, 0, 'kvm',
-    '10.0.2.1', '2.1.2', 'Core server deployed for redis-cluster-01',
+    '10.0.2.1', '10.0.2.1', '2.1.2', 'Core server deployed for redis-cluster-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.2.1"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":986856}]', 1789006385
   );
@@ -2578,12 +2578,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-redis-02', 'redis-cluster-02.cache.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Platinum 8280', 1788594786, 1789006409, 1789002815,
     1, 16, 8, 68719476736, 0, 'kvm',
-    '10.0.2.2', '2.1.2', 'Core server deployed for redis-cluster-02',
+    '10.0.2.2', '10.0.2.2', '2.1.2', 'Core server deployed for redis-cluster-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.2.2"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":411629}]', 1789006385
   );
@@ -2790,12 +2790,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-clickhouse', 'clickhouse-olap.analytics.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'AMD EPYC 7713 64-Core', 1786896910, 1789006399, 1789002815,
     1, 64, 32, 137438953472, 34359738368, 'bare-metal',
-    '10.0.3.50', '2.1.2', 'Core server deployed for clickhouse-olap',
+    '10.0.3.50', '10.0.3.50', '2.1.2', 'Core server deployed for clickhouse-olap',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.3.50"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2109505}]', 1789006385
   );
@@ -3002,12 +3002,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-kafka-01', 'kafka-01.mq.hexly.ai', 'Red Hat Enterprise Linux 9.4', '5.14.0-427.el9.x86_64', 'x86_64', 'Intel Xeon Gold 6248R', 1787718295, 1789006401, 1789002815,
     1, 24, 12, 68719476736, 8589934592, 'kvm',
-    '10.0.4.1', '2.1.1', 'Core server deployed for kafka-01',
+    '10.0.4.1', '10.0.4.1', '2.1.1', 'Core server deployed for kafka-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.4.1"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1288120}]', 1789006385
   );
@@ -3214,12 +3214,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-prod-kafka-02', 'kafka-02.mq.hexly.ai', 'Red Hat Enterprise Linux 9.4', '5.14.0-427.el9.x86_64', 'x86_64', 'Intel Xeon Gold 6248R', 1787679311, 1789006396, 1789002815,
     1, 24, 12, 68719476736, 8589934592, 'kvm',
-    '10.0.4.2', '2.1.1', 'Core server deployed for kafka-02',
+    '10.0.4.2', '10.0.4.2', '2.1.1', 'Core server deployed for kafka-02',
     '02:00', '06:00', 'Kernel upgrade and security patching window',
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.4.2"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1327104}]', 1789006385
   );
@@ -3426,12 +3426,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-app-01', 'app-stg-01.staging.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'Intel Xeon E5-2680 v4', 1788222203, 1789006393, 1789002815,
     1, 8, 4, 17179869184, 4294967296, 'kvm',
-    '192.0.2.100', '2.1.2', 'Core server deployed for app-stg-01',
+    '192.0.2.100', '192.0.2.100', '2.1.2', 'Core server deployed for app-stg-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.100"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":784212}]', 1789006385
   );
@@ -3638,12 +3638,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-app-02', 'app-stg-02.staging.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'x86_64', 'Intel Xeon E5-2680 v4', 1788099175, 1789006415, 1789002815,
     1, 8, 4, 17179869184, 4294967296, 'kvm',
-    '192.0.2.101', '2.1.2', 'Core server deployed for app-stg-02',
+    '192.0.2.101', '192.0.2.101', '2.1.2', 'Core server deployed for app-stg-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.101"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":907240}]', 1789006385
   );
@@ -3850,12 +3850,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-db-01', 'pg-stg-01.staging.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'Intel Xeon E-2388G', 1788820008, 1789006394, 1789002815,
     1, 16, 8, 34359738368, 8589934592, 'kvm',
-    '192.0.2.105', '2.1.2', 'Core server deployed for pg-stg-01',
+    '192.0.2.105', '192.0.2.105', '2.1.2', 'Core server deployed for pg-stg-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.105"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":186407}]', 1789006385
   );
@@ -4062,12 +4062,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-redis-01', 'redis-stg.staging.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Platinum 8280', 1787303440, 1789006402, 1789002815,
     1, 4, 2, 8589934592, 0, 'kvm',
-    '192.0.2.110', '2.1.1', 'Core server deployed for redis-stg',
+    '192.0.2.110', '192.0.2.110', '2.1.1', 'Core server deployed for redis-stg',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.110"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1702975}]', 1789006385
   );
@@ -4274,12 +4274,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-qa-runner-01', 'qa-runner-01.ci.hexly.ai', 'Fedora Linux 40', '6.9.12-200.fc40.x86_64', 'x86_64', 'AMD Ryzen 9 5950X', 1787450356, 1789006415, 1789002815,
     1, 32, 16, 67108864000, 16777216000, 'bare-metal',
-    '198.51.100.55', '2.1.2', 'Core server deployed for qa-runner-01',
+    '198.51.100.55', '198.51.100.55', '2.1.2', 'Core server deployed for qa-runner-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.55"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1556059}]', 1789006385
   );
@@ -4486,12 +4486,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-qa-runner-02', 'qa-runner-02.ci.hexly.ai', 'Fedora Linux 40', '6.9.12-200.fc40.x86_64', 'x86_64', 'AMD Ryzen 9 5950X', 1786681681, 1789006407, 1789002815,
     1, 32, 16, 67108864000, 16777216000, 'bare-metal',
-    '198.51.100.56', '2.1.2', 'Core server deployed for qa-runner-02',
+    '198.51.100.56', '198.51.100.56', '2.1.2', 'Core server deployed for qa-runner-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.56"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2324734}]', 1789006385
   );
@@ -4700,12 +4700,12 @@ INSERT OR REPLACE INTO alert_states (host_id, rule_id, severity, value, triggere
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-mock-svc', 'mock-services.staging.hexly.ai', 'Alpine Linux 3.20.2', '6.6.47-0-virt', 'x86_64', 'Intel Xeon Silver 4210', 1787691181, 1789006408, 1789002815,
     1, 4, 2, 4294967296, 2147483648, 'kvm',
-    '192.0.2.120', '2.0.3', 'Core server deployed for mock-services',
+    '192.0.2.120', '192.0.2.120', '2.0.3', 'Core server deployed for mock-services',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.120"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1315234}]', 1789006385
   );
@@ -4912,12 +4912,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-stg-k8s-master', 'k8s-cp-01.staging.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'AMD EPYC 7002', 1788064667, 1789002815, 1789002815,
     1, 8, 4, 17179869184, 0, 'kvm',
-    '192.0.2.150', '2.1.2', 'Core server deployed for k8s-cp-01',
+    '192.0.2.150', '192.0.2.150', '2.1.2', 'Core server deployed for k8s-cp-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["192.0.2.150"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":941748}]', 1789006385
   );
@@ -5124,12 +5124,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-ai-inference-01', 'gpu-node-01.ai.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'AMD EPYC 9354 32-Core', 1787507453, 1789006405, 1789002815,
     1, 64, 32, 274877906944, 68719476736, 'bare-metal',
-    '198.51.100.200', '2.1.2', 'Core server deployed for gpu-node-01',
+    '198.51.100.200', '198.51.100.200', '2.1.2', 'Core server deployed for gpu-node-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.200"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1498962}]', 1789006385
   );
@@ -5336,12 +5336,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-ai-inference-02', 'gpu-node-02.ai.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'AMD EPYC 9354 32-Core', 1788085202, 1789006405, 1789002815,
     1, 64, 32, 274877906944, 68719476736, 'bare-metal',
-    '198.51.100.201', '2.1.2', 'Core server deployed for gpu-node-02',
+    '198.51.100.201', '198.51.100.201', '2.1.2', 'Core server deployed for gpu-node-02',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["198.51.100.201"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":921213}]', 1789006385
   );
@@ -5548,12 +5548,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-edge-tokyo', 'nrt-edge-01.jp.hexly.ai', 'Debian 12.7', '6.1.0-25-arm64', 'aarch64', 'Ampere Altra Max M128-30', 1788594714, 1789006413, 1789002815,
     1, 32, 32, 68719476736, 8589934592, 'kvm',
-    '133.242.18.5', '2.1.2', 'Core server deployed for nrt-edge-01',
+    '133.242.18.5', '133.242.18.5', '2.1.2', 'Core server deployed for nrt-edge-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["133.242.18.5"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":411701}]', 1789006385
   );
@@ -5761,12 +5761,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-edge-london', 'lhr-edge-01.uk.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'Intel Xeon E-2288G', 1787635658, 1789006404, 1789002815,
     1, 16, 8, 34359738368, 8589934592, 'kvm',
-    '185.199.108.15', '2.1.2', 'Core server deployed for lhr-edge-01',
+    '185.199.108.15', '185.199.108.15', '2.1.2', 'Core server deployed for lhr-edge-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["185.199.108.15"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":1370757}]', 1789006385
   );
@@ -5974,12 +5974,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-edge-frankfurt', 'fra-edge-01.de.hexly.ai', 'Debian 12.7', '6.1.0-25-amd64', 'x86_64', 'Intel Xeon E-2288G', 1786572754, 1789006404, 1789002815,
     1, 16, 8, 34359738368, 8589934592, 'kvm',
-    '185.199.109.15', '2.1.2', 'Core server deployed for fra-edge-01',
+    '185.199.109.15', '185.199.109.15', '2.1.2', 'Core server deployed for fra-edge-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["185.199.109.15"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":2433661}]', 1789006385
   );
@@ -6187,12 +6187,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-edge-singapore', 'sin-edge-01.sg.hexly.ai', 'Ubuntu 24.04.2 LTS', '6.8.0-45-generic', 'aarch64', 'Neoverse-N1', 1788521700, 1789006393, 1789002815,
     1, 8, 8, 17179869184, 4294967296, 'kvm',
-    '128.199.200.12', '2.1.2', 'Core server deployed for sin-edge-01',
+    '128.199.200.12', '128.199.200.12', '2.1.2', 'Core server deployed for sin-edge-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["128.199.200.12"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":484715}]', 1789006385
   );
@@ -6402,12 +6402,12 @@ INSERT OR REPLACE INTO alert_states (host_id, rule_id, severity, value, triggere
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-mon-prometheus', 'mon-core-01.infra.hexly.ai', 'Ubuntu 22.04.4 LTS', '5.15.0-107-generic', 'x86_64', 'Intel Xeon Gold 5218', 1788562269, 1789006391, 1789002815,
     1, 32, 16, 137438953472, 17179869184, 'kvm',
-    '10.0.99.1', '2.1.2', 'Core server deployed for mon-core-01',
+    '10.0.99.1', '10.0.99.1', '2.1.2', 'Core server deployed for mon-core-01',
     NULL, NULL, NULL,
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.99.1"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":444146}]', 1789006385
   );
@@ -6614,12 +6614,12 @@ INSERT OR REPLACE INTO tier2_snapshots (
 INSERT OR REPLACE INTO hosts (
     host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, identity_updated_at,
     is_active, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization,
-    public_ip, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
+    public_ip, public_ip_v4, probe_version, description, maintenance_start, maintenance_end, maintenance_reason,
     disks, net_interfaces, boot_mode, timezone, dns_resolvers, top_processes_json, top_processes_ts
   ) VALUES (
     'srv-backup-storage', 'zfs-vault-01.backup.hexly.ai', 'FreeBSD 14.1-RELEASE', '14.1-RELEASE-p3', 'x86_64', 'AMD EPYC 7302 16-Core', 1788593942, 1789006399, 1789002815,
     1, 32, 16, 137438953472, 34359738368, 'bare-metal',
-    '10.0.99.50', '2.1.0', 'Core server deployed for zfs-vault-01',
+    '10.0.99.50', '10.0.99.50', '2.1.0', 'Core server deployed for zfs-vault-01',
     '02:00', '06:00', 'Kernel upgrade and security patching window',
     '[{"mount":"/","total_bytes":536870912000,"avail_bytes":295279001600,"used_pct":45.1},{"mount":"/data","total_bytes":2147483648000,"avail_bytes":1395864371200,"used_pct":35}]', '[{"iface":"eth0","ip_addresses":["10.0.99.50"],"mac_address":"52:54:00:12:34:56"},{"iface":"lo","ip_addresses":["127.0.0.1"],"mac_address":"00:00:00:00:00:00"}]', 'UEFI', 'UTC', '["1.1.1.1","8.8.8.8"]', '[{"pid":1024,"name":"node","cmd":"node dist/server.js","user":"app","state":"S","cpu_pct":12.4,"mem_pct":18.2,"mem_rss":1248576000,"num_threads":16,"io_read_rate":1048576,"io_write_rate":2097152,"uptime":84600},{"pid":2048,"name":"nginx","cmd":"nginx: worker process","user":"www-data","state":"S","cpu_pct":4.2,"mem_pct":2.1,"mem_rss":145000000,"num_threads":4,"io_read_rate":512000,"io_write_rate":128000,"uptime":120400},{"pid":3096,"name":"postgres","cmd":"postgres: writer","user":"postgres","state":"S","cpu_pct":8.9,"mem_pct":24.5,"mem_rss":4294967296,"num_threads":1,"io_read_rate":8388608,"io_write_rate":16777216,"uptime":254000},{"pid":4012,"name":"redis-server","cmd":"redis-server *:6379","user":"redis","state":"S","cpu_pct":2.1,"mem_pct":8.5,"mem_rss":850000000,"num_threads":4,"io_read_rate":0,"io_write_rate":64000,"uptime":300000},{"pid":5120,"name":"bat-probe","cmd":"/usr/local/bin/bat-probe","user":"root","state":"S","cpu_pct":0.1,"mem_pct":0.2,"mem_rss":16777216,"num_threads":4,"io_read_rate":4096,"io_write_rate":8192,"uptime":412473}]', 1789006385
   );
