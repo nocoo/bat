@@ -90,7 +90,7 @@ export function runChecks(facts: DoctorFacts): CheckResult[] {
 			id: "assets-profile",
 			label: "Assets profile",
 			status: "warn",
-			detail: `not configured at ${facts.assetsConfigPath} (optional; run 'bat login')`,
+			detail: `not configured at ${facts.assetsConfigPath} — only agent, asset, binding and heartbeat commands need it (run 'bat login')`,
 		});
 	} else {
 		const invalid = validateConfig(facts.assetsConfig);
