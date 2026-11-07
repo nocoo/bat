@@ -356,11 +356,9 @@ test.describe("Workstation consent", () => {
 
 		await page.goto(`/workstation-login?${consentQuery(callback)}`);
 		await expect(page.getByTestId("workstation-machine-name")).toHaveText("field-laptop");
+		await expect(page.getByText(/The browser receives a one-time code/)).toBeVisible();
 		await expect(
-			page.getByText("The browser receives a one-time authorization code only."),
-		).toBeVisible();
-		await expect(
-			page.getByText("No shell, process list, files, credentials or remote commands."),
+			page.getByText("Shell, process list, files, credentials and remote commands."),
 		).toBeVisible();
 		await page.getByLabel("Workstation display name").fill("Field laptop");
 		await page.getByRole("button", { name: "Approve workstation", exact: true }).click();
@@ -409,6 +407,29 @@ test.describe("Workstation consent", () => {
 		);
 		await expect(page).toHaveURL(/\/workstation-login\?/);
 		await expect(page.getByTestId("workstation-machine-name")).toBeVisible();
+	});
+
+	test("the display name field submits on Enter and stays inert while empty", async ({ page }) => {
+		const origin = new URL(process.env.BAT_E2E_BASE as string).origin;
+		const callback = `${origin}/callback`;
+		let posts = 0;
+		await page.route("**/api/workstation-auth/authorize", async (route) => {
+			posts += 1;
+			await route.continue();
+		});
+		await page.route(/\/callback\?/, (route) =>
+			route.fulfill({ status: 200, contentType: "text/html", body: "<html>callback</html>" }),
+		);
+		await page.goto(`/workstation-login?${consentQuery(callback)}`);
+		const field = page.getByLabel("Workstation display name");
+		await field.fill("   ");
+		await field.press("Enter");
+		await expect(page.getByTestId("workstation-machine-name")).toBeVisible();
+		expect(posts).toBe(0);
+		await field.fill("Field laptop");
+		await field.press("Enter");
+		await page.waitForURL(/\/callback\?/);
+		expect(posts).toBe(1);
 	});
 
 	test("cancel never posts an authorization request", async ({ page }) => {

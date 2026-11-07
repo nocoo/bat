@@ -7,11 +7,13 @@ import { app } from "../index.js";
 import { connectFixture, WORKSTATION_A } from "../test-helpers/connect.js";
 
 const HOST = "http://localhost";
-const NOW = Math.floor(Date.now() / 1000);
 
 describe("monitoring workstation reads", () => {
 	test("BAT_READ_KEY reads list, detail, metrics and connectivity", async () => {
 		const f = await connectFixture();
+		// The fixture seeds reports at its own receipt second; a window captured before
+		// it would exclude the newest sample at a one-second boundary.
+		const now = Math.floor(Date.now() / 1000);
 		const read = { Authorization: "Bearer legacy-read" };
 		const list = await app.request(`${HOST}/api/monitoring/workstations`, { headers: read }, f.env);
 		expect(list.status).toBe(200);
@@ -27,7 +29,7 @@ describe("monitoring workstation reads", () => {
 		expect(await detail.json()).toMatchObject({ id: WORKSTATION_A, disabled: false });
 
 		const metrics = await app.request(
-			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/metrics?from=${NOW - 3600}&to=${NOW}`,
+			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/metrics?from=${now - 3600}&to=${now}`,
 			{ headers: read },
 			f.env,
 		);
@@ -38,7 +40,7 @@ describe("monitoring workstation reads", () => {
 		});
 
 		const fullPage = await app.request(
-			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/metrics?from=${NOW - 3600}&to=${NOW}&limit=1`,
+			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/metrics?from=${now - 3600}&to=${now}&limit=1`,
 			{ headers: read },
 			f.env,
 		);
@@ -47,7 +49,7 @@ describe("monitoring workstation reads", () => {
 		});
 
 		const connectivity = await app.request(
-			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/connectivity?from=${NOW - 3600}&to=${NOW}&limit=10`,
+			`${HOST}/api/monitoring/workstations/${WORKSTATION_A}/connectivity?from=${now - 3600}&to=${now}&limit=10`,
 			{ headers: read },
 			f.env,
 		);

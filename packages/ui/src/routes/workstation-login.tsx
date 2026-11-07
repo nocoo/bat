@@ -1,5 +1,15 @@
 import { Button, Field, Input } from "@nocoo/basalt";
-import { AlertTriangle, Laptop, ShieldCheck, Terminal } from "lucide-react";
+import {
+	Activity,
+	AlertTriangle,
+	CircleSlash,
+	EyeOff,
+	KeyRound,
+	Laptop,
+	type LucideIcon,
+	Tag,
+	Terminal,
+} from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { authorizeWorkstationAPI } from "@/api";
@@ -11,12 +21,15 @@ import {
 	workstationMachineLabel,
 } from "@/lib/workstation-login";
 
-const SCOPE = [
-	"Reports CPU, memory, disk capacity and network interface addresses for this machine.",
-	"Pings only the servers your account can already see, three ICMP probes each.",
-	"No shell, process list, files, credentials or remote commands.",
-	"One report every ten minutes. After 30 minutes without a report it is marked stale, not critical.",
+const REPORTS = [
+	"CPU, memory, disk capacity and network addresses.",
+	"Round-trip time to your servers, three ICMP probes each.",
+	"One report every 10 minutes; stale after 30, never critical.",
 ];
+
+const NOT_COLLECTED = ["Shell, process list, files, credentials and remote commands."];
+
+const ICON = "shrink-0";
 
 function ConsentShell({ children }: { children: React.ReactNode }) {
 	return (
@@ -25,7 +38,7 @@ function ConsentShell({ children }: { children: React.ReactNode }) {
 				data-basalt-surface-root=""
 				className="flex w-full max-w-lg flex-col overflow-hidden rounded-basalt-lg bg-basalt-card ring-1 ring-basalt-border"
 			>
-				<div className="flex items-center justify-between gap-basalt-space-lg bg-basalt-primary px-basalt-space-lg py-basalt-space-lg">
+				<div className="flex items-center justify-between gap-basalt-layout bg-basalt-primary px-basalt-card py-basalt-space-lg">
 					<span className="flex items-center gap-basalt-space-md text-basalt-base font-semibold text-basalt-primary-foreground">
 						<Laptop aria-hidden="true" className="size-4" strokeWidth={1.5} />
 						bat
@@ -40,31 +53,54 @@ function ConsentShell({ children }: { children: React.ReactNode }) {
 	);
 }
 
+function Gutter({
+	icon: Icon,
+	iconClassName = "mt-basalt-space-xs size-3.5 text-basalt-muted-foreground",
+	children,
+}: {
+	icon: LucideIcon;
+	iconClassName?: string;
+	children: React.ReactNode;
+}) {
+	return (
+		<div className="flex gap-basalt-space-md">
+			<Icon aria-hidden="true" className={`${ICON} ${iconClassName}`} strokeWidth={1.5} />
+			<div className="min-w-0 flex-1">{children}</div>
+		</div>
+	);
+}
+
+function RowLabel({ children }: { children: React.ReactNode }) {
+	return <h2 className="text-basalt-base font-medium text-basalt-foreground">{children}</h2>;
+}
+
 function ConsentProblem({ message }: { message: string }) {
 	return (
 		<ConsentShell>
-			<div className="space-y-basalt-layout px-basalt-space-lg py-basalt-space-lg">
-				<div className="flex items-start gap-basalt-space-lg">
-					<AlertTriangle
-						aria-hidden="true"
-						className="mt-0.5 size-5 shrink-0 text-basalt-destructive"
-					/>
-					<div className="space-y-basalt-space-sm">
-						<h1 className="text-basalt-xl font-semibold">Authorization request rejected</h1>
-						<p role="alert" className="text-basalt-sm text-basalt-muted-foreground">
+			<div className="flex flex-col gap-basalt-layout p-basalt-card">
+				<Gutter
+					icon={AlertTriangle}
+					iconClassName="mt-basalt-space-md size-5 text-basalt-destructive"
+				>
+					<div className="space-y-basalt-space-lg">
+						<h1 className="text-basalt-3xl font-semibold text-basalt-foreground">
+							Authorization request rejected
+						</h1>
+						<p role="alert" className="text-basalt-base text-basalt-muted-foreground">
 							{message}
 						</p>
 					</div>
-				</div>
-				<div className="rounded-basalt-md bg-basalt-secondary p-basalt-layout-sm text-basalt-sm">
-					<p className="flex items-center gap-basalt-space-md font-medium">
-						<Terminal aria-hidden="true" className="size-4" strokeWidth={1.5} />
-						Request a fresh link
-					</p>
-					<p className="mt-basalt-space-sm text-basalt-muted-foreground">
-						Run <code className="font-mono">bat workstation login</code> again. The browser link
-						must come from the CLI on the machine you want to enroll.
-					</p>
+				</Gutter>
+				<div className="border-t border-basalt-border pt-basalt-layout">
+					<Gutter icon={Terminal}>
+						<div className="space-y-basalt-space-md">
+							<RowLabel>Request a fresh link</RowLabel>
+							<p className="text-basalt-base text-basalt-muted-foreground">
+								Run <code className="font-mono text-basalt-foreground">bat workstation login</code>{" "}
+								again. The browser link must come from the CLI on the machine you want to enroll.
+							</p>
+						</div>
+					</Gutter>
 				</div>
 			</div>
 		</ConsentShell>
@@ -112,14 +148,22 @@ function ConsentForm({ params }: { params: WorkstationLoginParams }) {
 	if (cancelled) {
 		return (
 			<ConsentShell>
-				<div className="space-y-basalt-layout px-basalt-space-lg py-basalt-space-lg">
-					<h1 className="text-basalt-xl font-semibold">Authorization cancelled</h1>
-					<p className="text-basalt-sm text-basalt-muted-foreground">
-						Nothing was enrolled. You can close this tab and return to the terminal.
-					</p>
-					<Button variant="outline" onClick={() => window.close()}>
-						Close tab
-					</Button>
+				<div className="flex flex-col gap-basalt-layout p-basalt-card">
+					<Gutter icon={CircleSlash} iconClassName="mt-basalt-space-md size-5">
+						<div className="space-y-basalt-space-lg">
+							<h1 className="text-basalt-3xl font-semibold text-basalt-foreground">
+								Authorization cancelled
+							</h1>
+							<p className="text-basalt-base text-basalt-muted-foreground">
+								Nothing was enrolled. You can close this tab and return to the terminal.
+							</p>
+						</div>
+					</Gutter>
+					<div className="border-t border-basalt-border pt-basalt-layout">
+						<Button variant="outline" onClick={() => window.close()}>
+							Close tab
+						</Button>
+					</div>
 				</div>
 			</ConsentShell>
 		);
@@ -127,75 +171,103 @@ function ConsentForm({ params }: { params: WorkstationLoginParams }) {
 
 	return (
 		<ConsentShell>
-			<div className="space-y-basalt-layout px-basalt-space-lg py-basalt-space-lg">
-				<div className="space-y-basalt-space-sm">
-					<p className="text-basalt-xs font-medium uppercase tracking-widest text-basalt-muted-foreground">
+			<form
+				aria-label="Workstation enrollment"
+				className="flex flex-col p-basalt-card"
+				onSubmit={(event) => {
+					event.preventDefault();
+					void approve();
+				}}
+			>
+				<header className="space-y-basalt-space-lg pb-basalt-layout">
+					<p className="text-basalt-sm font-medium uppercase tracking-widest text-basalt-muted-foreground">
 						Enrollment consent
 					</p>
-					<h1 className="text-basalt-xl font-semibold" data-testid="workstation-machine-name">
+					<h1
+						className="text-basalt-3xl font-semibold text-basalt-foreground"
+						data-testid="workstation-machine-name"
+					>
 						{machine}
 					</h1>
-					<p className="text-basalt-sm text-basalt-muted-foreground">
-						A local <code className="font-mono">bat</code> CLI is asking to add this machine to your
-						account. The authorization code returns only to the loopback listener at{" "}
-						<span className="font-mono">{callbackOrigin}</span>.
+					<p className="text-basalt-base text-basalt-muted-foreground">
+						A local <code className="font-mono text-basalt-foreground">bat</code> CLI is asking to
+						add this machine to your account.
 					</p>
+				</header>
+
+				<div className="divide-y divide-basalt-border border-t border-basalt-border">
+					<div className="py-basalt-layout">
+						<Gutter icon={Activity}>
+							<div className="space-y-basalt-space-md">
+								<RowLabel>Reports</RowLabel>
+								<ul className="space-y-basalt-space-md text-basalt-base text-basalt-muted-foreground">
+									{REPORTS.map((item) => (
+										<li key={item}>{item}</li>
+									))}
+								</ul>
+							</div>
+						</Gutter>
+					</div>
+					<div className="py-basalt-layout">
+						<Gutter icon={EyeOff}>
+							<div className="space-y-basalt-space-md">
+								<RowLabel>Not collected</RowLabel>
+								<ul className="space-y-basalt-space-md text-basalt-base text-basalt-muted-foreground">
+									{NOT_COLLECTED.map((item) => (
+										<li key={item}>{item}</li>
+									))}
+								</ul>
+							</div>
+						</Gutter>
+					</div>
+					<div className="py-basalt-layout">
+						<Gutter icon={Tag}>
+							<Field
+								label="Workstation display name"
+								hint="Shown on the Workstations page. 1–64 characters."
+							>
+								<Input
+									name="name"
+									value={name}
+									maxLength={64}
+									onChange={(event) => setName(event.target.value)}
+									disabled={pending || approved}
+									autoComplete="off"
+								/>
+							</Field>
+						</Gutter>
+					</div>
 				</div>
 
-				<ul className="space-y-basalt-space-md rounded-basalt-md bg-basalt-secondary p-basalt-layout-sm text-basalt-sm">
-					{SCOPE.map((item) => (
-						<li key={item} className="flex gap-basalt-space-md">
-							<ShieldCheck
-								aria-hidden="true"
-								className="mt-0.5 size-4 shrink-0 text-basalt-primary"
-								strokeWidth={1.5}
-							/>
-							<span>{item}</span>
-						</li>
-					))}
-				</ul>
-
-				<Field
-					label="Workstation display name"
-					hint="Shown on the Workstations page. 1–64 characters."
-				>
-					<Input
-						name="name"
-						value={name}
-						maxLength={64}
-						onChange={(event) => setName(event.target.value)}
-						disabled={pending || approved}
-						autoComplete="off"
-					/>
-				</Field>
-
 				{error && (
-					<p role="alert" className="text-basalt-sm text-basalt-destructive">
+					<p role="alert" className="pt-basalt-layout text-basalt-sm text-basalt-destructive">
 						{error}
 					</p>
 				)}
 
-				<div className="flex flex-wrap items-center justify-end gap-basalt-space-lg">
+				<div className="flex flex-wrap items-center justify-end gap-basalt-space-lg pt-basalt-space-sm">
 					<Button
+						type="button"
 						variant="outline"
 						onClick={() => setCancelled(true)}
 						disabled={pending || approved}
 					>
 						Cancel
 					</Button>
-					<Button
-						onClick={() => void approve()}
-						loading={pending}
-						disabled={approved || name.trim().length === 0}
-					>
+					<Button type="submit" loading={pending} disabled={approved || name.trim().length === 0}>
 						{approved ? "Returning to the CLI…" : "Approve workstation"}
 					</Button>
 				</div>
+			</form>
 
-				<p className="border-t border-basalt-border pt-basalt-layout-sm text-basalt-xs text-basalt-muted-foreground">
-					The browser receives a one-time authorization code only. The CLI exchanges that code on
-					this machine and stores the workstation key there; the browser never receives it.
-				</p>
+			<div className="border-t border-basalt-border px-basalt-card py-basalt-layout">
+				<Gutter icon={KeyRound}>
+					<p className="text-basalt-sm text-basalt-muted-foreground">
+						The browser receives a one-time code, sent to{" "}
+						<span className="font-mono">{callbackOrigin}</span>. The CLI exchanges it here, so the
+						workstation key never reaches the browser.
+					</p>
+				</Gutter>
 			</div>
 		</ConsentShell>
 	);
