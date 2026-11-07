@@ -24,6 +24,7 @@
 		"gate:security": "bun run scripts/run-security.ts",
 		"prepare": "husky",
 		"test:environments": "bun scripts/environments/verify.mjs",
+		"test:environments:unit": "bun test scripts/environments/",
 		"capture:environments": "bun scripts/environments/capture.mjs",
 		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive"
 	},
@@ -45,7 +46,7 @@
 		"vitest": "5.0.5"
 	},
 	"lint-staged": {
-		"*.{ts,tsx,js,jsx,json,css}": [
+		"*.{ts,tsx,js,mjs,jsx,json,css}": [
 			"biome check --error-on-warnings --no-errors-on-unmatched"
 		],
 		"CHANGELOG.md": [

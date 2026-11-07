@@ -321,3 +321,13 @@ generated release documents, and include CHANGELOG in the check-only staged gate
 The script also pushed the tag before its exact commit's CI completed, causing
 release-source rejection. Wait for successful source proof before tagging; leave
 published tags immutable and use a patch release to recover a failed candidate.
+
+## 2026-11-07 - Normalize recorded fixture identifiers before persistence
+
+A development-recording review caught IPv6 documentation-prefix and zone-id
+checks that could preserve private labels, and missing receipt ages that would
+break historical joins. Validate canonical addresses, strip zones before mapping,
+retain receipt timestamps as relative ages, and build target metadata from both
+latest reports and history. Audit the serialized result against source identifiers
+before staging; never expose raw captures or reversible mapping tables to model
+contexts, CI or the checked-in fixture catalog.

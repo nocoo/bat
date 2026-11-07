@@ -39,3 +39,4 @@ Historical design documents moved to `archive/`:
 
 - [Local environments](23-local-environments.md): Demo/E2E/Prod lifecycle, fixtures, commands and verification.
 - [Workstations](24-workstations.md): Access/PKCE enrollment, hash-only `batw_` keys, probe targets and idempotent reports, bounded history, derived status.
+- [Recorded Demo material](25-recordings.md): capture contract, whitelist de-identification, age-based timestamps and local loading boundaries.

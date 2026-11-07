@@ -31,6 +31,7 @@ wait_stage() {
 # Launch all stages concurrently
 run_bg unit_cov   bash scripts/check-coverage.sh 90 95
 run_bg typecheck  bun turbo typecheck
+run_bg environments bun run test:environments:unit
 run_bg lint       bunx lint-staged
 run_bg gitleaks   gitleaks protect --staged --no-banner
 run_bg routes     bun run gate:routes
@@ -44,6 +45,7 @@ fi
 # Wait in declaration order so logs print deterministically
 wait_stage unit_cov
 wait_stage typecheck
+wait_stage environments
 wait_stage lint
 wait_stage gitleaks
 wait_stage routes
