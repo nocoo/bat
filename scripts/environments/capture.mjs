@@ -81,14 +81,14 @@ try {
 	await page.goto(`${app.base}/workstations/${workstationId}`);
 	await page.getByRole("heading", { name: "Demo workstation", exact: true }).waitFor();
 	await page.getByTestId("workstation-public-ip").waitFor();
-	await page.getByTestId("workstation-connectivity").waitFor();
+	await page.getByTestId("workstation-topology").waitFor();
 	const connectivityTable = page.getByRole("table", {
-		name: "Connectivity targets",
+		name: "Reachability targets",
 		exact: true,
 	});
 	await connectivityTable.getByRole("link").nth(7).waitFor({ timeout: 60000 });
 	await page
-		.locator('[aria-label="CPU and memory history"] svg .recharts-line-curve')
+		.locator('figure[aria-label^="CPU, memory and uptime"] svg .recharts-area-area')
 		.first()
 		.waitFor();
 	const alphaConnectivity = connectivityTable
@@ -100,7 +100,7 @@ try {
 	await alphaConnectivity.getByText("0%", { exact: true }).first().waitFor();
 	await betaConnectivity.getByText("100%", { exact: true }).first().waitFor();
 	await page.screenshot({ path: `${output}/workstation-detail.png`, fullPage: true });
-	await page.locator('[aria-label="CPU and memory history"]').scrollIntoViewIfNeeded();
+	await page.locator('figure[aria-label^="CPU, memory and uptime"]').scrollIntoViewIfNeeded();
 	await page.waitForTimeout(300);
 	await page.screenshot({ path: `${output}/workstation-history.png` });
 

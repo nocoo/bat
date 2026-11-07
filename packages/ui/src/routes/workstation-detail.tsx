@@ -171,7 +171,7 @@ function WorkstationDetailBody({ record }: { record: WorkstationRecord }) {
 							/>
 						</LayerCard.Body>
 					</LayerCard>
-					<LayerCard>
+					<LayerCard data-testid="workstation-targets">
 						<LayerCard.Header>
 							<h2>Targets</h2>
 							<span className="text-basalt-sm text-basalt-muted-foreground">
@@ -207,7 +207,7 @@ function WorkstationDetailBody({ record }: { record: WorkstationRecord }) {
 				</div>
 			</div>
 
-			<LayerCard>
+			<LayerCard data-testid="workstation-topology">
 				<LayerCard.Header>
 					<h2>Topology</h2>
 					<span className="text-basalt-sm text-basalt-muted-foreground">
