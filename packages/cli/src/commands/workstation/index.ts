@@ -1,6 +1,7 @@
 // bat workstation — monitor this machine with an isolated profile.
 
 import { defineCommand } from "@nocoo/base-cli";
+import workstationDetail from "./detail.js";
 import workstationLogin from "./login.js";
 import workstationLogout from "./logout.js";
 import workstationProbe from "./probe.js";
@@ -14,6 +15,7 @@ export default defineCommand({
 	},
 	subCommands: {
 		login: workstationLogin,
+		detail: workstationDetail,
 		setup: workstationSetup,
 		probe: workstationProbe,
 		status: workstationStatus,

@@ -92,6 +92,7 @@ describe("command group", () => {
 	test("registers every workstation verb", () => {
 		expect(Object.keys(workstation.subCommands ?? {})).toStrictEqual([
 			"login",
+			"detail",
 			"setup",
 			"probe",
 			"status",

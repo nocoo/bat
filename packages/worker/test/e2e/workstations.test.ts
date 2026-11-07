@@ -84,6 +84,28 @@ async function exchange(code: string) {
 	});
 }
 
+async function enrollPairless(): Promise<{ token: string }> {
+	const installation = uuid();
+	const started = await pairStart(installation, "Readback laptop");
+	const pair = (await started.json()) as { pairing_code: string; code: string };
+	await fetch(`${BASE}/api/workstations/pair`, {
+		method: "POST",
+		headers: { ...managementHeaders(), ...(await browserHeaders()) },
+		body: JSON.stringify({ pairing_code: pair.pairing_code }),
+	});
+	const exchanged = await fetch(`${BASE}/api/workstation-auth/exchange`, {
+		method: "POST",
+		headers: { "Content-Type": "application/json" },
+		body: JSON.stringify({
+			code: pair.code,
+			code_verifier: VERIFIER,
+			installation_id: installation,
+		}),
+	});
+	const credential = (await exchanged.json()) as { token: string };
+	return credential;
+}
+
 async function pairStart(installation: string, name: string) {
 	return fetch(`${BASE}/api/workstation-auth/pair`, {
 		method: "POST",
@@ -540,6 +562,55 @@ describe("L2: workstations", () => {
 			headers: readHeaders(),
 		});
 		expect(exchangeWithoutKey.status).toBe(401);
+	});
+});
+
+describe("L2: machine report readback", () => {
+	test("the machine reads its own newest reports", async () => {
+		const serverId = `e2e-read-${uuid().slice(0, 8)}`;
+		const identity = await fetch(`${BASE}/api/identity`, {
+			method: "POST",
+			headers: writeHeaders(),
+			body: JSON.stringify({ ...makeIdentityPayload(serverId), public_ip: "8.8.8.8" }),
+		});
+		expect([200, 204]).toContain(identity.status);
+		const enrolled = await enrollPairless();
+		const upload = await fetch(`${BASE}/api/workstation-probe/reports`, {
+			method: "POST",
+			headers: { Authorization: `Bearer ${enrolled.token}`, "Content-Type": "application/json" },
+			body: JSON.stringify(
+				report(uuid(), [
+					{
+						server_id: serverId,
+						address: "8.8.8.8",
+						family: 4,
+						sent: 3,
+						received: 3,
+						rtts_ms: [11.2, 12.4, 13.6],
+						status: "reachable",
+					},
+				]),
+			),
+		});
+		expect([200, 201, 202]).toContain(upload.status);
+
+		const read = await fetch(`${BASE}/api/workstation-probe/reports?limit=2`, {
+			headers: { Authorization: `Bearer ${enrolled.token}` },
+		});
+		expect(read.status).toBe(200);
+		const body = (await read.json()) as {
+			data: { report_id: string; connectivity: { server_id: string; rtts_ms: unknown[] }[] }[];
+			limit: number;
+		};
+		expect(body.limit).toBe(2);
+		expect(body.data.length).toBeGreaterThan(0);
+		expect(body.data[0]?.connectivity[0]).toMatchObject({ server_id: serverId });
+		expect(body.data[0]?.connectivity[0]?.rtts_ms).toEqual([11.2, 12.4, 13.6]);
+
+		const bad = await fetch(`${BASE}/api/workstation-probe/reports?limit=0`, {
+			headers: { Authorization: `Bearer ${enrolled.token}` },
+		});
+		expect(bad.status).toBe(400);
 	});
 });
 

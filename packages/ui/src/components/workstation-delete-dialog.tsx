@@ -60,7 +60,7 @@ export function WorkstationDeleteDialog({ workstation }: { workstation: Workstat
 							: "Step 1 of 2 — review what will be permanently removed."}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
-				<div className="space-y-basalt-layout text-basalt-base">
+				<div className="mt-basalt-layout space-y-basalt-layout text-basalt-base">
 					<p>
 						This permanently deletes <strong>{workstation.name}</strong>, its report history and
 						connectivity samples. The machine's <code>batw_</code> key stops working immediately.

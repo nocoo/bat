@@ -16,6 +16,7 @@ import {
 	type WorkstationPairStatus,
 	type WorkstationPairStatusOutput,
 	type WorkstationReportInput,
+	type WorkstationReportsResponse,
 	type WorkstationTargetsResponse,
 } from "@bat/shared";
 import { ApiError, HttpClient, NetworkError } from "../lib/http.js";
@@ -50,6 +51,7 @@ export async function exchangeLogin(
 		undefined,
 		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
 		options.signal,
+		options.fetchImpl,
 	);
 	const raw = await client.post<unknown>("/api/workstation-auth/exchange", validated.value);
 	return parseExchangeOutput(raw, origins.machine);
@@ -200,6 +202,7 @@ export async function startPairing(
 		undefined,
 		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
 		options.signal,
+		options.fetchImpl,
 	);
 	const raw = await client.post<unknown>("/api/workstation-auth/pair", validated.value);
 	if (typeof raw !== "object" || raw === null) {
@@ -238,6 +241,7 @@ export async function pairingStatus(
 		undefined,
 		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
 		options.signal,
+		options.fetchImpl,
 	);
 	const raw = await client.get<unknown>(`/api/workstation-auth/pair/${normalized}`);
 	if (typeof raw !== "object" || raw === null) {
@@ -253,4 +257,27 @@ export async function pairingStatus(
 		name: typeof record.name === "string" ? record.name : "",
 		expires_at: typeof record.expires_at === "number" ? record.expires_at : 0,
 	};
+}
+
+/** Read the newest reports this key owns; the machine's own history. */
+export async function fetchReports(
+	workerUrl: string,
+	token: string,
+	limit: number,
+	options: RequestOptions = {},
+): Promise<WorkstationReportsResponse> {
+	const client = new HttpClient(
+		workerUrl,
+		token,
+		options.timeoutMs ?? REQUEST_TIMEOUT_MS,
+		options.signal,
+		options.fetchImpl,
+	);
+	const raw = await client.get<unknown>(
+		`/api/workstation-probe/reports?limit=${encodeURIComponent(String(limit))}`,
+	);
+	if (typeof raw !== "object" || raw === null || !Array.isArray((raw as { data?: unknown }).data)) {
+		throw new Error("report readback returned no data array");
+	}
+	return raw as WorkstationReportsResponse;
 }

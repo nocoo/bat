@@ -27,6 +27,7 @@ const MACHINE_ROUTES: Array<{ method: string; path: string; prefix?: boolean }> 
 	{ method: "GET", path: "/api/workstation-auth/pair", prefix: true },
 	{ method: "GET", path: "/api/workstation-probe/targets" },
 	{ method: "POST", path: "/api/workstation-probe/reports" },
+	{ method: "GET", path: "/api/workstation-probe/reports" },
 	{ method: "POST", path: "/api/workstation-probe/revoke" },
 	// Public routes
 	{ method: "GET", path: "/api/live" },

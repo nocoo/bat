@@ -63,7 +63,7 @@ export function HostDeleteDialog({ host, routeId }: { host: HostOverviewItem; ro
 							: "Step 1 of 2 — review what will be permanently removed."}
 					</AlertDialogDescription>
 				</AlertDialogHeader>
-				<div className="space-y-basalt-layout text-basalt-base">
+				<div className="mt-basalt-layout space-y-basalt-layout text-basalt-base">
 					{recent && (
 						<div
 							role="alert"

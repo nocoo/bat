@@ -74,7 +74,7 @@ export function WorkstationPairDialog() {
 					Pair
 				</Button>
 			</DialogTrigger>
-			<DialogContent size="base">
+			<DialogContent size="lg">
 				<DialogHeader>
 					<DialogTitle>Pair a workstation</DialogTitle>
 					<DialogDescription>
@@ -86,7 +86,7 @@ export function WorkstationPairDialog() {
 
 				{approved === null ? (
 					<form
-						className="space-y-basalt-layout"
+						className="mt-basalt-layout space-y-basalt-layout"
 						onSubmit={(event) => {
 							event.preventDefault();
 							void approve();
@@ -114,7 +114,7 @@ export function WorkstationPairDialog() {
 						</p>
 					</form>
 				) : (
-					<div className="flex items-start gap-basalt-space-md">
+					<div className="mt-basalt-layout flex items-start gap-basalt-space-md">
 						<Check aria-hidden="true" className="mt-basalt-space-xs size-4 text-basalt-success" />
 						<div className="space-y-basalt-space-xs">
 							<p className="font-medium">Approved {approved}</p>

@@ -265,6 +265,28 @@ export interface WorkstationConnectivityHistory {
 	data: WorkstationConnectivityPoint[];
 }
 
+/** One report with its connectivity rows, read back by the machine itself. */
+export interface WorkstationReportHistoryEntry {
+	report_id: string;
+	received_at: number;
+	started_at: number;
+	finished_at: number;
+	cpu_usage_pct: number | null;
+	mem_used_pct: number;
+	mem_total_bytes: number;
+	mem_available_bytes: number;
+	uptime_seconds: number;
+	connectivity: WorkstationConnectivity[];
+}
+
+export interface WorkstationReportsResponse {
+	data: WorkstationReportHistoryEntry[];
+	limit: number;
+}
+
+export const WORKSTATION_REPORTS_MAX_LIMIT = 20;
+export const WORKSTATION_REPORTS_DEFAULT_LIMIT = 3;
+
 export interface WorkstationConnectivityResponse {
 	targets: WorkstationConnectivityHistory[];
 	limit: number;

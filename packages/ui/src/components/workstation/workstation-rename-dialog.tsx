@@ -66,7 +66,7 @@ export function WorkstationRenameDialog({ workstation }: { workstation: Workstat
 					Rename
 				</Button>
 			</DialogTrigger>
-			<DialogContent size="base">
+			<DialogContent size="lg">
 				<DialogHeader>
 					<DialogTitle>Rename workstation</DialogTitle>
 					<DialogDescription>
@@ -75,7 +75,7 @@ export function WorkstationRenameDialog({ workstation }: { workstation: Workstat
 					</DialogDescription>
 				</DialogHeader>
 				<form
-					className="space-y-basalt-layout"
+					className="mt-basalt-layout space-y-basalt-layout"
 					onSubmit={(event) => {
 						event.preventDefault();
 						void save();

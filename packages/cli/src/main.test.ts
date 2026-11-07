@@ -39,6 +39,7 @@ describe("main command tree", () => {
 		expect(group.meta?.name).toBe("workstation");
 		expect(Object.keys(group.subCommands ?? {})).toStrictEqual([
 			"login",
+			"detail",
 			"setup",
 			"probe",
 			"status",

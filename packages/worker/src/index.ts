@@ -119,6 +119,7 @@ import {
 } from "./routes/workstation-monitoring.js";
 import {
 	workstationReportRoute,
+	workstationReportsReadRoute,
 	workstationRevokeRoute,
 	workstationTargetsRoute,
 } from "./routes/workstation-probe.js";
@@ -276,6 +277,7 @@ app.get("/api/monitoring/workstations", monitoringWorkstationsRoute);
 app.get("/api/monitoring/workstations/:id/metrics", monitoringWorkstationMetricsRoute);
 app.get("/api/monitoring/workstations/:id/connectivity", monitoringWorkstationConnectivityRoute);
 app.get("/api/monitoring/workstations/:id", monitoringWorkstationRoute);
+app.get("/api/workstation-probe/reports", workstationReportsReadRoute);
 app.post("/api/workstation-probe/reports", workstationReportRoute);
 app.post("/api/workstation-probe/revoke", workstationRevokeRoute);
 app.get("/api/workstations", workstationsListRoute);

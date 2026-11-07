@@ -11,6 +11,8 @@ import {
 	WORKSTATION_MAX_TARGETS,
 	WORKSTATION_PING_COUNT,
 	WORKSTATION_RATE_LIMITS,
+	WORKSTATION_REPORTS_DEFAULT_LIMIT,
+	WORKSTATION_REPORTS_MAX_LIMIT,
 } from "@bat/shared";
 import type { Context } from "hono";
 import { observedPublicIp, rateLimit } from "../domain/workstation-history.js";
@@ -78,6 +80,27 @@ export async function workstationRevokeRoute(c: Context<AppEnv>) {
 		return c.json({ error: "The credential could not be revoked" }, 409);
 	}
 	return c.body(null, 204);
+}
+
+/**
+ * The machine reads back its own newest reports so `bat workstation detail` can
+ * show per-target probe results without the browser.
+ */
+export async function workstationReportsReadRoute(c: Context<AppEnv>) {
+	const workstation = c.var.workstation;
+	if (!workstation) {
+		return c.json({ error: "Workstation authentication required" }, 401);
+	}
+	const raw = c.req.query("limit");
+	const parsed = raw === undefined ? WORKSTATION_REPORTS_DEFAULT_LIMIT : Number(raw);
+	if (!Number.isInteger(parsed) || parsed < 1 || parsed > WORKSTATION_REPORTS_MAX_LIMIT) {
+		return c.json(
+			{ error: `limit must be an integer between 1 and ${WORKSTATION_REPORTS_MAX_LIMIT}` },
+			400,
+		);
+	}
+	const data = await c.var.repos.workstations.recentReports(workstation.id, parsed);
+	return c.json({ data, limit: parsed });
 }
 
 export async function workstationReportRoute(c: Context<AppEnv>) {

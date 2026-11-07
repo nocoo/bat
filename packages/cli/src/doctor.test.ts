@@ -267,3 +267,60 @@ describe("gatherFacts", () => {
 		expect(facts.workstationReachable).toBeNull();
 	});
 });
+
+describe("default lookups through the shared client", () => {
+	const okJson = (body: unknown) =>
+		(async () =>
+			new Response(JSON.stringify(body), {
+				status: 200,
+				headers: { "Content-Type": "application/json" },
+			})) as unknown as typeof fetch;
+
+	test("reads the newest version from the first registry that answers", async () => {
+		const { fetchLatestVersion } = await import("./lib/registry.js");
+		const lookup = await fetchLatestVersion(okJson({ "dist-tags": { latest: "9.9.9" } }));
+		expect(lookup.version).toBe("9.9.9");
+	});
+
+	test("rejects a report readback without a data array", async () => {
+		const { fetchReports } = await import("./workstation/api.js");
+		await expect(
+			fetchReports("https://bat-ingest.worker.hexly.ai", `batw_${"a".repeat(43)}`, 1, {
+				fetchImpl: okJson({ nope: true }),
+			}),
+		).rejects.toThrow(/no data array/);
+	});
+
+	test("accepts a report readback and keeps the payload", async () => {
+		const { fetchReports } = await import("./workstation/api.js");
+		const body = { data: [{ report_id: "r1", connectivity: [] }], limit: 1 };
+		const result = await fetchReports(
+			"https://bat-ingest.worker.hexly.ai",
+			`batw_${"a".repeat(43)}`,
+			1,
+			{ fetchImpl: okJson(body) },
+		);
+		expect(result.data).toHaveLength(1);
+		expect(result.limit).toBe(1);
+	});
+
+	test("pairing start rejects an invalid input before any request", async () => {
+		const { startPairing } = await import("./workstation/api.js");
+		await expect(
+			startPairing(
+				{ dashboard: "https://bat.hexly.ai", machine: "https://bat-ingest.worker.hexly.ai" },
+				{ installation_id: "nope", name: "x", code_challenge: "short" },
+			),
+		).rejects.toThrow(/invalid pairing request/);
+	});
+
+	test("pairing status tolerates missing optional fields", async () => {
+		const { pairingStatus } = await import("./workstation/api.js");
+		const result = await pairingStatus(
+			{ dashboard: "https://bat.hexly.ai", machine: "https://bat-ingest.worker.hexly.ai" },
+			"ABCD-2345",
+			{ fetchImpl: okJson({ status: "pending" }) },
+		);
+		expect(result).toEqual({ status: "pending", name: "", expires_at: 0 });
+	});
+});

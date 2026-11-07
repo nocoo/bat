@@ -6,6 +6,7 @@ import type {
 	WorkstationConnectivityHistory,
 	WorkstationMetricPoint,
 	WorkstationRecord,
+	WorkstationReportHistoryEntry,
 	WorkstationReportInput,
 } from "@bat/shared";
 
@@ -128,6 +129,8 @@ export interface WorkstationsRepository {
 	get(id: string): Promise<WorkstationRecord | null>;
 	/** Delete the workstation and expire every pending code for its installation. */
 	delete(id: string, installationId: string): Promise<boolean>;
+	/** Newest reports with their connectivity rows, for the machine's own CLI. */
+	recentReports(id: string, limit: number): Promise<WorkstationReportHistoryEntry[]>;
 	metrics(
 		id: string,
 		from: number,

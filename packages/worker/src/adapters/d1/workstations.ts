@@ -2,10 +2,12 @@
 // the `WorkstationsRepository` contract.
 
 import type {
+	WorkstationConnectivity,
 	WorkstationConnectivityHistory,
 	WorkstationConnectivityStatus,
 	WorkstationMetricPoint,
 	WorkstationRecord,
+	WorkstationReportHistoryEntry,
 	WorkstationReportInput,
 	WorkstationReportRecord,
 } from "@bat/shared";
@@ -22,6 +24,9 @@ import type {
 	WorkstationSparklineRow,
 	WorkstationsRepository,
 } from "../../repos/workstations.js";
+
+const REPORT_COLUMNS_SELECT =
+	"SELECT report_id, received_at, started_at, finished_at, cpu_usage_pct, mem_used_pct, mem_total_bytes, mem_available_bytes, uptime_seconds";
 
 const REPORT_COLUMNS =
 	"received_at, started_at, finished_at, cpu_usage_pct, mem_used_pct, mem_total_bytes, mem_available_bytes, uptime_seconds";
@@ -361,6 +366,70 @@ ORDER BY workstation_id, ts ASC`,
 				.bind(Math.floor(Date.now() / 1000), installationId),
 		]);
 		return (results[0] as D1Result<unknown>).meta.changes > 0;
+	}
+
+	async recentReports(id: string, limit: number): Promise<WorkstationReportHistoryEntry[]> {
+		const { results } = await this.db
+			.prepare(
+				`${REPORT_COLUMNS_SELECT} FROM workstation_reports
+WHERE workstation_id = ?
+ORDER BY finished_at DESC, received_at DESC, report_id DESC
+LIMIT ?`,
+			)
+			.bind(id, limit)
+			.all<{
+				report_id: string;
+				received_at: number;
+				started_at: number;
+				finished_at: number;
+				cpu_usage_pct: number | null;
+				mem_used_pct: number;
+				mem_total_bytes: number;
+				mem_available_bytes: number;
+				uptime_seconds: number;
+			}>();
+		if (results.length === 0) {
+			return [];
+		}
+		const ids = results.map((row) => row.report_id);
+		const placeholders = ids.map(() => "?").join(", ");
+		const connectivity = await this.db
+			.prepare(
+				`SELECT report_id, server_id, address, family, sent, received, rtts, status
+FROM workstation_connectivity
+WHERE workstation_id = ? AND report_id IN (${placeholders})`,
+			)
+			.bind(id, ...ids)
+			.all<{
+				report_id: string;
+				server_id: string;
+				address: string;
+				family: 4 | 6;
+				sent: number;
+				received: number;
+				rtts: string;
+				status: WorkstationConnectivityStatus;
+			}>();
+		const byReport = new Map<string, WorkstationConnectivity[]>();
+		for (const row of connectivity.results) {
+			const list = byReport.get(row.report_id) ?? [];
+			list.push({
+				server_id: row.server_id,
+				address: row.address,
+				family: row.family,
+				sent: row.sent,
+				received: row.received,
+				rtts_ms: JSON.parse(row.rtts) as [number | null, number | null, number | null],
+				status: row.status,
+			});
+			byReport.set(row.report_id, list);
+		}
+		return results.map((row) => ({
+			...row,
+			connectivity: (byReport.get(row.report_id) ?? []).sort((a, b) =>
+				a.server_id.localeCompare(b.server_id),
+			),
+		}));
 	}
 
 	async metrics(

@@ -76,24 +76,27 @@ export function WorkstationSetupDialog() {
 					</DialogDescription>
 				</DialogHeader>
 
-				<ol className="space-y-basalt-layout">
+				<ol className="mt-basalt-card space-y-basalt-layout-lg">
 					{STEPS.map((step, index) => (
-						<li key={step.title} className="space-y-basalt-space-md">
-							<div className="flex items-baseline gap-basalt-space-md">
-								<span className="flex size-basalt-control-sm shrink-0 items-center justify-center rounded-basalt-full bg-basalt-secondary text-basalt-sm font-medium tabular-nums">
-									{index + 1}
-								</span>
-								<div className="min-w-0">
+						<li
+							key={step.title}
+							className="grid grid-cols-[1.75rem_minmax(0,1fr)] gap-x-basalt-space-md"
+						>
+							<span className="flex size-basalt-control-sm items-center justify-center rounded-basalt-full bg-basalt-secondary text-basalt-sm font-medium tabular-nums">
+								{index + 1}
+							</span>
+							<div className="min-w-0 space-y-basalt-space-md">
+								<div className="space-y-basalt-space-xs">
 									<p className="font-medium">{step.title}</p>
 									<p className="text-basalt-sm text-basalt-muted-foreground">{step.detail}</p>
 								</div>
+								<CodeBlock title="bash">{step.command}</CodeBlock>
 							</div>
-							<CodeBlock title="bash">{step.command}</CodeBlock>
 						</li>
 					))}
 				</ol>
 
-				<div className="space-y-basalt-space-md border-t border-basalt-border pt-basalt-layout">
+				<div className="mt-basalt-layout space-y-basalt-space-md border-t border-basalt-border pt-basalt-layout">
 					<p className="text-basalt-sm text-basalt-muted-foreground">
 						Removing the schedule keeps the enrollment; logging out revokes the key first and
 						refuses to delete it locally if the server cannot confirm.
