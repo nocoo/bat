@@ -1,127 +1,112 @@
-import type { WorkstationRecord } from "@bat/shared";
+import type { WorkstationListItem } from "@bat/shared";
 import { computeWorkstationStatus } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
-import { DataTable, type DataTableColumn } from "@nocoo/basalt/components/data-table";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { Laptop, Terminal } from "lucide-react";
-import { useMemo } from "react";
 import { Link } from "react-router";
-import { WorkstationStatusBadge } from "@/components/workstation-status-badge";
+import { Reading, type ReadingItem } from "@/components/layout/reading";
+import { Skeleton } from "@/components/ui/skeleton";
+import { WorkstationTable } from "@/components/workstation/workstation-table";
 import { useWorkstations } from "@/hooks";
-import { formatTimestamp } from "@/lib/format";
-import {
-	formatPercent,
-	latestOs,
-	rootDiskUsedPct,
-	workstationLastSeen,
-} from "@/lib/workstation-format";
-
-function columns(now: number): DataTableColumn<WorkstationRecord>[] {
-	return [
-		{
-			id: "name",
-			header: "Workstation",
-			sortable: false,
-			accessor: (record) => (
-				<Link
-					to={`/workstations/${record.id}`}
-					className="font-medium text-basalt-foreground underline-offset-4 hover:underline"
-				>
-					{record.name}
-				</Link>
-			),
-		},
-		{
-			id: "os",
-			header: "OS",
-			sortable: false,
-			accessor: (record) =>
-				latestOs(record) ?? <span className="text-basalt-muted-foreground">Not reported</span>,
-		},
-		{
-			id: "public_ip",
-			header: "Public IP",
-			sortable: false,
-			accessor: (record) =>
-				record.public_ip ? (
-					<span className="font-mono">{record.public_ip}</span>
-				) : (
-					<span className="text-basalt-muted-foreground">Not observed</span>
-				),
-		},
-		{
-			id: "cpu",
-			header: "CPU",
-			sortable: false,
-			textAlign: "end",
-			accessor: (record) => formatPercent(record.latest_report?.cpu.usage_pct ?? null),
-		},
-		{
-			id: "mem",
-			header: "Memory",
-			sortable: false,
-			textAlign: "end",
-			accessor: (record) => formatPercent(record.latest_report?.mem.used_pct ?? null),
-		},
-		{
-			id: "disk",
-			header: "Disk /",
-			sortable: false,
-			textAlign: "end",
-			accessor: (record) => formatPercent(rootDiskUsedPct(record.latest_report)),
-		},
-		{
-			id: "last_seen",
-			header: "Last seen",
-			sortable: false,
-			accessor: (record) => (
-				<span
-					title={
-						record.last_seen_at === null
-							? "No report has been received"
-							: formatTimestamp(record.last_seen_at)
-					}
-				>
-					{workstationLastSeen(record.last_seen_at, now)}
-				</span>
-			),
-		},
-		{
-			id: "status",
-			header: "Status",
-			sortable: false,
-			accessor: (record) => (
-				<WorkstationStatusBadge status={computeWorkstationStatus(record, now)} />
-			),
-		},
-	];
-}
+import { chart } from "@/lib/palette";
 
 function EmptyWorkstations() {
 	return (
-		<div className="flex flex-col items-center gap-basalt-space-sm py-basalt-layout-lg text-center">
-			<Laptop aria-hidden="true" className="size-8 text-basalt-muted-foreground" strokeWidth={1} />
-			<p className="font-medium">No workstations enrolled</p>
-			<p className="max-w-prose text-basalt-sm text-basalt-muted-foreground">
-				Run the bat CLI on your laptop or desktop. The browser consent page links it to your account
-				and delivers a dedicated workstation key to that machine.
-			</p>
-			<Button asChild={true} variant="outline" size="sm" className="mt-basalt-space-sm">
-				<Link to="/setup#workstations">
-					<Terminal aria-hidden="true" />
-					Workstation setup
-				</Link>
-			</Button>
-		</div>
+		<LayerCard.Body>
+			<div className="flex flex-col items-center gap-basalt-space-sm py-basalt-layout-lg text-center">
+				<Laptop
+					aria-hidden="true"
+					className="size-8 text-basalt-muted-foreground"
+					strokeWidth={1}
+				/>
+				<p className="font-medium">No workstations enrolled</p>
+				<p className="max-w-prose text-basalt-sm text-basalt-muted-foreground">
+					Run the bat CLI on your laptop or desktop. The browser consent page links it to your
+					account and delivers a dedicated workstation key to that machine.
+				</p>
+				<Button asChild={true} variant="outline" size="sm" className="mt-basalt-space-sm">
+					<Link to="/setup#workstations">
+						<Terminal aria-hidden="true" />
+						Workstation setup
+					</Link>
+				</Button>
+			</div>
+		</LayerCard.Body>
 	);
+}
+
+function summaryItems(records: readonly WorkstationListItem[], now: number): ReadingItem[] {
+	const statuses = records.map((record) => computeWorkstationStatus(record, now));
+	const recent = statuses.filter((status) => status === "recent").length;
+	const stale = statuses.filter((status) => status === "stale").length;
+	const disabled = statuses.filter((status) => status === "disabled").length;
+	const targets = records.reduce(
+		(total, record) => total + (record.latest_report?.connectivity.length ?? 0),
+		0,
+	);
+	const answering = records.reduce(
+		(total, record) =>
+			total +
+			(record.latest_report?.connectivity.filter(
+				(entry) => entry.status === "reachable" || entry.status === "partial",
+			).length ?? 0),
+		0,
+	);
+	return [
+		{
+			label: "Workstations",
+			value: String(records.length),
+			detail: "enrolled machines",
+			color: chart.sky,
+		},
+		{ label: "Reporting", value: String(recent), detail: "within 30 minutes", color: chart.green },
+		{ label: "Stale", value: String(stale), detail: "no report for 30m", color: chart.amber },
+		{ label: "Disabled", value: String(disabled), detail: "cannot report", color: chart.purple },
+		{
+			label: "Answering",
+			value: targets === 0 ? "—" : `${answering}/${targets}`,
+			detail: "server probes",
+			color: chart.orange,
+		},
+	];
 }
 
 export function WorkstationsPage() {
 	const { data, error, isLoading, mutate } = useWorkstations();
 	const now = Math.floor(Date.now() / 1000);
-	const tableColumns = useMemo(() => columns(now), [now]);
 	const records = data ?? [];
+
+	if (error && data === undefined) {
+		return (
+			<div className="space-y-basalt-layout" data-testid="workstations-page">
+				<PageHeader
+					title="Workstations"
+					description="Your laptops and desktops, reporting capacity and reachability from outside the fleet."
+				/>
+				<LayerCard>
+					<LayerCard.Body className="space-y-basalt-space-md">
+						<p className="text-basalt-sm text-basalt-muted-foreground">
+							Could not load workstations.
+						</p>
+						<Button variant="outline" size="sm" onClick={() => void mutate()}>
+							Try again
+						</Button>
+					</LayerCard.Body>
+				</LayerCard>
+			</div>
+		);
+	}
+
+	if (isLoading && data === undefined) {
+		return (
+			<div className="space-y-basalt-layout" data-testid="workstations-page">
+				<PageHeader title="Workstations" description="Loading your enrolled machines." />
+				<Skeleton className="h-24 w-full" />
+				<Skeleton className="h-64 w-full" />
+			</div>
+		);
+	}
 
 	return (
 		<div className="space-y-basalt-layout" data-testid="workstations-page">
@@ -134,23 +119,35 @@ export function WorkstationsPage() {
 					</Button>
 				}
 			/>
-			<LayerCard data-testid="workstation-table">
-				<DataTable
-					aria-label="Workstations"
-					edge="attached"
-					columns={tableColumns}
-					data={records}
-					getRowId={(record) => record.id}
-					loading={isLoading && data === undefined}
-					error={error && data === undefined ? "Could not load workstations." : undefined}
-					onRetry={() => void mutate()}
-					empty={<EmptyWorkstations />}
-				/>
-			</LayerCard>
-			<p className="text-basalt-sm text-basalt-muted-foreground">
-				Stale means no report for more than 30 minutes. It is informational and never raises a fleet
-				alert.
-			</p>
+
+			{records.length === 0 ? (
+				<LayerCard data-testid="workstation-table">
+					<EmptyWorkstations />
+				</LayerCard>
+			) : (
+				<>
+					<LayerCard padding="none">
+						<div className="grid grid-cols-2 divide-basalt-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
+							{summaryItems(records, now).map((item) => (
+								<Reading key={item.label} item={item} />
+							))}
+						</div>
+					</LayerCard>
+					<LayerCard data-testid="workstation-table">
+						<LayerCard.Header>
+							<h2>Machines</h2>
+							<span className="text-basalt-sm text-basalt-muted-foreground">
+								{records.length} enrolled
+							</span>
+						</LayerCard.Header>
+						<WorkstationTable records={records} now={now} />
+					</LayerCard>
+					<p className="text-basalt-sm text-basalt-muted-foreground">
+						Stale means no report for more than 30 minutes. It is informational and never raises a
+						fleet alert.
+					</p>
+				</>
+			)}
 		</div>
 	);
 }

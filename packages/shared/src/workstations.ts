@@ -1,6 +1,7 @@
 // @bat/shared — Workstation DTOs, strict validation and status helpers
 // Source of truth: docs/24-workstations.md
 
+import type { SparklinePoint } from "./api.js";
 import type { ValidationResult } from "./assets.js";
 
 // --- Protocol constants ---
@@ -164,6 +165,12 @@ export interface WorkstationRecord {
 	public_ip: string | null;
 	disabled: boolean;
 	latest_report: WorkstationReportRecord | null;
+}
+
+/** List projection: the record plus the last 24 hourly samples for the table. */
+export interface WorkstationListItem extends WorkstationRecord {
+	cpu_sparkline: SparklinePoint[] | null;
+	mem_sparkline: SparklinePoint[] | null;
 }
 
 export interface WorkstationTarget {

@@ -180,9 +180,15 @@ The default Demo catalog (fixture version 3) seeds fresh owned stores only:
 
 Every `*_age_seconds` value becomes `anchor - age`; absolute source epochs are
 never stored. The anchor is the fresh store's initialization epoch, so Demo
-history is a snapshot that ages naturally until an explicit reset. No replay
-daemon, keepalive, synthetic freshness clock or auto-reset is involved, and
-normal persistent Demo CRUD is unchanged. The isolated capture fixes only its
+history is a snapshot that ages naturally. No replay daemon, keepalive or
+synthetic freshness clock is involved: no sample is ever invented or restamped.
+
+A snapshot that ages past its windows would show empty charts, so the local
+launcher re-seeds a Demo store older than `DEMO_FRESH_SECONDS` (30 minutes) — at
+startup and, for a long running gateway, on a minute tick that swaps the runtime
+behind the existing instance id. The store is rebuilt from the checked-in
+recording; captured CRUD edits made in the Demo are disposable, while the
+sanitized catalog stays the only source of the shapes. The isolated capture fixes only its
 Playwright page clock to the runtime anchor for deterministic host comparisons;
 it does not change the Demo runtime clock or seeded ages.
 

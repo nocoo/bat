@@ -197,6 +197,7 @@ export class D1HostsRepository implements HostsRepository {
 		const result = await this.db
 			.prepare(
 				`SELECT host_id, hour_ts as ts, cpu_usage_avg as cpu, mem_used_pct_avg as mem,
+	cpu_load1_avg as load1,
 	CASE WHEN net_rx_bytes_avg IS NOT NULL AND net_tx_bytes_avg IS NOT NULL
 		THEN net_rx_bytes_avg + net_tx_bytes_avg ELSE NULL END as net
 FROM metrics_hourly

@@ -159,6 +159,20 @@ async function stopWorker(child) {
 	if (child.exitCode === null && child.signalCode === null)
 		throw new Error("Worker did not stop; owned storage retained");
 }
+/**
+ * The demo catalog is a snapshot: every sample keeps its captured age, so a
+ * store seeded hours ago shows nothing inside a one hour window. Re-seed a
+ * demo store older than the freshness window instead of serving an empty
+ * dashboard; captured CRUD edits are disposable, raw captures are not.
+ */
+export const DEMO_FRESH_SECONDS = 1800;
+
+export function demoStoreAge(path, now = Math.floor(Date.now() / 1000)) {
+	if (!existsSync(join(path, "owner.json"))) return null;
+	const manifest = JSON.parse(readFileSync(join(path, "owner.json"), "utf8"));
+	return Number.isFinite(manifest.anchor) ? now - manifest.anchor : null;
+}
+
 export async function createRuntime({
 	mode = "e2e",
 	dataset = "empty",
@@ -167,6 +181,13 @@ export async function createRuntime({
 	if (!["demo", "e2e"].includes(mode)) throw new Error("Invalid local mode");
 	const owner = mode === "demo" ? "demo" : `e2e-${randomUUID()}`;
 	const path = join(storageRoot, owner);
+	if (mode === "demo" && existsSync(path) && !existsSync(join(path, "running.lock"))) {
+		const age = demoStoreAge(path);
+		if (age !== null && age > DEMO_FRESH_SECONDS) {
+			verifyOwnership(path, owner);
+			rmSync(path, { recursive: true });
+		}
+	}
 	const fresh = !existsSync(path);
 	mkdirSync(path, { recursive: true });
 	const lock = join(path, "running.lock");

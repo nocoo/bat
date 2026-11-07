@@ -3,6 +3,7 @@
 // same-origin management confirmation and owner or global-manager authority.
 // These routes are never registered on the machine endpoint.
 
+import type { SparklinePoint, WorkstationListItem } from "@bat/shared";
 import type { Context } from "hono";
 import { configuredManager } from "../domain/connect.js";
 import { parseHistoryQuery } from "../domain/workstation-history.js";
@@ -10,8 +11,44 @@ import type { AppEnv } from "../types.js";
 
 const nowSeconds = (): number => Math.floor(Date.now() / 1000);
 
+/**
+ * The list projection adds the last 24 hourly samples so the table can draw a
+ * trend without one request per workstation. A workstation without samples
+ * keeps null instead of a fabricated flat line.
+ */
 export async function workstationsListRoute(c: Context<AppEnv>) {
-	return c.json(await c.var.repos.workstations.list());
+	const records = await c.var.repos.workstations.list();
+	if (records.length === 0) {
+		return c.json([]);
+	}
+	const now = nowSeconds();
+	const rows = await c.var.repos.workstations.listSparklineRowsSince(
+		records.map((record) => record.id),
+		now - 86_400,
+	);
+	const byId = new Map<string, { cpu: SparklinePoint[]; mem: SparklinePoint[] }>();
+	for (const row of rows) {
+		let entry = byId.get(row.workstation_id);
+		if (!entry) {
+			entry = { cpu: [], mem: [] };
+			byId.set(row.workstation_id, entry);
+		}
+		if (row.cpu !== null) {
+			entry.cpu.push({ ts: row.ts, v: row.cpu });
+		}
+		if (row.mem !== null) {
+			entry.mem.push({ ts: row.ts, v: row.mem });
+		}
+	}
+	const items: WorkstationListItem[] = records.map((record) => {
+		const sparklines = byId.get(record.id);
+		return {
+			...record,
+			cpu_sparkline: sparklines && sparklines.cpu.length > 0 ? sparklines.cpu : null,
+			mem_sparkline: sparklines && sparklines.mem.length > 0 ? sparklines.mem : null,
+		};
+	});
+	return c.json(items);
 }
 
 export async function workstationDetailRoute(c: Context<AppEnv, "/api/workstations/:id">) {

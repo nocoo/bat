@@ -88,6 +88,15 @@ on `847af18` plus the authentication/toolbar fix. The deployed commit hash and
 MFA challenge were not exposed/independently verified; no production writes were made.
 Offline authentication regression: `bun test scripts/environments/production.test.mjs`.
 
+## Demo freshness
+
+The Demo catalog is a fixed recording, so its samples keep the age they had when
+the store was seeded. A Demo store older than `DEMO_FRESH_SECONDS` (30 minutes)
+is dropped and rebuilt from the checked-in recording: at launcher start, and on a
+one-minute tick that replaces the runtime behind the current instance id so an
+open browser keeps working. `--mode e2e` and the automated lanes never do this;
+they seed a fresh per-run store already.
+
 ## Fixture matrix and evidence
 
 Catalog version 3 seeds rich Demo from the audited recording described in

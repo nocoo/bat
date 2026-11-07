@@ -25,6 +25,7 @@
   "hostname": "h1.bl.example.com",
   "kernel": "6.8.0-bl",
   "last_seen": "<TS>",
+  "load_sparkline": null,
   "maintenance_end": "<HHMM>",
   "maintenance_reason": "bl-baseline",
   "maintenance_start": "<HHMM>",

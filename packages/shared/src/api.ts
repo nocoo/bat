@@ -82,6 +82,7 @@ export interface HostOverviewItem {
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
 	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
 	net_sparkline: SparklinePoint[] | null; // 24h hourly Network usage (normalized 0–100)
+	load_sparkline: SparklinePoint[] | null; // 24h hourly load average (1m)
 	// Maintenance window (UTC "HH:MM", nullable)
 	maintenance_start: string | null;
 	maintenance_end: string | null;

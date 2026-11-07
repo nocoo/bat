@@ -21,6 +21,7 @@ import type {
 	Tier2Snapshot,
 	WebhookConfig,
 	WorkstationConnectivityResponse,
+	WorkstationListItem,
 	WorkstationMetricsResponse,
 	WorkstationRecord,
 } from "@bat/shared";
@@ -161,9 +162,9 @@ export const useSettings = () =>
 // The list and the detail snapshot share one cadence so a fresh report updates
 // public IP, connectivity, last-seen and the derived status together.
 export const useWorkstations = () =>
-	useSWR<WorkstationRecord[]>(
+	useSWR<WorkstationListItem[]>(
 		"workstations",
-		() => getAPI<WorkstationRecord[]>("/api/workstations"),
+		() => getAPI<WorkstationListItem[]>("/api/workstations"),
 		POLL_60,
 	);
 

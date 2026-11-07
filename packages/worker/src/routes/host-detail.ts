@@ -70,6 +70,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		cpu_sparkline: null, // detail page uses its own metrics endpoint
 		mem_sparkline: null,
 		net_sparkline: null,
+		load_sparkline: null,
 		description: host.description,
 		swap_total_bytes: host.swap_total_bytes,
 		boot_mode: host.boot_mode,

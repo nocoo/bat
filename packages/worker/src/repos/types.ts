@@ -236,6 +236,7 @@ export interface HostSparklineRow {
 	cpu: number | null;
 	mem: number | null;
 	net: number | null;
+	load1: number | null;
 }
 
 /**

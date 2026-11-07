@@ -204,6 +204,7 @@ export type {
 	WorkstationDisk,
 	WorkstationInterface,
 	WorkstationIpFamily,
+	WorkstationListItem,
 	WorkstationLoginExchangeInput,
 	WorkstationLoginExchangeOutput,
 	WorkstationMemory,

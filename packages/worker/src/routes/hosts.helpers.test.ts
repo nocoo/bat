@@ -56,7 +56,8 @@ describe("buildSparklinesByHost", () => {
 		cpu: number | null = null,
 		mem: number | null = null,
 		net: number | null = null,
-	): SparklineRow => ({ host_id, ts, cpu, mem, net });
+		load1: number | null = null,
+	): SparklineRow => ({ host_id, ts, cpu, mem, net, load1 });
 
 	test("returns an empty map for no rows", () => {
 		expect(buildSparklinesByHost([]).size).toBe(0);
@@ -64,9 +65,9 @@ describe("buildSparklinesByHost", () => {
 
 	test("groups samples per host and per channel", () => {
 		const map = buildSparklinesByHost([
-			row("web", 1, 10, 20, 300),
-			row("web", 2, 15, 25, 400),
-			row("db", 1, 5, null, null),
+			row("web", 1, 10, 20, 300, 1.5),
+			row("web", 2, 15, 25, 400, 2.5),
+			row("db", 1, 5, null, null, null),
 		]);
 		expect(map.get("web")).toEqual({
 			cpu: [
@@ -81,11 +82,16 @@ describe("buildSparklinesByHost", () => {
 				{ ts: 1, v: 300 },
 				{ ts: 2, v: 400 },
 			],
+			load: [
+				{ ts: 1, v: 1.5 },
+				{ ts: 2, v: 2.5 },
+			],
 		});
 		expect(map.get("db")).toEqual({
 			cpu: [{ ts: 1, v: 5 }],
 			mem: [],
 			net: [],
+			load: [],
 		});
 	});
 
@@ -94,6 +100,7 @@ describe("buildSparklinesByHost", () => {
 		expect(map.get("x")?.cpu).toEqual([{ ts: 2, v: 5 }]);
 		expect(map.get("x")?.mem).toEqual([{ ts: 1, v: 10 }]);
 		expect(map.get("x")?.net).toEqual([]);
+		expect(map.get("x")?.load).toEqual([]);
 	});
 
 	test("preserves input order within each host", () => {
@@ -108,6 +115,13 @@ describe("buildSparklinesByHost", () => {
 	test("creates an entry per host even if all channels are null", () => {
 		// Helper eagerly creates the entry; callers decide whether to use it.
 		const map = buildSparklinesByHost([row("ghost", 1, null, null, null)]);
-		expect(map.get("ghost")).toEqual({ cpu: [], mem: [], net: [] });
+		expect(map.get("ghost")).toEqual({ cpu: [], mem: [], net: [], load: [] });
+	});
+
+	test("keeps load samples apart from the percentage channels", () => {
+		const map = buildSparklinesByHost([
+			{ host_id: "web", ts: 1, cpu: null, mem: null, net: null, load1: 3.5 },
+		]);
+		expect(map.get("web")?.load).toEqual([{ ts: 1, v: 3.5 }]);
 	});
 });

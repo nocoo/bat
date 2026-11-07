@@ -165,6 +165,12 @@ and the exchange response, carries `Cache-Control: no-store`.
 
 ## Records, status and history
 
+`GET /api/workstations` returns `WorkstationListItem`: a `WorkstationRecord` plus
+`cpu_sparkline` and `mem_sparkline`, the last 24 hourly averages of the report history.
+A workstation without samples keeps `null` rather than a fabricated flat line; the list
+table draws the trend from those two arrays so it needs no per-row history request.
+`GET /api/workstations/{id}` stays a plain `WorkstationRecord`.
+
 Reads return `WorkstationRecord`:
 
 | Field           | Type                                                         |

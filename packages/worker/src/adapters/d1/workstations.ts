@@ -19,6 +19,7 @@ import type {
 	WorkstationGrant,
 	WorkstationRow,
 	WorkstationServerTarget,
+	WorkstationSparklineRow,
 	WorkstationsRepository,
 } from "../../repos/workstations.js";
 
@@ -285,6 +286,30 @@ WHERE installation_id = (SELECT installation_id FROM workstations WHERE id = ?)
 			.prepare(`${LIST_SQL} ORDER BY w.created_at DESC, w.id DESC`)
 			.all<WorkstationListRow>();
 		return results.map(toRecord);
+	}
+
+	async listSparklineRowsSince(
+		ids: string[],
+		sinceSeconds: number,
+	): Promise<WorkstationSparklineRow[]> {
+		if (ids.length === 0) {
+			return [];
+		}
+		const placeholders = ids.map(() => "?").join(", ");
+		const { results } = await this.db
+			.prepare(
+				`SELECT workstation_id,
+	CAST(finished_at / 3600 AS INTEGER) * 3600 AS ts,
+	AVG(cpu_usage_pct) AS cpu,
+	AVG(mem_used_pct) AS mem
+FROM workstation_reports
+WHERE workstation_id IN (${placeholders}) AND finished_at >= ?
+GROUP BY workstation_id, ts
+ORDER BY workstation_id, ts ASC`,
+			)
+			.bind(...ids, sinceSeconds)
+			.all<WorkstationSparklineRow>();
+		return results;
 	}
 
 	async get(id: string): Promise<WorkstationRecord | null> {

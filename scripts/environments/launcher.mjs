@@ -5,6 +5,7 @@ import { authenticateProd } from "./production.mjs";
 import {
 	assertTestEnvironment,
 	createRuntime,
+	DEMO_FRESH_SECONDS,
 	removeOwned,
 	root,
 	storageRoot,
@@ -253,7 +254,30 @@ export async function launch({
 				},
 			},
 		});
+		// Keep the demo catalog usable for a long running gateway: the recorded
+		// snapshot ages, so a store older than the freshness window is re-seeded
+		// in place, keeping the instance id the browser already holds.
+		const demoRefresh = setInterval(() => {
+			void (async () => {
+				if (automated) return;
+				const instance = [...instances.values()].find(
+					(candidate) => candidate.mode === "demo" && candidate.active,
+				);
+				if (!instance?.runtime) return;
+				if (Date.now() / 1000 - instance.runtime.anchor <= DEMO_FRESH_SECONDS) return;
+				try {
+					const previous = instance.runtime;
+					await previous.close({ remove: true });
+					const next = await createRuntime({ mode: "demo", dataset: "demo" });
+					instance.runtime = next;
+					demo = next;
+				} catch (error) {
+					console.error("demo catalog refresh failed", error);
+				}
+			})();
+		}, 60_000);
 		const close = async () => {
+			clearInterval(demoRefresh);
 			server.stop(true);
 			await vite?.close();
 			for (const i of instances.values()) if (i.mode === "e2e") await i.runtime.close();

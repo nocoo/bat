@@ -14,18 +14,32 @@ const HOSTS_CACHE_TTL_SECONDS = 30;
  * Pure helper: group sparkline rows into per-host CPU/mem/net arrays,
  * dropping individual null samples. Exported for unit tests.
  */
-export function buildSparklinesByHost(
-	rows: SparklineRow[],
-): Map<string, { cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }> {
+export function buildSparklinesByHost(rows: SparklineRow[]): Map<
+	string,
+	{
+		cpu: SparklinePoint[];
+		mem: SparklinePoint[];
+		net: { ts: number; v: number }[];
+		load: SparklinePoint[];
+	}
+> {
 	const map = new Map<
 		string,
-		{ cpu: SparklinePoint[]; mem: SparklinePoint[]; net: { ts: number; v: number }[] }
+		{
+			cpu: SparklinePoint[];
+			mem: SparklinePoint[];
+			net: { ts: number; v: number }[];
+			load: SparklinePoint[];
+		}
 	>();
 	for (const row of rows) {
 		let entry = map.get(row.host_id);
 		if (!entry) {
-			entry = { cpu: [], mem: [], net: [] };
+			entry = { cpu: [], mem: [], net: [], load: [] };
 			map.set(row.host_id, entry);
+		}
+		if (typeof row.load1 === "number") {
+			entry.load.push({ ts: row.ts, v: row.load1 });
 		}
 		if (row.cpu !== null) {
 			entry.cpu.push({ ts: row.ts, v: row.cpu });
@@ -64,6 +78,7 @@ export interface SparklineRow {
 	cpu: number | null;
 	mem: number | null;
 	net: number | null;
+	load1: number | null;
 }
 
 export async function hostsListRoute(c: Context<AppEnv>) {
@@ -159,6 +174,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			cpu_sparkline: sparklines && sparklines.cpu.length > 0 ? sparklines.cpu : null,
 			mem_sparkline: sparklines && sparklines.mem.length > 0 ? sparklines.mem : null,
 			net_sparkline: netSparkline,
+			load_sparkline: sparklines && sparklines.load.length > 0 ? sparklines.load : null,
 			maintenance_start: host.maintenance_start,
 			maintenance_end: host.maintenance_end,
 			maintenance_reason: host.maintenance_reason,

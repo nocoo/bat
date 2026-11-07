@@ -62,6 +62,13 @@ export type ExchangeResult =
 	| { ok: "owner_mismatch" }
 	| { ok: "disabled" };
 
+export interface WorkstationSparklineRow {
+	workstation_id: string;
+	ts: number;
+	cpu: number | null;
+	mem: number | null;
+}
+
 export interface WorkstationGrant {
 	id: string;
 	name: string;
@@ -107,6 +114,8 @@ export interface WorkstationsRepository {
 	 */
 	revokeKey(workstationId: string, tokenHash: string, now: number): Promise<boolean>;
 	list(): Promise<WorkstationRecord[]>;
+	/** Hourly CPU and memory samples for the workstation list sparklines. */
+	listSparklineRowsSince(ids: string[], sinceSeconds: number): Promise<WorkstationSparklineRow[]>;
 	get(id: string): Promise<WorkstationRecord | null>;
 	/** Delete the workstation and expire every pending code for its installation. */
 	delete(id: string, installationId: string): Promise<boolean>;

@@ -35,6 +35,31 @@ function formatBytesPerSecond(value: number | null): string {
 	return `${Math.round(scaled * 10) / 10} ${units[unit]}/s`;
 }
 
+function MiniTrend({
+	points,
+	color,
+	label,
+}: {
+	points: { ts: number; v: number }[] | null;
+	color: string;
+	label: string;
+}) {
+	if (!points || points.length < 2) {
+		return null;
+	}
+	return (
+		<LineChart
+			data={points.map((point) => ({ x: point.ts, value: point.v }))}
+			series={[{ key: "value", color }]}
+			ariaLabel={label}
+			className="mt-basalt-space-xs h-4 w-16"
+			showAxes={false}
+			showLegend={false}
+			accessibilityLayer={false}
+		/>
+	);
+}
+
 /** Only pressure is coloured; a healthy reading stays on the neutral rail. */
 function pressureClass(value: number): string {
 	return value >= 60 ? getValueColor(value) : "";
@@ -70,7 +95,6 @@ export function HostTable({
 						<TableHead textAlign="end">Disk</TableHead>
 						<TableHead textAlign="end">Load 1m</TableHead>
 						<TableHead textAlign="end">Net</TableHead>
-						<TableHead>24h CPU</TableHead>
 						<TableHead textAlign="end">Ports</TableHead>
 						<TableHead textAlign="end">Last seen</TableHead>
 					</TableRow>
@@ -78,9 +102,6 @@ export function HostTable({
 				<TableBody>
 					{hosts.map((host) => {
 						const tags = tagsFor(host.host_id) ?? [];
-						const trend = (host.cpu_sparkline ?? [])
-							.map((point, index) => ({ x: index, value: point.v }))
-							.filter((point) => Number.isFinite(point.value));
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
@@ -123,41 +144,47 @@ export function HostTable({
 									<StatusBadge status={host.status} />
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
-									<Pct value={host.cpu_usage_pct} />
+									<div className="flex flex-col items-end">
+										<Pct value={host.cpu_usage_pct} />
+										<MiniTrend
+											points={host.cpu_sparkline}
+											color={chart.pink}
+											label={`${host.hostname} 24 hour CPU`}
+										/>
+									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
-									<Pct value={host.mem_used_pct} />
+									<div className="flex flex-col items-end">
+										<Pct value={host.mem_used_pct} />
+										<MiniTrend
+											points={host.mem_sparkline}
+											color={chart.sky}
+											label={`${host.hostname} 24 hour memory`}
+										/>
+									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
 									<Pct value={host.disk_root_used_pct} />
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
-									{host.cpu_load1 === null ? (
-										<span className="text-basalt-muted-foreground">—</span>
-									) : (
-										(host.cpu_load1 as number).toFixed(2)
-									)}
+									<div className="flex flex-col items-end">
+										{host.cpu_load1 === null ? (
+											<span className="text-basalt-muted-foreground">—</span>
+										) : (
+											(host.cpu_load1 as number).toFixed(2)
+										)}
+										<MiniTrend
+											points={host.load_sparkline}
+											color={chart.teal}
+											label={`${host.hostname} 24 hour load`}
+										/>
+									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={`${NUMERIC} text-basalt-sm`}>
 									<span className="text-basalt-muted-foreground">↓</span>{" "}
 									{formatBytesPerSecond(host.net_rx_rate)}{" "}
 									<span className="text-basalt-muted-foreground">↑</span>{" "}
 									{formatBytesPerSecond(host.net_tx_rate)}
-								</TableCell>
-								<TableCell>
-									{trend.length > 1 ? (
-										<LineChart
-											data={trend}
-											series={[{ key: "value", color: chart.sky }]}
-											ariaLabel={`${host.hostname} 24 hour CPU trend`}
-											className="h-6 w-20"
-											showAxes={false}
-											showLegend={false}
-											accessibilityLayer={false}
-										/>
-									) : (
-										<span className="text-basalt-sm text-basalt-muted-foreground">No samples</span>
-									)}
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
 									{openPortsFor(host.host_id) > 0 ? (
