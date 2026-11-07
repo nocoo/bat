@@ -370,9 +370,18 @@ pub struct PublicIps {
 }
 
 impl PublicIps {
-    /// True when neither family has been observed.
-    pub const fn is_empty(&self) -> bool {
-        self.v4.is_none() && self.v6.is_none()
+    /// Merge a fresh observation into this one, family by family.
+    ///
+    /// A refresh only knows what it just observed. The families are independent
+    /// observations, so an absent value must never erase the last good one: an
+    /// IPv6-only refresh keeps the cached IPv4 address.
+    pub fn merge(&mut self, fresh: Self) {
+        if fresh.v4.is_some() {
+            self.v4 = fresh.v4;
+        }
+        if fresh.v6.is_some() {
+            self.v6 = fresh.v6;
+        }
     }
 }
 

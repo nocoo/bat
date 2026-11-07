@@ -66,10 +66,7 @@ async fn main() {
     let public_ips: Arc<Mutex<PublicIps>> = Arc::new(Mutex::new(PublicIps::default()));
     // Fetch initial public IPs before the first identity send. The lookup is
     // bounded internally so a slow family cannot delay startup.
-    let initial = fetch_public_ips().await;
-    if !initial.is_empty() {
-        *public_ips.lock().await = initial;
-    }
+    public_ips.lock().await.merge(fetch_public_ips().await);
 
     tracing::info!(
         %host_id,
@@ -244,10 +241,8 @@ async fn main() {
                 if echo_timer.elapsed() >= echo_interval {
                     let pips = Arc::clone(&public_ips);
                     tokio::spawn(async move {
-                        let ips = fetch_public_ips().await;
-                        if !ips.is_empty() {
-                            *pips.lock().await = ips;
-                        }
+                        let fresh = fetch_public_ips().await;
+                        pips.lock().await.merge(fresh);
                     });
                     echo_timer = tokio::time::Instant::now();
                 }
@@ -838,7 +833,7 @@ mod tests {
         )
         .await;
 
-        assert!(ips.is_empty());
+        assert_eq!(ips, PublicIps::default());
     }
 
     #[tokio::test(start_paused = true)]
@@ -850,7 +845,7 @@ mod tests {
         )
         .await;
 
-        assert!(ips.is_empty());
+        assert_eq!(ips, PublicIps::default());
     }
 
     #[tokio::test(start_paused = true)]

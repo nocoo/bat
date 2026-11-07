@@ -952,22 +952,56 @@ mod tests {
     }
 
     #[test]
-    fn public_ips_is_empty() {
-        assert!(PublicIps::default().is_empty());
-        assert!(
-            !PublicIps {
+    fn public_ips_merge_keeps_a_family_the_refresh_lost() {
+        // Double stack observed, then the IPv4 echo path fails and only IPv6 is
+        // re-observed: the cached IPv4 must survive, and the preferred address
+        // must stay the stored IPv4.
+        let mut cached = PublicIps {
+            v4: Some("203.0.113.1".to_string()),
+            v6: Some("2001:db8::2".to_string()),
+        };
+        cached.merge(PublicIps {
+            v4: None,
+            v6: Some("2001:db8::9".to_string()),
+        });
+
+        assert_eq!(
+            cached,
+            PublicIps {
                 v4: Some("203.0.113.1".to_string()),
-                v6: None,
+                v6: Some("2001:db8::9".to_string()),
             }
-            .is_empty()
         );
-        assert!(
-            !PublicIps {
-                v4: None,
-                v6: Some("2001:db8::2".to_string()),
-            }
-            .is_empty()
+        assert_eq!(
+            preferred_public_ip(&cached),
+            Some("203.0.113.1".to_string())
         );
+    }
+
+    #[test]
+    fn public_ips_merge_updates_only_the_family_it_observed() {
+        let mut cached = PublicIps {
+            v4: Some("203.0.113.1".to_string()),
+            v6: Some("2001:db8::2".to_string()),
+        };
+        cached.merge(PublicIps {
+            v4: Some("203.0.113.5".to_string()),
+            v6: None,
+        });
+
+        assert_eq!(cached.v4, Some("203.0.113.5".to_string()));
+        assert_eq!(cached.v6, Some("2001:db8::2".to_string()));
+    }
+
+    #[test]
+    fn public_ips_merge_of_nothing_is_a_no_op() {
+        let mut cached = PublicIps {
+            v4: Some("203.0.113.1".to_string()),
+            v6: None,
+        };
+        let before = cached.clone();
+        cached.merge(PublicIps::default());
+        assert_eq!(cached, before);
     }
 
     #[test]
