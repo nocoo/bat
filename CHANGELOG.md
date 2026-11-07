@@ -1,5 +1,15 @@
 # Changelog
 
+## v3.1.1
+
+### Added
+
+- Publish a machine-readable probe release manifest
+
+### Fixed
+
+- Keep the OpenAPI spec version out of the stale-version scan
+
 ## v3.1.0
 
 ### Added
