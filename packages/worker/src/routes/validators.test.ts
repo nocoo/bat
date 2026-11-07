@@ -51,6 +51,52 @@ describe("validateIdentityPayload", () => {
 	test("rejects non-string probe_version", () => {
 		expect(validateIdentityPayload({ ...validIdentity, probe_version: 1 })).toBe(false);
 	});
+
+	test("accepts absent, null and valid family literals", () => {
+		expect(validateIdentityPayload({ ...validIdentity })).toBe(true);
+		expect(
+			validateIdentityPayload({ ...validIdentity, public_ip_v4: null, public_ip_v6: null }),
+		).toBe(true);
+		expect(
+			validateIdentityPayload({
+				...validIdentity,
+				public_ip_v4: "203.0.113.10",
+				public_ip_v6: "2001:db8::2",
+			}),
+		).toBe(true);
+		expect(validateIdentityPayload({ ...validIdentity, public_ip_v6: "::1" })).toBe(true);
+	});
+
+	test("rejects a public_ip_v4 that is not an IPv4 literal", () => {
+		for (const value of [
+			"2001:db8::2",
+			"not-an-ip",
+			"203.0.113",
+			"203.0.113.300",
+			"",
+			{ address: "203.0.113.10" },
+			["203.0.113.10"],
+			12,
+			true,
+		]) {
+			expect(validateIdentityPayload({ ...validIdentity, public_ip_v4: value })).toBe(false);
+		}
+	});
+
+	test("rejects a public_ip_v6 that is not an IPv6 literal", () => {
+		for (const value of [
+			"203.0.113.10",
+			"not-an-ip",
+			"2001:db8:::1",
+			"",
+			{ address: "2001:db8::2" },
+			["2001:db8::2"],
+			12,
+			true,
+		]) {
+			expect(validateIdentityPayload({ ...validIdentity, public_ip_v6: value })).toBe(false);
+		}
+	});
 });
 
 // --- pickInventoryFields ---

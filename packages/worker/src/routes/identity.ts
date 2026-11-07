@@ -1,8 +1,14 @@
 import type { IdentityPayload } from "@bat/shared";
+import { isIpv4, isIpv6 } from "@bat/shared";
 // POST /api/identity — upsert host identity
 import type { Context } from "hono";
 import type { HostInventoryUpdate } from "../repos/types.js";
 import type { AppEnv } from "../types.js";
+
+/** An optional address must be absent, null, or a literal of the right family. */
+function isOptionalLiteral(value: unknown, accepts: (input: string) => boolean): boolean {
+	return value === undefined || value === null || (typeof value === "string" && accepts(value));
+}
 
 /** Lightweight validation — checks required fields exist and are correct types */
 export function validateIdentityPayload(body: unknown): body is IdentityPayload {
@@ -21,6 +27,11 @@ export function validateIdentityPayload(body: unknown): body is IdentityPayload 
 		typeof b.cpu_model === "string" &&
 		typeof b.uptime_seconds === "number" &&
 		typeof b.boot_time === "number" &&
+		// The per-family addresses are stored verbatim and rendered as literals, so a
+		// malformed value (an object, an array, the wrong family) is refused here,
+		// before any write, rather than reaching the dashboard.
+		isOptionalLiteral(b.public_ip_v4, isIpv4) &&
+		isOptionalLiteral(b.public_ip_v6, isIpv6) &&
 		// probe_version is optional for backward compatibility
 		(b.probe_version === undefined || typeof b.probe_version === "string")
 	);

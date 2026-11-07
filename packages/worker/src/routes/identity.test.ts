@@ -52,6 +52,38 @@ describe("POST /api/identity", () => {
 		app = createApp(db);
 	});
 
+	test("rejects a malformed public address family before any write", async () => {
+		for (const bad of [
+			{ public_ip_v4: "2001:db8::2" },
+			{ public_ip_v4: "not-an-ip" },
+			{ public_ip_v4: { address: "203.0.113.10" } },
+			{ public_ip_v4: ["203.0.113.10"] },
+			{ public_ip_v6: "203.0.113.10" },
+			{ public_ip_v6: "2001:db8:::1" },
+			{ public_ip_v6: { address: "2001:db8::2" } },
+			{ public_ip_v6: ["2001:db8::2"] },
+		] as const) {
+			const res = await post(app, { ...makePayload(), ...bad });
+			expect(res.status).toBe(400);
+		}
+
+		const row = await db
+			.prepare("SELECT host_id FROM hosts WHERE host_id = ?")
+			.bind("host-001")
+			.first();
+		expect(row).toBeNull();
+	});
+
+	test("accepts valid family literals and null", async () => {
+		const res = await post(app, {
+			...makePayload(),
+			public_ip: "203.0.113.10",
+			public_ip_v4: "203.0.113.10",
+			public_ip_v6: null,
+		});
+		expect(res.status).toBe(204);
+	});
+
 	test("valid identity → 204, host created", async () => {
 		const res = await post(app, makePayload());
 		expect(res.status).toBe(204);
