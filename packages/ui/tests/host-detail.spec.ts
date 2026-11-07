@@ -1,7 +1,21 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
+
+/** Rendered line count of a block-level text element. */
+async function lineCount(locator: Locator): Promise<number> {
+	return locator.evaluate((element) => {
+		const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
+		if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+			return 0;
+		}
+		return Math.round(element.getBoundingClientRect().height / lineHeight);
+	});
+}
 
 test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
+	const betaHid = "4c494cde";
+	const publicIpv6 = "2001:db8:85a3:8d3:1319:8a2e:370:7348";
+	const interfaceIpv6 = "2001:db8:85a3:8d3:1319:8a2e:370:7349";
 
 	test("network legend uses inbound and outbound labels", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
@@ -161,12 +175,102 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText("0.9.99").first()).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("system info card shows public IP", async ({ page }) => {
+	test("public address lead block shows both families with copy affordances", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		// The address appears in the header and in the system info card.
-		await expect(page.getByText("203.0.113.10").first()).toBeVisible({ timeout: 15_000 });
+		const v4 = page.getByTestId("host-public-ip-v4");
+		const v6 = page.getByTestId("host-public-ip-v6");
+		await expect(v4).toHaveText("203.0.113.10", { timeout: 15_000 });
+		await expect(v6).toHaveText(publicIpv6);
+		await expect(page.getByText("IPv4", { exact: true }).first()).toBeVisible();
+		await expect(page.getByText("IPv6", { exact: true }).first()).toBeVisible();
+		await expect(
+			page.getByRole("button", { name: "Copy public address 203.0.113.10", exact: true }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("button", { name: `Copy public address ${publicIpv6}`, exact: true }),
+		).toBeVisible();
+		// The lead cell is a narrow column: the literal wraps instead of being clipped.
+		expect(await v6.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+			true,
+		);
+		expect(await lineCount(v6)).toBeGreaterThan(1);
+		expect(await v6.evaluate((element) => getComputedStyle(element).textOverflow)).not.toBe(
+			"ellipsis",
+		);
+	});
+
+	test("a family without an observation shows a muted dash instead of disappearing", async ({
+		page,
+	}) => {
+		await page.goto(`/hosts/${betaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByTestId("host-public-ip-v4")).toHaveText("198.51.100.20", {
+			timeout: 15_000,
+		});
+		await expect(page.getByTestId("host-public-ip-v6")).toHaveText("—");
+	});
+
+	test("system info lists public IPv4 and IPv6 separately", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByText("Public IPv4", { exact: true })).toBeVisible({
+			timeout: 15_000,
+		});
+		await expect(page.getByText("Public IPv6", { exact: true })).toBeVisible();
+		await expect(page.getByText("Public IP", { exact: true })).toHaveCount(0);
+	});
+
+	test("interface addresses render one entry per interface", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(page.getByText("Interfaces", { exact: true })).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText("eth0", { exact: true })).toBeVisible();
+		await expect(page.getByText("eth1", { exact: true })).toBeVisible();
+		await expect(page.getByText("10.0.1.10", { exact: true })).toBeVisible();
+		await expect(page.getByText(interfaceIpv6, { exact: true })).toBeVisible();
+	});
+
+	test("long interface IPv6 literals never clip or ellipsize", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const literal = page.getByText(interfaceIpv6, { exact: true });
+		await expect(literal).toBeVisible({ timeout: 15_000 });
+		expect(
+			await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+		).toBe(true);
+		const style = await literal.evaluate((element) => {
+			const computed = getComputedStyle(element);
+			return { wordBreak: computed.wordBreak, textOverflow: computed.textOverflow };
+		});
+		expect(style.wordBreak).toBe("break-all");
+		expect(style.textOverflow).not.toBe("ellipsis");
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true,
+		);
+	});
+
+	test("narrow viewport keeps the family rows and their copy controls usable", async ({ page }) => {
+		await page.setViewportSize({ width: 390, height: 900 });
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const v6 = page.getByTestId("host-public-ip-v6");
+		await expect(v6).toHaveText(publicIpv6, { timeout: 15_000 });
+		await expect(
+			page.getByRole("button", { name: `Copy public address ${publicIpv6}`, exact: true }),
+		).toBeVisible();
+		expect(await v6.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
+			true,
+		);
+		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+			true,
+		);
 	});
 
 	test("navigating from hosts list to detail and back", async ({ page }) => {

@@ -1,6 +1,10 @@
 // A public address with an explicit copy control and visible feedback. The
 // clipboard is optional in embedded browsers, so a refused copy says so instead
 // of pretending it worked.
+//
+// The address never truncates: it wraps inside the available width, so a long
+// IPv6 literal stays readable and fully selectable. Callers that render it in a
+// narrow column cap the type size instead of clipping the value.
 
 import { Button } from "@nocoo/basalt";
 import { Check, Copy, TriangleAlert } from "lucide-react";
@@ -8,7 +12,29 @@ import { useEffect, useState } from "react";
 
 type CopyState = "idle" | "copied" | "failed";
 
-export function CopyableAddress({ value }: { value: string | null }) {
+export interface CopyableAddressProps {
+	/** The address to show and copy. `null` renders the empty state. */
+	value: string | null;
+	/** Small leading label, e.g. the address family ("IPv4"). */
+	label?: string;
+	/** Text shown when no address was observed. */
+	emptyText?: string;
+	/** Test id of the address element. */
+	testId?: string;
+	/** Font size class for the address. */
+	sizeClassName?: string;
+	/** Show the copy control as an icon only, without the text label. */
+	iconOnly?: boolean;
+}
+
+export function CopyableAddress({
+	value,
+	label,
+	emptyText = "No public IP observed",
+	testId = "workstation-public-ip",
+	sizeClassName = "text-basalt-xl",
+	iconOnly = false,
+}: CopyableAddressProps) {
 	const [state, setState] = useState<CopyState>("idle");
 
 	useEffect(() => {
@@ -32,18 +58,24 @@ export function CopyableAddress({ value }: { value: string | null }) {
 	}
 
 	return (
-		<div className="flex items-center gap-basalt-space-sm">
+		<div className="flex min-w-0 items-center gap-basalt-space-sm">
+			{label !== undefined && (
+				<span className="shrink-0 text-basalt-xs font-semibold text-basalt-muted-foreground">
+					{label}
+				</span>
+			)}
 			<span
-				className="font-mono text-basalt-xl font-semibold tabular-nums"
-				data-testid="workstation-public-ip"
+				className={`min-w-0 flex-1 break-all font-mono ${sizeClassName} font-semibold tabular-nums`}
+				data-testid={testId}
 			>
-				{value ?? "No public IP observed"}
+				{value === null ? <span className="text-basalt-muted-foreground">{emptyText}</span> : value}
 			</span>
 			{value !== null && (
 				<Button
 					type="button"
 					variant="ghost"
 					size="sm"
+					className="shrink-0"
 					onClick={() => void copy()}
 					aria-label={`Copy public address ${value}`}
 					title="Copy the public address"
@@ -59,7 +91,8 @@ export function CopyableAddress({ value }: { value: string | null }) {
 					) : (
 						<Copy aria-hidden="true" strokeWidth={1.5} />
 					)}
-					{state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
+					{!iconOnly &&
+						(state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy")}
 				</Button>
 			)}
 		</div>

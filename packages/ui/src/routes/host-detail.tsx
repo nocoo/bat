@@ -20,14 +20,15 @@ import {
 import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { HostDeleteDialog } from "@/components/host-delete-dialog";
+import { HostInterfaceAddresses } from "@/components/host-interface-addresses";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
+import { HostPublicAddress } from "@/components/host-public-address";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
 import { SkeletonChartCard, SkeletonRail } from "@/components/layout/page-skeleton";
 import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { StatusBadge } from "@/components/status-badge";
-import { CopyableAddress } from "@/components/workstation/copyable-address";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
 import { formatLastSeen, formatMemory, formatUptime } from "@/lib/host-card-format";
 import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
@@ -45,9 +46,9 @@ const TIME_RANGES = [
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
 	return (
-		<div className="flex justify-between text-basalt-base">
-			<span className="text-basalt-muted-foreground">{label}</span>
-			<span className="font-mono tabular-nums">{value ?? "—"}</span>
+		<div className="flex justify-between gap-basalt-space-sm text-basalt-base">
+			<span className="shrink-0 text-basalt-muted-foreground">{label}</span>
+			<span className="min-w-0 break-all text-right font-mono tabular-nums">{value ?? "—"}</span>
 		</div>
 	);
 }
@@ -226,9 +227,7 @@ export function HostDetailPage() {
 					lead={
 						<>
 							<p className="text-basalt-sm text-basalt-muted-foreground">Public address</p>
-							<div className="mt-basalt-space-xs">
-								<CopyableAddress value={host?.public_ip ?? null} />
-							</div>
+							<HostPublicAddress detail={detail} />
 							<p className="mt-basalt-space-xs text-basalt-sm text-basalt-muted-foreground">
 								{host ? `Last seen ${formatLastSeen(host.last_seen, now)}` : "No report yet"}
 							</p>
@@ -313,7 +312,9 @@ export function HostDetailPage() {
 										{detail?.probe_version && (
 											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
 										)}
-										{detail?.public_ip && <InfoRow label="Public IP" value={detail.public_ip} />}
+										<InfoRow label="Public IPv4" value={detail?.public_ip_v4} />
+										<InfoRow label="Public IPv6" value={detail?.public_ip_v6} />
+										<HostInterfaceAddresses interfaces={detail?.net_interfaces} />
 										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
 										<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
 										{detail?.timezone && <InfoRow label="Timezone" value={detail.timezone} />}

@@ -2,7 +2,7 @@
 //
 // Lives in `lib/` (not in the component file) so the rules can be unit-tested
 // without rendering React, and so the View stays presentation-only (MVVM).
-import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
+import type { SparklinePoint } from "@bat/shared";
 
 // ---------------------------------------------------------------------------
 // Formatters
@@ -39,15 +39,6 @@ export function formatLastSeen(unixSeconds: number, nowSeconds?: number): string
 		return `${Math.floor(delta / 3600)}h ago`;
 	}
 	return `${Math.floor(delta / 86400)}d ago`;
-}
-
-/** Truncate PRETTY_NAME — "Ubuntu 22.04.3 LTS" → "Ubuntu 22.04". */
-export function shortenOs(os: string | null): string | null {
-	if (!os) {
-		return null;
-	}
-	const match = os.match(/^(\S+)\s+(\d+\.\d+)/);
-	return match ? `${match[1]} ${match[2]}` : os;
 }
 
 /** Format bytes as "8 GB" / "512 MB". */
@@ -112,25 +103,6 @@ export function formatNetRate(bytesPerSec: number | null): string {
 /** Disk usage percentage display — "47%" or "—". */
 export function formatDiskUsage(pct: number | null): string {
 	return pct === null ? "—" : `${Math.round(pct)}%`;
-}
-
-/** Build host-card subtitle: "Ubuntu 22.04 · x86_64 · KVM · 203.0.113.42". */
-export function buildSubtitle(host: HostOverviewItem): string | null {
-	const parts: string[] = [];
-	const os = shortenOs(host.os);
-	if (os) {
-		parts.push(os);
-	}
-	if (host.arch) {
-		parts.push(host.arch);
-	}
-	if (host.virtualization) {
-		parts.push(host.virtualization.toUpperCase());
-	}
-	if (host.public_ip) {
-		parts.push(host.public_ip);
-	}
-	return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 // ---------------------------------------------------------------------------

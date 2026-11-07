@@ -1,7 +1,6 @@
-import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
+import type { SparklinePoint } from "@bat/shared";
 import { describe, expect, test } from "vitest";
 import {
-	buildSubtitle,
 	formatCpuTopology,
 	formatDiskUsage,
 	formatLastSeen,
@@ -11,7 +10,6 @@ import {
 	formatUptime,
 	getBarColor,
 	getValueColor,
-	shortenOs,
 	statusDotColor,
 	toPolyline,
 } from "./host-card-format";
@@ -46,18 +44,6 @@ describe("formatLastSeen", () => {
 	test("falls back to wall clock when nowSeconds omitted", () => {
 		const wall = Math.floor(Date.now() / 1000);
 		expect(formatLastSeen(wall - 5)).toBe("just now");
-	});
-});
-
-describe("shortenOs", () => {
-	test("trims patch/edition", () => {
-		expect(shortenOs("Ubuntu 22.04.3 LTS")).toBe("Ubuntu 22.04");
-	});
-	test("returns the input when pattern doesn't match", () => {
-		expect(shortenOs("Arch Linux")).toBe("Arch Linux");
-	});
-	test("returns null for null", () => {
-		expect(shortenOs(null)).toBeNull();
 	});
 });
 
@@ -115,29 +101,6 @@ describe("formatDiskUsage", () => {
 	test("rounds to integer percent or returns —", () => {
 		expect(formatDiskUsage(null)).toBe("—");
 		expect(formatDiskUsage(47.6)).toBe("48%");
-	});
-});
-
-describe("buildSubtitle", () => {
-	const base = (h: Partial<HostOverviewItem>): HostOverviewItem => h as HostOverviewItem;
-
-	test("joins os/arch/virt/ip with separator and uppercases virt", () => {
-		expect(
-			buildSubtitle(
-				base({
-					os: "Ubuntu 22.04.3 LTS",
-					arch: "x86_64",
-					virtualization: "kvm",
-					public_ip: "1.2.3.4",
-				}),
-			),
-		).toBe("Ubuntu 22.04 · x86_64 · KVM · 1.2.3.4");
-	});
-
-	test("returns null when no parts", () => {
-		expect(
-			buildSubtitle(base({ os: null, arch: null, virtualization: null, public_ip: null })),
-		).toBeNull();
 	});
 });
 
