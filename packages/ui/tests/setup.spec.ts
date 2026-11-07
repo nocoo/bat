@@ -32,8 +32,19 @@ test.describe("Setup page", () => {
 
 		// Step headings should be visible
 		await expect(page.getByText("Step 1 — Get your write key")).toBeVisible({ timeout: 15_000 });
-		await expect(page.getByText("Step 2 — Run the install command")).toBeVisible();
-		await expect(page.getByText("Step 3 — Verify the installation")).toBeVisible();
+		await expect(page.getByText("Step 2 — Install the binary and the unit")).toBeVisible();
+		await expect(page.getByText("Step 3 — Configure")).toBeVisible();
+		await expect(page.getByText("Step 4 — Start and verify")).toBeVisible();
+	});
+
+	test("shows the manifest and a real install command", async ({ page }) => {
+		await page.goto("/setup");
+		await page.waitForLoadState("domcontentloaded");
+
+		await expect(
+			page.getByText("https://s.zhe.to/apps/bat/latest/manifest.json", { exact: true }),
+		).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText(/bat-probe-linux-\$arch/).first()).toBeVisible();
 	});
 
 	test("shows install command with placeholder", async ({ page }) => {
@@ -66,8 +77,8 @@ test.describe("Setup page", () => {
 		await expect(uninstallButton).toBeVisible({ timeout: 15_000 });
 
 		// Initially, uninstall command should NOT be visible
-		const uninstallCmd = page.getByText("--uninstall");
-		await expect(uninstallCmd).not.toBeVisible();
+		const uninstallCmd = page.getByText("systemctl disable --now bat-probe");
+		await expect(uninstallCmd).toBeHidden();
 
 		// Click to expand
 		await uninstallButton.click();

@@ -25,7 +25,7 @@ jobs:
       install-policy: "trusted"
       timeout-minutes: 5
       command: |
-        bun test scripts/release.test.ts
+        bun test scripts/release.test.ts scripts/probe-manifest.test.ts
         bun run test:environments:unit
         bun run gate:routes
         bun run gate:pages

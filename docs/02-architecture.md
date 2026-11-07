@@ -168,7 +168,7 @@ Worker secrets (one-time, not every release): `BAT_WRITE_KEY`, `BAT_READ_KEY`, `
 
 ### Probe on VPS
 
-Binaries (not `install.sh`) are on R2: `https://s.zhe.to/apps/bat/latest/bat-probe-linux-{x86_64,aarch64}`. `probe/install.sh` is not uploaded by CD and exits unless `DASHBOARD_URL` was injected. Runbook: [docs/19-edge-deployment.md](docs/19-edge-deployment.md).
+Binaries (not `install.sh`) are on R2: `https://s.zhe.to/apps/bat/latest/bat-probe-linux-{x86_64,aarch64}`, with the always-latest machine-readable index at `https://s.zhe.to/apps/bat/latest/manifest.json` and the systemd unit at `.../latest/bat-probe.service`. `probe/install.sh` is not uploaded by CD and exits unless `DASHBOARD_URL` was injected. Runbook: [docs/19-edge-deployment.md](docs/19-edge-deployment.md).
 
 ---
 

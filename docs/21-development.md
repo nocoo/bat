@@ -46,7 +46,7 @@ systemctl status bat-probe
 
 使用完整的 `probe/dist/bat-probe.service`：它配置 `AmbientCapabilities=CAP_DAC_READ_SEARCH`、只读系统路径、`NoNewPrivileges` 和 15M 内存上限。该上限不是实测内存占用。不要从历史设计文档复制缺少 capabilities 的 unit 片段。
 
-发布流程只上传二进制与 `.sha256`，不上传 `install.sh`。仓库的 `probe/install.sh` 仍需要注入部署地址，Setup 页引用的脚本也不由当前 CD 发布；不要把它当作现成的一键安装入口。
+发布流程上传二进制、`.sha256`、systemd unit 和 `manifest.json`，不上传 `install.sh`。仓库的 `probe/install.sh` 需要注入部署地址，会与线上部署漂移，不要把它当作安装入口；懒加载的机器（含 agent）读取 `https://s.zhe.to/apps/bat/latest/manifest.json` 拿当前版本、按架构的下载地址、SHA-256 与 unit 地址，Setup 页也以它为准。
 
 探针基本指标默认每 30 秒采集，身份信息定期更新；扩展采集约每 30 分钟执行，其中深度磁盘扫描间隔更长。软件、Docker、systemd 和站点发现依赖目标机现有命令、配置文件和权限。探针还尝试从 `https://echo.nocoo.cloud/api/ip` 取得公网地址，该地址写在源码中；请求失败时保留可用的本地采集流程。
 

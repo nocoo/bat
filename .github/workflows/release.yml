@@ -144,6 +144,11 @@ jobs:
           file probe/out/bat-probe-linux-x86_64
           file probe/out/bat-probe-linux-aarch64
 
+      - name: Build probe manifest
+        run: |
+          cp probe/dist/bat-probe.service probe/out/bat-probe.service
+          bun scripts/probe-manifest.mjs --dir probe/out --version "${{ steps.ver.outputs.version }}" --out probe/out/manifest.json
+
       - name: Upload artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -172,7 +177,8 @@ jobs:
           test "$reported" = "$expected"
           for tier in "$VERSION" latest; do
             for f in bat-probe-linux-x86_64 bat-probe-linux-aarch64 \
-                     bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256; do
+                     bat-probe-linux-x86_64.sha256 bat-probe-linux-aarch64.sha256 \
+                     bat-probe.service manifest.json; do
               echo "→ zhe/apps/bat/$tier/$f"
               "$WRANGLER" r2 object put "zhe/apps/bat/$tier/$f" \
                 --file "probe/out/$f" --remote

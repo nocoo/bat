@@ -36,7 +36,7 @@ write_key = "<your-write-key>"
 interval = 30
 ```
 
-`worker_url` 需要 HTTPS，loopback 开发地址除外；间隔不能低于 10 秒。Setup API 只返回地址，不提供 write key。发布流程上传探针二进制和校验文件，没有发布可直接使用的一键安装脚本。
+`worker_url` 需要 HTTPS，loopback 开发地址除外；间隔不能低于 10 秒。Setup API 只返回地址，不提供 write key。发布流程上传探针二进制、校验文件、systemd unit 和 `manifest.json`（`https://s.zhe.to/apps/bat/latest/manifest.json`，含版本、按架构下载地址与 SHA-256），没有发布可直接使用的一键安装脚本。
 
 CLI 包名为 `@nocoo/bat`，命令为 `bat`，构建生成无需 Bun 的 Node.js 产物。npm 发布单独执行；发布前可从源码运行：
 
