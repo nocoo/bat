@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { HostDetailItem } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { Hono } from "hono";
@@ -8,6 +9,23 @@ import type { AppEnv } from "../types";
 import { hostDetailRoute } from "./host-detail";
 
 const READ_KEY = "test-read-key";
+
+/** The backfill statements exactly as 0034 ships them, so the test can replay
+ *  the migration on rows written by a pre-split probe. */
+const BACKFILL_SQL = readFileSync(
+	new URL("../../migrations/0034_public_ip_families.sql", import.meta.url),
+	"utf8",
+)
+	.split(";")
+	.map((statement) =>
+		statement
+			.split("\n")
+			.filter((line) => !line.trimStart().startsWith("--"))
+			.join("\n")
+			.trim(),
+	)
+	.filter((statement) => statement.startsWith("UPDATE"))
+	.join(";\n");
 
 function createApp(db: D1Database) {
 	const app = new Hono<AppEnv>();
@@ -185,6 +203,27 @@ describe("GET /api/hosts/:id", () => {
 
 		const body = (await res.json()) as HostDetailItem;
 		expect(body.public_ip).toBe("203.0.113.42");
+	});
+
+	test("a host observed before the family split keeps showing its address", async () => {
+		// A pre-0034 probe only wrote `public_ip`; the migration backfill is what
+		// makes that address visible through the per-family fields.
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
+			)
+			.bind("host-legacy", "host-legacy", now, "203.0.113.10")
+			.run();
+		await db.exec(BACKFILL_SQL);
+
+		const res = await get(app, "host-legacy");
+		expect(res.status).toBe(200);
+
+		const body = (await res.json()) as HostDetailItem;
+		expect(body.public_ip).toBe("203.0.113.10");
+		expect(body.public_ip_v4).toBe("203.0.113.10");
+		expect(body.public_ip_v6).toBeNull();
 	});
 
 	test("public address families returned in detail response", async () => {
