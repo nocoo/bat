@@ -107,6 +107,12 @@ export function TagsPage() {
 
 			{/* Create new tag */}
 			<LayerCard>
+				<LayerCard.Header>
+					<h2>New tag</h2>
+					<span className="text-basalt-sm text-basalt-muted-foreground">
+						Up to {TAG_MAX_LENGTH} characters
+					</span>
+				</LayerCard.Header>
 				<LayerCard.Body>
 					<form
 						className="flex items-center gap-2"
@@ -138,13 +144,26 @@ export function TagsPage() {
 
 			{/* Tag list */}
 			{!tags || tags.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-					<Tag className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-basalt-lg font-semibold text-basalt-foreground">No tags yet</h2>
-					<p className="mt-2 text-basalt-base">Create a tag above to get started.</p>
-				</div>
+				<LayerCard>
+					<LayerCard.Header>
+						<h2>Tag list</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">none defined</span>
+					</LayerCard.Header>
+					<LayerCard.Body>
+						<div className="flex items-center gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground">
+							<Tag aria-hidden="true" className="size-4" strokeWidth={1.5} />
+							No tags yet. Create one above to group hosts.
+						</div>
+					</LayerCard.Body>
+				</LayerCard>
 			) : (
 				<LayerCard>
+					<LayerCard.Header>
+						<h2>Tag list</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">
+							{tags.length} defined
+						</span>
+					</LayerCard.Header>
 					<LayerCard.Body>
 						<div className="divide-y divide-basalt-border">
 							{tags.map((tag) => (

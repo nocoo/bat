@@ -5,7 +5,7 @@ import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { Laptop, Terminal } from "lucide-react";
 import { Link } from "react-router";
-import { Reading, type ReadingItem } from "@/components/layout/reading";
+import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WorkstationTable } from "@/components/workstation/workstation-table";
 import { useWorkstations } from "@/hooks";
@@ -126,13 +126,7 @@ export function WorkstationsPage() {
 				</LayerCard>
 			) : (
 				<>
-					<LayerCard padding="none">
-						<div className="grid grid-cols-2 divide-basalt-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
-							{summaryItems(records, now).map((item) => (
-								<Reading key={item.label} item={item} />
-							))}
-						</div>
-					</LayerCard>
+					<PageSummary items={summaryItems(records, now)} />
 					<LayerCard data-testid="workstation-table">
 						<LayerCard.Header>
 							<h2>Machines</h2>

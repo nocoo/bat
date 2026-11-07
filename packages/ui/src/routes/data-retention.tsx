@@ -60,20 +60,32 @@ export function DataRetentionPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-basalt-layout max-w-4xl">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Data Retention"
 				description="Data outside this window is permanently deleted hourly."
 			/>
 
-			{/* Action error banner */}
 			{actionError && (
-				<div className="rounded-md border border-basalt-destructive/50 bg-basalt-destructive/10 px-4 py-3 text-basalt-base text-basalt-destructive">
-					{actionError}
-				</div>
+				<LayerCard>
+					<LayerCard.Body className="flex items-start gap-basalt-space-md text-basalt-sm text-basalt-destructive">
+						<AlertTriangle
+							aria-hidden="true"
+							className="mt-basalt-space-xs size-4 shrink-0"
+							strokeWidth={1.5}
+						/>
+						{actionError}
+					</LayerCard.Body>
+				</LayerCard>
 			)}
 
 			<LayerCard>
+				<LayerCard.Header>
+					<h2>Retention</h2>
+					<span className="text-basalt-sm text-basalt-muted-foreground">
+						Applies to metrics, events, alerts and workstation history
+					</span>
+				</LayerCard.Header>
 				<LayerCard.Body>
 					<SegmentControl
 						legend="Retention window"

@@ -42,7 +42,7 @@ export function SetupPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-basalt-layout max-w-3xl">
+		<div className="space-y-basalt-layout">
 			<PageHeader
 				title="Install Probe"
 				description="Deploy the monitoring probe on your Linux servers, or link a laptop with the bat CLI."
@@ -50,12 +50,17 @@ export function SetupPage() {
 
 			{/* Prerequisites */}
 			<LayerCard>
+				<LayerCard.Header>
+					<h2>Prerequisites</h2>
+					<span className="text-basalt-sm text-basalt-muted-foreground">
+						Linux servers only; laptops use the CLI
+					</span>
+				</LayerCard.Header>
 				<LayerCard.Body>
 					<div className="flex items-start gap-3 text-basalt-base text-basalt-muted-foreground">
 						<Terminal className="h-4 w-4 mt-0.5 shrink-0" strokeWidth={1.5} />
 						<div>
-							<p className="font-medium text-basalt-foreground">Prerequisites</p>
-							<ul className="mt-1 list-disc list-inside space-y-0.5">
+							<ul className="list-disc list-inside space-y-0.5">
 								<li>Linux server (x86_64 or aarch64)</li>
 								<li>Root access (sudo)</li>
 								<li>systemd-based init system</li>

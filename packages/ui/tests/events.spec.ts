@@ -23,7 +23,7 @@ test.describe("Events page", () => {
 		await expect(page.getByRole("columnheader", { name: "Host" })).toBeVisible({ timeout: 15_000 });
 		await expect(page.getByRole("columnheader", { name: "Title" })).toBeVisible();
 		await expect(page.getByRole("columnheader", { name: "Tags" })).toBeVisible();
-		await expect(page.getByRole("columnheader", { name: "Time" })).toBeVisible();
+		await expect(page.getByRole("columnheader", { name: "When" })).toBeVisible();
 	});
 
 	test("shows event rows with titles", async ({ page }) => {

@@ -13,7 +13,7 @@ import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { HostTable } from "@/components/host/host-table";
-import { Reading, type ReadingItem } from "@/components/layout/reading";
+import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
@@ -178,13 +178,7 @@ export function HostsPage() {
 				}
 			/>
 
-			<LayerCard padding="none">
-				<div className="grid grid-cols-2 divide-basalt-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
-					{summaryItems(filteredHosts).map((item) => (
-						<Reading key={item.label} item={item} />
-					))}
-				</div>
-			</LayerCard>
+			<PageSummary items={summaryItems(filteredHosts)} />
 
 			<LayerCard data-testid="host-list">
 				<LayerCard.Header>

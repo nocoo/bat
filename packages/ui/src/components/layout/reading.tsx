@@ -3,6 +3,7 @@
 // anatomy so the two pages read as one product.
 
 import { LineChart } from "@nocoo/basalt/charts/line";
+import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import type { ReactNode } from "react";
 
 export interface TrendPoint {
@@ -64,5 +65,18 @@ export function Readings({ items, lead }: { items: readonly ReadingItem[]; lead?
 				<Reading key={item.label} item={item} />
 			))}
 		</div>
+	);
+}
+
+/** Summary strip for list pages: five readings on one surface, no lead cell. */
+export function PageSummary({ items }: { items: readonly ReadingItem[] }) {
+	return (
+		<LayerCard padding="none">
+			<div className="grid grid-cols-2 divide-basalt-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
+				{items.map((item) => (
+					<Reading key={item.label} item={item} />
+				))}
+			</div>
+		</LayerCard>
 	);
 }

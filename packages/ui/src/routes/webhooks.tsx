@@ -93,21 +93,33 @@ export function WebhooksPage() {
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>
 	) : (
-		<div className="space-y-basalt-layout max-w-4xl" data-bat-dirty={!!selectedHostId}>
+		<div className="space-y-basalt-layout" data-bat-dirty={!!selectedHostId}>
 			<PageHeader
 				title="Webhooks"
 				description="Configure webhook tokens for hosts to send events via POST /api/events."
 			/>
 
-			{/* Action error banner */}
 			{actionError && (
-				<div className="rounded-md border border-basalt-destructive/50 bg-basalt-destructive/10 px-4 py-3 text-basalt-base text-basalt-destructive">
-					{actionError}
-				</div>
+				<LayerCard>
+					<LayerCard.Body className="flex items-start gap-basalt-space-md text-basalt-sm text-basalt-destructive">
+						<AlertTriangle
+							aria-hidden="true"
+							className="mt-basalt-space-xs size-4 shrink-0"
+							strokeWidth={1.5}
+						/>
+						{actionError}
+					</LayerCard.Body>
+				</LayerCard>
 			)}
 
 			{/* Create new webhook */}
 			<LayerCard>
+				<LayerCard.Header>
+					<h2>New webhook</h2>
+					<span className="text-basalt-sm text-basalt-muted-foreground">
+						One token per host, sent as X-Webhook-Token
+					</span>
+				</LayerCard.Header>
 				<LayerCard.Body>
 					<form
 						className="flex items-center gap-2"
@@ -138,15 +150,26 @@ export function WebhooksPage() {
 
 			{/* Webhook list */}
 			{!webhooks || webhooks.length === 0 ? (
-				<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-					<Webhook className="h-12 w-12 mb-4" strokeWidth={1} />
-					<h2 className="text-basalt-lg font-semibold text-basalt-foreground">
-						No webhooks configured
-					</h2>
-					<p className="mt-2 text-basalt-base">Select a host above to generate a webhook token.</p>
-				</div>
+				<LayerCard>
+					<LayerCard.Header>
+						<h2>Tokens</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">none configured</span>
+					</LayerCard.Header>
+					<LayerCard.Body>
+						<div className="flex items-center gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground">
+							<Webhook aria-hidden="true" className="size-4" strokeWidth={1.5} />
+							Select a host above to generate a webhook token.
+						</div>
+					</LayerCard.Body>
+				</LayerCard>
 			) : (
 				<LayerCard>
+					<LayerCard.Header>
+						<h2>Tokens</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">
+							{webhooks.length} configured
+						</span>
+					</LayerCard.Header>
 					<LayerCard.Body>
 						<div className="divide-y divide-basalt-border">
 							{webhooks.map((wh) => (
