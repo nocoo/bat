@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.1.0
+
+### Added
+
+- Mirror the real layout in every loading placeholder
+- Give the fleet lists hourly trends
+- Rebuild the server list and detail pages on the workstation standard
+- Rebuild the workstation detail page
+- Load recorded samples in local demo
+- Add sanitized observation fixtures
+
+### Changed
+
+- Bring the remaining pages onto the fleet page standard
+- Grid-align workstation consent page
+
+### Fixed
+
+- Give the workstation header air and stop the mobile breadcrumb overlap
+
 ## v3.0.1
 
 ### Fixed
