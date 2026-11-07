@@ -180,8 +180,10 @@ sample (greatest `finished_at`, then receipt time, then report id): a duplicate 
 sample is stored in history but never becomes latest, never refreshes liveness and never changes the
 recorded public address. `last_seen_at` is the newest sample's `finished_at`. `public_ip` is the
 platform-observed client address (`CF-Connecting-IP`) and only in production; development and E2E
-store `null` instead of trusting a header. Every workstation observation response, including errors
-and the exchange response, carries `Cache-Control: no-store`.
+store `null` instead of trusting a header. A workstation keeps that single observed address — the
+server hosts' per-family `public_ip_v4` / `public_ip_v6` split does not apply here, because the
+platform reports exactly one address per request. Every workstation observation response, including
+errors and the exchange response, carries `Cache-Control: no-store`.
 
 ## Records, status and history
 
@@ -193,16 +195,16 @@ table draws the trend from those two arrays so it needs no per-row history reque
 
 Reads return `WorkstationRecord`:
 
-| Field           | Type                                                         |
-| --------------- | ------------------------------------------------------------ |
-| `id`            | workstation UUID assigned by the server                      |
-| `owner`         | Access principal that enrolled it                            |
-| `name`          | display name from the consent page                           |
-| `created_at`    | epoch seconds                                                |
-| `last_seen_at`  | epoch seconds or `null`                                      |
-| `public_ip`     | last platform-observed public address or `null`              |
-| `disabled`      | boolean; disabled workstations cannot report                 |
-| `latest_report` | `WorkstationReportRecord` or `null` (report + `received_at`) |
+| Field           | Type                                                                                    |
+| --------------- | --------------------------------------------------------------------------------------- |
+| `id`            | workstation UUID assigned by the server                                                 |
+| `owner`         | Access principal that enrolled it                                                       |
+| `name`          | display name from the consent page                                                      |
+| `created_at`    | epoch seconds                                                                           |
+| `last_seen_at`  | epoch seconds or `null`                                                                 |
+| `public_ip`     | last platform-observed public address or `null`; a workstation is never split by family |
+| `disabled`      | boolean; disabled workstations cannot report                                            |
+| `latest_report` | `WorkstationReportRecord` or `null` (report + `received_at`)                            |
 
 Status is derived with `computeWorkstationStatus`, never stored: `disabled`, `recent`, or `stale`
 when `last_seen_at` is `null` or older than 1800 seconds. Clock skew into the future stays `recent`.

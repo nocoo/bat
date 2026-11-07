@@ -14,7 +14,7 @@
 
 ### hosts
 
-Host identity and lifecycle state. Written by Worker on ingest (UPSERT `last_seen`) and identity (full overwrite of metadata fields).
+Host identity and lifecycle state. Written by Worker on ingest (UPSERT `last_seen`) and identity (full overwrite of metadata fields). The public-address columns hold the echo-service observation: `public_ip` is the preferred address (IPv4 first), `public_ip_v4` and `public_ip_v6` keep each family independently, and the echo service has no AAAA record today so `public_ip_v6` is usually null.
 
 ```sql
 CREATE TABLE hosts (
@@ -530,7 +530,7 @@ interface HostOverviewItem {
 	cpu_physical: number | null;
 	mem_total_bytes: number | null;
 	virtualization: string | null;
-	public_ip: string | null;
+	public_ip: string | null; // preferred public address: ipv4 ?? ipv6
 	// Extended overview fields
 	probe_version: string | null;
 	cpu_load1: number | null;
@@ -551,6 +551,8 @@ interface HostOverviewItem {
 // @bat/shared — packages/shared/src/api.ts
 interface HostDetailItem extends HostOverviewItem {
 	probe_version: string | null;
+	public_ip_v4: string | null; // public IPv4, null when never observed
+	public_ip_v6: string | null; // public IPv6, null when never observed
 	swap_total_bytes: number | null;
 	boot_mode: string | null;
 	timezone: string | null;

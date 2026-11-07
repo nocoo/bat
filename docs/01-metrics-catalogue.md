@@ -331,26 +331,35 @@ Collected at startup + every 6 hours via `POST /api/identity` (host identity) an
 
 ### Host Identity (procfs/sysfs reads, no fork)
 
-| Signal             | Type      | Source                                                         | Status |
-| ------------------ | --------- | -------------------------------------------------------------- | ------ |
-| `host_id`          | string    | Config or `/etc/hostname` fallback                             | ✅     |
-| `hostname`         | string    | `/etc/hostname`                                                | ✅     |
-| `os`               | string    | `/etc/os-release` PRETTY_NAME                                  | ✅     |
-| `kernel`           | string    | `/proc/version`                                                | ✅     |
-| `arch`             | string    | `uname -m` (libc)                                              | ✅     |
-| `cpu_model`        | string    | `/proc/cpuinfo` first `model name`                             | ✅     |
-| `cpu_logical`      | u32       | `/proc/cpuinfo` `^processor` count                             | ✅     |
-| `cpu_physical`     | u32       | `/proc/cpuinfo` unique (physical_id, core_id) pairs            | ✅     |
-| `mem_total_bytes`  | u64       | `/proc/meminfo` MemTotal × 1024                                | ✅     |
-| `swap_total_bytes` | u64       | `/proc/meminfo` SwapTotal × 1024                               | ✅     |
-| `virtualization`   | string    | `/sys/class/dmi/id/sys_vendor` + `product_name`                | ✅     |
-| `net_interfaces[]` | array     | `/sys/class/net/` + `address` + `speed` + `/proc/net/if_inet6` | ✅     |
-| `disks[]`          | array     | `/sys/block/{dev}/size` + `queue/rotational`                   | ✅     |
-| `boot_mode`        | string    | `/sys/firmware/efi` existence → "uefi"/"bios"                  | ✅     |
-| `uptime_seconds`   | u64       | `/proc/uptime`                                                 | ✅     |
-| `boot_time`        | u64 epoch | `now() - uptime`                                               | ✅     |
-| `probe_version`    | string    | `CARGO_PKG_VERSION`                                            | ✅     |
-| `public_ip`        | string    | `https://echo.nocoo.cloud/api/ip` (also refreshed every 1h)    | ✅     |
+| Signal             | Type      | Source                                                      | Status |
+| ------------------ | --------- | ----------------------------------------------------------- | ------ |
+| `host_id`          | string    | Config or `/etc/hostname` fallback                          | ✅     |
+| `hostname`         | string    | `/etc/hostname`                                             | ✅     |
+| `os`               | string    | `/etc/os-release` PRETTY_NAME                               | ✅     |
+| `kernel`           | string    | `/proc/version`                                             | ✅     |
+| `arch`             | string    | `uname -m` (libc)                                           | ✅     |
+| `cpu_model`        | string    | `/proc/cpuinfo` first `model name`                          | ✅     |
+| `cpu_logical`      | u32       | `/proc/cpuinfo` `^processor` count                          | ✅     |
+| `cpu_physical`     | u32       | `/proc/cpuinfo` unique (physical_id, core_id) pairs         | ✅     |
+| `mem_total_bytes`  | u64       | `/proc/meminfo` MemTotal × 1024                             | ✅     |
+| `swap_total_bytes` | u64       | `/proc/meminfo` SwapTotal × 1024                            | ✅     |
+| `virtualization`   | string    | `/sys/class/dmi/id/sys_vendor` + `product_name`             | ✅     |
+| `net_interfaces[]` | array     | `/sys/class/net/` + `address` + `speed` + `getifaddrs(3)`   | ✅     |
+| `disks[]`          | array     | `/sys/block/{dev}/size` + `queue/rotational`                | ✅     |
+| `boot_mode`        | string    | `/sys/firmware/efi` existence → "uefi"/"bios"               | ✅     |
+| `uptime_seconds`   | u64       | `/proc/uptime`                                              | ✅     |
+| `boot_time`        | u64 epoch | `now() - uptime`                                            | ✅     |
+| `probe_version`    | string    | `CARGO_PKG_VERSION`                                         | ✅     |
+| `public_ip`        | string    | `https://echo.nocoo.cloud/api/ip` (also refreshed every 1h) | ✅     |
+| `public_ip_v4`     | string    | Echo lookup pinned to the resolved IPv4 address             | ✅     |
+| `public_ip_v6`     | string    | Echo lookup pinned to the resolved IPv6 address             | ✅     |
+
+Interface addresses come from `getifaddrs(3)`: IPv4 is collected as a dotted quad and IPv6 is
+emitted in RFC 5952 compressed form (`fe80::1`, not `fe80:0:0:0:0:0:0:1`); the probe is the single
+formatter, clients never re-compress. `public_ip` is the preferred address (`public_ip_v4 ??
+public_ip_v6`); `public_ip_v4` and `public_ip_v6` keep each family independently. The echo service
+has no AAAA record today, so `public_ip_v6` is normally absent — that is an honest observation, not
+a failure.
 
 Uses 2-state wire semantics: key present = update, key absent = retain.
 

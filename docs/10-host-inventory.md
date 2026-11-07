@@ -32,7 +32,7 @@ These fields do not change without hardware replacement, re-provisioning, or reb
 | S3  | `mem_total_bytes`  | `/proc/meminfo`                                                                          | `MemTotal` × 1024                                                                                                                                      | `8388608000`                                                                                            |
 | S4  | `swap_total_bytes` | `/proc/meminfo`                                                                          | `SwapTotal` × 1024                                                                                                                                     | `2147483648`                                                                                            |
 | S5  | `virtualization`   | `/sys/class/dmi/id/sys_vendor` + `product_name`                                          | map known vendors                                                                                                                                      | `"kvm"`, `"vmware"`, `"bare-metal"`                                                                     |
-| S6  | `net_interfaces`   | `libc::getifaddrs()` + `/sys/class/net/{iface}/address` + `/sys/class/net/{iface}/speed` | per interface                                                                                                                                          | `[{"iface":"eth0","mac":"aa:bb:cc:dd:ee:ff","ipv4":["10.0.1.5"],"ipv6":["fe80::1"],"speed_mbps":1000}]` |
+| S6  | `net_interfaces`   | `libc::getifaddrs()` + `/sys/class/net/{iface}/address` + `/sys/class/net/{iface}/speed` | per interface; IPv6 literals RFC 5952 compressed                                                                                                       | `[{"iface":"eth0","mac":"aa:bb:cc:dd:ee:ff","ipv4":["10.0.1.5"],"ipv6":["fe80::1"],"speed_mbps":1000}]` |
 | S7  | `disks`            | `/sys/block/{dev}/size` + `/sys/block/{dev}/queue/rotational`                            | 512 × sectors; 0=SSD, 1=HDD                                                                                                                            | `[{"device":"sda","size_bytes":500107862016,"rotational":false}]`                                       |
 | S8  | `boot_mode`        | `/sys/firmware/efi`                                                                      | dir exists → `"uefi"`, else `"bios"`                                                                                                                   | `"uefi"`                                                                                                |
 
@@ -249,8 +249,8 @@ Fields S1–S4 reuse existing procfs reads:
 ### Phase 2 — New Collectors ✅
 
 - S5 `virtualization` — read 2 sysfs files, map known vendor strings ✅
-- S6 `net_interfaces` — `getifaddrs()` + 2 sysfs files per interface ✅ (IPv6 via `/proc/net/if_inet6`, IPv4 skipped — no clean procfs source)
-- S6b `public_ip` — fetch from `echo.nocoo.cloud/api/ip` every 1h, stored in identity payload ✅
+- S6 `net_interfaces` — `getifaddrs(3)` for every interface address plus 2 sysfs files per interface for MAC/speed ✅ (IPv4 collected as dotted quad, IPv6 emitted RFC 5952 compressed; `lo` skipped)
+- S6b `public_ip` — fetch from `echo.nocoo.cloud/api/ip` every 1h, pinned per family ✅ (stored as the IPv4-first preferred address; `public_ip_v4` / `public_ip_v6` keep each family separately. The echo host has no AAAA record, so IPv6 is normally absent)
 - S7 `disks` — iterate `/sys/block/`, read 2 files per device ✅
 - S8 `boot_mode` — 1 path existence check ✅
 
