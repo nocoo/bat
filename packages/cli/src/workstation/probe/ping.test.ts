@@ -10,6 +10,7 @@ import {
 	parseUnixPingOutput,
 	parseWindowsPingOutput,
 	pingTarget,
+	resolveUnixPingCommand,
 	sequenceBase,
 	WINDOWS_PING_SCRIPT,
 } from "./ping.js";
@@ -55,14 +56,14 @@ function linuxOutput(times: (number | null)[]): string {
 describe("plans", () => {
 	test("builds macOS ping argv without a shell", () => {
 		const v4 = buildUnixPingPlan("darwin", 4, "203.0.113.10");
-		expect(v4.command).toBe("ping");
+		expect(v4.command).toMatch(/(^|\/)ping$/);
 		expect(v4.args).toStrictEqual(["-n", "-c", "3", "-W", "1000", "203.0.113.10"]);
 		expect(v4.env).toStrictEqual({ LC_ALL: "C", LANG: "C" });
 	});
 
 	test("omits -W on macOS ping6 because it is not implemented there", () => {
 		const v6 = buildUnixPingPlan("darwin", 6, "2001:db8::1", 1500);
-		expect(v6.command).toBe("ping6");
+		expect(v6.command).toMatch(/(^|\/)ping6$/);
 		expect(v6.args).toStrictEqual(["-n", "-c", "3", "2001:db8::1"]);
 		expect(v6.args).not.toContain("-W");
 	});
@@ -300,7 +301,7 @@ describe("pingTarget", () => {
 	test("uses ping6 for IPv6 targets on macOS", async () => {
 		const exec = vi.fn().mockResolvedValue(result({ stdout: macOutput([1, 1, 1]) }));
 		await pingTarget(TARGET6, { exec, platform: "darwin" });
-		expect(exec.mock.calls[0]?.[0]).toBe("ping6");
+		expect(exec.mock.calls[0]?.[0]).toMatch(/(^|\/)ping6$/);
 	});
 
 	test("parses the PowerShell result on Windows", async () => {
@@ -367,5 +368,19 @@ describe("pingTarget", () => {
 		expect(outcome.connectivity.status).toBe("reachable");
 		expect(outcome.connectivity.received).toBe(3);
 		expect(outcome.connectivity.rtts_ms.every((rtt) => rtt !== null)).toBe(true);
+	});
+});
+
+describe("resolveUnixPingCommand", () => {
+	test("prefers the absolute binary the scheduler's PATH would miss", () => {
+		expect(resolveUnixPingCommand("ping", (path) => path === "/sbin/ping")).toBe("/sbin/ping");
+		expect(resolveUnixPingCommand("ping", (path) => path === "/usr/bin/ping")).toBe(
+			"/usr/bin/ping",
+		);
+		expect(resolveUnixPingCommand("ping6", (path) => path === "/sbin/ping6")).toBe("/sbin/ping6");
+	});
+
+	test("falls back to the bare name when nothing is installed there", () => {
+		expect(resolveUnixPingCommand("ping", () => false)).toBe("ping");
 	});
 });

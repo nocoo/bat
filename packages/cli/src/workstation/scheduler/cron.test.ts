@@ -45,7 +45,7 @@ describe("cron line", () => {
 	test("uses absolute paths, ten minute cadence and a log redirect", () => {
 		const line = cronLine(CONTEXT);
 		expect(line).toBe(
-			"*/10 * * * * '/usr/local/bin/node' '/opt/bat/dist/bat.js' workstation probe >> '/home/tester/.config/bat/workstation/probe.log' 2>&1",
+			"*/10 * * * * PATH=/usr/bin:/bin:/usr/sbin:/sbin '/usr/local/bin/node' '/opt/bat/dist/bat.js' workstation probe >> '/home/tester/.config/bat/workstation/probe.log' 2>&1",
 		);
 	});
 

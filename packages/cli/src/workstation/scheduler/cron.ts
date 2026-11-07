@@ -29,7 +29,12 @@ export function cronLine(context: ScheduleContext): string {
 		shellQuote(context.logPath),
 		"2>&1",
 	].join(" ");
-	return `*/${minutes} * * * * ${command}`.replace(/%/g, () => "\\%");
+	// Cron starts jobs with PATH=/usr/bin:/bin on macOS, which omits /sbin where
+	// ping lives; a managed PATH keeps any child the probe spawns resolvable.
+	return `*/${minutes} * * * * PATH=/usr/bin:/bin:/usr/sbin:/sbin ${command}`.replace(
+		/%/g,
+		() => "\\%",
+	);
 }
 
 export function stripCronBlock(current: string): { text: string; removed: boolean } {

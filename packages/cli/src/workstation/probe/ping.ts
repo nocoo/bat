@@ -2,6 +2,7 @@
 // A missing or denied ping binary is a local "error", never a network "down".
 // Every probe sends exactly three samples; a lost packet keeps its slot.
 
+import { existsSync } from "node:fs";
 import type {
 	WorkstationConnectivity,
 	WorkstationConnectivityStatus,
@@ -22,6 +23,24 @@ export interface PingPlan {
 }
 
 /**
+ * Cron and systemd start jobs with a minimal PATH (`/usr/bin:/bin` on macOS does
+ * not include `/sbin`, where ping lives). Resolve the binary absolutely so the
+ * probe never reports a local "command not found" as a network failure.
+ */
+export function resolveUnixPingCommand(
+	command: "ping" | "ping6",
+	exists: (path: string) => boolean = existsSync,
+): string {
+	for (const directory of ["/sbin", "/usr/bin", "/bin", "/usr/sbin"]) {
+		const candidate = `${directory}/${command}`;
+		if (exists(candidate)) {
+			return candidate;
+		}
+	}
+	return command;
+}
+
+/**
  * Unix ping argv.
  * macOS `ping` documents `-W` in milliseconds; macOS `ping6` does not implement
  * it, so IPv6 on macOS relies on the child timeout instead.
@@ -31,17 +50,18 @@ export function buildUnixPingPlan(
 	family: WorkstationIpFamily,
 	address: string,
 	timeoutMs = PING_TIMEOUT_MS,
+	exists: (path: string) => boolean = existsSync,
 ): PingPlan {
 	if (family === 6) {
 		if (platform === "darwin") {
 			return {
-				command: "ping6",
+				command: resolveUnixPingCommand("ping6", exists),
 				args: ["-n", "-c", "3", address],
 				env: BASE_ENV,
 			};
 		}
 		return {
-			command: "ping",
+			command: resolveUnixPingCommand("ping", exists),
 			args: [
 				"-n",
 				"-c",
@@ -56,13 +76,13 @@ export function buildUnixPingPlan(
 	}
 	if (platform === "darwin") {
 		return {
-			command: "ping",
+			command: resolveUnixPingCommand("ping", exists),
 			args: ["-n", "-c", "3", "-W", String(timeoutMs), address],
 			env: BASE_ENV,
 		};
 	}
 	return {
-		command: "ping",
+		command: resolveUnixPingCommand("ping", exists),
 		args: ["-n", "-c", "3", "-W", String(Math.max(1, Math.ceil(timeoutMs / 1000))), address],
 		env: BASE_ENV,
 	};
