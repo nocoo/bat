@@ -271,6 +271,44 @@ pub fn format_addresses(raw: RawInterfaceAddresses) -> InterfaceAddresses {
         .collect()
 }
 
+/// Address bytes carried by one `ifaddrs` entry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IpAddrBytes {
+    V4([u8; 4]),
+    V6([u8; 16]),
+}
+
+/// Decode the address carried by a `sockaddr`.
+///
+/// `sockaddr_in.sin_addr` and `sockaddr_in6.sin6_addr` both hold the address in
+/// network byte order, which is exactly what the formatters expect. A null
+/// pointer, an uninitialised entry or a non-IP family (`AF_UNIX`, `AF_PACKET`)
+/// decodes to `None`.
+///
+/// # Safety
+/// `addr` must be null or point to a valid `sockaddr` whose family matches the
+/// allocation, as `getifaddrs(3)` guarantees.
+unsafe fn decode_sockaddr(addr: *const libc::sockaddr) -> Option<IpAddrBytes> {
+    if addr.is_null() {
+        return None;
+    }
+    // SAFETY: the caller guarantees a valid `sockaddr`.
+    let family = unsafe { (*addr).sa_family };
+    if i32::from(family) == libc::AF_INET {
+        // SAFETY: an AF_INET address is a `sockaddr_in`.
+        let sin = unsafe { &*addr.cast::<libc::sockaddr_in>() };
+        // `s_addr` stores the address in network byte order; `to_ne_bytes`
+        // recovers those memory bytes on both endiannesses.
+        Some(IpAddrBytes::V4(sin.sin_addr.s_addr.to_ne_bytes()))
+    } else if i32::from(family) == libc::AF_INET6 {
+        // SAFETY: an AF_INET6 address is a `sockaddr_in6`.
+        let sin6 = unsafe { &*addr.cast::<libc::sockaddr_in6>() };
+        Some(IpAddrBytes::V6(sin6.sin6_addr.s6_addr))
+    } else {
+        None
+    }
+}
+
 /// Collect interface addresses via `getifaddrs(3)`.
 #[cfg_attr(coverage_nightly, coverage(off))]
 pub fn read_interface_addresses() -> InterfaceAddresses {
@@ -286,28 +324,15 @@ pub fn read_interface_addresses() -> InterfaceAddresses {
     while !node.is_null() {
         // SAFETY: `node` points to a live node of the list returned by getifaddrs.
         let current = unsafe { &*node };
-        let name = unsafe { std::ffi::CStr::from_ptr(current.ifa_name) }
-            .to_string_lossy()
-            .into_owned();
-
-        if !current.ifa_addr.is_null() {
-            let addr = current.ifa_addr;
-            // SAFETY: `addr` points to a `sockaddr`; the family is checked before casting.
-            let family = unsafe { (*addr).sa_family };
-            if i32::from(family) == libc::AF_INET {
-                // SAFETY: an AF_INET address is a `sockaddr_in`.
-                let sin = unsafe { &*addr.cast::<libc::sockaddr_in>() };
-                // `s_addr` holds the address in network byte order; `to_ne_bytes`
-                // recovers those bytes on both endiannesses.
-                let octets = sin.sin_addr.s_addr.to_ne_bytes();
-                raw.entry(name.clone()).or_default().0.push(octets);
-            } else if i32::from(family) == libc::AF_INET6 {
-                // SAFETY: an AF_INET6 address is a `sockaddr_in6`.
-                let sin6 = unsafe { &*addr.cast::<libc::sockaddr_in6>() };
-                raw.entry(name.clone())
-                    .or_default()
-                    .1
-                    .push(sin6.sin6_addr.s6_addr);
+        // SAFETY: `ifa_addr` is null or a valid `sockaddr` owned by the list.
+        if let Some(addr) = unsafe { decode_sockaddr(current.ifa_addr) } {
+            let name = unsafe { std::ffi::CStr::from_ptr(current.ifa_name) }
+                .to_string_lossy()
+                .into_owned();
+            let entry = raw.entry(name).or_default();
+            match addr {
+                IpAddrBytes::V4(octets) => entry.0.push(octets),
+                IpAddrBytes::V6(octets) => entry.1.push(octets),
             }
         }
 
@@ -801,6 +826,60 @@ mod tests {
             0x00, 0x04,
         ];
         assert_eq!(format_ipv6(&addr), "1::2:0:0:3:4");
+    }
+
+    #[test]
+    fn format_ipv6_compresses_leading_and_trailing_runs() {
+        let loopback = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        assert_eq!(format_ipv6(&loopback), "::1");
+
+        let trailing = [0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(format_ipv6(&trailing), "2001:db8::");
+
+        let both = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0a, 0x0b, 0x0c, 0x0d];
+        assert_eq!(format_ipv6(&both), "::a0b:c0d");
+    }
+
+    #[test]
+    fn decode_sockaddr_reads_ipv4_network_order() {
+        let mut sin: libc::sockaddr_in = unsafe { std::mem::zeroed() };
+        sin.sin_family = libc::sa_family_t::try_from(libc::AF_INET).unwrap();
+        // The ABI stores the address as four network-order bytes; build the
+        // fixture from those bytes so the assertion is endianness independent.
+        sin.sin_addr.s_addr = u32::from_ne_bytes([203, 0, 113, 9]);
+
+        let decoded = unsafe { decode_sockaddr((&raw const sin).cast::<libc::sockaddr>()) };
+        assert_eq!(decoded, Some(IpAddrBytes::V4([203, 0, 113, 9])));
+    }
+
+    #[test]
+    fn decode_sockaddr_reads_ipv6() {
+        let mut sin6: libc::sockaddr_in6 = unsafe { std::mem::zeroed() };
+        sin6.sin6_family = libc::sa_family_t::try_from(libc::AF_INET6).unwrap();
+        sin6.sin6_addr.s6_addr = [0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+
+        let decoded = unsafe { decode_sockaddr((&raw const sin6).cast::<libc::sockaddr>()) };
+        assert_eq!(
+            decoded,
+            Some(IpAddrBytes::V6([
+                0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2,
+            ]))
+        );
+    }
+
+    #[test]
+    fn decode_sockaddr_ignores_null_pointer() {
+        assert_eq!(unsafe { decode_sockaddr(std::ptr::null()) }, None);
+    }
+
+    #[test]
+    fn decode_sockaddr_ignores_non_ip_families() {
+        for family in [libc::AF_UNIX, libc::AF_UNSPEC] {
+            let mut storage: libc::sockaddr_storage = unsafe { std::mem::zeroed() };
+            storage.ss_family = libc::sa_family_t::try_from(family).unwrap();
+            let addr = (&raw const storage).cast::<libc::sockaddr>();
+            assert_eq!(unsafe { decode_sockaddr(addr) }, None);
+        }
     }
 
     #[test]
