@@ -176,6 +176,7 @@ test.describe("Host detail page", () => {
 	});
 
 	test("public address lead block shows both families with copy affordances", async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 1000 });
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
@@ -199,6 +200,39 @@ test.describe("Host detail page", () => {
 		expect(await v6.evaluate((element) => getComputedStyle(element).textOverflow)).not.toBe(
 			"ellipsis",
 		);
+	});
+
+	test("the family label and the copy control stay on the first line of a wrapped literal", async ({
+		page,
+	}) => {
+		await page.setViewportSize({ width: 1440, height: 1000 });
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const value = page.getByTestId("host-public-ip-v6");
+		await expect(value).toHaveText(publicIpv6, { timeout: 15_000 });
+		expect(await lineCount(value)).toBeGreaterThan(1);
+
+		const label = page.getByText("IPv6", { exact: true }).first();
+		const copy = page.getByRole("button", {
+			name: `Copy public address ${publicIpv6}`,
+			exact: true,
+		});
+		const [valueBox, labelBox, copyBox] = await Promise.all([
+			value.boundingBox(),
+			label.boundingBox(),
+			copy.boundingBox(),
+		]);
+		const lineHeight = await value.evaluate((element) =>
+			Number.parseFloat(getComputedStyle(element).lineHeight),
+		);
+		const firstLineBottom = (valueBox?.y ?? 0) + lineHeight;
+
+		// Neither the label nor the copy control may drift to the vertical centre
+		// of the wrapped block: both belong to the first line.
+		expect(labelBox?.y).toBeGreaterThanOrEqual((valueBox?.y ?? 0) - 2);
+		expect((labelBox?.y ?? 0) + (labelBox?.height ?? 0)).toBeLessThanOrEqual(firstLineBottom + 2);
+		expect(copyBox?.y).toBeLessThanOrEqual(firstLineBottom);
 	});
 
 	test("a family without an observation shows a muted dash instead of disappearing", async ({
@@ -235,24 +269,58 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText(interfaceIpv6, { exact: true })).toBeVisible();
 	});
 
-	test("long interface IPv6 literals never clip or ellipsize", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
+	test("interface rows use the address-row anatomy and wrap a long IPv6 at rail and narrow widths", async ({
+		page,
+	}) => {
+		for (const viewport of [
+			{ width: 1440, height: 1000 },
+			{ width: 390, height: 900 },
+		]) {
+			await page.setViewportSize(viewport);
+			await page.goto(`/hosts/${alphaHid}`);
+			await page.waitForLoadState("domcontentloaded");
 
-		const literal = page.getByText(interfaceIpv6, { exact: true });
-		await expect(literal).toBeVisible({ timeout: 15_000 });
-		expect(
-			await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-		).toBe(true);
-		const style = await literal.evaluate((element) => {
-			const computed = getComputedStyle(element);
-			return { wordBreak: computed.wordBreak, textOverflow: computed.textOverflow };
-		});
-		expect(style.wordBreak).toBe("break-all");
-		expect(style.textOverflow).not.toBe("ellipsis");
-		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-			true,
-		);
+			const row = page.getByTestId("host-interface-eth0");
+			await expect(row).toBeVisible({ timeout: 15_000 });
+			const name = page.getByText("eth0", { exact: true });
+			const addresses = page.getByTestId("host-interface-addresses-eth0");
+
+			const [rowBox, nameBox, addressesBox] = await Promise.all([
+				row.boundingBox(),
+				name.boundingBox(),
+				addresses.boundingBox(),
+			]);
+			// Interface name on the left, literals right-aligned against the row edge.
+			expect(nameBox?.x).toBeLessThan(addressesBox?.x ?? 0);
+			expect(
+				Math.abs(
+					(addressesBox?.x ?? 0) +
+						(addressesBox?.width ?? 0) -
+						((rowBox?.x ?? 0) + (rowBox?.width ?? 0)),
+				),
+			).toBeLessThanOrEqual(1);
+
+			const literal = page.getByText(interfaceIpv6, { exact: true });
+			await expect(literal).toBeVisible();
+			expect(
+				await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+			).toBe(true);
+			expect(await lineCount(literal)).toBeGreaterThan(1);
+			const style = await literal.evaluate((element) => {
+				const computed = getComputedStyle(element);
+				return { wordBreak: computed.wordBreak, textOverflow: computed.textOverflow };
+			});
+			expect(style.wordBreak).toBe("break-all");
+			expect(style.textOverflow).not.toBe("ellipsis");
+			// The whole row stays inside the card: the literal wraps, it never leaves.
+			expect(
+				(await addresses.evaluate((element) => element.getBoundingClientRect().right)) <=
+					(await row.evaluate((element) => element.getBoundingClientRect().right)) + 1,
+			).toBe(true);
+			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+				true,
+			);
+		}
 	});
 
 	test("narrow viewport keeps the family rows and their copy controls usable", async ({ page }) => {

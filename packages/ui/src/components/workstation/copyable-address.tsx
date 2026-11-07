@@ -58,18 +58,24 @@ export function CopyableAddress({
 	}
 
 	return (
-		<div className="flex min-w-0 items-center gap-basalt-space-sm">
-			{label !== undefined && (
-				<span className="shrink-0 text-basalt-xs font-semibold text-basalt-muted-foreground">
-					{label}
+		<div className="flex min-w-0 items-start gap-basalt-space-sm">
+			<div className="flex min-w-0 flex-1 items-baseline gap-basalt-space-sm">
+				{label !== undefined && (
+					<span className="shrink-0 text-basalt-xs font-semibold text-basalt-muted-foreground">
+						{label}
+					</span>
+				)}
+				<span
+					className={`min-w-0 break-all font-mono ${sizeClassName} font-semibold tabular-nums`}
+					data-testid={testId}
+				>
+					{value === null ? (
+						<span className="text-basalt-muted-foreground">{emptyText}</span>
+					) : (
+						value
+					)}
 				</span>
-			)}
-			<span
-				className={`min-w-0 flex-1 break-all font-mono ${sizeClassName} font-semibold tabular-nums`}
-				data-testid={testId}
-			>
-				{value === null ? <span className="text-basalt-muted-foreground">{emptyText}</span> : value}
-			</span>
+			</div>
 			{value !== null && (
 				<Button
 					type="button"

@@ -1,8 +1,9 @@
-// Interface addresses of a host, one compact entry per interface.
+// Interface addresses of a host, one row per interface.
 //
-// The addresses are what the probe saw on the interface itself: they are not
-// public addresses and they are not guaranteed to be reachable. Literals wrap
-// instead of truncating, so a long IPv6 stays readable.
+// The rows use the same anatomy as the Public IPv4/IPv6 rows in the same card:
+// the interface name on the left, its literals right-aligned in monospace. A
+// long literal wraps inside the column instead of truncating, so the card stays
+// one readable list at rail width.
 
 import type { NetInterfaceDTO } from "@bat/shared";
 
@@ -17,23 +18,25 @@ export function HostInterfaceAddresses({
 	}
 
 	return (
-		<div className="min-w-0 space-y-basalt-space-sm">
+		<div className="min-w-0 space-y-basalt-space-xs">
 			<p className="text-basalt-sm text-basalt-muted-foreground">Interfaces</p>
 			{rows.map((entry) => (
-				<div key={entry.iface} className="min-w-0 space-y-basalt-space-xs">
-					<p className="truncate text-basalt-sm font-semibold text-basalt-foreground">
-						{entry.iface}
-					</p>
-					<div className="flex min-w-0 flex-wrap gap-x-basalt-space-sm gap-y-basalt-space-xs">
+				<div
+					key={entry.iface}
+					data-testid={`host-interface-${entry.iface}`}
+					className="flex min-w-0 justify-between gap-basalt-space-sm text-basalt-base"
+				>
+					<span className="shrink-0 text-basalt-muted-foreground">{entry.iface}</span>
+					<span
+						data-testid={`host-interface-addresses-${entry.iface}`}
+						className="flex min-w-0 flex-wrap justify-end gap-x-basalt-space-sm text-right font-mono tabular-nums"
+					>
 						{[...entry.ipv4, ...entry.ipv6].map((address) => (
-							<span
-								key={address}
-								className="min-w-0 break-all font-mono text-basalt-xs tabular-nums text-basalt-foreground"
-							>
+							<span key={address} className="min-w-0 break-all">
 								{address}
 							</span>
 						))}
-					</div>
+					</span>
 				</div>
 			))}
 		</div>
