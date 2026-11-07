@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.3.0
+
+### Added
+
+- Add doctor and update
+
 ## v3.2.0
 
 ### Added
