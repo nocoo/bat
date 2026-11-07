@@ -479,15 +479,7 @@ async fn build_identity_payload(
     let virt = collectors::inventory::read_virtualization();
     let virtualization = if virt.is_empty() { None } else { Some(virt) };
 
-    let ipv6_map = std::fs::read_to_string("/proc/net/if_inet6")
-        .ok()
-        .map(|c| collectors::inventory::parse_if_inet6(&c))
-        .unwrap_or_default();
-    // Build ip_map with empty IPv4 (no clean procfs source) and IPv6 from if_inet6
-    let ip_map: std::collections::HashMap<String, (Vec<String>, Vec<String>)> = ipv6_map
-        .into_iter()
-        .map(|(iface, v6)| (iface, (vec![], v6)))
-        .collect();
+    let ip_map = collectors::inventory::read_interface_addresses();
     let net_interfaces = Some(collectors::inventory::read_net_interfaces_from(
         "/sys/class/net",
         &ip_map,

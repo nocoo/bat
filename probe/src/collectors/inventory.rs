@@ -5,6 +5,8 @@
 //! - `read_*_from()` — parameterized path for testing
 //! - `read_*()` — hardcoded real path
 
+use std::collections::HashMap;
+
 use serde::Serialize;
 
 // ── Virtualization detection ─────────────────────────────────────────
@@ -146,15 +148,21 @@ pub fn parse_speed(content: &str) -> Option<i32> {
     if val < 0 { None } else { Some(val) }
 }
 
+/// Interface name → (IPv4 literals, IPv6 literals).
+pub type InterfaceAddresses = HashMap<String, (Vec<String>, Vec<String>)>;
+
+/// Interface name → (raw IPv4 bytes, raw IPv6 bytes) as collected from the OS.
+pub type RawInterfaceAddresses = HashMap<String, (Vec<[u8; 4]>, Vec<[u8; 16]>)>;
+
 /// Read network interface identity from sysfs.
 ///
 /// For each interface in `/sys/class/net/` (excluding `lo`):
 /// - MAC from `{iface}/address`
 /// - Speed from `{iface}/speed`
-/// - IPv4/IPv6 from provided `ip_map` (pre-parsed from `getifaddrs` or `/proc/net/if_inet6`)
+/// - IPv4/IPv6 from provided `ip_map` (collected via `getifaddrs`)
 pub fn read_net_interfaces_from(
     sysfs_net_dir: &str,
-    ip_map: &std::collections::HashMap<String, (Vec<String>, Vec<String>)>,
+    ip_map: &InterfaceAddresses,
 ) -> Vec<NetInterface> {
     let mut interfaces = Vec::new();
 
@@ -195,54 +203,120 @@ pub fn read_net_interfaces_from(
     interfaces
 }
 
-/// Parse IPv4 and IPv6 addresses per interface from `/proc/net/fib_trie` and `/proc/net/if_inet6`.
-///
-/// This is a simpler alternative to `getifaddrs()` that doesn't require libc FFI.
-/// Parses `/proc/net/if_inet6` for IPv6 and iterates sysfs operstate files to find
-/// interfaces, then reads addresses from `/proc/net/fib_trie` or falls back to
-/// reading from `/proc/net/fib_trie` output.
-///
-/// For simplicity, we parse addresses from dedicated proc files.
-pub fn parse_if_inet6(content: &str) -> std::collections::HashMap<String, Vec<String>> {
-    let mut map: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+/// Format 4 raw bytes as a dotted-quad IPv4 literal.
+pub fn format_ipv4(bytes: [u8; 4]) -> String {
+    format!("{}.{}.{}.{}", bytes[0], bytes[1], bytes[2], bytes[3])
+}
 
-    for line in content.lines() {
-        let fields: Vec<&str> = line.split_whitespace().collect();
-        // Format: hex_addr idx prefix_len scope flags iface_name
-        if fields.len() >= 6 {
-            let hex_addr = fields[0];
-            let iface = fields[5];
+/// Format 16 raw bytes as an RFC 5952 compressed IPv6 literal.
+///
+/// The longest run of two or more zero groups is collapsed into `::`
+/// (leftmost run wins on a tie); all-zero addresses render as `::`.
+pub fn format_ipv6(bytes: &[u8; 16]) -> String {
+    let groups: [u16; 8] =
+        std::array::from_fn(|i| u16::from_be_bytes([bytes[i * 2], bytes[i * 2 + 1]]));
 
-            if let Some(addr) = hex_ipv6_to_string(hex_addr) {
-                map.entry(iface.to_string()).or_default().push(addr);
-            }
+    let mut best_start = 0usize;
+    let mut best_len = 0usize;
+    let mut i = 0usize;
+    while i < groups.len() {
+        if groups[i] != 0 {
+            i += 1;
+            continue;
+        }
+        let start = i;
+        while i < groups.len() && groups[i] == 0 {
+            i += 1;
+        }
+        let len = i - start;
+        if len >= 2 && len > best_len {
+            best_start = start;
+            best_len = len;
         }
     }
 
-    map
-}
-
-/// Convert a 32-char hex IPv6 address to standard notation.
-fn hex_ipv6_to_string(hex: &str) -> Option<String> {
-    if hex.len() != 32 {
-        return None;
+    if best_len < 2 {
+        return groups
+            .iter()
+            .map(|g| format!("{g:x}"))
+            .collect::<Vec<_>>()
+            .join(":");
     }
 
-    let groups: Vec<String> = (0..8)
-        .map(|i| {
-            let start = i * 4;
-            let group = &hex[start..start + 4];
-            // Strip leading zeros but keep at least one digit
-            let trimmed = group.trim_start_matches('0');
-            if trimmed.is_empty() {
-                "0".to_string()
-            } else {
-                trimmed.to_string()
-            }
-        })
-        .collect();
+    let left = groups[..best_start]
+        .iter()
+        .map(|g| format!("{g:x}"))
+        .collect::<Vec<_>>()
+        .join(":");
+    let right = groups[best_start + best_len..]
+        .iter()
+        .map(|g| format!("{g:x}"))
+        .collect::<Vec<_>>()
+        .join(":");
+    format!("{left}::{right}")
+}
 
-    Some(groups.join(":"))
+/// Turn raw address bytes into literals, deduplicated and ordered per interface.
+pub fn format_addresses(raw: RawInterfaceAddresses) -> InterfaceAddresses {
+    raw.into_iter()
+        .map(|(iface, (mut v4, mut v6))| {
+            v4.sort_unstable();
+            v4.dedup();
+            v6.sort_unstable();
+            v6.dedup();
+            let ipv4 = v4.iter().map(|b| format_ipv4(*b)).collect();
+            let ipv6 = v6.iter().map(format_ipv6).collect();
+            (iface, (ipv4, ipv6))
+        })
+        .collect()
+}
+
+/// Collect interface addresses via `getifaddrs(3)`.
+#[cfg_attr(coverage_nightly, coverage(off))]
+pub fn read_interface_addresses() -> InterfaceAddresses {
+    let mut raw: RawInterfaceAddresses = HashMap::new();
+    let mut head: *mut libc::ifaddrs = std::ptr::null_mut();
+
+    // SAFETY: `head` is only read after getifaddrs reports success.
+    if unsafe { libc::getifaddrs(&raw mut head) } != 0 {
+        return format_addresses(raw);
+    }
+
+    let mut node = head;
+    while !node.is_null() {
+        // SAFETY: `node` points to a live node of the list returned by getifaddrs.
+        let current = unsafe { &*node };
+        let name = unsafe { std::ffi::CStr::from_ptr(current.ifa_name) }
+            .to_string_lossy()
+            .into_owned();
+
+        if !current.ifa_addr.is_null() {
+            let addr = current.ifa_addr;
+            // SAFETY: `addr` points to a `sockaddr`; the family is checked before casting.
+            let family = unsafe { (*addr).sa_family };
+            if i32::from(family) == libc::AF_INET {
+                // SAFETY: an AF_INET address is a `sockaddr_in`.
+                let sin = unsafe { &*addr.cast::<libc::sockaddr_in>() };
+                // `s_addr` holds the address in network byte order; `to_ne_bytes`
+                // recovers those bytes on both endiannesses.
+                let octets = sin.sin_addr.s_addr.to_ne_bytes();
+                raw.entry(name.clone()).or_default().0.push(octets);
+            } else if i32::from(family) == libc::AF_INET6 {
+                // SAFETY: an AF_INET6 address is a `sockaddr_in6`.
+                let sin6 = unsafe { &*addr.cast::<libc::sockaddr_in6>() };
+                raw.entry(name.clone())
+                    .or_default()
+                    .1
+                    .push(sin6.sin6_addr.s6_addr);
+            }
+        }
+
+        node = current.ifa_next;
+    }
+
+    // SAFETY: `head` came from getifaddrs and is freed exactly once.
+    unsafe { libc::freeifaddrs(head) };
+    format_addresses(raw)
 }
 
 // ── Block devices ────────────────────────────────────────────────────
@@ -681,31 +755,82 @@ mod tests {
     }
 
     #[test]
-    fn parse_if_inet6_normal() {
-        let content = "fe800000000000000000000000000001 02 40 20 80 eth0\n\
-                        00000000000000000000000000000001 01 80 10 80 lo\n";
-        let map = parse_if_inet6(content);
-        assert_eq!(map.get("eth0").unwrap(), &["fe80:0:0:0:0:0:0:1"]);
-        assert_eq!(map.get("lo").unwrap(), &["0:0:0:0:0:0:0:1"]);
+    fn format_ipv4_dotted_quad() {
+        assert_eq!(format_ipv4([10, 0, 1, 5]), "10.0.1.5");
+        assert_eq!(format_ipv4([127, 0, 0, 1]), "127.0.0.1");
+        assert_eq!(format_ipv4([0, 0, 0, 0]), "0.0.0.0");
+        assert_eq!(format_ipv4([255, 255, 255, 255]), "255.255.255.255");
     }
 
     #[test]
-    fn parse_if_inet6_empty() {
-        let map = parse_if_inet6("");
-        assert!(map.is_empty());
+    fn format_ipv6_compresses_longest_zero_run() {
+        let fe80 = [0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1];
+        assert_eq!(format_ipv6(&fe80), "fe80::1");
+
+        let global = [0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2];
+        assert_eq!(format_ipv6(&global), "2001:db8::2");
     }
 
     #[test]
-    fn hex_ipv6_to_string_valid() {
-        assert_eq!(
-            hex_ipv6_to_string("fe800000000000000000000000000001"),
-            Some("fe80:0:0:0:0:0:0:1".to_string())
-        );
+    fn format_ipv6_all_zero_is_double_colon() {
+        assert_eq!(format_ipv6(&[0u8; 16]), "::");
     }
 
     #[test]
-    fn hex_ipv6_to_string_invalid_length() {
-        assert_eq!(hex_ipv6_to_string("fe80"), None);
+    fn format_ipv6_without_zero_run_keeps_all_groups() {
+        let full = [
+            0x20, 0x01, 0x0d, 0xb8, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04, 0x00, 0x05,
+            0x00, 0x06,
+        ];
+        assert_eq!(format_ipv6(&full), "2001:db8:1:2:3:4:5:6");
+    }
+
+    #[test]
+    fn format_ipv6_single_zero_group_is_not_compressed() {
+        let addr = [
+            0x20, 0x01, 0x0d, 0xb8, 0x00, 0x00, 0x00, 0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0x04,
+            0x00, 0x05,
+        ];
+        assert_eq!(format_ipv6(&addr), "2001:db8:0:1:2:3:4:5");
+    }
+
+    #[test]
+    fn format_ipv6_tie_prefers_leftmost_run() {
+        let addr = [
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03,
+            0x00, 0x04,
+        ];
+        assert_eq!(format_ipv6(&addr), "1::2:0:0:3:4");
+    }
+
+    #[test]
+    fn format_addresses_dedupes_and_orders() {
+        let mut raw: RawInterfaceAddresses = HashMap::new();
+        let entry = raw.entry("eth0".to_string()).or_default();
+        entry.0.push([10, 0, 0, 2]);
+        entry.0.push([10, 0, 0, 10]);
+        entry.0.push([10, 0, 0, 2]);
+        entry
+            .1
+            .push([0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+        entry
+            .1
+            .push([0xfe, 0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
+
+        let formatted = format_addresses(raw);
+        let (v4, v6) = formatted.get("eth0").unwrap();
+        assert_eq!(v4, &["10.0.0.2".to_string(), "10.0.0.10".to_string()]);
+        assert_eq!(v6, &["fe80::1".to_string()]);
+    }
+
+    #[test]
+    fn format_addresses_empty_interface_lists() {
+        let mut raw: RawInterfaceAddresses = HashMap::new();
+        raw.insert("eth1".to_string(), (vec![], vec![]));
+        let formatted = format_addresses(raw);
+        let (v4, v6) = formatted.get("eth1").unwrap();
+        assert!(v4.is_empty());
+        assert!(v6.is_empty());
     }
 
     #[test]
@@ -725,7 +850,7 @@ mod tests {
         std::fs::create_dir(&lo).unwrap();
         std::fs::write(lo.join("address"), "00:00:00:00:00:00\n").unwrap();
 
-        let mut ip_map = std::collections::HashMap::new();
+        let mut ip_map: InterfaceAddresses = HashMap::new();
         ip_map.insert(
             "eth0".to_string(),
             (vec!["10.0.1.5".to_string()], vec!["fe80::1".to_string()]),
@@ -746,14 +871,14 @@ mod tests {
         let net_dir = dir.path().join("net");
         std::fs::create_dir(&net_dir).unwrap();
 
-        let ip_map = std::collections::HashMap::new();
+        let ip_map: InterfaceAddresses = HashMap::new();
         let ifaces = read_net_interfaces_from(net_dir.to_str().unwrap(), &ip_map);
         assert!(ifaces.is_empty());
     }
 
     #[test]
     fn read_net_interfaces_missing_dir() {
-        let ip_map = std::collections::HashMap::new();
+        let ip_map: InterfaceAddresses = HashMap::new();
         let ifaces = read_net_interfaces_from("/nonexistent/path", &ip_map);
         assert!(ifaces.is_empty());
     }
