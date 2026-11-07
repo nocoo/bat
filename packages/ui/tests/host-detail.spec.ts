@@ -165,13 +165,14 @@ test.describe("Host detail page", () => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		await expect(page.getByText("203.0.113.10")).toBeVisible({ timeout: 15_000 });
+		// The address appears in the header and in the system info card.
+		await expect(page.getByText("203.0.113.10").first()).toBeVisible({ timeout: 15_000 });
 	});
 
 	test("navigating from hosts list to detail and back", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 

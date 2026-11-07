@@ -55,10 +55,11 @@ for (const resolution of ["raw", "hourly"] as const) {
 						["TCP Connections", [100, 50, 25], ["Established", "TIME_WAIT", "Orphan"]],
 						["Disk I/O", [1000, 500], ["Read IOPS", "Write IOPS", "Utilization %"]],
 					] as const) {
+						// Header readings reuse some labels (CPU, Disk); the chart title is the anchor.
 						const card = page
-							.getByText(title, { exact: true })
-							.locator("../..")
-							.filter({ has: page.locator(".recharts-wrapper") });
+							.getByTestId("chart-title")
+							.filter({ hasText: title })
+							.locator("../..");
 						const chart = card.locator(".recharts-wrapper");
 						await chart.scrollIntoViewIfNeeded();
 						const boxes = await areaBoxes(chart, values.length);

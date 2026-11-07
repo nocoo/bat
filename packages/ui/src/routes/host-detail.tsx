@@ -23,12 +23,16 @@ import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
+import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
 import { StatusBadge } from "@/components/status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CopyableAddress } from "@/components/workstation/copyable-address";
 import { useAlerts, useHostDetail, useHostMetrics, useHosts, useHostTier2 } from "@/hooks";
-import { formatMemory, formatUptime } from "@/lib/host-card-format";
+import { formatLastSeen, formatMemory, formatUptime } from "@/lib/host-card-format";
 import { capitalizeVirt, formatBootTime, formatCpuLabel } from "@/lib/host-detail-format";
+import { chart } from "@/lib/palette";
+import { formatPercent } from "@/lib/workstation-format";
 
 const TIME_RANGES = [
 	{ label: "1h", seconds: 3600 },
@@ -108,6 +112,52 @@ export function HostDetailPage() {
 		[detail, mutateDetail],
 	);
 
+	const series = (metricsResponse?.data ?? []).map((point) => ({
+		ts: point.ts,
+		cpu: point.cpu_usage_pct,
+		mem: point.mem_used_pct,
+		load1: point.cpu_load1,
+		rx: point.net_rx_bytes_avg,
+		tx: point.net_tx_bytes_avg,
+	}));
+	const trend = (key: "cpu" | "mem" | "load1" | "rx") =>
+		series
+			.map((point) => ({ x: point.ts * 1000, value: point[key] }))
+			.filter((point): point is { x: number; value: number } => point.value !== null);
+	const last = series[series.length - 1];
+	const readings: ReadingItem[] = [
+		{
+			label: "CPU",
+			value: formatPercent(last?.cpu ?? host?.cpu_usage_pct ?? null),
+			detail:
+				detail?.cpu_logical === null || detail?.cpu_logical === undefined
+					? "no thread count"
+					: `${detail.cpu_logical} thread${detail.cpu_logical === 1 ? "" : "s"}`,
+			color: chart.pink,
+			points: trend("cpu"),
+		},
+		{
+			label: "Memory",
+			value: formatPercent(last?.mem ?? host?.mem_used_pct ?? null),
+			detail: `${formatMemory(detail?.mem_total_bytes ?? host?.mem_total_bytes ?? null) ?? "—"} total`,
+			color: chart.sky,
+			points: trend("mem"),
+		},
+		{
+			label: "Load 1m",
+			value: last?.load1 === null || last?.load1 === undefined ? "—" : last.load1.toFixed(2),
+			detail: "one minute average",
+			color: chart.teal,
+			points: trend("load1"),
+		},
+		{
+			label: "Disk",
+			value: formatPercent(host?.disk_root_used_pct ?? null),
+			detail: "root volume",
+			color: chart.orange,
+			points: [],
+		},
+	];
 	if (detailError instanceof ApiError && detailError.status === 404) {
 		return (
 			<div className="space-y-basalt-layout">
@@ -127,57 +177,70 @@ export function HostDetailPage() {
 
 	return (
 		<div className="space-y-basalt-layout">
-			{/* Header */}
-			<div
-				className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-basalt-space-lg"
-				data-testid="host-detail-header"
-			>
-				<Button
-					asChild={true}
-					variant="ghost"
-					size="icon"
-					className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
-				>
-					<Link to="/hosts" aria-label="Back to hosts">
-						<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
-					</Link>
-				</Button>
-				<div className="min-w-0 space-y-basalt-space-sm">
-					<div className="flex min-w-0 flex-wrap items-center justify-between gap-basalt-space-lg">
-						<div className="flex min-w-0 basis-full flex-wrap items-center gap-basalt-space-lg xl:basis-auto xl:flex-1 [&>[data-testid=status-badge]]:h-basalt-control-sm">
-							<div className="min-w-0 max-w-full">
-								<PageHeader title={host?.hostname ?? hid} />
+			<LayerCard data-testid="host-detail-header" padding="none">
+				<div className="flex items-start gap-basalt-space-md px-basalt-card py-basalt-layout">
+					<Button
+						asChild={true}
+						variant="ghost"
+						size="icon"
+						className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
+					>
+						<Link to="/hosts" aria-label="Back to hosts">
+							<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
+						</Link>
+					</Button>
+					<div className="min-w-0 flex-1 space-y-basalt-space-md">
+						<div className="flex flex-wrap items-center justify-between gap-x-basalt-layout gap-y-basalt-space-lg">
+							<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-lg [&>[data-testid=status-badge]]:h-basalt-control-sm">
+								<h1 className="truncate text-basalt-3xl font-semibold text-basalt-foreground">
+									{host?.hostname ?? hid}
+								</h1>
+								{host && <StatusBadge status={host.status} />}
+								{host && <HostTagsPanel key={host.host_id} hostId={host.host_id} />}
 							</div>
-							{host && <StatusBadge status={host.status} />}
-							{host && <HostTagsPanel key={host.host_id} hostId={host.host_id} />}
+							<div className="flex min-w-0 max-w-full items-center gap-basalt-space-lg">
+								<SegmentControl
+									legend="Time range"
+									className={INLINE_SEGMENT}
+									value={String(rangeSeconds)}
+									onValueChange={(value) => setRangeSeconds(Number(value))}
+									options={TIME_RANGES.map(({ label, seconds }) => ({
+										label,
+										value: String(seconds),
+									}))}
+								/>
+								{host && <HostDeleteDialog key={host.host_id} host={host} routeId={hid} />}
+							</div>
 						</div>
-						<div className="flex min-w-0 max-w-full items-center gap-basalt-space-sm">
-							<SegmentControl
-								legend="Time range"
-								className={INLINE_SEGMENT}
-								value={String(rangeSeconds)}
-								onValueChange={(value) => setRangeSeconds(Number(value))}
-								options={TIME_RANGES.map(({ label, seconds }) => ({
-									label,
-									value: String(seconds),
-								}))}
+						{detail && (
+							<DescriptionEditor
+								hid={hid}
+								value={detail.description}
+								onSaved={handleDescriptionSaved}
 							/>
-							{host && <HostDeleteDialog key={host.host_id} host={host} routeId={hid} />}
-						</div>
+						)}
 					</div>
-					{detail && (
-						<DescriptionEditor
-							hid={hid}
-							value={detail.description}
-							onSaved={handleDescriptionSaved}
-						/>
-					)}
 				</div>
-			</div>
+
+				<Readings
+					lead={
+						<>
+							<p className="text-basalt-sm text-basalt-muted-foreground">Public address</p>
+							<div className="mt-basalt-space-xs">
+								<CopyableAddress value={host?.public_ip ?? null} />
+							</div>
+							<p className="mt-basalt-space-xs text-basalt-sm text-basalt-muted-foreground">
+								{host ? `Last seen ${formatLastSeen(host.last_seen, now)}` : "No report yet"}
+							</p>
+						</>
+					}
+					items={readings}
+				/>
+			</LayerCard>
 
 			{/* Metrics — simplified for now */}
 			{metricsLoading && !metricsResponse ? (
-				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
 					<div className="space-y-4">
 						{Array.from({ length: 4 }, (_, i) => (
 							<LayerCard key={`chart-skeleton-${i.toString()}`} className="p-4 md:p-5">
@@ -192,15 +255,9 @@ export function HostDetailPage() {
 					</div>
 				</div>
 			) : metricsResponse ? (
-				<div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
+				<div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
 					{/* Left column — charts */}
 					<div className="min-w-0 space-y-4">
-						<div className="flex items-baseline justify-between">
-							<h2 className="text-basalt-base font-semibold">Metrics</h2>
-							<span className="text-basalt-sm text-basalt-muted-foreground">
-								Last {TIME_RANGES.find((r) => r.seconds === rangeSeconds)?.label ?? "—"}
-							</span>
-						</div>
 						<CpuChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 						<MemoryChart data={metricsResponse.data} rangeSeconds={rangeSeconds} />
 						<NetworkChart
@@ -220,7 +277,6 @@ export function HostDetailPage() {
 
 					{/* Right column — system info + disks */}
 					<div className="space-y-4 min-w-0">
-						<h2 className="text-basalt-base font-semibold">Overview</h2>
 						{host && (
 							<HostAlertsCard alerts={alerts?.filter((a) => a.host_id === host.host_id) ?? []} />
 						)}

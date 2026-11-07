@@ -12,11 +12,13 @@ import {
 import { AlertTriangle, Server } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { HostCard } from "@/components/host-card";
+import { HostTable } from "@/components/host/host-table";
+import { Reading, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
+import { chart } from "@/lib/palette";
 
 type SortKey = "name-asc" | "name-desc" | "cpu" | "mem" | "disk";
 
@@ -49,17 +51,9 @@ function sortHosts(hosts: HostOverviewItem[], key: SortKey): HostOverviewItem[] 
 
 function HostsLoading() {
 	return (
-		<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-			{Array.from({ length: 6 }, (_, i) => (
-				<LayerCard key={`skeleton-${i.toString()}`}>
-					<LayerCard.Body className="space-y-4 py-6">
-						<Skeleton className="h-5 w-32" />
-						<Skeleton className="h-4 w-full" />
-						<Skeleton className="h-4 w-full" />
-						<Skeleton className="h-4 w-3/4" />
-					</LayerCard.Body>
-				</LayerCard>
-			))}
+		<div className="space-y-basalt-layout">
+			<Skeleton className="h-24 w-full" />
+			<Skeleton className="h-80 w-full" />
 		</div>
 	);
 }
@@ -67,8 +61,8 @@ function HostsLoading() {
 function HostsError({ message }: { message: string }) {
 	return (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
-			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">Failed to load hosts</h2>
+			<AlertTriangle className="mb-4 h-12 w-12 text-basalt-destructive" strokeWidth={1} />
+			<h2 className="text-basalt-xl font-semibold text-basalt-foreground">Failed to load hosts</h2>
 			<p className="mt-2 text-basalt-base">{message}</p>
 		</div>
 	);
@@ -77,14 +71,45 @@ function HostsError({ message }: { message: string }) {
 function HostsEmpty() {
 	return (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-			<Server className="h-12 w-12 mb-4" strokeWidth={1} />
-			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">No hosts registered</h2>
+			<Server className="mb-4 h-12 w-12" strokeWidth={1} />
+			<h2 className="text-basalt-xl font-semibold text-basalt-foreground">No hosts registered</h2>
 			<p className="mt-2 text-basalt-base">Deploy a probe to start monitoring your servers.</p>
-			<Button asChild className="mt-4">
+			<Button asChild={true} className="mt-4">
 				<Link to="/setup">Setup Guide</Link>
 			</Button>
 		</div>
 	);
+}
+
+function summaryItems(hosts: readonly HostOverviewItem[]): ReadingItem[] {
+	const healthy = hosts.filter((host) => host.status === "healthy").length;
+	const degraded = hosts.filter(
+		(host) => host.status === "warning" || host.status === "critical",
+	).length;
+	const offline = hosts.filter((host) => host.status === "offline").length;
+	const alerts = hosts.reduce((total, host) => total + host.alert_count, 0);
+	return [
+		{
+			label: "Servers",
+			value: String(hosts.length),
+			detail: "registered probes",
+			color: chart.sky,
+		},
+		{ label: "Healthy", value: String(healthy), detail: "reporting normally", color: chart.green },
+		{
+			label: "Degraded",
+			value: String(degraded),
+			detail: "warning or critical",
+			color: chart.amber,
+		},
+		{ label: "Offline", value: String(offline), detail: "no recent report", color: chart.red },
+		{
+			label: "Open alerts",
+			value: String(alerts),
+			detail: "across the fleet",
+			color: chart.orange,
+		},
+	];
 }
 
 export function HostsPage() {
@@ -101,7 +126,6 @@ export function HostsPage() {
 		);
 	}, []);
 
-	// Filter hosts by selected tags (AND logic), then sort
 	const filteredHosts = useMemo(() => {
 		if (!hosts) {
 			return [];
@@ -119,8 +143,8 @@ export function HostsPage() {
 		return sortHosts(filtered, sortKey);
 	}, [hosts, selectedTagIds, hostTagsMap, sortKey]);
 
-	// Only show filter bar when there are tags defined
 	const showFilterBar = allTags && allTags.length > 0;
+	const now = Math.floor(Date.now() / 1000);
 
 	return isLoading && !hosts ? (
 		<HostsLoading />
@@ -153,29 +177,41 @@ export function HostsPage() {
 					) : null
 				}
 			/>
-			<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-				{filteredHosts.map((host, index) => (
-					<div
-						key={host.host_id}
-						className="animate-fade-up"
-						style={{ animationDelay: `${index * 60}ms` }}
-					>
-						<HostCard
-							host={host}
-							tags={hostTagsMap?.[host.host_id]}
-							openPublicPorts={countOpenPublicPorts(alerts, host.host_id)}
-						/>
-					</div>
-				))}
-			</div>
-			{filteredHosts.length === 0 && selectedTagIds.length > 0 && (
-				<div className="flex flex-col items-center justify-center py-12 text-basalt-muted-foreground">
-					<p className="text-basalt-base">No hosts match the selected tags.</p>
-					<Button variant="link" onClick={() => setSelectedTagIds([])} className="mt-2">
-						Clear filters
-					</Button>
+
+			<LayerCard padding="none">
+				<div className="grid grid-cols-2 divide-basalt-border sm:grid-cols-3 lg:grid-cols-5 lg:divide-x">
+					{summaryItems(filteredHosts).map((item) => (
+						<Reading key={item.label} item={item} />
+					))}
 				</div>
-			)}
+			</LayerCard>
+
+			<LayerCard data-testid="host-list">
+				<LayerCard.Header>
+					<h2>Servers</h2>
+					<span className="text-basalt-sm text-basalt-muted-foreground">
+						{filteredHosts.length} of {hosts.length}
+						{selectedTagIds.length > 0 ? " · filtered by tags" : ""}
+					</span>
+				</LayerCard.Header>
+				{filteredHosts.length === 0 ? (
+					<LayerCard.Body className="space-y-basalt-space-md">
+						<p className="text-basalt-sm text-basalt-muted-foreground">
+							No hosts match the selected tags.
+						</p>
+						<Button variant="outline" size="sm" onClick={() => setSelectedTagIds([])}>
+							Clear filters
+						</Button>
+					</LayerCard.Body>
+				) : (
+					<HostTable
+						hosts={filteredHosts}
+						tagsFor={(hostId) => hostTagsMap?.[hostId]}
+						now={now}
+						openPortsFor={(hostId) => countOpenPublicPorts(alerts, hostId)}
+					/>
+				)}
+			</LayerCard>
 		</div>
 	);
 }

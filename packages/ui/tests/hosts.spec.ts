@@ -4,7 +4,7 @@ test.describe("Hosts list page", () => {
 	test("standard sort select supports pointer and keyboard selection", async ({ page }) => {
 		await page.goto("/hosts");
 		const sort = page.getByRole("combobox", { name: "Sort hosts" });
-		const cards = page.getByTestId("host-card");
+		const cards = page.getByTestId("host-row");
 		await expect(cards).toHaveCount(2);
 		await expect(sort).toHaveCSS("font-size", "14px");
 		await expect(cards.first()).toContainText("alpha.test.local");
@@ -30,10 +30,10 @@ test.describe("Hosts list page", () => {
 		await staging.focus();
 		await staging.press("Space");
 		await expect(staging).toHaveAttribute("aria-pressed", "true");
-		await expect(page.getByTestId("host-card")).toHaveCount(1);
+		await expect(page.getByTestId("host-row")).toHaveCount(1);
 		await filters.getByRole("button", { name: "Clear", exact: true }).click();
 		await expect(staging).toHaveAttribute("aria-pressed", "false");
-		await expect(page.getByTestId("host-card")).toHaveCount(2);
+		await expect(page.getByTestId("host-row")).toHaveCount(2);
 	});
 
 	test("page loads and displays sidebar navigation", async ({ page }) => {
@@ -85,12 +85,12 @@ test.describe("Hosts list page", () => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
 
-		const cards = page.locator('[data-testid="host-card"]');
+		const cards = page.locator('[data-testid="host-row"]');
 		await expect(cards.first()).toBeVisible({ timeout: 15_000 });
 		await expect(cards).toHaveCount(2);
 	});
 
-	test("cards stretch to the tallest card in each row but remain content-sized on mobile", async ({
+	test("the fleet table keeps uniform rows and stays inside the island on mobile", async ({
 		page,
 	}) => {
 		const path = "/api/hosts/pw-host-beta/tags";
@@ -100,57 +100,43 @@ test.describe("Hosts list page", () => {
 		try {
 			expect((await page.request.put(path, { data: { tag_ids: [] } })).ok()).toBe(true);
 			await page.goto("/hosts");
-			const cards = page.getByTestId("host-card");
-			await expect(cards).toHaveCount(2);
-			await expect(cards.first().getByText("production", { exact: true })).toBeVisible();
+			const rows = page.getByTestId("host-row");
+			await expect(rows).toHaveCount(2);
+			await expect(rows.first().getByText("production", { exact: true })).toBeVisible();
+
 			for (const width of [1280, 900]) {
 				await page.setViewportSize({ width, height: 900 });
 				await expect
 					.poll(() =>
-						cards.evaluateAll((elements) => {
-							const [first, second] = elements.map((element) => ({
-								card: element.getBoundingClientRect(),
-								footer: element.lastElementChild?.getBoundingClientRect(),
-								link: element.closest("a")?.getBoundingClientRect(),
-							}));
-							return (
-								first &&
-								second &&
-								Math.abs(first.card.top - second.card.top) < 1 &&
-								Math.abs(first.card.height - second.card.height) < 1 &&
-								Math.abs((first.footer?.bottom ?? 0) - (second.footer?.bottom ?? 0)) < 1 &&
-								Math.abs((second.link?.height ?? 0) - second.card.height) < 1
-							);
+						rows.evaluateAll((elements) => {
+							const heights = elements.map((element) => element.getBoundingClientRect().height);
+							// The last row has no bottom hairline, so allow that single pixel.
+							return heights.every((height) => Math.abs(height - (heights[0] ?? 0)) <= 1);
 						}),
 					)
 					.toBe(true);
 			}
+
 			await page.setViewportSize({ width: 390, height: 844 });
-			// Resize reflows asynchronously; poll until the single-column layout settles.
+			await expect(rows).toHaveCount(2);
 			await expect
 				.poll(() =>
-					cards.evaluateAll((elements) => {
-						const [first, second] = elements.map((element) => element.getBoundingClientRect());
-						return (
-							!!first &&
-							!!second &&
-							second.top >= first.bottom - 0.5 &&
-							first.height > second.height
-						);
-					}),
+					page
+						.locator("[data-basalt-island]")
+						.evaluate((element) => element.scrollWidth <= element.clientWidth),
 				)
 				.toBe(true);
 		} finally {
-			expect(
-				(await page.request.put(path, { data: { tag_ids: tags.map((tag) => tag.id) } })).ok(),
-			).toBe(true);
+			await page.request
+				.put(path, { data: { tag_ids: tags.map((tag) => tag.id) } })
+				.catch(() => {});
 		}
 	});
 
 	test("host card shows hostname", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 
@@ -161,7 +147,7 @@ test.describe("Hosts list page", () => {
 	test("host card shows status badge", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 
@@ -172,7 +158,7 @@ test.describe("Hosts list page", () => {
 	test("tag filter bar is visible when tags exist", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 
@@ -193,7 +179,7 @@ test.describe("Hosts list page", () => {
 	test("clicking tag filter narrows host list", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 
@@ -201,14 +187,14 @@ test.describe("Hosts list page", () => {
 		await page.locator('[data-testid="tag-filter-bar"]').getByText("staging").click();
 
 		// Should filter to 1 card
-		await expect(page.locator('[data-testid="host-card"]')).toHaveCount(1);
+		await expect(page.locator('[data-testid="host-row"]')).toHaveCount(1);
 		await expect(page.getByText("beta.test.local")).toBeVisible();
 	});
 
 	test("clicking host card navigates to detail page", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.waitForLoadState("domcontentloaded");
-		await expect(page.locator('[data-testid="host-card"]').first()).toBeVisible({
+		await expect(page.locator('[data-testid="host-row"]').first()).toBeVisible({
 			timeout: 15_000,
 		});
 

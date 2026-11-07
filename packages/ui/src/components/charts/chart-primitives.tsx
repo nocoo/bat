@@ -74,7 +74,10 @@ export function ChartHeader({
 	const hasLegend = (series && series.length > 0) || extraLegend !== undefined;
 	return (
 		<div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-			<div className="flex items-center gap-2 text-basalt-base font-medium">
+			<div
+				className="flex items-center gap-2 text-basalt-base font-medium"
+				data-testid="chart-title"
+			>
 				<Icon className="h-4 w-4" />
 				{title}
 			</div>
