@@ -175,6 +175,8 @@ export interface HostOverviewRow {
 	mem_total_bytes: number | null;
 	virtualization: string | null;
 	public_ip: string | null;
+	public_ip_v4: string | null;
+	public_ip_v6: string | null;
 	probe_version: string | null;
 	maintenance_start: string | null;
 	maintenance_end: string | null;
