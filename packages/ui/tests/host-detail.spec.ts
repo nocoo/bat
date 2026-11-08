@@ -323,27 +323,26 @@ test.describe("Host detail page", () => {
 		).toBeVisible();
 	});
 
-	test("a longest IPv4 never overflows the inner value span in the lead layout", async ({
+	test("a longest IPv4 remains complete and the Reading values stay untruncated", async ({
 		page,
 	}) => {
 		for (const viewport of [
 			{ width: 1440, height: 1000 },
 			{ width: 1024, height: 1000 },
-			{ width: 900, height: 1000 },
 		]) {
 			await page.setViewportSize(viewport);
 			await page.goto(`/hosts/${alphaHid}`);
 			await page.waitForLoadState("domcontentloaded");
 
 			const header = page.getByTestId("host-detail-header");
-			const value = header
-				.getByRole("button", { name: "Copy address 203.0.113.10", exact: true })
-				.getByTestId("ip-address-chip-value");
-			await expect(value).toBeVisible({ timeout: 15_000 });
+			const chip = header.getByRole("button", { name: "Copy address 203.0.113.10", exact: true });
+			await expect(chip).toBeVisible({ timeout: 15_000 });
+			const value = chip.getByTestId("ip-address-chip-value");
 			await value.evaluate((element) => {
 				element.textContent = "123.123.123.123";
 			});
-			const geometry = await value.evaluate((element) => {
+
+			const ipv4Geometry = await value.evaluate((element) => {
 				const rect = element.getBoundingClientRect();
 				return {
 					text: element.textContent,
@@ -353,8 +352,32 @@ test.describe("Host detail page", () => {
 					clipped: element.scrollWidth > element.clientWidth + 1,
 				};
 			});
-			expect(geometry.text).toBe("123.123.123.123");
-			expect(geometry.clipped).toBe(false);
+			expect(ipv4Geometry.text).toBe("123.123.123.123");
+			expect(ipv4Geometry.clipped).toBe(false);
+			expect(ipv4Geometry.width).toBeGreaterThanOrEqual(126);
+
+			for (const label of ["CPU", "Memory", "Load 1m", "Disk"]) {
+				const readingValue = header
+					.getByText(label, { exact: true })
+					.locator("..")
+					.locator("span.font-mono")
+					.first();
+				await expect(readingValue).toBeVisible({ timeout: 15_000 });
+				const geometry = await readingValue.evaluate((element) => {
+					const rect = element.getBoundingClientRect();
+					return {
+						text: element.textContent,
+						width: Math.round(rect.width),
+						clientWidth: element.clientWidth,
+						scrollWidth: element.scrollWidth,
+						clipped: element.scrollWidth > element.clientWidth + 1,
+					};
+				});
+				expect(geometry.text).toBeTruthy();
+				expect(geometry.text).not.toContain("…");
+				expect(geometry.clipped).toBe(false);
+			}
+
 			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 				true,
 			);
@@ -366,6 +389,7 @@ test.describe("Host detail page", () => {
 	}) => {
 		for (const viewport of [
 			{ width: 1440, height: 1000 },
+			{ width: 1024, height: 1000 },
 			{ width: 900, height: 1000 },
 		]) {
 			await page.setViewportSize(viewport);

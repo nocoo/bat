@@ -13,14 +13,14 @@ export interface TrendPoint {
 
 export function Trend({ points, color }: { points: readonly TrendPoint[]; color: string }) {
 	if (points.length < 2) {
-		return <span className="hidden h-6 w-14 sm:block" aria-hidden="true" />;
+		return <span className="hidden h-6 w-14 xl:block" aria-hidden="true" />;
 	}
 	return (
 		<LineChart
 			data={points as TrendPoint[]}
 			series={[{ key: "value", color }]}
 			ariaLabel="Trend"
-			className="hidden h-6 w-14 sm:block"
+			className="hidden h-6 w-14 xl:block"
 			showAxes={false}
 			showLegend={false}
 			accessibilityLayer={false}
@@ -55,7 +55,7 @@ export function Reading({ item }: { item: ReadingItem }) {
 
 export function Readings({ items, lead }: { items: readonly ReadingItem[]; lead?: ReactNode }) {
 	return (
-		<div className="grid grid-cols-2 divide-basalt-border border-t border-basalt-border sm:grid-cols-3 lg:grid-cols-[minmax(18rem,1.15fr)_repeat(4,minmax(0,1fr))] lg:divide-x">
+		<div className="grid grid-cols-2 divide-basalt-border border-t border-basalt-border sm:grid-cols-3 lg:grid-cols-[minmax(13rem,1.15fr)_repeat(4,minmax(0,1fr))] lg:divide-x">
 			{lead !== undefined && (
 				<div className="col-span-2 border-b border-basalt-border px-basalt-card py-basalt-layout sm:col-span-3 lg:col-span-1 lg:border-b-0">
 					{lead}

@@ -8,11 +8,19 @@ import { IpAddressChip } from "@/components/ip-address-chip";
 
 export function HostPublicAddress({ detail }: { detail: HostDetailItem | undefined }) {
 	return (
-		<div className="mt-basalt-space-xs grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-basalt-space-sm gap-y-basalt-space-xs">
-			<span className="text-basalt-xs font-semibold text-basalt-muted-foreground">IPv4</span>
-			<IpAddressChip value={detail?.public_ip_v4 ?? null} />
-			<span className="text-basalt-xs font-semibold text-basalt-muted-foreground">IPv6</span>
-			<IpAddressChip value={detail?.public_ip_v6 ?? null} />
+		<div className="mt-basalt-space-xs space-y-basalt-space-xs">
+			<div className="space-y-basalt-space-xs">
+				<span className="block text-basalt-xs font-semibold text-basalt-muted-foreground">
+					IPv4
+				</span>
+				<IpAddressChip value={detail?.public_ip_v4 ?? null} />
+			</div>
+			<div className="space-y-basalt-space-xs">
+				<span className="block text-basalt-xs font-semibold text-basalt-muted-foreground">
+					IPv6
+				</span>
+				<IpAddressChip value={detail?.public_ip_v6 ?? null} />
+			</div>
 		</div>
 	);
 }
