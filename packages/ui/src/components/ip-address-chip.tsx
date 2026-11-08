@@ -17,7 +17,7 @@ const FEEDBACK_MS = 1400;
 export function IpAddressChip({ value }: { value: string | null }) {
 	const [state, setState] = useState<CopyState>("idle");
 	const [announcement, setAnnouncement] = useState("");
-	const [announcementKey, setAnnouncementKey] = useState(0);
+	const [request, setRequest] = useState<{ id: number; message: string } | null>(null);
 	const feedbackTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const empty = value === null;
 
@@ -29,6 +29,18 @@ export function IpAddressChip({ value }: { value: string | null }) {
 			}
 		};
 	}, []);
+
+	// One live region for the whole chip, never remounted: the message is cleared
+	// first and set again afterwards, so repeating the same copy is announced
+	// again instead of being swallowed as an unchanged text node.
+	useEffect(() => {
+		if (!request) {
+			return;
+		}
+		setAnnouncement("");
+		const id = setTimeout(() => setAnnouncement(request.message), 0);
+		return () => clearTimeout(id);
+	}, [request]);
 
 	function restartFeedback(next: CopyState) {
 		if (feedbackTimer.current !== null) {
@@ -48,12 +60,16 @@ export function IpAddressChip({ value }: { value: string | null }) {
 		try {
 			await navigator.clipboard.writeText(value);
 			restartFeedback("copied");
-			setAnnouncementKey((key) => key + 1);
-			setAnnouncement(`Address copied: ${value}`);
+			setRequest((previous) => ({
+				id: (previous?.id ?? 0) + 1,
+				message: `Address copied: ${value}`,
+			}));
 		} catch {
 			restartFeedback("failed");
-			setAnnouncementKey((key) => key + 1);
-			setAnnouncement(`Could not copy address: ${value}`);
+			setRequest((previous) => ({
+				id: (previous?.id ?? 0) + 1,
+				message: `Could not copy address: ${value}`,
+			}));
 		}
 	}
 
@@ -119,13 +135,7 @@ export function IpAddressChip({ value }: { value: string | null }) {
 					</span>
 				)}
 			</button>
-			<span
-				key={announcementKey}
-				role="status"
-				aria-live="polite"
-				aria-atomic="true"
-				className="sr-only"
-			>
+			<span role="status" aria-live="polite" aria-atomic="true" className="sr-only">
 				{announcement}
 			</span>
 		</Fragment>

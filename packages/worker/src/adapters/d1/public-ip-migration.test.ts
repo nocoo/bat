@@ -1,13 +1,16 @@
-// 0034 splits the public address into per-family columns. Hosts observed before
-// the split only have `public_ip`, so the migration backfills each stored
-// literal into its own family column: without it an existing fleet would render
-// without any public address.
+// 0034 splits the public address into per-family columns.
+//
+// The migration only adds the two columns: deciding which family a historical
+// `public_ip` belongs to needs a real address parser, so the split happens on
+// read instead (see `lib/public-address.ts`). A legacy row therefore keeps its
+// `public_ip` and has no family value until the probe reports one.
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import BetterSqlite3 from "better-sqlite3";
 import { describe, expect, test } from "vitest";
+import { resolvePublicAddresses } from "../../lib/public-address.js";
 
 const MIGRATION = "0034_public_ip_families.sql";
 const migrationsDir = fileURLToPath(new URL("../../../migrations/", import.meta.url));
@@ -48,63 +51,48 @@ function readHost(
 }
 
 describe("0034 public address families", () => {
-	test("backfills an IPv4 address into the IPv4 column and leaves public_ip alone", () => {
+	test("adds the family columns without touching the legacy address", () => {
+		const db = databaseBeforeSplit();
+		insertHost(db, "legacy", "203.0.113.10");
+
+		applyMigration(db);
+
+		// The migration is additive only: no value is copied, nothing is rewritten.
+		expect(readHost(db, "legacy")).toEqual({
+			public_ip: "203.0.113.10",
+			public_ip_v4: null,
+			public_ip_v6: null,
+		});
+		db.close();
+	});
+
+	test("leaves every historical value untouched, valid or not", () => {
 		const db = databaseBeforeSplit();
 		insertHost(db, "legacy-v4", "203.0.113.10");
+		insertHost(db, "legacy-v6", "2001:db8::10");
+		insertHost(db, "legacy-none", null);
+		insertHost(db, "legacy-empty", "");
+		insertHost(db, "legacy-junk", "not-an-ip");
 
 		applyMigration(db);
 
 		expect(readHost(db, "legacy-v4")).toEqual({
 			public_ip: "203.0.113.10",
-			public_ip_v4: "203.0.113.10",
+			public_ip_v4: null,
 			public_ip_v6: null,
 		});
-		db.close();
-	});
-
-	test("backfills an IPv6 address into the IPv6 column", () => {
-		const db = databaseBeforeSplit();
-		insertHost(db, "legacy-v6", "2001:db8::10");
-
-		applyMigration(db);
-
 		expect(readHost(db, "legacy-v6")).toEqual({
 			public_ip: "2001:db8::10",
 			public_ip_v4: null,
-			public_ip_v6: "2001:db8::10",
+			public_ip_v6: null,
 		});
-		db.close();
-	});
-
-	test("a host without a stored address gains no family value", () => {
-		const db = databaseBeforeSplit();
-		insertHost(db, "legacy-none", null);
-
-		applyMigration(db);
-
 		expect(readHost(db, "legacy-none")).toEqual({
 			public_ip: null,
 			public_ip_v4: null,
 			public_ip_v6: null,
 		});
-		db.close();
-	});
-
-	test("empty and invalid historical values stay in public_ip only", () => {
-		const db = databaseBeforeSplit();
-		insertHost(db, "legacy-empty", "");
-		insertHost(db, "legacy-whitespace", "   ");
-		insertHost(db, "legacy-junk", "not-an-ip");
-
-		applyMigration(db);
-
 		expect(readHost(db, "legacy-empty")).toEqual({
 			public_ip: "",
-			public_ip_v4: null,
-			public_ip_v6: null,
-		});
-		expect(readHost(db, "legacy-whitespace")).toEqual({
-			public_ip: "   ",
 			public_ip_v4: null,
 			public_ip_v6: null,
 		});
@@ -113,59 +101,42 @@ describe("0034 public address families", () => {
 			public_ip_v4: null,
 			public_ip_v6: null,
 		});
-
 		db.close();
 	});
 
-	test("junk migration stays junk but a later valid IPv6 becomes preferred", () => {
+	test("the read path derives a family from a valid legacy address", () => {
 		const db = databaseBeforeSplit();
-		insertHost(db, "legacy-mixed", "");
-		insertHost(db, "legacy-junk", "garbage");
+		insertHost(db, "legacy-v4", "203.0.113.10");
+		insertHost(db, "legacy-v6", "2001:db8::10");
 
 		applyMigration(db);
 
-		expect(readHost(db, "legacy-mixed")).toEqual({
-			public_ip: "",
-			public_ip_v4: null,
+		expect(resolvePublicAddresses(readHost(db, "legacy-v4"))).toEqual({
+			public_ip: "203.0.113.10",
+			public_ip_v4: "203.0.113.10",
 			public_ip_v6: null,
 		});
-
-		db.prepare("UPDATE hosts SET public_ip_v6 = ? WHERE host_id = ?").run(
-			"2001:db8::20",
-			"legacy-mixed",
-		);
-		db.prepare(
-			"UPDATE hosts SET public_ip = COALESCE(NULLIF(public_ip_v4, ''), NULLIF(public_ip_v6, '')) WHERE host_id = ?",
-		).run("legacy-mixed");
-
-		expect(readHost(db, "legacy-mixed")).toEqual({
-			public_ip: "2001:db8::20",
+		expect(resolvePublicAddresses(readHost(db, "legacy-v6"))).toEqual({
+			public_ip: "2001:db8::10",
 			public_ip_v4: null,
-			public_ip_v6: "2001:db8::20",
+			public_ip_v6: "2001:db8::10",
 		});
 		db.close();
 	});
 
-	test("the backfill keeps every row and leaves no host without its address", () => {
+	test("an invalid legacy address never surfaces and never wins", () => {
 		const db = databaseBeforeSplit();
-		insertHost(db, "host-a", "203.0.113.1");
-		insertHost(db, "host-b", "2001:db8::2");
-		insertHost(db, "host-c", "198.51.100.3");
+		insertHost(db, "legacy-empty", "");
+		insertHost(db, "legacy-junk", "not-an-ip");
 
 		applyMigration(db);
 
-		const rows = db
-			.prepare("SELECT host_id, public_ip, public_ip_v4, public_ip_v6 FROM hosts ORDER BY host_id")
-			.all() as {
-			host_id: string;
-			public_ip: string;
-			public_ip_v4: string | null;
-			public_ip_v6: string | null;
-		}[];
-		expect(rows).toHaveLength(3);
-		for (const row of rows) {
-			// Each address is still visible through exactly one family column.
-			expect(row.public_ip_v4 ?? row.public_ip_v6).toBe(row.public_ip);
+		for (const hostId of ["legacy-empty", "legacy-junk"]) {
+			expect(resolvePublicAddresses(readHost(db, hostId))).toEqual({
+				public_ip: null,
+				public_ip_v4: null,
+				public_ip_v6: null,
+			});
 		}
 		db.close();
 	});

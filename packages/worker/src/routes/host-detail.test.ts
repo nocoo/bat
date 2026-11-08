@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import type { HostDetailItem } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { Hono } from "hono";
@@ -9,23 +8,6 @@ import type { AppEnv } from "../types";
 import { hostDetailRoute } from "./host-detail";
 
 const READ_KEY = "test-read-key";
-
-/** The backfill statements exactly as 0034 ships them, so the test can replay
- *  the migration on rows written by a pre-split probe. */
-const BACKFILL_SQL = readFileSync(
-	new URL("../../migrations/0034_public_ip_families.sql", import.meta.url),
-	"utf8",
-)
-	.split(";")
-	.map((statement) =>
-		statement
-			.split("\n")
-			.filter((line) => !line.trimStart().startsWith("--"))
-			.join("\n")
-			.trim(),
-	)
-	.filter((statement) => statement.startsWith("UPDATE"))
-	.join(";\n");
 
 function createApp(db: D1Database) {
 	const app = new Hono<AppEnv>();
@@ -206,8 +188,8 @@ describe("GET /api/hosts/:id", () => {
 	});
 
 	test("a host observed before the family split keeps showing its address", async () => {
-		// A pre-0034 probe only wrote `public_ip`; the migration backfill is what
-		// makes that address visible through the per-family fields.
+		// A pre-0034 probe only wrote `public_ip`; the read path derives the family
+		// from that value when it parses as one.
 		const now = Math.floor(Date.now() / 1000);
 		await db
 			.prepare(
@@ -215,7 +197,6 @@ describe("GET /api/hosts/:id", () => {
 			)
 			.bind("host-legacy", "host-legacy", now, "203.0.113.10")
 			.run();
-		await db.exec(BACKFILL_SQL);
 
 		const res = await get(app, "host-legacy");
 		expect(res.status).toBe(200);
@@ -224,6 +205,70 @@ describe("GET /api/hosts/:id", () => {
 		expect(body.public_ip).toBe("203.0.113.10");
 		expect(body.public_ip_v4).toBe("203.0.113.10");
 		expect(body.public_ip_v6).toBeNull();
+	});
+
+	test("a legacy IPv6 address is shown as the IPv6 family", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
+			)
+			.bind("host-legacy-v6", "host-legacy-v6", now, "2001:db8::10")
+			.run();
+
+		const res = await get(app, "host-legacy-v6");
+		const body = (await res.json()) as HostDetailItem;
+		expect(body.public_ip).toBe("2001:db8::10");
+		expect(body.public_ip_v4).toBeNull();
+		expect(body.public_ip_v6).toBe("2001:db8::10");
+	});
+
+	test("an invalid legacy address surfaces nothing and never wins", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		for (const [hostId, legacy] of [
+			["host-legacy-empty", ""],
+			["host-legacy-junk", "999.1.1.1"],
+			["host-legacy-junk2", "1..2.345"],
+			["host-legacy-junk3", "2001:::1"],
+		] as const) {
+			await db
+				.prepare(
+					"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
+				)
+				.bind(hostId, hostId, now, legacy)
+				.run();
+
+			const res = await get(app, hostId);
+			const body = (await res.json()) as HostDetailItem;
+			expect(body.public_ip).toBeNull();
+			expect(body.public_ip_v4).toBeNull();
+			expect(body.public_ip_v6).toBeNull();
+		}
+	});
+
+	test("a later valid IPv6 becomes the preferred address after a junk legacy value", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, last_seen, is_active, public_ip) VALUES (?, ?, ?, 1, ?)",
+			)
+			.bind("host-junk", "host-junk", now, "999.1.1.1")
+			.run();
+
+		const before = (await (await get(app, "host-junk")).json()) as HostDetailItem;
+		expect(before.public_ip_v4).toBeNull();
+		expect(before.public_ip_v6).toBeNull();
+
+		// The probe now reports a valid IPv6 for the same host.
+		await db
+			.prepare("UPDATE hosts SET public_ip_v6 = ? WHERE host_id = ?")
+			.bind("2001:db8::20", "host-junk")
+			.run();
+
+		const after = (await (await get(app, "host-junk")).json()) as HostDetailItem;
+		expect(after.public_ip).toBe("2001:db8::20");
+		expect(after.public_ip_v4).toBeNull();
+		expect(after.public_ip_v6).toBe("2001:db8::20");
 	});
 
 	test("public address families returned in detail response", async () => {

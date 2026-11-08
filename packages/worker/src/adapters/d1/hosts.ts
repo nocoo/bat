@@ -4,6 +4,7 @@
 // the routes (which still own the wire-DTO shape) or in `services/`.
 
 import { type HostMetaProjection, loadHostMeta, storeHostMeta } from "../../lib/host-meta-cache.js";
+import { publicAddressLiteral, resolvePublicAddresses } from "../../lib/public-address.js";
 import type {
 	HostDetailRow,
 	HostInventoryUpdate,
@@ -16,7 +17,7 @@ import type {
 } from "../../repos/types.js";
 
 const HOST_OVERVIEW_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, probe_version, maintenance_start, maintenance_end, maintenance_reason";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version, maintenance_start, maintenance_end, maintenance_reason";
 
 const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen, maintenance_start, maintenance_end";
 
@@ -130,7 +131,7 @@ export class D1HostsRepository implements HostsRepository {
 		const result = await this.db
 			.prepare(`SELECT ${HOST_OVERVIEW_COLUMNS} FROM hosts WHERE is_active = 1`)
 			.all<HostOverviewRow>();
-		return result.results;
+		return result.results.map((row) => ({ ...row, ...resolvePublicAddresses(row) }));
 	}
 
 	async listStatusRows(): Promise<HostStatusRow[]> {
@@ -141,10 +142,14 @@ export class D1HostsRepository implements HostsRepository {
 	}
 
 	async getDetailRow(hostId: string): Promise<HostDetailRow | null> {
-		return this.db
+		const row = await this.db
 			.prepare(`SELECT ${HOST_DETAIL_COLUMNS} FROM hosts WHERE host_id = ? AND is_active = 1`)
 			.bind(hostId)
 			.first<HostDetailRow>();
+		if (!row) {
+			return null;
+		}
+		return { ...row, ...resolvePublicAddresses(row) };
 	}
 
 	async getStatusRow(hostId: string): Promise<HostStatusRow | null> {
@@ -273,10 +278,6 @@ ON CONFLICT(host_id) DO UPDATE SET
 	}
 
 	async updateInventory(hostId: string, fields: HostInventoryUpdate): Promise<void> {
-		// A per-family observation makes the stored families the source of truth:
-		// `public_ip` is re-derived from them below, so a probe whose own preference
-		// went stale can never contradict what was actually observed.
-		const derivesPreferred = "public_ip_v4" in fields || "public_ip_v6" in fields;
 		const clauses: string[] = [];
 		const values: unknown[] = [];
 		if ("cpu_logical" in fields) {
@@ -311,38 +312,60 @@ ON CONFLICT(host_id) DO UPDATE SET
 			clauses.push("boot_mode = ?");
 			values.push(fields.boot_mode);
 		}
-		if ("public_ip" in fields && !derivesPreferred) {
+		// A per-family observation makes the stored families the source of truth:
+		// `public_ip` is re-derived from them below, so a probe whose own preference
+		// went stale can never contradict what was actually observed. A family the
+		// payload does not mention keeps its stored value — and a stored legacy
+		// address still fills the family it parses as.
+		const derivesPreferred = "public_ip_v4" in fields || "public_ip_v6" in fields;
+		if (derivesPreferred) {
+			const current = await this.readPublicAddresses(hostId);
+			const resolved = resolvePublicAddresses(current);
+			// A family the payload does not mention keeps the stored value, and a
+			// stored legacy address still fills the family it parses as. A family the
+			// payload does mention is taken as-is, including an explicit null.
+			const v4 =
+				"public_ip_v4" in fields
+					? publicAddressLiteral(fields.public_ip_v4, "v4")
+					: resolved.public_ip_v4;
+			const v6 =
+				"public_ip_v6" in fields
+					? publicAddressLiteral(fields.public_ip_v6, "v6")
+					: resolved.public_ip_v6;
+			clauses.push("public_ip_v4 = ?");
+			values.push(v4);
+			clauses.push("public_ip_v6 = ?");
+			values.push(v6);
+			clauses.push("public_ip = ?");
+			values.push(v4 ?? v6);
+		} else if ("public_ip" in fields) {
 			clauses.push("public_ip = ?");
 			values.push(fields.public_ip);
-		}
-		if ("public_ip_v4" in fields) {
-			clauses.push("public_ip_v4 = ?");
-			values.push(fields.public_ip_v4);
-		}
-		if ("public_ip_v6" in fields) {
-			clauses.push("public_ip_v6 = ?");
-			values.push(fields.public_ip_v6);
 		}
 		if (clauses.length === 0) {
 			return;
 		}
-		const update = this.db
+		await this.db
 			.prepare(`UPDATE hosts SET ${clauses.join(", ")} WHERE host_id = ?`)
-			.bind(...values, hostId);
-		if (!derivesPreferred) {
-			await update.run();
-			return;
-		}
-		// One batch: the derived column reads the families written by the same
-		// transaction, and a family that was absent keeps its stored value.
-		await this.db.batch([
-			update,
-			this.db
-				.prepare(
-					"UPDATE hosts SET public_ip = COALESCE(NULLIF(public_ip_v4, ''), NULLIF(public_ip_v6, '')) WHERE host_id = ?",
-				)
-				.bind(hostId),
-		]);
+			.bind(...values, hostId)
+			.run();
+	}
+
+	/** The stored address columns, for resolving a family before writing it. */
+	private async readPublicAddresses(hostId: string): Promise<{
+		public_ip: string | null;
+		public_ip_v4: string | null;
+		public_ip_v6: string | null;
+	}> {
+		const row = await this.db
+			.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+			.bind(hostId)
+			.first<{
+				public_ip: string | null;
+				public_ip_v4: string | null;
+				public_ip_v6: string | null;
+			}>();
+		return row ?? { public_ip: null, public_ip_v4: null, public_ip_v6: null };
 	}
 
 	async updateTier2Inventory(hostId: string, fields: HostTier2Inventory): Promise<void> {

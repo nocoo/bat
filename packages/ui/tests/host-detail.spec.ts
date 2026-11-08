@@ -323,6 +323,43 @@ test.describe("Host detail page", () => {
 		).toBeVisible();
 	});
 
+	test("the live region node survives repeated copies and re-announces the message", async ({
+		page,
+		context,
+	}) => {
+		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+
+		// The live region that belongs to this chip (its sibling in the fragment).
+		const region = chip.locator("xpath=following-sibling::*[@role='status']");
+		await region.evaluate((element) => {
+			element.setAttribute("data-live-region", "stable");
+		});
+
+		await chip.click();
+		await expect(
+			page.getByRole("status").filter({ hasText: `Address copied: ${publicIpv6}` }),
+		).toBeVisible();
+
+		await chip.click();
+		await expect(
+			page.getByRole("status").filter({ hasText: `Address copied: ${publicIpv6}` }),
+		).toBeVisible();
+
+		// The same node is still in the document — it was never remounted, only its
+		// text changed — so the repeated message is announced again.
+		await expect(page.locator('[data-live-region="stable"]')).toHaveCount(1);
+		await expect(page.locator('[data-live-region="stable"]')).toHaveText(
+			`Address copied: ${publicIpv6}`,
+		);
+	});
+
 	test("a longest IPv4 remains complete and the Reading values stay untruncated", async ({
 		page,
 	}) => {

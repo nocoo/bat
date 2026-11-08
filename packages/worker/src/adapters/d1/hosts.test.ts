@@ -35,6 +35,8 @@ async function seedHost(
 		dns_resolvers?: string | null;
 		dns_search?: string | null;
 		public_ip?: string | null;
+		public_ip_v4?: string | null;
+		public_ip_v6?: string | null;
 		probe_version?: string | null;
 		description?: string | null;
 		maintenance_start?: string | null;
@@ -49,10 +51,10 @@ host_id, hostname, last_seen, is_active,
 os, kernel, arch, cpu_model, boot_time,
 cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes,
 virtualization, net_interfaces, disks, boot_mode,
-timezone, dns_resolvers, dns_search, public_ip,
+timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6,
 probe_version, description,
 maintenance_start, maintenance_end, maintenance_reason
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			hostId,
@@ -76,6 +78,8 @@ maintenance_start, maintenance_end, maintenance_reason
 			overrides.dns_resolvers ?? null,
 			overrides.dns_search ?? null,
 			overrides.public_ip ?? null,
+			overrides.public_ip_v4 ?? null,
+			overrides.public_ip_v6 ?? null,
 			overrides.probe_version ?? null,
 			overrides.description ?? null,
 			overrides.maintenance_start ?? null,
@@ -649,13 +653,69 @@ describe("D1HostsRepository", () => {
 			const row = await db
 				.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
 				.bind("h1")
-				.first<{ public_ip: string; public_ip_v4: string; public_ip_v6: string }>();
+				.first<{ public_ip: string; public_ip_v4: string | null; public_ip_v6: string }>();
 			expect(row).toEqual({
 				public_ip: "2001:db8::20",
-				public_ip_v4: "",
+				public_ip_v4: null,
 				public_ip_v6: "2001:db8::20",
 			});
 		});
+		test("legacy junk does not surface as an address and a later valid IPv6 wins", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				public_ip: "999.1.1.1",
+				public_ip_v4: null,
+				public_ip_v6: null,
+			});
+			const before = await repo.getDetailRow("h1");
+			expect(before?.public_ip).toBeNull();
+			expect(before?.public_ip_v4).toBeNull();
+			expect(before?.public_ip_v6).toBeNull();
+
+			await repo.updateInventory("h1", { public_ip_v6: "2001:db8::20" });
+			const after = await repo.getDetailRow("h1");
+			expect(after?.public_ip).toBe("2001:db8::20");
+			expect(after?.public_ip_v4).toBeNull();
+			expect(after?.public_ip_v6).toBe("2001:db8::20");
+		});
+
+		test("legacy valid v4 and v6 are shown through the read derivation", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				public_ip: "203.0.113.10",
+				public_ip_v4: null,
+				public_ip_v6: null,
+			});
+			const v4 = await repo.getDetailRow("h1");
+			expect(v4?.public_ip).toBe("203.0.113.10");
+			expect(v4?.public_ip_v4).toBe("203.0.113.10");
+			expect(v4?.public_ip_v6).toBeNull();
+
+			await seedHost(db, "h2", "h2.example.com", {
+				public_ip: "2001:db8::10",
+				public_ip_v4: null,
+				public_ip_v6: null,
+			});
+			const v6 = await repo.getDetailRow("h2");
+			expect(v6?.public_ip).toBe("2001:db8::10");
+			expect(v6?.public_ip_v4).toBeNull();
+			expect(v6?.public_ip_v6).toBe("2001:db8::10");
+		});
+
+		test("a fresh identity family write overrides the legacy value", async () => {
+			await seedHost(db, "h1", "h1.example.com", {
+				public_ip: "203.0.113.1",
+				public_ip_v4: null,
+				public_ip_v6: null,
+			});
+			await repo.updateInventory("h1", {
+				public_ip_v4: "198.51.100.7",
+				public_ip_v6: "2001:db8::20",
+			});
+			const row = await repo.getDetailRow("h1");
+			expect(row?.public_ip).toBe("198.51.100.7");
+			expect(row?.public_ip_v4).toBe("198.51.100.7");
+			expect(row?.public_ip_v6).toBe("2001:db8::20");
+		});
+
 		test("a payload without family observations keeps writing the wire public_ip", async () => {
 			await seedHost(db, "h1", "h1.example.com");
 			await repo.updateInventory("h1", { public_ip: "198.51.100.7" });
