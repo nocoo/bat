@@ -228,22 +228,33 @@ test.describe("Host detail page", () => {
 			.getByText("IPv6", { exact: true })
 			.locator("..");
 		await expect(row.getByTestId("ip-address-row-value")).toBeVisible({ timeout: 15_000 });
-		const geometry = await row.evaluate((element) => {
-			const value = element.querySelector('[data-testid="ip-address-row-value"]');
-			const button = element.querySelector('[data-testid="ip-address-row-copy"]');
-			if (!value || !button) {
-				return null;
-			}
-			const range = document.createRange();
-			range.selectNodeContents(value);
-			const textRight = Math.max(...Array.from(range.getClientRects()).map((rect) => rect.right));
-			return {
-				textRight: Math.round(textRight),
-				buttonLeft: Math.round(button.getBoundingClientRect().left),
-			};
-		});
-		expect(geometry).not.toBeNull();
-		expect(geometry?.textRight ?? 0).toBeLessThanOrEqual(geometry?.buttonLeft ?? 0);
+
+		const measure = () =>
+			row.evaluate((element) => {
+				const value = element.querySelector('[data-testid="ip-address-row-value"]');
+				const button = element.querySelector('[data-testid="ip-address-row-copy"]');
+				if (!value || !button) {
+					return null;
+				}
+				const range = document.createRange();
+				range.selectNodeContents(value);
+				const textRight = Math.max(...Array.from(range.getClientRects()).map((rect) => rect.right));
+				return {
+					textRight: Math.round(textRight),
+					rowRight: Math.round(element.getBoundingClientRect().right),
+					buttonLeft: Math.round(button.getBoundingClientRect().left),
+				};
+			});
+
+		// At rest the hidden button owns no width, so the address ends at the row end.
+		const resting = await measure();
+		expect(resting).not.toBeNull();
+		expect(Math.abs((resting?.textRight ?? 0) - (resting?.rowRight ?? 0))).toBeLessThanOrEqual(1);
+
+		// While the button is visible it reserves its own width and never covers the text.
+		await row.hover();
+		const hovered = await measure();
+		expect(hovered?.textRight ?? 0).toBeLessThanOrEqual(hovered?.buttonLeft ?? 0);
 	});
 
 	test("hover and keyboard focus reveal the copy button", async ({ page }) => {

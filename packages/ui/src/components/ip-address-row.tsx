@@ -85,7 +85,12 @@ export function IpAddressRow({
 					</span>
 				) : null}
 				<span
-					className={`relative min-w-0 shrink overflow-hidden whitespace-nowrap pr-basalt-control-sm font-mono text-basalt-base text-basalt-foreground tabular-nums ${alignment === "right" ? "ml-auto text-right" : "text-left"}`}
+					className={`relative min-w-0 shrink overflow-hidden whitespace-nowrap font-mono text-basalt-base text-basalt-foreground tabular-nums ${
+						// The copy button owns the row end only while it is visible.
+						state === "idle"
+							? "pr-0 group-hover:pr-basalt-control-sm group-focus-within:pr-basalt-control-sm"
+							: "pr-basalt-control-sm"
+					} ${alignment === "right" ? "ml-auto text-right" : "text-left"}`}
 					data-testid="ip-address-row-value"
 					title={address}
 				>

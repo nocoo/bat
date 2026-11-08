@@ -32,6 +32,22 @@ describe("IpAddressRow", () => {
 		expect(row.className).toContain("justify-between");
 	});
 
+	test("reserves the copy button width only while the button is visible", async () => {
+		render(<IpAddressRow label="Public IPv4" value="203.0.113.10" alignment="right" />);
+		const value = screen.getByTestId("ip-address-row-value");
+		expect(value.className).toContain("pr-0");
+		expect(value.className).toContain("group-hover:pr-basalt-control-sm");
+
+		await act(async () => {
+			fireEvent.click(screen.getByRole("button", { name: "Copy address 203.0.113.10" }));
+			await Promise.resolve();
+		});
+		await flushAnnouncement();
+
+		expect(value.className).toContain("pr-basalt-control-sm");
+		expect(value.className).not.toContain("pr-0");
+	});
+
 	test("does not render a missing value", () => {
 		const view = render(<IpAddressRow label="IPv6" value={null} />);
 		expect(view.queryByTestId("ip-address-row")).toBeNull();
