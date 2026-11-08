@@ -1,5 +1,34 @@
 import type { NetInterfaceDTO } from "@bat/shared";
-import { IpAddressRow } from "@/components/ip-address-row";
+import {
+	CircleDot,
+	Container,
+	EthernetPort,
+	type LucideIcon,
+	Network,
+	Shield,
+	Wifi,
+} from "lucide-react";
+import { IpAddressRow } from "./ip-address-row";
+
+function interfaceIcon(iface: string): LucideIcon {
+	const name = iface.toLowerCase();
+	if (name === "lo" || name.startsWith("loopback")) {
+		return CircleDot;
+	}
+	if (/^(tailscale|wg|tun|tap)/.test(name)) {
+		return Shield;
+	}
+	if (/^(docker|br-|veth|virbr)/.test(name)) {
+		return Container;
+	}
+	if (/^(eth|en)/.test(name)) {
+		return EthernetPort;
+	}
+	if (/^(wl)/.test(name)) {
+		return Wifi;
+	}
+	return Network;
+}
 
 export function HostInterfaceAddresses({
 	interfaces,
@@ -14,16 +43,43 @@ export function HostInterfaceAddresses({
 	return (
 		<div className="min-w-0 space-y-basalt-space-sm">
 			<p className="text-basalt-sm text-basalt-muted-foreground">Interfaces</p>
-			{rows.map((entry) => (
-				<div key={entry.iface} data-testid={`host-interface-${entry.iface}`} className="min-w-0">
-					<p className="font-mono text-basalt-xs text-basalt-muted-foreground">{entry.iface}</p>
-					<div className="ml-basalt-space-lg space-y-0">
-						{[...entry.ipv4, ...entry.ipv6].map((address) => (
-							<IpAddressRow key={address} value={address} />
-						))}
+			{rows.map((entry) => {
+				const InterfaceIcon = interfaceIcon(entry.iface);
+				return (
+					<div key={entry.iface} data-testid={`host-interface-${entry.iface}`} className="min-w-0">
+						<p className="flex items-center gap-basalt-space-xs font-mono text-basalt-xs text-basalt-muted-foreground">
+							<InterfaceIcon
+								aria-hidden="true"
+								className="size-basalt-icon shrink-0"
+								strokeWidth={1.5}
+							/>
+							<span>{entry.iface}</span>
+						</p>
+						<div className="ml-basalt-space-lg space-y-0">
+							{entry.ipv4.map((address) => (
+								<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
+									<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
+										v4
+									</span>
+									<div className="min-w-0 flex-1">
+										<IpAddressRow value={address} alignment="right" />
+									</div>
+								</div>
+							))}
+							{entry.ipv6.map((address) => (
+								<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
+									<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
+										v6
+									</span>
+									<div className="min-w-0 flex-1">
+										<IpAddressRow value={address} alignment="right" />
+									</div>
+								</div>
+							))}
+						</div>
 					</div>
-				</div>
-			))}
+				);
+			})}
 		</div>
 	);
 }
