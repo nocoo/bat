@@ -282,6 +282,9 @@ test.describe("Host detail page", () => {
 		const overlay = chip.getByTestId("ip-address-chip-overlay");
 		await expect(overlay).toContainText("Copy failed");
 		await expect(chip.locator("svg")).toHaveClass(/text-basalt-warning/);
+		await expect(
+			page.getByRole("status").filter({ hasText: `Could not copy address: ${publicIpv6}` }),
+		).toBeVisible();
 	});
 
 	test("reduced motion drops the overlay transition and the check animation", async ({ page }) => {
@@ -295,6 +298,96 @@ test.describe("Host detail page", () => {
 			.getByTestId("ip-address-chip-overlay");
 		await expect(overlay).toBeVisible({ timeout: 15_000 });
 		await expect(overlay).toHaveCSS("transition-property", "none");
+	});
+
+	test("copy success and failure are announced in an accessible live region", async ({
+		page,
+		context,
+	}) => {
+		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+		await expect(chip.getByTestId("ip-address-chip-overlay")).toHaveAttribute(
+			"aria-hidden",
+			"true",
+		);
+
+		await chip.click();
+		await expect(
+			page.getByRole("status").filter({ hasText: `Address copied: ${publicIpv6}` }),
+		).toBeVisible();
+	});
+
+	test("a longest IPv4 never overflows the inner value span in the lead layout", async ({
+		page,
+	}) => {
+		for (const viewport of [
+			{ width: 1440, height: 1000 },
+			{ width: 1024, height: 1000 },
+			{ width: 900, height: 1000 },
+		]) {
+			await page.setViewportSize(viewport);
+			await page.goto(`/hosts/${alphaHid}`);
+			await page.waitForLoadState("domcontentloaded");
+
+			const header = page.getByTestId("host-detail-header");
+			const value = header
+				.getByRole("button", { name: "Copy address 203.0.113.10", exact: true })
+				.getByTestId("ip-address-chip-value");
+			await expect(value).toBeVisible({ timeout: 15_000 });
+			await value.evaluate((element) => {
+				element.textContent = "123.123.123.123";
+			});
+			const geometry = await value.evaluate((element) => {
+				const rect = element.getBoundingClientRect();
+				return {
+					text: element.textContent,
+					width: Math.round(rect.width),
+					clientWidth: element.clientWidth,
+					scrollWidth: element.scrollWidth,
+					clipped: element.scrollWidth > element.clientWidth + 1,
+				};
+			});
+			expect(geometry.text).toBe("123.123.123.123");
+			expect(geometry.clipped).toBe(false);
+			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+				true,
+			);
+		}
+	});
+
+	test("public and interface chips share one width in the System Info surface", async ({
+		page,
+	}) => {
+		for (const viewport of [
+			{ width: 1440, height: 1000 },
+			{ width: 900, height: 1000 },
+		]) {
+			await page.setViewportSize(viewport);
+			await page.goto(`/hosts/${alphaHid}`);
+			await page.waitForLoadState("domcontentloaded");
+
+			const publicV4 = page
+				.getByText("Public IPv4", { exact: true })
+				.locator("..")
+				.getByTestId("ip-address-chip");
+			const iface = page.getByTestId("host-interface-eth0").getByTestId("ip-address-chip").first();
+			await expect(publicV4).toBeVisible({ timeout: 15_000 });
+			await expect(iface).toBeVisible();
+
+			const publicBox = await publicV4.boundingBox();
+			const ifaceBox = await iface.boundingBox();
+			expect(publicBox?.width).toBe(ifaceBox?.width);
+			expect(publicBox?.height).toBe(ifaceBox?.height);
+			expect(
+				await iface.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+			).toBe(true);
+		}
 	});
 
 	test("keyboard activation copies the literal", async ({ page, context }) => {
@@ -338,12 +431,10 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText("Public IP", { exact: true })).toHaveCount(0);
 
 		// The two chips inside the System Info card share one width.
-		const chips = page.getByTestId("ip-address-chip");
-		const card = page.getByText("Public IPv4", { exact: true }).locator("..");
-		const [v4Chip, v6Chip] = [
-			card.getByRole("button", { name: "Copy address 203.0.113.10", exact: true }),
-			card.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true }),
-		];
+		const v4Label = page.getByText("Public IPv4", { exact: true });
+		const v6Label = page.getByText("Public IPv6", { exact: true });
+		const v4Chip = v4Label.locator("..").getByTestId("ip-address-chip");
+		const v6Chip = v6Label.locator("..").getByTestId("ip-address-chip");
 		await expect(v4Chip).toBeVisible();
 		await expect(v6Chip).toBeVisible();
 		const [v4Box, v6Box] = await Promise.all([chipBox(v4Chip), chipBox(v6Chip)]);
@@ -351,7 +442,7 @@ test.describe("Host detail page", () => {
 		expect(v4Box.height).toBe(v6Box.height);
 		expect(v4Box.clipped).toBe(false);
 		expect(v6Box.clipped).toBe(false);
-		await expect(chips.first()).toBeVisible();
+		await expect(page.getByTestId("ip-address-chip").first()).toBeVisible();
 	});
 
 	test("interfaces list every literal as its own chip, one per line and equal width", async ({
