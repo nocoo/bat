@@ -6,7 +6,6 @@ export interface FleetSummary {
 	healthy: number;
 	warning: number;
 	critical: number;
-	maintenance: number;
 	overall: "healthy" | "degraded" | "critical";
 }
 
@@ -19,7 +18,6 @@ export function summarizeHostStatuses(statuses: HostStatus[]): FleetSummary {
 	let healthy = 0;
 	let warning = 0;
 	let critical = 0;
-	let maintenance = 0;
 
 	for (const status of statuses) {
 		switch (status) {
@@ -32,9 +30,6 @@ export function summarizeHostStatuses(statuses: HostStatus[]): FleetSummary {
 			case "critical":
 			case "offline":
 				critical++;
-				break;
-			case "maintenance":
-				maintenance++;
 				break;
 			default:
 				break;
@@ -50,5 +45,5 @@ export function summarizeHostStatuses(statuses: HostStatus[]): FleetSummary {
 		overall = "healthy";
 	}
 
-	return { healthy, warning, critical, maintenance, overall };
+	return { healthy, warning, critical, overall };
 }

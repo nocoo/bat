@@ -21,7 +21,6 @@ describe("createD1Repositories", () => {
 			"ports",
 			"tags",
 			"settings",
-			"maintenance",
 			"agents",
 			"assets",
 			"bindings",
@@ -79,7 +78,7 @@ describe("reposMiddleware", () => {
 			hasHosts: true,
 			hasMetrics: true,
 			hasAggregation: true,
-			keyCount: 18,
+			keyCount: 17,
 		});
 	});
 

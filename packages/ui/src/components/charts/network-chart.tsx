@@ -1,10 +1,10 @@
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
 import { Globe } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { formatBytesRate, getTimeFormatter, transformNetData } from "@/lib/transforms";
-import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
+import { ChartCard, ChartEmptyState, ChartHeader } from "./chart-primitives";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
@@ -17,16 +17,13 @@ export function NetworkChart({
 	data,
 	resolution,
 	rangeSeconds = 3600,
-	maintenanceWindow,
 }: {
 	data: MetricsDataPoint[];
 	resolution: MetricsResolution;
 	rangeSeconds?: number;
-	maintenanceWindow?: { start: string; end: string } | null;
 }) {
 	const chartData = useMemo(() => transformNetData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
-	const mwAreas = useMaintenanceAreas(chartData, maintenanceWindow);
 
 	if (chartData.length === 0) {
 		return <ChartEmptyState message="No network data" />;
@@ -53,17 +50,6 @@ export function NetworkChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<Tooltip content={<ChartTooltip valueFormatter={(v) => formatBytesRate(v)} />} />
-					{mwAreas.map((area) => (
-						<ReferenceArea
-							key={`mw-${area.x1}`}
-							x1={area.x1}
-							x2={area.x2}
-							fill="currentColor"
-							fillOpacity={0.06}
-							stroke="none"
-							ifOverflow="hidden"
-						/>
-					))}
 					{SERIES.map((s) => (
 						<Line
 							key={s.key}

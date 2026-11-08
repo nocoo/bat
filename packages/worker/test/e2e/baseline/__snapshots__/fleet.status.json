@@ -1,7 +1,6 @@
 {
   "has_critical": true,
   "has_healthy": true,
-  "has_maintenance": true,
   "has_total_hosts": true,
   "has_warning": true,
   "status": "<STATUS>",

@@ -189,8 +189,6 @@ describe("Connect real HTTP / D1 / Durable Object", () => {
 		});
 		await mutation("events.create", { title: "HTTP event", body: { test: true } });
 		await mutation("server.description.update", { description: "HTTP checked" });
-		await mutation("maintenance.set", { start: "01:00", end: "02:00" });
-		await mutation("maintenance.delete");
 		const tagId = String((await mutation("tags.create", { name: "E2E Connect", color: 1 })).id);
 		await mutation("tags.update", { name: "E2E Connect renamed" }, { id: tagId });
 		await mutation("hostTags.add", { tag_id: Number(tagId) });
@@ -227,7 +225,6 @@ describe("Connect real HTTP / D1 / Durable Object", () => {
 			"server.get",
 			"metrics.list",
 			"tier2.get",
-			"maintenance.get",
 			"alerts.list",
 			"events.list",
 			"status.get",

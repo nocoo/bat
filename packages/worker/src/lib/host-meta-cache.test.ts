@@ -37,11 +37,7 @@ function makeKv() {
 	};
 }
 
-const sample: HostMetaProjection = {
-	is_active: 1,
-	maintenance_start: "01:00",
-	maintenance_end: "02:00",
-};
+const sample: HostMetaProjection = { is_active: 1 };
 
 describe("hostMetaKey", () => {
 	test("composes bat:host:meta:{id}", () => {
@@ -73,7 +69,7 @@ describe("loadHostMeta", () => {
 
 	test("retired host projection (is_active=0) is cached and returned", async () => {
 		const { kv } = makeKv();
-		await storeHostMeta(kv, "h", { is_active: 0, maintenance_start: null, maintenance_end: null });
+		await storeHostMeta(kv, "h", { is_active: 0 });
 		const hit = await loadHostMeta(kv, "h");
 		expect(hit?.is_active).toBe(0);
 	});

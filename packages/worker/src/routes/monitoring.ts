@@ -2,7 +2,6 @@
 // Design doc: docs/16-monitoring-api.md
 
 import type { HostStatus } from "@bat/shared";
-import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import type { AlertReadRow } from "../repos/types.js";
@@ -12,20 +11,6 @@ import type { AppEnv } from "../types.js";
 // --- Shared types ---
 
 export type AlertRow = AlertReadRow;
-
-/**
- * Pure helper: convert a host row's maintenance_start/end fields into the
- * `{ start, end } | null` shape accepted by `deriveHostStatus`. A window
- * is only returned when both endpoints are present.
- */
-export function getMaintenanceWindow(host: {
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-}): { start: string; end: string } | null {
-	return host.maintenance_start && host.maintenance_end
-		? { start: host.maintenance_start, end: host.maintenance_end }
-		: null;
-}
 
 const CACHE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -64,7 +49,6 @@ const TIER_PRIORITY: Record<string, number> = {
 	warning: 1,
 	critical: 2,
 	offline: 3,
-	maintenance: 4,
 };
 
 export function worstTier(a: HostStatus, b: HostStatus): HostStatus {
@@ -84,7 +68,7 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 			{
 				status: "ok",
 				host_count: 0,
-				by_tier: { healthy: 0, warning: 0, critical: 0, offline: 0, maintenance: 0 },
+				by_tier: { healthy: 0, warning: 0, critical: 0, offline: 0 },
 				hosts: [],
 			},
 			200,
@@ -115,17 +99,14 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 		warning: 0,
 		critical: 0,
 		offline: 0,
-		maintenance: 0,
 	};
 	const hostItems: unknown[] = [];
 
 	for (const host of hosts) {
 		const hostAlerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const mw = getMaintenanceWindow(host);
 		const lastSeen = host.last_seen;
-		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
-		const inMaintenance = tier === "maintenance";
+		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts);
 
 		// Tag filtering (AND logic)
 		if (tagsByHost && tagFilters.length > 0) {
@@ -147,8 +128,8 @@ export async function monitoringHostsRoute(c: Context<AppEnv>) {
 			hostname: host.hostname,
 			tier,
 			last_seen: lastSeen,
-			alert_count: inMaintenance ? 0 : hostAlerts.length,
-			alerts: inMaintenance ? [] : formatAlerts(hostAlerts),
+			alert_count: hostAlerts.length,
+			alerts: formatAlerts(hostAlerts),
 		});
 	}
 
@@ -189,10 +170,8 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 	]);
 
 	const allowedPorts = allowedByHost.get(hostId);
-	const mw = getMaintenanceWindow(host);
 	const lastSeen = host.last_seen;
-	const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
-	const inMaintenance = tier === "maintenance";
+	const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts);
 	const tags = (tagsByHost.get(hostId) ?? []).slice().sort();
 
 	return c.json(
@@ -203,8 +182,8 @@ export async function monitoringHostDetailRoute(c: Context<AppEnv, "/api/monitor
 			tier,
 			last_seen: lastSeen,
 			uptime_seconds: uptime,
-			alert_count: inMaintenance ? 0 : hostAlerts.length,
-			alerts: inMaintenance ? [] : formatAlerts(hostAlerts),
+			alert_count: hostAlerts.length,
+			alerts: formatAlerts(hostAlerts),
 			tags,
 		},
 		200,
@@ -237,11 +216,10 @@ export async function monitoringGroupsRoute(c: Context<AppEnv>) {
 	for (const host of hosts) {
 		const hostAlerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const mw = getMaintenanceWindow(host);
 		const lastSeen = host.last_seen;
-		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts, mw);
+		const tier = deriveHostStatus(lastSeen, now, hostAlerts, allowedPorts);
 		hostTiers.set(host.host_id, tier);
-		hostAlertCounts.set(host.host_id, tier === "maintenance" ? 0 : hostAlerts.length);
+		hostAlertCounts.set(host.host_id, hostAlerts.length);
 	}
 
 	const result = buildTagGroups(hosts, hostTiers, hostAlertCounts, tagsByHost);
@@ -258,7 +236,6 @@ export interface MonitoringGroup {
 		warning: number;
 		critical: number;
 		offline: number;
-		maintenance: number;
 	};
 	alert_count: number;
 	hosts: { host_id: string; hostname: string }[];
@@ -296,7 +273,7 @@ export function buildTagGroups(
 			if (!g) {
 				g = {
 					hosts: [],
-					byTier: { healthy: 0, warning: 0, critical: 0, offline: 0, maintenance: 0 },
+					byTier: { healthy: 0, warning: 0, critical: 0, offline: 0 },
 					alertCount: 0,
 					worstTier: "healthy",
 				};
@@ -322,30 +299,6 @@ export function buildTagGroups(
 /** GET /api/monitoring/alerts — active alerts enriched for monitoring */
 export interface MonitoringAlertRow extends AlertRow {
 	hostname: string;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-}
-
-/**
- * Pure helper: drop alerts whose host is currently inside its maintenance
- * window. `nowHHMM` should be produced via `toUtcHHMM(now)`.
- */
-export function filterNonMaintenanceAlerts<
-	A extends {
-		maintenance_start: string | null;
-		maintenance_end: string | null;
-	},
->(alerts: A[], nowHHMM: string): A[] {
-	return alerts.filter((a) => {
-		if (
-			a.maintenance_start &&
-			a.maintenance_end &&
-			isInMaintenanceWindow(nowHHMM, a.maintenance_start, a.maintenance_end)
-		) {
-			return false;
-		}
-		return true;
-	});
 }
 
 export interface MonitoringAlertItem {
@@ -416,14 +369,11 @@ export async function monitoringAlertsRoute(c: Context<AppEnv>) {
 
 	const alertRows = (await repos.alerts.listActiveJoinedHosts()) as MonitoringAlertRow[];
 
-	const nowHHMM = toUtcHHMM(now);
-	const nonMaintenanceAlerts = filterNonMaintenanceAlerts(alertRows, nowHHMM);
-
-	const hostIds = [...new Set(nonMaintenanceAlerts.map((a) => a.host_id))];
+	const hostIds = [...new Set(alertRows.map((a) => a.host_id))];
 	const tagsByHost = await repos.tags.listNamesForHosts(hostIds);
 
 	const result = buildMonitoringAlertsResult(
-		nonMaintenanceAlerts,
+		alertRows,
 		tagsByHost,
 		{
 			severity: c.req.query("severity"),

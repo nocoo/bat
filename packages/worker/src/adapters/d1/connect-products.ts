@@ -166,7 +166,6 @@ export class D1ConnectProductsRepository implements ConnectProductsRepository {
 				listOverviewRows: async () => own(await base.hosts.listOverviewRows()),
 				listStatusRows: async () => own(await base.hosts.listStatusRows()),
 				getActiveFlag: (id) => base.hosts.getActiveFlag(bound(id)),
-				getActiveAndMaintenance: (id) => base.hosts.getActiveAndMaintenance(bound(id)),
 				getDetailRow: (id) => base.hosts.getDetailRow(bound(id)),
 				getStatusRow: (id) => base.hosts.getStatusRow(bound(id)),
 				getLatestUptime: (id) => base.hosts.getLatestUptime(bound(id)),
@@ -209,11 +208,6 @@ export class D1ConnectProductsRepository implements ConnectProductsRepository {
 				findActiveWebhookByToken: unsupported,
 				insertEvent: unsupported,
 			}),
-			maintenance: {
-				getForHost: (id) => base.maintenance.getForHost(bound(id)),
-				setForHost: (id, value, opts) => base.maintenance.setForHost(bound(id), value, opts),
-				clearForHost: (id, opts) => base.maintenance.clearForHost(bound(id), opts),
-			},
 			ports: view(base.ports, {
 				listAllByHost: async () => {
 					const all = await base.ports.listAllByHost();

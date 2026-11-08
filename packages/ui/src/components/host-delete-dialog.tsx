@@ -82,8 +82,8 @@ export function HostDeleteDialog({ host, routeId }: { host: HostOverviewItem; ro
 					)}
 					<p>
 						This permanently deletes <strong>{host.hostname}</strong>, its metrics, inventory,
-						alerts, events, tag assignments, port rules, maintenance and Connect grants. The host
-						disappears from the dashboard.
+						alerts, events, tag assignments, port rules and Connect grants. The host disappears from
+						the dashboard.
 					</p>
 					<p>
 						Webhook credentials and host-assigned agents/assets are also deleted, including their

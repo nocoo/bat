@@ -1,12 +1,11 @@
 // GET /api/hosts/:id — return full host detail with inventory fields
 import type { HostDetailItem } from "@bat/shared";
-import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import { extractNetRates, extractRootDiskPct, safeParse } from "../lib/json-helpers.js";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
-import { getMaintenanceWindow } from "./monitoring.js";
 
 export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const idParam = c.var.connectServerId ?? c.req.param("id");
@@ -32,12 +31,8 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const metrics = latestRows[0] ?? null;
 	const allowedPorts = allowedByHost.get(hostId);
 
-	const maintenance = getMaintenanceWindow(host);
 	const lastSeen = host.last_seen;
-	const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts, maintenance);
-	const inMaintenance =
-		maintenance !== null &&
-		isInMaintenanceWindow(toUtcHHMM(now), maintenance.start, maintenance.end);
+	const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts);
 	const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 	const netRates = extractNetRates(metrics?.net_json ?? null);
 
@@ -55,7 +50,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		mem_used_pct: metrics?.mem_used_pct ?? null,
 		uptime_seconds: metrics?.uptime_seconds ?? null,
 		last_seen: lastSeen,
-		alert_count: inMaintenance ? 0 : alerts.length,
+		alert_count: alerts.length,
 		cpu_logical: host.cpu_logical,
 		cpu_physical: host.cpu_physical,
 		mem_total_bytes: host.mem_total_bytes,
@@ -83,9 +78,6 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		disks: safeParse(host.disks),
 		top_processes_json: host.top_processes_json,
 		top_processes_ts: host.top_processes_ts,
-		maintenance_start: host.maintenance_start,
-		maintenance_end: host.maintenance_end,
-		maintenance_reason: host.maintenance_reason,
 	};
 
 	return c.json(item);

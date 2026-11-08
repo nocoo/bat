@@ -4,13 +4,7 @@
 
 import type { HostStatus } from "@bat/shared";
 import { describe, expect, test } from "vitest";
-import {
-	type AlertRow,
-	buildAlertsByHost,
-	formatAlerts,
-	getMaintenanceWindow,
-	worstTier,
-} from "./monitoring";
+import { type AlertRow, buildAlertsByHost, formatAlerts, worstTier } from "./monitoring";
 
 const alert = (over: Partial<AlertRow>): AlertRow => ({
 	host_id: "h",
@@ -71,11 +65,6 @@ describe("formatAlerts", () => {
 describe("worstTier", () => {
 	const worse = (a: HostStatus, b: HostStatus): HostStatus => worstTier(a, b);
 
-	test("maintenance beats everything", () => {
-		expect(worse("maintenance", "critical")).toBe("maintenance");
-		expect(worse("offline", "maintenance")).toBe("maintenance");
-	});
-
 	test("offline > critical > warning > healthy", () => {
 		expect(worse("offline", "critical")).toBe("offline");
 		expect(worse("critical", "warning")).toBe("critical");
@@ -91,48 +80,7 @@ describe("worstTier", () => {
 	});
 });
 
-describe("getMaintenanceWindow", () => {
-	test("returns the { start, end } object when both ends are present", () => {
-		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "03:00" })).toEqual({
-			start: "02:00",
-			end: "03:00",
-		});
-	});
-
-	test("returns null when either endpoint is missing", () => {
-		expect(getMaintenanceWindow({ maintenance_start: null, maintenance_end: "03:00" })).toBeNull();
-		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: null })).toBeNull();
-		expect(getMaintenanceWindow({ maintenance_start: null, maintenance_end: null })).toBeNull();
-	});
-
-	test("treats empty strings as falsy (no window)", () => {
-		expect(getMaintenanceWindow({ maintenance_start: "", maintenance_end: "03:00" })).toBeNull();
-		expect(getMaintenanceWindow({ maintenance_start: "02:00", maintenance_end: "" })).toBeNull();
-	});
-
-	test("does not validate the HHMM format (that's callers' job)", () => {
-		// Pure coercion helper; lets callers decide whether to validate.
-		expect(getMaintenanceWindow({ maintenance_start: "not-a-time", maintenance_end: "x" })).toEqual(
-			{ start: "not-a-time", end: "x" },
-		);
-	});
-
-	test("ignores extra row fields", () => {
-		const row = {
-			host_id: "web",
-			maintenance_start: "01:00",
-			maintenance_end: "05:00",
-			last_seen: 0,
-		};
-		expect(getMaintenanceWindow(row)).toEqual({ start: "01:00", end: "05:00" });
-	});
-});
-
-import {
-	buildMonitoringAlertsResult,
-	filterNonMaintenanceAlerts,
-	type MonitoringAlertRow,
-} from "./monitoring";
+import { buildMonitoringAlertsResult, type MonitoringAlertRow } from "./monitoring";
 
 const mAlert = (over: Partial<MonitoringAlertRow>): MonitoringAlertRow => ({
 	host_id: "h1",
@@ -142,46 +90,7 @@ const mAlert = (over: Partial<MonitoringAlertRow>): MonitoringAlertRow => ({
 	value: 50,
 	message: null,
 	triggered_at: 1000,
-	maintenance_start: null,
-	maintenance_end: null,
 	...over,
-});
-
-describe("filterNonMaintenanceAlerts", () => {
-	test("keeps alerts with no maintenance window", () => {
-		const a = mAlert({});
-		expect(filterNonMaintenanceAlerts([a], "12:00")).toEqual([a]);
-	});
-	test("drops alerts inside maintenance window", () => {
-		const a = mAlert({ maintenance_start: "00:00", maintenance_end: "06:00" });
-		expect(filterNonMaintenanceAlerts([a], "03:00")).toEqual([]);
-	});
-	test("keeps alerts outside maintenance window", () => {
-		const a = mAlert({ maintenance_start: "00:00", maintenance_end: "06:00" });
-		expect(filterNonMaintenanceAlerts([a], "12:00")).toEqual([a]);
-	});
-	test("half-set window falls through (treated as no window)", () => {
-		const a = mAlert({ maintenance_start: "00:00", maintenance_end: null });
-		expect(filterNonMaintenanceAlerts([a], "03:00")).toEqual([a]);
-		const b = mAlert({ maintenance_start: null, maintenance_end: "06:00" });
-		expect(filterNonMaintenanceAlerts([b], "03:00")).toEqual([b]);
-	});
-	test("wrap-around window (e.g. 22:00 → 02:00)", () => {
-		const a = mAlert({ maintenance_start: "22:00", maintenance_end: "02:00" });
-		expect(filterNonMaintenanceAlerts([a], "23:00")).toEqual([]);
-		expect(filterNonMaintenanceAlerts([a], "01:00")).toEqual([]);
-		expect(filterNonMaintenanceAlerts([a], "12:00")).toEqual([a]);
-	});
-	test("preserves order", () => {
-		const a = mAlert({ rule_id: "1" });
-		const b = mAlert({ rule_id: "2" });
-		const c = mAlert({ rule_id: "3" });
-		expect(filterNonMaintenanceAlerts([a, b, c], "12:00").map((x) => x.rule_id)).toEqual([
-			"1",
-			"2",
-			"3",
-		]);
-	});
 });
 
 describe("buildMonitoringAlertsResult", () => {
@@ -301,7 +210,6 @@ describe("buildTagGroups", () => {
 			warning: 1,
 			critical: 0,
 			offline: 0,
-			maintenance: 0,
 		});
 		expect(groups[0]?.tier).toBe("warning");
 	});
@@ -363,7 +271,7 @@ describe("buildTagGroups", () => {
 				["b", "warning"],
 				["c", "critical"],
 				["d", "offline"],
-				["e", "maintenance"],
+				["e", "offline"],
 			]),
 			new Map(),
 			new Map([
@@ -378,8 +286,7 @@ describe("buildTagGroups", () => {
 			healthy: 1,
 			warning: 1,
 			critical: 1,
-			offline: 1,
-			maintenance: 1,
+			offline: 2,
 		});
 	});
 });

@@ -21,7 +21,6 @@ import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
 import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { HostInterfaceAddresses } from "@/components/host-interface-addresses";
-import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostPublicAddress } from "@/components/host-public-address";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
@@ -325,7 +324,6 @@ export function HostDetailPage() {
 								</LayerCard.Body>
 							</LayerCard>
 						)}
-						{host && <MaintenancePanel hostId={host.host_id} />}
 						{host && (
 							<AllowedPortsPanel
 								hostId={host.host_id}

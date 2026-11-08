@@ -1,6 +1,5 @@
 // POST /api/ingest — receive and store metrics from probes
 import type { MetricsPayload } from "@bat/shared";
-import { isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../types.js";
 
@@ -128,8 +127,8 @@ export async function ingestRoute(c: Context<AppEnv>) {
 	if (await repos.hosts.isDeleted(body.host_id))
 		return c.json({ error: "Host is deleted; browser re-registration is required" }, 403);
 
-	// Single SELECT covers retired check, maintenance window, and host existence.
-	const existing = await repos.hosts.getActiveAndMaintenance(body.host_id, {
+	// Single SELECT covers retired check and host existence.
+	const existing = await repos.hosts.getActiveFlag(body.host_id, {
 		kv: c.env.BAT_KV,
 	});
 
@@ -148,21 +147,9 @@ export async function ingestRoute(c: Context<AppEnv>) {
 	// Only evaluate alerts for genuinely new data — retried payloads with
 	// identical timestamps are no-ops from here.
 	if (inserted) {
-		// Check maintenance window — skip alert evaluation + purge alert_pending
-		const nowHHMM = toUtcHHMM(workerNow);
-		const inMaintenance =
-			existing?.maintenance_start &&
-			existing?.maintenance_end &&
-			isInMaintenanceWindow(nowHHMM, existing.maintenance_start, existing.maintenance_end);
-
-		if (inMaintenance) {
-			// Purge duration rule timers to prevent stale first_seen accumulation
-			await repos.alerts.clearPendingForHost(body.host_id, { kv: c.env.BAT_KV });
-		} else {
-			await repos.alerts.evaluateAndApply(body.host_id, body, workerNow, {
-				kv: c.env.BAT_KV,
-			});
-		}
+		await repos.alerts.evaluateAndApply(body.host_id, body, workerNow, {
+			kv: c.env.BAT_KV,
+		});
 	}
 
 	return c.body(null, 204);

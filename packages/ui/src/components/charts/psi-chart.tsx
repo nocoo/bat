@@ -1,10 +1,10 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { Gauge } from "lucide-react";
 import { useMemo } from "react";
-import { CartesianGrid, Line, LineChart, ReferenceArea, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformPsiData } from "@/lib/transforms";
-import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
+import { ChartCard, ChartEmptyState, ChartHeader } from "./chart-primitives";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
@@ -17,15 +17,12 @@ const SERIES = [
 export function PsiChart({
 	data,
 	rangeSeconds = 3600,
-	maintenanceWindow,
 }: {
 	data: MetricsDataPoint[];
 	rangeSeconds?: number;
-	maintenanceWindow?: { start: string; end: string } | null;
 }) {
 	const chartData = useMemo(() => transformPsiData(data), [data]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
-	const mwAreas = useMaintenanceAreas(chartData, maintenanceWindow);
 
 	if (chartData.length === 0) {
 		return <ChartEmptyState message="No PSI pressure data" />;
@@ -52,17 +49,6 @@ export function PsiChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<Tooltip content={<ChartTooltip />} />
-					{mwAreas.map((area) => (
-						<ReferenceArea
-							key={`mw-${area.x1}`}
-							x1={area.x1}
-							x2={area.x2}
-							fill="currentColor"
-							fillOpacity={0.06}
-							stroke="none"
-							ifOverflow="hidden"
-						/>
-					))}
 					{SERIES.map((s) => (
 						<Line
 							key={s.key}

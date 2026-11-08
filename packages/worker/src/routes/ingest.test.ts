@@ -554,51 +554,6 @@ describe("POST /api/ingest", () => {
 			const res = await post(app, makePayload({ probe_version: "1.2.3" }));
 			expect(res.status).toBe(204);
 		});
-
-		test("maintenance window skips alert evaluation and purges pending", async () => {
-			const now = Math.floor(Date.now() / 1000);
-			// Figure out current UTC HH:MM and create a maintenance window around it
-			const nowHHMM = new Date(now * 1000).toISOString().slice(11, 16);
-			const startHour = Number.parseInt(nowHHMM.slice(0, 2), 10);
-			const start = `${String((startHour + 23) % 24).padStart(2, "0")}:00`;
-			const end = `${String((startHour + 1) % 24).padStart(2, "0")}:59`;
-
-			await db
-				.prepare(
-					"INSERT INTO hosts (host_id, hostname, last_seen, is_active, maintenance_start, maintenance_end) VALUES (?, ?, ?, 1, ?, ?)",
-				)
-				.bind("host-maint", "m", now, start, end)
-				.run();
-
-			// Seed alert_pending row that should be purged
-			await db
-				.prepare(
-					"INSERT INTO alert_pending (host_id, rule_id, first_seen, last_value) VALUES (?, ?, ?, ?)",
-				)
-				.bind("host-maint", "cpu_high", now - 60, 80)
-				.run();
-
-			const payload = makePayload({ host_id: "host-maint", timestamp: now });
-			payload.disk = [
-				{ mount: "/", total_bytes: 100_000_000_000, avail_bytes: 1_000_000_000, used_pct: 99 },
-			];
-			const res = await post(app, payload);
-			expect(res.status).toBe(204);
-
-			// alert_pending should be gone
-			const pending = await db
-				.prepare("SELECT COUNT(*) AS cnt FROM alert_pending WHERE host_id = ?")
-				.bind("host-maint")
-				.first<{ cnt: number }>();
-			expect(pending?.cnt).toBe(0);
-
-			// No alert_states row created (maintenance window suppresses evaluation)
-			const alerts = await db
-				.prepare("SELECT COUNT(*) AS cnt FROM alert_states WHERE host_id = ?")
-				.bind("host-maint")
-				.first<{ cnt: number }>();
-			expect(alerts?.cnt).toBe(0);
-		});
 	});
 
 	test("T3 fields null when absent (backward compat)", async () => {

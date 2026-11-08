@@ -4,8 +4,6 @@
 //     (those modules retain the SQL planning + write batches for the tier-1
 //     and tier-2 paths; the pure rule evaluators are re-exported by
 //     `domain/alerts/{evaluate,tier2}.ts`).
-// Maintenance-window filtering for /api/alerts stays in the route — it is
-// pure wall-clock comparison and doesn't belong in the persistence layer.
 
 import type { MetricsPayload, Tier2Payload } from "@bat/shared";
 import { invalidateHealthy } from "../../lib/alerts-healthy-cache.js";
@@ -24,7 +22,7 @@ export class D1AlertsRepository implements AlertsRepository {
 		const result = await this.db
 			.prepare(
 				`SELECT a.host_id, a.rule_id, a.severity, a.value, a.triggered_at, a.message,
-       h.hostname, h.maintenance_start, h.maintenance_end
+       h.hostname
 FROM alert_states a
 JOIN hosts h ON a.host_id = h.host_id
 WHERE h.is_active = 1

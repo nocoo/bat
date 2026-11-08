@@ -4,35 +4,6 @@
 import { LayerCard } from "@nocoo/basalt";
 import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { useMemo } from "react";
-import { maintenanceAreas } from "./maintenance-overlay";
-
-interface MaintenanceWindow {
-	start: string;
-	end: string;
-}
-
-interface TimePoint {
-	ts: number;
-}
-
-/**
- * Compute maintenance overlay rectangles aligned to the chart's data range.
- * Returns [] when no data or no window is set.
- */
-export function useMaintenanceAreas(
-	chartData: readonly TimePoint[],
-	window: MaintenanceWindow | null | undefined,
-): { x1: number; x2: number }[] {
-	return useMemo(() => {
-		if (!window || chartData.length === 0) {
-			return [];
-		}
-		const from = chartData[0]?.ts ?? 0;
-		const to = chartData[chartData.length - 1]?.ts ?? 0;
-		return maintenanceAreas(window.start, window.end, from, to);
-	}, [window, chartData]);
-}
 
 /** Card wrapper used by every chart (consistent padding + radius). */
 export function ChartCard({ children }: { children: ReactNode }) {

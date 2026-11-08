@@ -6,7 +6,6 @@ import { describe, expect, test as it, test } from "vitest";
 import { validateAllowedPortBody } from "./allowed-ports";
 import { pickInventoryFields, validateIdentityPayload } from "./identity";
 import { validateMetricsPayload } from "./ingest";
-import { validateMaintenanceBody } from "./maintenance";
 import { validateTier2Payload } from "./tier2-ingest";
 
 // --- validateIdentityPayload ---
@@ -409,93 +408,6 @@ describe("groupPortsByHost", () => {
 			b: [2],
 			c: [4],
 		});
-	});
-});
-
-describe("validateMaintenanceBody", () => {
-	it("accepts valid body with reason", () => {
-		const r = validateMaintenanceBody({ start: "00:00", end: "06:30", reason: "backup" });
-		expect(r).toEqual({ ok: true, value: { start: "00:00", end: "06:30", reason: "backup" } });
-	});
-	it("accepts valid body without reason (null default)", () => {
-		const r = validateMaintenanceBody({ start: "09:00", end: "17:00" });
-		expect(r).toEqual({ ok: true, value: { start: "09:00", end: "17:00", reason: null } });
-	});
-	it("rejects non-object body", () => {
-		expect(validateMaintenanceBody(null)).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-		expect(validateMaintenanceBody("x" as unknown)).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-	});
-	it("rejects missing start/end", () => {
-		expect(validateMaintenanceBody({ start: "01:00" })).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-		expect(validateMaintenanceBody({ end: "01:00" })).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-		expect(validateMaintenanceBody({})).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-	});
-	it("rejects empty string start/end", () => {
-		expect(validateMaintenanceBody({ start: "", end: "01:00" })).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-	});
-	it("rejects non-string start/end", () => {
-		expect(validateMaintenanceBody({ start: 1, end: "01:00" })).toEqual({
-			ok: false,
-			error: "start and end are required",
-		});
-	});
-	it("rejects invalid start time", () => {
-		expect(validateMaintenanceBody({ start: "25:00", end: "01:00" })).toEqual({
-			ok: false,
-			error: "Invalid start time: 25:00",
-		});
-	});
-	it("rejects invalid end time", () => {
-		expect(validateMaintenanceBody({ start: "01:00", end: "bad" })).toEqual({
-			ok: false,
-			error: "Invalid end time: bad",
-		});
-	});
-	it("rejects when start equals end", () => {
-		expect(validateMaintenanceBody({ start: "02:00", end: "02:00" })).toEqual({
-			ok: false,
-			error: "start and end must be different",
-		});
-	});
-	it("rejects non-string reason", () => {
-		expect(validateMaintenanceBody({ start: "00:00", end: "01:00", reason: 5 })).toEqual({
-			ok: false,
-			error: "reason must be a string",
-		});
-	});
-	it("rejects reason longer than 200 chars", () => {
-		const reason = "x".repeat(201);
-		expect(validateMaintenanceBody({ start: "00:00", end: "01:00", reason })).toEqual({
-			ok: false,
-			error: "reason must be 200 characters or fewer",
-		});
-	});
-	it("accepts reason exactly 200 chars", () => {
-		const reason = "x".repeat(200);
-		const r = validateMaintenanceBody({ start: "00:00", end: "01:00", reason });
-		expect(r.ok).toBe(true);
-	});
-	it("accepts empty-string reason (coerced to empty string, not null)", () => {
-		const r = validateMaintenanceBody({ start: "00:00", end: "01:00", reason: "" });
-		expect(r).toEqual({ ok: true, value: { start: "00:00", end: "01:00", reason: "" } });
 	});
 });
 

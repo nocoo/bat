@@ -496,12 +496,16 @@
 			},
 			"server_ids": {
 				"type": "array",
-				"items": { "type": "string" },
+				"items": {
+					"type": "string"
+				},
 				"description": "Authorization after the operation. Server audit endpoints include only their own server."
 			},
 			"previous_server_ids": {
 				"type": ["array", "null"],
-				"items": { "type": "string" },
+				"items": {
+					"type": "string"
+				},
 				"description": "Authorization before a key change; null when not applicable."
 			},
 			"token_id": {
@@ -907,23 +911,11 @@
 			"critical": {
 				"type": "number"
 			},
-			"maintenance": {
-				"type": "number"
-			},
 			"checked_at": {
 				"type": "number"
 			}
 		},
-		"required": [
-			"status",
-			"version",
-			"total_hosts",
-			"healthy",
-			"warning",
-			"critical",
-			"maintenance",
-			"checked_at"
-		]
+		"required": ["status", "version", "total_hosts", "healthy", "warning", "critical", "checked_at"]
 	},
 	"HealthStatus": {
 		"enum": ["healthy", "degraded", "critical", "empty"]
@@ -1051,15 +1043,6 @@
 					}
 				]
 			},
-			"maintenance_start": {
-				"type": ["string", "null"]
-			},
-			"maintenance_end": {
-				"type": ["string", "null"]
-			},
-			"maintenance_reason": {
-				"type": ["string", "null"]
-			},
 			"description": {
 				"type": ["string", "null"]
 			},
@@ -1162,9 +1145,6 @@
 			"cpu_sparkline",
 			"mem_sparkline",
 			"net_sparkline",
-			"maintenance_start",
-			"maintenance_end",
-			"maintenance_reason",
 			"description",
 			"swap_total_bytes",
 			"boot_mode",
@@ -1293,15 +1273,6 @@
 						"type": "null"
 					}
 				]
-			},
-			"maintenance_start": {
-				"type": ["string", "null"]
-			},
-			"maintenance_end": {
-				"type": ["string", "null"]
-			},
-			"maintenance_reason": {
-				"type": ["string", "null"]
 			}
 		},
 		"required": [
@@ -1332,14 +1303,11 @@
 			"net_tx_rate",
 			"cpu_sparkline",
 			"mem_sparkline",
-			"net_sparkline",
-			"maintenance_start",
-			"maintenance_end",
-			"maintenance_reason"
+			"net_sparkline"
 		]
 	},
 	"HostStatus": {
-		"enum": ["healthy", "warning", "critical", "offline", "maintenance"]
+		"enum": ["healthy", "warning", "critical", "offline"]
 	},
 	"HostTag": {
 		"type": "object",
@@ -1469,21 +1437,6 @@
 			}
 		},
 		"required": ["port", "bind", "protocol", "pid", "process"]
-	},
-	"MaintenanceWindow": {
-		"type": "object",
-		"properties": {
-			"start": {
-				"type": "string"
-			},
-			"end": {
-				"type": "string"
-			},
-			"reason": {
-				"type": "string"
-			}
-		},
-		"required": ["start", "end", "reason"]
 	},
 	"MemMetrics": {
 		"type": "object",
@@ -2156,12 +2109,9 @@
 					},
 					"offline": {
 						"type": "number"
-					},
-					"maintenance": {
-						"type": "number"
 					}
 				},
-				"required": ["healthy", "warning", "critical", "offline", "maintenance"]
+				"required": ["healthy", "warning", "critical", "offline"]
 			},
 			"alert_count": {
 				"type": "number"

@@ -12,7 +12,6 @@ const STATUS_CONFIG: Record<
 	warning: { label: "Warning", variant: "warning" },
 	critical: { label: "Critical", variant: "destructive" },
 	offline: { label: "Offline", variant: "secondary" },
-	maintenance: { label: "Maintenance", variant: "purple" },
 };
 
 export function StatusBadge({ status }: { status: HostStatus }) {

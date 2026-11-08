@@ -105,7 +105,6 @@ describe("GET /api/monitoring/hosts", () => {
 			warning: 0,
 			critical: 0,
 			offline: 0,
-			maintenance: 0,
 		});
 		expect(body.hosts).toEqual([]);
 	});
@@ -246,7 +245,6 @@ describe("GET /api/monitoring/hosts", () => {
 			warning: 1,
 			critical: 1,
 			offline: 1,
-			maintenance: 0,
 		});
 	});
 });
@@ -417,7 +415,6 @@ describe("GET /api/monitoring/groups", () => {
 			warning: 0,
 			critical: 0,
 			offline: 0,
-			maintenance: 0,
 		});
 		expect(body.groups[0].alert_count).toBe(0);
 	});

@@ -56,15 +56,13 @@ export interface HostsRepository {
 	 *  the 8-char hid hash. Used when the route param looks like a hid. */
 	listActiveHostIds(): Promise<{ host_id: string }[]>;
 
-	/** All-hosts scan (active + retired); used by the maintenance / retire
-	 *  routes that need to 403 a known-but-retired host. */
+	/** All-hosts scan (active + retired); used by routes that need to 403 a
+	 *  known-but-retired host. */
 	listAllHostIdsWithActive(): Promise<{ host_id: string; is_active: number }[]>;
 
 	/** Look up a single host's `(host_id, is_active)` by raw host_id.
 	 *  `opts.kv` enables a short-TTL projection cache. KV miss/throw falls
-	 *  back to D1; the projection only carries `is_active`, plus the
-	 *  maintenance window for callers that want both — so a future
-	 *  `getActiveAndMaintenance` call inside the TTL is also served by KV. */
+	 *  back to D1; the projection carries only `is_active`. */
 	getActiveFlag(
 		hostId: string,
 		opts?: { kv?: KVNamespace | undefined },
@@ -94,18 +92,6 @@ export interface HostsRepository {
 	/** 24h hourly sparkline rows for the hosts list. */
 	listSparklineRowsSince(hostIds: string[], sinceSeconds: number): Promise<HostSparklineRow[]>;
 
-	/** Read `(is_active, maintenance_start, maintenance_end)` for the ingest
-	 *  hot path: a single SELECT covering retired check + maintenance window
-	 *  + host existence. Returns null for unknown hosts. `opts.kv` enables
-	 *  the same short-TTL projection cache as `getActiveFlag`. */
-	getActiveAndMaintenance(
-		hostId: string,
-		opts?: { kv?: KVNamespace | undefined },
-	): Promise<{
-		is_active: number;
-		maintenance_start: string | null;
-		maintenance_end: string | null;
-	} | null>;
 	/** Upsert host identity (hostname/os/kernel/arch/cpu_model/boot_time +
 	 *  last_seen + identity_updated_at + probe_version) used by `/api/identity`.
 	 *  ON CONFLICT(host_id) refreshes all listed columns. */
@@ -178,9 +164,6 @@ export interface HostOverviewRow {
 	public_ip_v4: string | null;
 	public_ip_v6: string | null;
 	probe_version: string | null;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-	maintenance_reason: string | null;
 }
 
 /** Subset used for status derivation (fleet + monitoring). */
@@ -188,8 +171,6 @@ export interface HostStatusRow {
 	host_id: string;
 	hostname: string;
 	last_seen: number;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
 }
 
 /** Full row required by `/api/hosts/:id` detail. */
@@ -218,9 +199,6 @@ export interface HostDetailRow {
 	public_ip_v4: string | null;
 	public_ip_v6: string | null;
 	description: string | null;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
-	maintenance_reason: string | null;
 	top_processes_json: string | null;
 	top_processes_ts: number | null;
 }
@@ -286,12 +264,11 @@ export interface MetricsHourlyRow extends Record<string, unknown> {
  * Alert state read + reconciliation. Pure rule evaluators live in
  * `domain/alerts/{evaluate,tier2}.ts`; this repo only owns the D1 persistence
  * (alert_states + alert_pending) and the joined-with-hosts read for the list
- * route. Maintenance-window filtering stays in the route since it depends on
- * wall-clock semantics.
+ * route.
  */
 export interface AlertsRepository {
-	/** Active alerts joined with host inventory + maintenance window for the
-	 *  /api/alerts list route; ordered by triggered_at desc. */
+	/** Active alerts joined with host inventory for the /api/alerts list route;
+	 *  ordered by triggered_at desc. */
 	listActiveJoinedHosts(): Promise<AlertActiveJoinedRow[]>;
 	/** Evaluate tier-1 / signal-expansion / tier-3 rules and reconcile
 	 *  alert_states + alert_pending in a single batch. No-op when nothing
@@ -308,13 +285,8 @@ export interface AlertsRepository {
 	 *  reconcile alert_states + alert_pending in a single batch. */
 	evaluateAndApplyTier2(hostId: string, payload: Tier2Payload, now: number): Promise<void>;
 	/**
-	 * Clear all pending duration-rule timers for a host. Used by ingest when a
-	 * host enters its maintenance window — we suppress alert evaluation but
-	 * still need to drop accumulated `alert_pending.first_seen` so the
-	 * post-maintenance baseline is clean. Does not touch `alert_states`
-	 * (already-fired alerts persist; the maintenance filter on the list route
-	 * hides them). `opts.kv` (when provided) also invalidates the host's
-	 * healthy-sentinel so the next ingest re-derives state.
+	 * Clear all pending duration-rule timers for a host. `opts.kv` (when
+	 * provided) also invalidates the host's healthy-sentinel.
 	 */
 	clearPendingForHost(hostId: string, opts?: { kv?: KVNamespace | undefined }): Promise<void>;
 	/** Read-model: alerts for the given hosts, used by hosts list, host
@@ -347,8 +319,6 @@ export interface AlertActiveJoinedRow {
 	value: number | null;
 	triggered_at: number;
 	message: string | null;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
 }
 /**
  * Webhook event ingest + read. Powers `POST /api/events` (token lookup,
@@ -548,32 +518,6 @@ export interface SettingsRepository {
 	setRetentionDays(value: RetentionDays): Promise<void>;
 }
 
-/**
- * Maintenance window read/write for a host's `maintenance_*` columns.
- * Callers pass an already-resolved raw `host_id`; hid resolution still
- * lives in `lib/resolve-host.ts` until C9 folds it into HostsRepository.
- */
-export interface MaintenanceRepository {
-	/** Returns the window for `hostId`, or null when no window is set. */
-	getForHost(hostId: string): Promise<MaintenanceWindow | null>;
-	/** Upsert the window for `hostId`. `opts.kv` invalidates the host meta
-	 *  projection so the next ingest sees the new window without waiting
-	 *  for TTL. */
-	setForHost(
-		hostId: string,
-		window: MaintenanceWindow,
-		opts?: { kv?: KVNamespace | undefined },
-	): Promise<void>;
-	/** Clear the window (sets all three columns to NULL). `opts.kv` same
-	 *  invalidation contract as `setForHost`. */
-	clearForHost(hostId: string, opts?: { kv?: KVNamespace | undefined }): Promise<void>;
-}
-
-export interface MaintenanceWindow {
-	start: string;
-	end: string;
-	reason: string | null;
-}
 /**
  * Agent CRUD + agent_tags edges + heartbeat. Atomic upsert via
  * INSERT ... ON CONFLICT(source_key, match_key) preserves race-safe
@@ -794,7 +738,6 @@ export interface Repositories {
 	ports: PortAllowlistRepository;
 	tags: TagsRepository;
 	settings: SettingsRepository;
-	maintenance: MaintenanceRepository;
 	agents: AgentsRepository;
 	assets: AssetsRepository;
 	bindings: BindingsRepository;

@@ -109,19 +109,6 @@ describe("C0 baseline: normalized API snapshot (permanent regression guard)", ()
 		);
 	});
 
-	test("GET /api/hosts/:id/maintenance (window present)", async () => {
-		await snap("hosts.maintenance.h1", () => fetchJson(`/api/hosts/${HIDS[H1]}/maintenance`), {
-			sanity: (json) => {
-				// start/end are wall-clock derived (NOW+2h, NOW+2h+1m); only
-				// the reason and shape are deterministic.
-				const obj = json as { start: string; end: string; reason: string };
-				expect(obj.reason).toBe("bl-baseline");
-				expect(obj.start).toMatch(/^\d{2}:\d{2}$/);
-				expect(obj.end).toMatch(/^\d{2}:\d{2}$/);
-			},
-		});
-	});
-
 	test("GET /api/alerts (filtered to H1 — disk_full)", async () => {
 		await snap("alerts.list", () => fetchJson("/api/alerts"), {
 			filter: (json) => filterByHostId(json),
@@ -273,24 +260,6 @@ describe("C0 baseline: normalized API snapshot (permanent regression guard)", ()
 			body: JSON.stringify({ description: null }),
 		});
 		expect(restoreRes.status).toBe(204);
-	});
-
-	test("PUT /api/hosts/:id/maintenance round-trip", async () => {
-		const get = (): Promise<unknown> => fetchJson(`/api/hosts/${HIDS[H3]}/maintenance`);
-		expect(await get()).toBeNull();
-		const setRes = await fetch(`${BASE}/api/hosts/${HIDS[H3]}/maintenance`, {
-			method: "PUT",
-			headers: writeHeaders(),
-			body: JSON.stringify({ start: "02:00", end: "03:00", reason: "bl-test" }),
-		});
-		expect(setRes.status).toBe(204);
-		expect(await get()).toMatchObject({ start: "02:00", end: "03:00", reason: "bl-test" });
-		const delRes = await fetch(`${BASE}/api/hosts/${HIDS[H3]}/maintenance`, {
-			method: "DELETE",
-			headers: writeHeaders(),
-		});
-		expect(delRes.status).toBe(204);
-		expect(await get()).toBeNull();
 	});
 
 	test("POST /api/identity is upsert-idempotent on hostname change", async () => {
@@ -504,24 +473,6 @@ async function seedBaselineDataset(): Promise<void> {
 		body: JSON.stringify({ description: "bl-baseline-desc" }),
 	});
 	assertStatus(descRes.status, 204, "seed description");
-
-	// Maintenance window on H1. Compute a 1-minute window starting 2 hours
-	// after NOW so it never overlaps wall-clock during the test run, no
-	// matter what hour the suite executes. Without this, a window like
-	// "01:00-02:00" would put H1 into `maintenance` tier whenever the
-	// suite runs in that UTC range and break the `critical` snapshot.
-	// The volatile start/end strings are scrubbed by normalize() to `<HHMM>`
-	// so the snapshot stays stable.
-	const winStart = new Date((NOW + 7200) * 1000);
-	const winEnd = new Date((NOW + 7260) * 1000);
-	const fmt = (d: Date): string =>
-		`${d.getUTCHours().toString().padStart(2, "0")}:${d.getUTCMinutes().toString().padStart(2, "0")}`;
-	const mwRes = await fetch(`${BASE}/api/hosts/${HIDS[H1]}/maintenance`, {
-		method: "PUT",
-		headers: writeHeaders(),
-		body: JSON.stringify({ start: fmt(winStart), end: fmt(winEnd), reason: "bl-baseline" }),
-	});
-	assertStatus(mwRes.status, 204, "seed maintenance");
 
 	// 3 metric points on H1 — last one trips disk_full (used_pct = 90 > 85)
 	for (let i = 0; i < 3; i++) {
@@ -850,7 +801,6 @@ function filterFleetStatusShape(json: unknown): unknown {
 			has_healthy: typeof o.healthy === "number",
 			has_warning: typeof o.warning === "number",
 			has_critical: typeof o.critical === "number",
-			has_maintenance: typeof o.maintenance === "number",
 		};
 	}
 	return json;

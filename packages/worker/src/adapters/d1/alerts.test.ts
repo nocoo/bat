@@ -85,7 +85,7 @@ describe("D1AlertsRepository", () => {
 	});
 
 	describe("listActiveJoinedHosts", () => {
-		test("returns alerts joined with hostname + maintenance, ordered by triggered_at desc", async () => {
+		test("returns alerts joined with hostname, ordered by triggered_at desc", async () => {
 			await insertActiveAlert(db, HOST_A, "disk_full", "critical", 95, NOW + 10, "/ at 95%");
 			await insertActiveAlert(db, HOST_A, "iowait_high", "warning", 25, NOW + 20, "iowait 25%");
 			await insertActiveAlert(db, HOST_B, "mem_high", "critical", 90, NOW + 15, "mem 90%");
@@ -106,18 +106,6 @@ describe("D1AlertsRepository", () => {
 
 		test("returns empty array when no alerts", async () => {
 			expect(await repo.listActiveJoinedHosts()).toEqual([]);
-		});
-
-		test("includes maintenance window fields when set", async () => {
-			await db
-				.prepare("UPDATE hosts SET maintenance_start = ?, maintenance_end = ? WHERE host_id = ?")
-				.bind("01:00", "02:00", HOST_A)
-				.run();
-			await insertActiveAlert(db, HOST_A, "x", "critical", 1, NOW, "");
-
-			const rows = await repo.listActiveJoinedHosts();
-			expect(rows[0]?.maintenance_start).toBe("01:00");
-			expect(rows[0]?.maintenance_end).toBe("02:00");
 		});
 	});
 

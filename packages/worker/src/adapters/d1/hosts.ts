@@ -3,7 +3,7 @@
 // `lib/resolve-host.ts`. Pure status / sparkline derivation stays in
 // the routes (which still own the wire-DTO shape) or in `services/`.
 
-import { type HostMetaProjection, loadHostMeta, storeHostMeta } from "../../lib/host-meta-cache.js";
+import { loadHostMeta, storeHostMeta } from "../../lib/host-meta-cache.js";
 import { publicAddressLiteral, resolvePublicAddresses } from "../../lib/public-address.js";
 import type {
 	HostDetailRow,
@@ -17,12 +17,12 @@ import type {
 } from "../../repos/types.js";
 
 const HOST_OVERVIEW_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version, maintenance_start, maintenance_end, maintenance_reason";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version";
 
-const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen, maintenance_start, maintenance_end";
+const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen";
 
 const HOST_DETAIL_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6, description, maintenance_start, maintenance_end, maintenance_reason, top_processes_json, top_processes_ts";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6, description, top_processes_json, top_processes_ts";
 
 const LATEST_METRICS_COLUMNS =
 	"cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json";
@@ -106,22 +106,11 @@ export class D1HostsRepository implements HostsRepository {
 			return { host_id: hostId, is_active: cached.is_active };
 		}
 		const row = await this.db
-			.prepare(
-				"SELECT host_id, is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?",
-			)
+			.prepare("SELECT host_id, is_active FROM hosts WHERE host_id = ?")
 			.bind(hostId)
-			.first<{
-				host_id: string;
-				is_active: number;
-				maintenance_start: string | null;
-				maintenance_end: string | null;
-			}>();
+			.first<{ host_id: string; is_active: number }>();
 		if (row) {
-			await storeHostMeta(opts?.kv, hostId, {
-				is_active: row.is_active,
-				maintenance_start: row.maintenance_start,
-				maintenance_end: row.maintenance_end,
-			});
+			await storeHostMeta(opts?.kv, hostId, { is_active: row.is_active });
 			return { host_id: row.host_id, is_active: row.is_active };
 		}
 		return null;
@@ -212,28 +201,6 @@ ORDER BY host_id, hour_ts ASC`,
 			.bind(...hostIds, sinceSeconds)
 			.all<HostSparklineRow>();
 		return result.results;
-	}
-
-	async getActiveAndMaintenance(
-		hostId: string,
-		opts?: { kv?: KVNamespace | undefined },
-	): Promise<{
-		is_active: number;
-		maintenance_start: string | null;
-		maintenance_end: string | null;
-	} | null> {
-		const cached = await loadHostMeta(opts?.kv, hostId);
-		if (cached) {
-			return cached;
-		}
-		const row = await this.db
-			.prepare("SELECT is_active, maintenance_start, maintenance_end FROM hosts WHERE host_id = ?")
-			.bind(hostId)
-			.first<HostMetaProjection>();
-		// Do NOT cache null — first-seen hosts should be visible to the very
-		// next ingest after upsert, not masked for the TTL window.
-		await storeHostMeta(opts?.kv, hostId, row);
-		return row;
 	}
 
 	async upsertIdentity(params: {

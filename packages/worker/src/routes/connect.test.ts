@@ -226,8 +226,6 @@ describe("Connect writes and retry semantics", () => {
 			body: { source: "unit" },
 			tags: ["test"],
 		});
-		await mutate("maintenance.set", { start: "01:00", end: "02:00", reason: "Work" });
-		await mutate("maintenance.delete");
 		const tag = await mutate("tags.create", { name: "Created private", color: 2 });
 		const tagId = Number(tag?.id);
 		await mutate("tags.update", { name: "Renamed private" }, { id: String(tagId) });
@@ -307,17 +305,6 @@ describe("Connect writes and retry semantics", () => {
 					{ description: "No" },
 					{},
 					{ "Idempotency-Key": "" },
-				)
-			).status,
-		).toBe(428);
-		expect(
-			(
-				await f.call(
-					"maintenance.set",
-					write.secret,
-					{ start: "01:00", end: "02:00" },
-					{},
-					{ "X-Bat-Confirm": "" },
 				)
 			).status,
 		).toBe(428);

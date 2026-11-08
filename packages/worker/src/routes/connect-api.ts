@@ -61,7 +61,6 @@ import { hostDetailRoute } from "./host-detail.js";
 import { hostsListRoute } from "./hosts.js";
 import { identityRoute } from "./identity.js";
 import { ingestRoute } from "./ingest.js";
-import { maintenanceDeleteRoute, maintenanceGetRoute, maintenanceSetRoute } from "./maintenance.js";
 import { hostMetricsRoute } from "./metrics.js";
 import {
 	monitoringAlertsRoute,
@@ -345,9 +344,6 @@ const productHandlers: Record<string, ProductHandler> = {
 	"identity.update": identityRoute,
 	"tier2.get": hostTier2Route,
 	"tier2.ingest": tier2IngestRoute,
-	"maintenance.get": maintenanceGetRoute,
-	"maintenance.set": maintenanceSetRoute,
-	"maintenance.delete": maintenanceDeleteRoute,
 	"alerts.list": alertsListRoute,
 	"events.list": async (c) => {
 		const input = await pageInput(c, "events.list");

@@ -42,7 +42,7 @@ export async function resolveHostIdByHash(
 /**
  * Resolve a route param to a `{ host_id, is_active }` record.
  * Unlike `resolveHostIdByHash`, this scans both active and retired hosts
- * (used by maintenance routes that need to 403 on retired hosts).
+ * for routes that need to 403 on retired hosts.
  */
 export async function resolveHostRecord(
 	repo: HostsRepository,

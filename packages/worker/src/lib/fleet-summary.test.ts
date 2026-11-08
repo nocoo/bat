@@ -8,7 +8,6 @@ describe("summarizeHostStatuses", () => {
 			healthy: 0,
 			warning: 0,
 			critical: 0,
-			maintenance: 0,
 			overall: "healthy",
 		});
 	});
@@ -29,14 +28,6 @@ describe("summarizeHostStatuses", () => {
 		expect(out.overall).toBe("degraded");
 	});
 
-	test("reports healthy when everything is healthy or in maintenance", () => {
-		const statuses: HostStatus[] = ["healthy", "healthy", "maintenance"];
-		const out = summarizeHostStatuses(statuses);
-		expect(out.maintenance).toBe(1);
-		expect(out.healthy).toBe(2);
-		expect(out.overall).toBe("healthy");
-	});
-
 	test("critical takes precedence over warning in the overall verdict", () => {
 		const statuses: HostStatus[] = ["warning", "critical", "healthy"];
 		const out = summarizeHostStatuses(statuses);
@@ -44,20 +35,12 @@ describe("summarizeHostStatuses", () => {
 	});
 
 	test("counts each bucket independently", () => {
-		const statuses: HostStatus[] = [
-			"healthy",
-			"warning",
-			"warning",
-			"critical",
-			"offline",
-			"maintenance",
-		];
+		const statuses: HostStatus[] = ["healthy", "warning", "warning", "critical", "offline"];
 		const out = summarizeHostStatuses(statuses);
 		expect(out).toEqual({
 			healthy: 1,
 			warning: 2,
 			critical: 2,
-			maintenance: 1,
 			overall: "critical",
 		});
 	});

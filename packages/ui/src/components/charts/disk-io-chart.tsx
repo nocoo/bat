@@ -1,19 +1,10 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
-import {
-	Area,
-	CartesianGrid,
-	ComposedChart,
-	Line,
-	ReferenceArea,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts";
+import { Area, CartesianGrid, ComposedChart, Line, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformDiskIoData } from "@/lib/transforms";
-import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
+import { ChartCard, ChartEmptyState, ChartHeader } from "./chart-primitives";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
@@ -27,16 +18,13 @@ export function DiskIoChart({
 	data,
 	resolution = "raw",
 	rangeSeconds = 3600,
-	maintenanceWindow,
 }: {
 	data: MetricsDataPoint[];
 	resolution?: "raw" | "hourly";
 	rangeSeconds?: number;
-	maintenanceWindow?: { start: string; end: string } | null;
 }) {
 	const chartData = useMemo(() => transformDiskIoData(data, resolution), [data, resolution]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
-	const mwAreas = useMaintenanceAreas(chartData, maintenanceWindow);
 
 	if (chartData.length === 0) {
 		return <ChartEmptyState message="No disk I/O data" />;
@@ -73,18 +61,6 @@ export function DiskIoChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<Tooltip content={<ChartTooltip valueFormatter={(value) => value.toFixed(1)} />} />
-					{mwAreas.map((area) => (
-						<ReferenceArea
-							key={`mw-${area.x1}`}
-							yAxisId="iops"
-							x1={area.x1}
-							x2={area.x2}
-							fill="currentColor"
-							fillOpacity={0.06}
-							stroke="none"
-							ifOverflow="hidden"
-						/>
-					))}
 					{SERIES.slice(0, 2).map((s) => (
 						<Area
 							key={s.key}

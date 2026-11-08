@@ -63,7 +63,7 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		id: "server.get",
 		method: "GET",
 		path: server,
-		summary: "Host inventory, current metrics, processes, network and maintenance information",
+		summary: "Host inventory, current metrics, processes and network information",
 	},
 	{
 		id: "server.description.update",
@@ -104,27 +104,6 @@ export const CONNECT_OPERATIONS: ConnectOperation[] = [
 		path: `${server}/tier2`,
 		summary: "Submit this server's tier-2 inventory and evaluate alerts",
 		body: "Tier2",
-	},
-	{
-		id: "maintenance.get",
-		method: "GET",
-		path: `${server}/maintenance`,
-		summary: "Read the daily UTC maintenance window",
-	},
-	{
-		id: "maintenance.set",
-		method: "PUT",
-		path: `${server}/maintenance`,
-		summary: "Set the daily UTC window; alerts are suppressed during this window",
-		body: "Maintenance",
-		dangerous: true,
-	},
-	{
-		id: "maintenance.delete",
-		method: "DELETE",
-		path: `${server}/maintenance`,
-		summary: "Remove the maintenance window",
-		dangerous: true,
 	},
 	{
 		id: "alerts.list",

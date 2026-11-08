@@ -326,14 +326,6 @@ export const CONNECT_SCHEMAS: Record<string, Schema> = {
 	Description: object({ description: { type: ["string", "null"], maxLength: 200 } }, [
 		"description",
 	]),
-	Maintenance: object(
-		{
-			start: { type: "string", pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
-			end: { type: "string", pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
-			reason: { ...string, maxLength: 200 },
-		},
-		["start", "end"],
-	),
 	Port: object(
 		{
 			port: { type: "integer", minimum: 1, maximum: 65535 },
@@ -528,7 +520,6 @@ for (const name of [
 	"TagUpdate",
 	"TagAssignment",
 	"Description",
-	"Maintenance",
 	"Port",
 	"Binding",
 	"Webhook",
@@ -563,7 +554,6 @@ const responseTypes: Record<string, string> = {
 	"server.get": "HostDetailItem",
 	"metrics.list": "MetricsQueryResponse",
 	"tier2.get": "Tier2Snapshot",
-	"maintenance.get": "MaintenanceWindow",
 	"alerts.list": "AlertItem",
 	"events.list": "EventItem",
 	"status.get": "HealthResponse",
@@ -655,7 +645,7 @@ export function connectResponseSchema(operation: ConnectOperation): Schema {
 			["targets", "limit", "requestId", "workstationIds"],
 		);
 	let data = ref(responseTypes[operation.id] ?? "Envelope");
-	if (operation.id === "maintenance.get") data = { anyOf: [data, { type: "null" }] };
+
 	if (operation.list || operation.id === "hostTags.replace") data = array(data);
 	const properties: Record<string, Schema> = { data, requestId: string, serverId: string };
 	const required = ["data", "requestId", "serverId"];

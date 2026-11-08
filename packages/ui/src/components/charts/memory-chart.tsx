@@ -2,19 +2,10 @@ import type { MetricsDataPoint } from "@bat/shared";
 import { ALERT_THRESHOLDS } from "@bat/shared";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
-import {
-	Area,
-	AreaChart,
-	CartesianGrid,
-	ReferenceArea,
-	ReferenceLine,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from "recharts";
+import { Area, AreaChart, CartesianGrid, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";
 import { getTimeFormatter, transformMemData } from "@/lib/transforms";
-import { ChartCard, ChartEmptyState, ChartHeader, useMaintenanceAreas } from "./chart-primitives";
+import { ChartCard, ChartEmptyState, ChartHeader } from "./chart-primitives";
 import { ChartTooltip } from "./chart-tooltip";
 import { DashboardResponsiveContainer } from "./dashboard-responsive-container";
 
@@ -23,15 +14,12 @@ const GRADIENT_ID = "memoryGradient";
 export function MemoryChart({
 	data,
 	rangeSeconds = 3600,
-	maintenanceWindow,
 }: {
 	data: MetricsDataPoint[];
 	rangeSeconds?: number;
-	maintenanceWindow?: { start: string; end: string } | null;
 }) {
 	const chartData = useMemo(() => transformMemData(data), [data]);
 	const tickFormatter = getTimeFormatter(rangeSeconds);
-	const mwAreas = useMaintenanceAreas(chartData, maintenanceWindow);
 
 	if (chartData.length === 0) {
 		return <ChartEmptyState message="No memory data" />;
@@ -78,17 +66,6 @@ export function MemoryChart({
 						tick={{ fill: chartAxis, fontSize: 11 }}
 					/>
 					<Tooltip content={<ChartTooltip />} />
-					{mwAreas.map((area) => (
-						<ReferenceArea
-							key={`mw-${area.x1}`}
-							x1={area.x1}
-							x2={area.x2}
-							fill="currentColor"
-							fillOpacity={0.06}
-							stroke="none"
-							ifOverflow="hidden"
-						/>
-					))}
 					<ReferenceLine
 						y={ALERT_THRESHOLDS.MEM_HIGH_PCT}
 						stroke={chart.teal}

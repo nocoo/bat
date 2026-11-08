@@ -14,7 +14,6 @@ import { D1ConnectRepository } from "./connect.js";
 import { D1ConnectProductsRepository } from "./connect-products.js";
 import { D1EventsRepository } from "./events.js";
 import { D1HostsRepository } from "./hosts.js";
-import { D1MaintenanceRepository } from "./maintenance.js";
 import { D1MetricsRepository } from "./metrics.js";
 import { D1SettingsRepository } from "./settings.js";
 import { D1TagsRepository } from "./tags.js";
@@ -39,7 +38,6 @@ export function createD1Repositories(db: D1Database): Repositories {
 		ports: new D1PortAllowlistRepository(db),
 		tags: new D1TagsRepository(db),
 		settings: new D1SettingsRepository(db),
-		maintenance: new D1MaintenanceRepository(db),
 		agents: new D1AgentsRepository(db),
 		assets: new D1AssetsRepository(db),
 		bindings: new D1BindingsRepository(db),

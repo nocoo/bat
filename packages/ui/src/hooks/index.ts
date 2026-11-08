@@ -8,7 +8,6 @@ export {
 	useAllowedPorts,
 	useEvents,
 	useHostDetail,
-	useHostMaintenance,
 	useHostMetrics,
 	useHosts,
 	useHostTags,

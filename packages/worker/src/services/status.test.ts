@@ -30,31 +30,6 @@ describe("deriveHostStatus", () => {
 		expect(status).toBe("warning");
 	});
 
-	test("maintenance window takes precedence over offline", () => {
-		// NOW in UTC is 18:00 — window 17:00-19:00 covers it
-		const status = deriveHostStatus(
-			STALE,
-			NOW,
-			[{ severity: "critical", rule_id: "no_firewall" }],
-			undefined,
-			{ start: "17:00", end: "19:00" },
-		);
-		expect(status).toBe("maintenance");
-	});
-
-	test("maintenance object without active window does not override", () => {
-		// Window in the future (UTC 20:00-22:00)
-		const status = deriveHostStatus(FRESH, NOW, [], undefined, {
-			start: "20:00",
-			end: "22:00",
-		});
-		expect(status).toBe("healthy");
-	});
-
-	test("null maintenance is ignored", () => {
-		expect(deriveHostStatus(FRESH, NOW, [], undefined, null)).toBe("healthy");
-	});
-
 	test("public_port warning suppressed when all ports allowlisted", () => {
 		const allowed = new Set([80, 443]);
 		const status = deriveHostStatus(

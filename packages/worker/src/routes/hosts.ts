@@ -1,12 +1,12 @@
 // GET /api/hosts — list all active hosts with overview DTO
 import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
-import { hashHostId, isInMaintenanceWindow, toUtcHHMM } from "@bat/shared";
+import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import { tryReadCache, writeCache } from "../lib/dashboard-cache.js";
 import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
-import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
+import { buildAlertsByHost } from "./monitoring.js";
 
 const HOSTS_CACHE_TTL_SECONDS = 30;
 
@@ -128,16 +128,12 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 	const sparklinesByHost = buildSparklinesByHost(sparklineRows);
 
 	// 6. Build response
-	const nowHHMM = toUtcHHMM(now);
 	const items: HostOverviewItem[] = hosts.map((host) => {
 		const metrics = metricsMap.get(host.host_id);
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const maintenance = getMaintenanceWindow(host);
 		const lastSeen = host.last_seen;
-		const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts, maintenance);
-		const inMaintenance =
-			maintenance !== null && isInMaintenanceWindow(nowHHMM, maintenance.start, maintenance.end);
+		const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts);
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
 		const netRates = extractNetRates(metrics?.net_json ?? null);
 		const sparklines = sparklinesByHost.get(host.host_id);
@@ -159,7 +155,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			mem_used_pct: metrics?.mem_used_pct ?? null,
 			uptime_seconds: metrics?.uptime_seconds ?? null,
 			last_seen: lastSeen,
-			alert_count: inMaintenance ? 0 : (alertCountMap.get(host.host_id) ?? 0),
+			alert_count: alertCountMap.get(host.host_id) ?? 0,
 			cpu_logical: host.cpu_logical,
 			cpu_physical: host.cpu_physical,
 			mem_total_bytes: host.mem_total_bytes,
@@ -175,9 +171,6 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			mem_sparkline: sparklines && sparklines.mem.length > 0 ? sparklines.mem : null,
 			net_sparkline: netSparkline,
 			load_sparkline: sparklines && sparklines.load.length > 0 ? sparklines.load : null,
-			maintenance_start: host.maintenance_start,
-			maintenance_end: host.maintenance_end,
-			maintenance_reason: host.maintenance_reason,
 		};
 	});
 

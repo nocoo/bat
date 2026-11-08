@@ -22,7 +22,7 @@ describe("L2: fleet status", () => {
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as HealthResponse;
 		expect(body.total_hosts).toBeGreaterThan(0);
-		expect(body.healthy + body.warning + body.critical + body.maintenance).toBe(body.total_hosts);
+		expect(body.healthy + body.warning + body.critical).toBe(body.total_hosts);
 		expect(["empty", "healthy", "degraded", "critical"]).toContain(body.status);
 		expect(typeof body.version).toBe("string");
 		expect(typeof body.checked_at).toBe("number");

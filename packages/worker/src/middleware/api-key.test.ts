@@ -240,24 +240,6 @@ describe("apiKeyAuth middleware", () => {
 			);
 		});
 
-		test("PUT/DELETE /api/hosts/:id/maintenance requires write key", async () => {
-			const a = appWithRoutes();
-			expect(
-				(await a.request(req("PUT", "/api/hosts/my-host/maintenance", { key: WRITE_KEY }))).status,
-			).toBe(204);
-			expect(
-				(await a.request(req("DELETE", "/api/hosts/my-host/maintenance", { key: WRITE_KEY })))
-					.status,
-			).toBe(204);
-			expect(
-				(await a.request(req("PUT", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status,
-			).toBe(403);
-			// GET is read-only
-			expect(
-				(await a.request(req("GET", "/api/hosts/my-host/maintenance", { key: READ_KEY }))).status,
-			).toBe(204);
-		});
-
 		test("POST /api/tags requires write key", async () => {
 			const a = appWithRoutes();
 			expect((await a.request(req("POST", "/api/tags", { key: WRITE_KEY }))).status).toBe(204);

@@ -50,10 +50,7 @@ const TOKEN_KEYS = new Set(["token"]);
 
 const DURATION_KEYS = new Set(["uptime", "uptime_seconds", "duration_seconds"]);
 
-// Maintenance window start/end are HH:MM strings derived from wall-clock at
-// seed time (the fixture computes them relative to NOW to avoid overlapping
-// the current minute). Scrub them so the snapshot doesn't drift across runs.
-const HHMM_KEYS = new Set(["start", "end", "maintenance_start", "maintenance_end"]);
+const HHMM_KEYS = new Set(["start", "end"]);
 
 const STABLE_SORT_KEYS = [
 	"host_id",

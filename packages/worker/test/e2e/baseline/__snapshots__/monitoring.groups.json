@@ -5,7 +5,6 @@
       "by_tier": {
         "critical": 1,
         "healthy": 1,
-        "maintenance": 0,
         "offline": 0,
         "warning": 0
       },

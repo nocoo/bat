@@ -32,16 +32,6 @@ describe("isWriteRequest — webhook CRUD", () => {
 	});
 });
 
-describe("isWriteRequest — maintenance windows", () => {
-	test("PUT and DELETE on maintenance are writes", () => {
-		expect(isWriteRequest("PUT", "/api/hosts/h-1/maintenance")).toBe(true);
-		expect(isWriteRequest("DELETE", "/api/hosts/h-1/maintenance")).toBe(true);
-	});
-	test("GET on maintenance is read", () => {
-		expect(isWriteRequest("GET", "/api/hosts/h-1/maintenance")).toBe(false);
-	});
-});
-
 describe("isWriteRequest — tags + host-tags", () => {
 	test("POST /api/tags is a write", () => {
 		expect(isWriteRequest("POST", "/api/tags")).toBe(true);

@@ -36,7 +36,6 @@ export function useDeleteHost(hostId: string, routeId: string) {
 									`host-detail-${id}`,
 									`tier2-${id}`,
 									`host-tags-${id}`,
-									`maintenance-${id}`,
 									`allowed-ports-${id}`,
 								].includes(key) || key.startsWith(`metrics-${id}-`),
 						)),

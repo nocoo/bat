@@ -26,7 +26,6 @@ export type {
 	HostOverviewItem,
 	HostStatus,
 	HostTag,
-	MaintenanceWindow,
 	MetricsDataPoint,
 	MetricsQueryResponse,
 	MetricsResolution,
@@ -134,12 +133,6 @@ export type {
 	IdentityPayload,
 	NetInterfaceDTO,
 } from "./identity.js";
-// Maintenance window utilities
-export {
-	isInMaintenanceWindow,
-	isValidTimeHHMM,
-	toUtcHHMM,
-} from "./maintenance.js";
 // Metrics payload types
 export type {
 	ConntrackMetrics,

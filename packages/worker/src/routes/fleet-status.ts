@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { summarizeHostStatuses } from "../lib/fleet-summary.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
-import { buildAlertsByHost, getMaintenanceWindow } from "./monitoring.js";
+import { buildAlertsByHost } from "./monitoring.js";
 
 export async function fleetStatusRoute(c: Context<AppEnv>) {
 	const repos = c.var.repos;
@@ -20,7 +20,6 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 			healthy: 0,
 			warning: 0,
 			critical: 0,
-			maintenance: 0,
 			checked_at: now,
 		};
 		return c.json(response, 200);
@@ -38,11 +37,10 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 	const statuses: HostStatus[] = hosts.map((host) => {
 		const alerts = alertsByHost.get(host.host_id) ?? [];
 		const allowedPorts = allowedByHost.get(host.host_id);
-		const mw = getMaintenanceWindow(host);
 		const lastSeen = host.last_seen;
-		return deriveHostStatus(lastSeen, now, alerts, allowedPorts, mw);
+		return deriveHostStatus(lastSeen, now, alerts, allowedPorts);
 	});
-	const { healthy, warning, critical, maintenance, overall } = summarizeHostStatuses(statuses);
+	const { healthy, warning, critical, overall } = summarizeHostStatuses(statuses);
 
 	const response: HealthResponse = {
 		status: overall,
@@ -51,7 +49,6 @@ export async function fleetStatusRoute(c: Context<AppEnv>) {
 		healthy,
 		warning,
 		critical,
-		maintenance,
 		checked_at: now,
 	};
 

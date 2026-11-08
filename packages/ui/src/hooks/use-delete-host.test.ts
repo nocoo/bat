@@ -51,7 +51,6 @@ describe("useDeleteHost", () => {
 			`host-detail-${hashHostId("host-1")}`,
 			"tier2-host-1",
 			"host-tags-abc12345",
-			"maintenance-host-1",
 			"allowed-ports-host-1",
 			"metrics-abc12345-100-200",
 		])

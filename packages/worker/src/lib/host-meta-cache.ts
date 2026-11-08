@@ -1,9 +1,8 @@
 // Host meta projection KV cache for ingest/tier2/identity hot paths.
 //
-// `/api/ingest` calls `getActiveAndMaintenance` and `/api/tier2`/`/api/identity`
-// call `getActiveFlag` on every request just to check retired-flag + (for
-// ingest) maintenance window. With 6 hosts × ~30 ingests/15min that is ~180
-// D1 reads / 15min that almost never change.
+// `/api/ingest`, `/api/tier2` and `/api/identity` call `getActiveFlag` on
+// every request to check the retired flag. With 6 hosts × ~30 ingests/15min
+// that is ~180 D1 reads / 15min that almost never change.
 //
 // Cache the projection per-host with a short TTL. Validation is end-to-end:
 //   - KV miss / throw  → fall through to D1, then populate.
@@ -11,7 +10,7 @@
 //   - D1 returned null (first-seen host)  → do NOT cache; a new host upsert
 //     should land in D1 the moment it appears, not be masked for 120s by a
 //     negative cache.
-//   - retire / maintenance write paths SHOULD `invalidate(...)` so the
+//   - retire write paths SHOULD `invalidate(...)` so the
 //     change takes effect on the next ingest; absent that the worst case is
 //     the TTL ceiling (120s).
 //
@@ -19,14 +18,11 @@
 
 export interface HostMetaProjection {
 	is_active: number;
-	maintenance_start: string | null;
-	maintenance_end: string | null;
 }
 
 const KEY_PREFIX = "bat:host:meta:";
-/** Worst-case staleness for retired/maintenance changes when the write path
- *  forgets to invalidate. Conservative — same order of magnitude as the
- *  alert sentinel TTL. */
+/** Worst-case staleness for retired changes when the write path forgets to
+ *  invalidate. Conservative — same order of magnitude as the alert sentinel TTL. */
 export const HOST_META_TTL_SECONDS = 120;
 
 export function hostMetaKey(hostId: string): string {
@@ -69,9 +65,9 @@ export async function storeHostMeta(
 	}
 }
 
-/** Best-effort invalidate. Used by retire/maintenance write paths so the
- *  next ingest sees the new state without waiting for TTL. KV failure is
- *  swallowed — worst case the change is delayed up to TTL. */
+/** Best-effort invalidate. Used by retire write paths so the next ingest
+ *  sees the new state without waiting for TTL. KV failure is swallowed —
+ *  worst case the change is delayed up to TTL. */
 export async function invalidateHostMeta(
 	kv: KVNamespace | undefined,
 	hostId: string,
