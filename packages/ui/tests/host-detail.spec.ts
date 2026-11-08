@@ -551,6 +551,15 @@ test.describe("Host detail page", () => {
 			},
 		] as const;
 
+		const measurements: Array<{
+			fixture: string;
+			width: number;
+			donuts: number;
+			sectorFills: string[];
+			cardHeight: number;
+			summaryText: number;
+		}> = [];
+
 		for (const fixture of fixtures) {
 			await page.route("**/api/hosts/*/metrics?*", async (route) => {
 				const response = await route.fetch();
@@ -582,32 +591,118 @@ test.describe("Host detail page", () => {
 					await expect(donuts.nth(index)).toBeVisible();
 				}
 
-				const v4Row = page.getByText("Public IPv4", { exact: true }).locator("..");
-				const v6Row = page.getByText("Public IPv6", { exact: true }).locator("..");
-				const v4Right = await v4Row
-					.getByTestId("ip-address-row-value")
-					.evaluate((element) => element.getBoundingClientRect().right);
-				const v6Right = await v6Row
-					.getByTestId("ip-address-row-value")
-					.evaluate((element) => element.getBoundingClientRect().right);
-				expect(Math.abs(v4Right - v6Right)).toBeLessThanOrEqual(1);
+				const sectorFills = await donuts.evaluateAll((nodes) =>
+					nodes.flatMap((node) =>
+						Array.from(node.querySelectorAll("path.recharts-sector")).map(
+							(path) => getComputedStyle(path).fill,
+						),
+					),
+				);
+				expect(sectorFills.length).toBe(fixture.expected * 2);
+				for (const fill of sectorFills) {
+					expect(fill).not.toBe("rgb(0, 0, 0)");
+					expect(fill).not.toBe("none");
+				}
+				expect(new Set(sectorFills).size).toBeGreaterThan(1);
 
-				const eth0 = page.getByTestId("host-interface-eth0");
-				await expect(eth0.getByText("eth0", { exact: true })).toBeVisible();
-				await expect(eth0.locator("svg").first()).toBeVisible();
-				await expect(eth0.getByText("v4", { exact: true }).first()).toBeVisible();
-				await expect(eth0.getByText("v6", { exact: true }).first()).toBeVisible();
+				// The chart shell must not repeat the disk summary above the donut.
+				await expect(page.getByText(/free across/)).toHaveCount(0);
 
-				await page
+				const card = page
 					.getByText("Disk Usage", { exact: true })
-					.locator("..")
-					.screenshot({
-						path: testInfo.outputPath(`disk-${fixture.name}-${width}.png`),
-					});
+					.locator("xpath=ancestor::*[@data-basalt-surface][1]");
+				const cardBox = await card.boundingBox();
+				expect(cardBox?.height ?? 0).toBeLessThan(320);
+
+				await card.screenshot({
+					path: testInfo.outputPath(`disk-${fixture.name}-${width}.png`),
+				});
+
+				measurements.push({
+					fixture: fixture.name,
+					width,
+					donuts: fixture.expected,
+					sectorFills: [...new Set(sectorFills)],
+					cardHeight: Math.round(cardBox?.height ?? 0),
+					summaryText: 0,
+				});
 			}
 
 			await page.unrouteAll({ behavior: "wait" });
 		}
+
+		console.log(`DISK_MEASUREMENTS ${JSON.stringify(measurements)}`);
+	});
+
+	test("system info values and interface addresses share one right edge", async ({
+		page,
+	}, testInfo) => {
+		const measurements: Array<{
+			width: number;
+			kernel: number;
+			cpu: number;
+			publicIpv4: number;
+			publicIpv6: number;
+			interfaceAddress: number;
+		}> = [];
+
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 1000 });
+			await page.goto(`/hosts/${alphaHid}`);
+			await expect(page.getByText("System Info", { exact: true })).toBeVisible({
+				timeout: 15_000,
+			});
+
+			const systemHeading = page.getByText("System Info", { exact: true });
+			const systemBody = systemHeading.locator("xpath=../following-sibling::*[1]");
+			const interfacesPanel = page.getByText("Interfaces", { exact: true }).locator("..");
+
+			const textRight = (locator: ReturnType<typeof page.getByText>) =>
+				locator.evaluate((element) => {
+					const range = document.createRange();
+					range.selectNodeContents(element);
+					return Math.round(
+						Math.max(...Array.from(range.getClientRects()).map((rect) => rect.right)),
+					);
+				});
+
+			const kernel = await textRight(
+				systemBody.getByText("Kernel", { exact: true }).locator("..").locator("span").last(),
+			);
+			const cpu = await textRight(
+				systemBody.getByText("CPU", { exact: true }).locator("..").locator("span").last(),
+			);
+			const publicIpv4 = await textRight(
+				systemBody
+					.getByText("Public IPv4", { exact: true })
+					.locator("..")
+					.getByTestId("ip-address-row-value"),
+			);
+			const publicIpv6 = await textRight(
+				systemBody
+					.getByText("Public IPv6", { exact: true })
+					.locator("..")
+					.getByTestId("ip-address-row-value"),
+			);
+			const interfaceAddress = await textRight(
+				page.getByTestId("host-interface-eth0").getByTestId("ip-address-row-value").first(),
+			);
+
+			for (const edge of [cpu, publicIpv4, publicIpv6, interfaceAddress]) {
+				expect(Math.abs(edge - kernel)).toBeLessThanOrEqual(1);
+			}
+
+			await systemBody.screenshot({
+				path: testInfo.outputPath(`system-info-${width}.png`),
+			});
+			await interfacesPanel.screenshot({
+				path: testInfo.outputPath(`interfaces-${width}.png`),
+			});
+
+			measurements.push({ width, kernel, cpu, publicIpv4, publicIpv6, interfaceAddress });
+		}
+
+		console.log(`SYSTEM_INFO_MEASUREMENTS ${JSON.stringify(measurements)}`);
 	});
 
 	test("keyboard activation copies the literal", async ({ page, context }) => {

@@ -104,8 +104,9 @@ interface DiskJsonEntry {
 
 /**
  * Parse disk_json from the latest data point and group mounts that identify
- * the same filesystem. Legacy entries are grouped only when their size pair
- * is unambiguous.
+ * the same filesystem. Mounts are grouped by device when the probe reported
+ * one; legacy entries without a device fall back to the size pair, because
+ * the same filesystem mounted twice reports identical totals.
  */
 export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
 	if (data.length === 0) {
@@ -131,22 +132,11 @@ export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
 			.sort((a, b) => a.mount.localeCompare(b.mount));
 
 		const groups = new Map<string, DiskBarEntry>();
-		const legacyCounts = new Map<string, number>();
-		for (const entry of normalized) {
-			if (!entry.device) {
-				const sizeKey = `${entry.total_bytes}:${entry.avail_bytes}`;
-				legacyCounts.set(sizeKey, (legacyCounts.get(sizeKey) ?? 0) + 1);
-			}
-		}
 
 		for (const entry of normalized) {
-			let key: string;
-			if (entry.device) {
-				key = `device:${entry.device}`;
-			} else {
-				const sizeKey = `${entry.total_bytes}:${entry.avail_bytes}`;
-				key = (legacyCounts.get(sizeKey) ?? 0) === 1 ? `size:${sizeKey}` : `mount:${entry.mount}`;
-			}
+			const key = entry.device
+				? `device:${entry.device}`
+				: `size:${entry.total_bytes}:${entry.avail_bytes}`;
 
 			const existing = groups.get(key);
 			if (existing) {

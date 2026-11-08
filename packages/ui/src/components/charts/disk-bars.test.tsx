@@ -41,6 +41,16 @@ describe("DiskBars", () => {
 		expect(screen.getByText("80.0% used")).toBeTruthy();
 		expect(screen.getByText("200 B free")).toBeTruthy();
 		expect(screen.getByText("/mnt/data-01")).toBeTruthy();
+		expect(screen.getByText("/dev/vda1")).toBeTruthy();
+	});
+
+	test("does not repeat the disk summary above the chart", () => {
+		const diskJson = JSON.stringify([
+			{ mount: "/", device: "/dev/vda1", used_pct: 40, total_bytes: 1000, avail_bytes: 600 },
+		]);
+		render(<DiskBars data={[dp(diskJson)]} />);
+		expect(screen.queryByText(/free across/)).toBeNull();
+		expect(screen.getAllByText("40.0% used")).toHaveLength(1);
 	});
 
 	test("renders separate donuts for two devices", () => {

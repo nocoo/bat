@@ -3,6 +3,7 @@ import { LayerCard } from "@nocoo/basalt";
 import { DonutChart } from "@nocoo/basalt/charts/donut";
 import { HardDrive } from "lucide-react";
 import { useMemo } from "react";
+import { chart, chartMuted } from "../../lib/palette";
 import { formatBytes, transformDiskData } from "../../lib/transforms";
 
 export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
@@ -24,14 +25,11 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 				<HardDrive className="h-4 w-4" />
 				Disk Usage
 			</div>
-			<div className="flex flex-wrap gap-basalt-layout">
+			<div className="grid grid-cols-2 gap-x-2 gap-y-3 lg:grid-cols-3">
 				{disks.map((disk) => {
+					// Chart palette hues carry the severity: primary → warning → destructive.
 					const usedColor =
-						disk.used_pct > 90
-							? "var(--basalt-destructive)"
-							: disk.used_pct > 80
-								? "var(--basalt-warning)"
-								: "var(--basalt-primary)";
+						disk.used_pct > 90 ? chart.red : disk.used_pct > 80 ? chart.orange : chart.sky;
 					const usedBytes =
 						disk.total_bytes > 0 ? Math.max(disk.total_bytes - disk.avail_bytes, 0) : disk.used_pct;
 					const freeBytes = disk.total_bytes > 0 ? disk.avail_bytes : 100 - disk.used_pct;
@@ -40,32 +38,37 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 						<div
 							key={disk.key}
 							data-testid="disk-donut"
-							className="flex min-w-[8.5rem] flex-1 basis-[calc(50%-0.5rem)] flex-col items-center text-center"
+							data-disk-device={disk.device ?? ""}
+							className="flex min-w-0 flex-col items-center text-center"
 						>
 							<DonutChart
 								ariaLabel={`${primaryMount} disk usage`}
-								className="h-basalt-36 w-basalt-36"
+								className="h-24 w-24"
 								data={[
 									{ name: "Used", value: usedBytes },
 									{ name: "Free", value: freeBytes },
 								]}
 								series={[
 									{ key: "Used", label: "Used", color: usedColor },
-									{ key: "Free", label: "Free", color: "var(--basalt-muted)" },
+									{ key: "Free", label: "Free", color: chartMuted },
 								]}
 								valueFormatter={(value) =>
 									disk.total_bytes > 0 ? formatBytes(value) : `${value.toFixed(1)}%`
 								}
-								summary={`${disk.used_pct.toFixed(1)}% used, ${formatBytes(disk.avail_bytes)} free across ${disk.mounts.join(", ")}`}
 								accessibilityLayer={false}
 							/>
-							<p className="mt-basalt-space-xs text-basalt-base tabular-nums">
+							<p className="mt-1 text-basalt-xs font-medium tabular-nums">
 								{disk.used_pct.toFixed(1)}% used
 							</p>
-							<p className="text-basalt-xs text-basalt-muted-foreground tabular-nums">
+							<p className="text-basalt-xs tabular-nums text-basalt-muted-foreground">
 								{formatBytes(disk.avail_bytes)} free
 							</p>
-							<div className="mt-basalt-space-xs space-y-0 text-basalt-xs">
+							{disk.device ? (
+								<p className="truncate font-mono text-basalt-xs text-basalt-muted-foreground">
+									{disk.device}
+								</p>
+							) : null}
+							<div className="space-y-0 text-basalt-xs">
 								{disk.mounts.map((mount) => (
 									<p
 										key={mount}

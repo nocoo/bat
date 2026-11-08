@@ -135,14 +135,14 @@ describe("transformDiskData", () => {
 		]);
 	});
 
-	test("does not collapse ambiguous legacy size pairs", () => {
+	test("merges legacy mounts that share the same size pair", () => {
 		const json = JSON.stringify([
+			{ mount: "/mnt/data-01", used_pct: 50, total_bytes: 1000, avail_bytes: 500 },
 			{ mount: "/", used_pct: 50, total_bytes: 1000, avail_bytes: 500 },
 			{ mount: "/home", used_pct: 50, total_bytes: 1000, avail_bytes: 500 },
 		]);
 		expect(transformDiskData([dp({ disk_json: json })]).map((disk) => disk.mounts)).toEqual([
-			["/"],
-			["/home"],
+			["/", "/home", "/mnt/data-01"],
 		]);
 	});
 
