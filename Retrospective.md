@@ -339,3 +339,24 @@ compare payload and relational observations, traverse nested timestamps, and kee
 captured packet tuples distinct from aggregate-equivalent history reconstruction.
 Block forbidden production requests before dispatch in offline captures, and fix
 only the capture page clock when comparing two time-windowed charts.
+
+## 2026-11-08 - Restarting the daily Demo needs the stale lock and the build order
+
+Killing the Demo launcher left `packages/worker/.wrangler/environments/demo/running.lock`
+behind with a dead PID, so the next start failed with `EEXIST` and the gateway
+answered 503 long after the process was gone. Verify the lock PID is dead before
+removing that one file, never the store directory. A `bun run build` started while
+the Demo was running also rewrote `packages/worker/static` under a live worker and
+killed it. Build first, then start the Demo, and restart the launcher after any
+worker-side change because the launcher does not hot-reload the Worker.
+
+## 2026-11-08 - Split public addresses by family, and review the migration against real data
+
+The first cut of the per-family public address work made the UI read only the new
+family columns while the migration only added them, so every host already in the
+fleet would have shown no address until a manual probe upgrade. A second cut moved
+the classification into SQL shape filters and still promoted junk such as
+`999.1.1.1`. Migrations stay additive; validate legacy values with the shared
+address parsers on the read path instead of re-implementing address grammar in
+SQL, and test the migration and the read path against pre-existing rows, not only
+against rows written by the new probe.
