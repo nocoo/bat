@@ -1,5 +1,37 @@
 # Changelog
 
+## v3.5.0
+
+### Added
+
+- Replace address rows with one chip control
+- Show public address per family
+- Store public address per family
+- Report public address per family
+- Collect interface IPv4 via getifaddrs
+
+### Changed
+
+- Record demo restart and migration review lessons
+- Decode ifaddrs sockaddr in one helper
+- Document per-family public addresses
+
+### Fixed
+
+- Normalize legacy public IP at read and live region
+- Remove legacy public IP migration backfill
+- Preserve reading values and host IPv4 width
+- Harden chip layout feedback and timer
+- Harden public address backfill and preference
+- Separate interface literals and break at separators
+- Align address labels and interface rows
+- Validate identity address families
+- Derive preferred address from families
+- Backfill per-family public addresses
+- Merge echo refreshes per family
+- Bound and parallelise echo family lookups
+- Never proxy or follow redirects for echo
+
 ## v3.4.2
 
 ### Added
