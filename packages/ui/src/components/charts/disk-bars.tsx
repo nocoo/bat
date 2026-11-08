@@ -25,7 +25,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 				<HardDrive className="h-4 w-4" />
 				Disk Usage
 			</div>
-			<div className="grid grid-cols-2 gap-x-2 gap-y-3 lg:grid-cols-3">
+			<div className="flex flex-wrap justify-center gap-x-3 gap-y-3">
 				{disks.map((disk) => {
 					// Chart palette hues carry the severity: primary → warning → destructive.
 					const usedColor =
@@ -39,7 +39,7 @@ export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 							key={disk.key}
 							data-testid="disk-donut"
 							data-disk-device={disk.device ?? ""}
-							className="flex min-w-0 flex-col items-center text-center"
+							className="flex w-24 min-w-0 flex-col items-center text-center"
 						>
 							<DonutChart
 								ariaLabel={`${primaryMount} disk usage`}
