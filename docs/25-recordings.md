@@ -74,8 +74,8 @@ snapshot and ages naturally. `null` and zero values remain exactly as captured.
 The sanitizer is a whitelist, not a scrubber. Unknown keys are dropped at every
 level and no free-form string survives unchanged.
 
-- Identity: server `host_id`, `hid`, hostname, description and maintenance
-  reason are regenerated. `hid` is the FNV-1a hash of the generated `host_id`.
+- Identity: server `host_id`, `hid`, hostname and description are regenerated.
+  `hid` is the FNV-1a hash of the generated `host_id`.
 - Free text: OS is kept only when it matches a known distribution/version
   pattern; a Darwin numeric release becomes the fixed `macOS` label. The kernel
   only survives as its numeric version, the CPU model only as a generic label

@@ -134,10 +134,10 @@ Final auth layer. Enforces API key on machine routes, skips for browser users wh
 
 **Key scope separation**:
 
-| Key             | Scope            | Routes                                                                                             |
-| --------------- | ---------------- | -------------------------------------------------------------------------------------------------- |
-| `BAT_WRITE_KEY` | Write operations | `POST /api/ingest`, `/api/identity`, `/api/tier2`, plus CRUD on webhooks, maintenance, tags, ports |
-| `BAT_READ_KEY`  | Read operations  | All GET routes on machine endpoint                                                                 |
+| Key             | Scope            | Routes                                                                                |
+| --------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `BAT_WRITE_KEY` | Write operations | `POST /api/ingest`, `/api/identity`, `/api/tier2`, plus CRUD on webhooks, tags, ports |
+| `BAT_READ_KEY`  | Read operations  | All GET routes on machine endpoint                                                    |
 
 Cross-key usage is rejected: using a read key on a write route (or vice versa) returns a specific error message. Token is extracted from `Authorization: Bearer <token>`.
 

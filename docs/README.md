@@ -24,7 +24,6 @@ Current setup and operational boundaries are in [probe installation, development
 | 14  | [top-processes](./14-top-processes.md)                                   | Per-process CPU/Memory/IO monitoring: procfs collection, Top 50 snapshot, Dashboard table with sort/filter/color        |
 | 15  | [enhanced-software-and-websites](./15-enhanced-software-and-websites.md) | Expand software registry (frp/Xray/n8n/etc.), Docker image→software mapping, Nginx/Apache vhost website discovery       |
 | 16  | [monitoring-api](./16-monitoring-api.md)                                 | Monitoring API for Uptime Kuma integration: host health tiers, group aggregation, alert endpoints, auto-onboarding flow |
-| 17  | [maintenance-window](./17-maintenance-window.md)                         | Per-host daily recurring maintenance window: alert suppression, `maintenance` status, chart grey overlay                |
 | 18  | [quality-system-upgrade](./18-quality-system-upgrade.md)                 | Six-dimension quality system upgrade (L1/L2/L3 + G1/G2 + D1): Tier C → S roadmap, 12 atomic commits                     |
 | 19  | [edge-deployment](./19-edge-deployment.md)                               | Single-Worker and dual-domain deployment background                                                                     |
 | 20  | [D1-to-KV migration](./20-d1-to-kv-migration.md)                         | Optional KV caches and D1 query reduction                                                                               |

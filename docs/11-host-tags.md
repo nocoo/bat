@@ -29,7 +29,7 @@ Allow users to tag hosts with arbitrary labels (e.g. `production`, `us-east`, `d
 
 Tags are **user-initiated state** — the SPA reads and writes them via Worker routes directly. The Probe never touches tags. The Worker has full CRUD access to `tags` and `host_tags` tables, including read-only access for the monitoring aggregation API (see [16-monitoring-api § Architecture Decision](./16-monitoring-api.md#architecture-decision-worker-reads-tags-read-only)).
 
-- **SPA calls Worker tag routes directly** — same pattern as hosts, alerts, webhooks, and maintenance.
+- **SPA calls Worker tag routes directly** — same pattern as hosts, alerts, and webhooks.
 - Browser-facing routes are protected by Cloudflare Access (JWT verification).
 - The Worker's hosts list query does NOT include tags — the SPA enriches the response client-side by querying `/api/tags/by-hosts` separately.
 

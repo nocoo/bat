@@ -18,7 +18,7 @@ One Hono Worker serves both API and SPA. D1 persists data, while the production 
 
 - Collect CPU, memory, disk, network, PSI, TCP, and process metrics. Basic metrics are sent every 30 seconds by default, with a configurable interval.
 - Discover hardware, software, Docker containers, systemd services, listening ports, and selected web-server configuration. Available commands and read permissions determine what can be collected.
-- Inspect host history, alerts, tags, and events; configure allowed ports and daily maintenance windows in UTC.
+- Inspect host history, alerts, tags, and events; configure allowed ports.
 - Expose monitoring APIs for tools such as Uptime Kuma to query host or group health. Webhook endpoints receive events from external scripts.
 - Manage agents, assets, their relationships, and agent heartbeats through the dashboard and CLI.
 - Create server-bound read/write Bearer tokens in Connect, discover `/api/v1` through OpenAPI, and access authorized resources with repeat Reveal, rotation, revocation and optional expiry.

@@ -255,7 +255,7 @@ before testing overflow and capture the scrolled editors and active tooltip.
 ## 2026-10-29 - Bind chart grids to explicit axes
 
 The Disk I/O dual-axis conversion assigned named axes to every series and
-maintenance overlay but left CartesianGrid on its default axis. Recharts used
+chart overlays but left CartesianGrid on its default axis. Recharts used
 an implicit axis, dropping the interior IOPS grid lines. The initial browser
 check only compared the outer grid bounds, so it missed the defect. Review
 caught it before push. Bind the grid to the IOPS axis and verify that every

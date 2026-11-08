@@ -7,10 +7,10 @@
 
 ### v5 → v6 (this revision)
 
-| #   | v5 issue (reviewer)                                                                        | v6 fix                                                                                                                                                                                                                                                                                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Q1  | "SQL only in adapters/d1" conflicted with "one-shot `db.prepare` may stay in route/domain" | §3.5 rewritten: **zero D1/SQL access outside `adapters/d1/`**. Thin SQL becomes a small adapter method or an adapter-private helper — never inline in routes/middleware/domain/lib. §8 grep gate covers `packages/worker/src/**` minus `adapters/d1/`, tests, test-helpers.                                                                                                               |
-| Q2  | Missing DB callsites and wrong endpoint paths                                              | §3.1 adds `lib/resolve-host.ts` (→ folded into `HostsRepository.resolveByIdOrHid`); `routes/live.ts:SELECT 1 AS probe` (→ `HostsRepository.pingDatabase()`, no exception); `routes/monitoring.ts` direct SQL (→ assigned to C9 alongside the rest of host reads). §6.5 fixes endpoint paths (`/api/fleet/status`, `/api/hosts/:id/maintenance`) and adds the 4 `/api/monitoring/*` reads. |
+| #   | v5 issue (reviewer)                                                                        | v6 fix                                                                                                                                                                                                                                                                                                                                                      |
+| --- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q1  | "SQL only in adapters/d1" conflicted with "one-shot `db.prepare` may stay in route/domain" | §3.5 rewritten: **zero D1/SQL access outside `adapters/d1/`**. Thin SQL becomes a small adapter method or an adapter-private helper — never inline in routes/middleware/domain/lib. §8 grep gate covers `packages/worker/src/**` minus `adapters/d1/`, tests, test-helpers.                                                                                 |
+| Q2  | Missing DB callsites and wrong endpoint paths                                              | §3.1 adds `lib/resolve-host.ts` (→ folded into `HostsRepository.resolveByIdOrHid`); `routes/live.ts:SELECT 1 AS probe` (→ `HostsRepository.pingDatabase()`, no exception); `routes/monitoring.ts` direct SQL (→ assigned to C9 alongside the rest of host reads). §6.5 fixes endpoint paths (`/api/fleet/status`) and adds the 4 `/api/monitoring/*` reads. |
 
 ### v4 → v5
 
@@ -128,7 +128,6 @@ export interface Repositories {
 	ports: PortAllowlistRepository;
 	tags: TagsRepository;
 	settings: SettingsRepository;
-	maintenance: MaintenanceRepository;
 	agents: AgentsRepository;
 	assets: AssetsRepository;
 	bindings: BindingsRepository;
@@ -231,7 +230,7 @@ A single file `packages/worker/test/baseline/api-snapshot.test.ts` that:
 1. Sets up a fixed seed:
    - Clock pinned via `vi.useFakeTimers().setSystemTime(new Date('2026-05-30T00:00:00Z'))`.
    - Auth headers fixed (the test `BAT_*_KEY` from `globalSetup`).
-   - Database seeded by a small fixture: 3 hosts, 30 raw rows / host, 2 alerts, 1 webhook, 1 maintenance window, 2 agents, 2 assets, 2 bindings, 1 cli token.
+   - Database seeded by a small fixture: 3 hosts, 30 raw rows / host, 2 alerts, 1 webhook, 2 agents, 2 assets, 2 bindings, 1 cli token.
 2. Hits a **defined set of read endpoints** (the critical ones — listed in §6.5).
 3. For each response, normalizes:
    - Strip `timestamp`, `created_at`, `updated_at`, `last_seen`, `triggered_at`, etc. to `"<TS>"`.
@@ -249,7 +248,6 @@ The C0 snapshot covers:
 - `GET /api/hosts/:id`
 - `GET /api/hosts/:id/metrics?window=24h`
 - `GET /api/hosts/:id/metrics?window=7d`
-- `GET /api/hosts/:id/maintenance`
 - `GET /api/alerts`
 - `GET /api/webhooks`
 - `GET /api/allowed-ports`
@@ -265,7 +263,7 @@ The C0 snapshot covers:
 - `GET /api/monitoring/groups`
 - `GET /api/monitoring/alerts`
 
-Write endpoints aren't snapshotted directly (volatile by design); instead the snapshot test does `PATCH /api/hosts/:id/description`, then re-fetches `GET /api/hosts/:id`, then asserts the description changed and the rest of the JSON did not. Similar pattern for `POST /api/identity`, `POST /api/metrics`, `POST /api/events`, `POST /api/maintenance`, the agents/assets/bindings CRUD, and the cron `aggregateHour` invocation.
+Write endpoints aren't snapshotted directly (volatile by design); instead the snapshot test does `PATCH /api/hosts/:id/description`, then re-fetches `GET /api/hosts/:id`, then asserts the description changed and the rest of the JSON did not. Similar pattern for `POST /api/identity`, `POST /api/metrics`, `POST /api/events`, the agents/assets/bindings CRUD, and the cron `aggregateHour` invocation.
 
 This is the realistic version of "bit-for-bit": targeted, normalized, fast, deterministic.
 
@@ -278,7 +276,7 @@ Each commit ships green for `lint` + `typecheck` + `test` + `gate:routes` + `gat
 | C0  | **Baseline snapshot test** (§6.4) — pre-refactor capture                                                                                                                                                                                                                                                               | new test file only                    |
 | C1  | `Repositories` type, `createD1Repositories` factory, `reposMiddleware`, `Variables.repos` wired into Hono; scheduled handler uses factory directly. No routes consume it yet; adapters are empty stubs (re-exporting today's service functions to make wiring compile + green).                                        | wiring only                           |
 | C2  | `SettingsRepository` + `WebhooksRepository`. Smallest blast radius. Includes their contract tests. Adapters carry SQL verbatim. Routes switch. Old service files deleted.                                                                                                                                              | 2 domains                             |
-| C3  | `PortAllowlistRepository` + `MaintenanceRepository` (incl. `activeAt(now)` used by alerts cron).                                                                                                                                                                                                                       | 2 domains                             |
+| C3  | `PortAllowlistRepository`                                                                                                                                                                                                                                                                                              | 1 domain                              |
 | C4  | `Tier2Repository` + `TagsRepository` (tags include paired edge/reverse SQL).                                                                                                                                                                                                                                           | 2 domains                             |
 | C5  | `AssetsRepository` + `BindingsRepository`.                                                                                                                                                                                                                                                                             | 2 domains                             |
 | C6  | `AgentsRepository` + `CliTokensRepository`.`upsertBy` keeps today's `ON CONFLICT(source_key, match_key)`. Middleware `api-key` switches to `c.var.repos.cliTokens` (drops dynamic import).                                                                                                                             | 2 domains                             |

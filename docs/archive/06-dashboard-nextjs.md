@@ -61,7 +61,6 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 | `/api/alerts`                   | `GET /api/alerts`                  | GET    |
 | `/api/events`                   | `GET /api/events`                  | GET    |
 | `/api/webhooks`                 | `GET /api/webhooks`                | GET    |
-| `/api/hosts/[id]/maintenance`   | `GET /api/hosts/:id/maintenance`   | GET    |
 | `/api/tags`                     | `GET /api/tags`                    | GET    |
 | `/api/tags/by-hosts`            | `GET /api/tags/by-hosts`           | GET    |
 | `/api/hosts/[id]/tags`          | `GET /api/hosts/:id/tags`          | GET    |
@@ -75,8 +74,6 @@ See [02-architecture.md § Dashboard proxy pattern](./02-architecture.md) for fu
 | `/api/webhooks`                        | `POST /api/webhooks`                        | POST   |
 | `/api/webhooks/[id]`                   | `DELETE /api/webhooks/:id`                  | DELETE |
 | `/api/webhooks/[id]/regenerate`        | `POST /api/webhooks/:id/regenerate`         | POST   |
-| `/api/hosts/[id]/maintenance`          | `PUT /api/hosts/:id/maintenance`            | PUT    |
-| `/api/hosts/[id]/maintenance`          | `DELETE /api/hosts/:id/maintenance`         | DELETE |
 | `/api/tags`                            | `POST /api/tags`                            | POST   |
 | `/api/tags/[id]`                       | `PUT /api/tags/:id`                         | PUT    |
 | `/api/tags/[id]`                       | `DELETE /api/tags/:id`                      | DELETE |
@@ -227,18 +224,18 @@ These transformations are pure functions in `lib/transforms.ts`, unit-testable w
 
 ## Environment Variables
 
-| Variable               | Purpose                                                                                                                                                                                                                |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `BAT_API_URL`          | Worker URL (e.g. `https://bat-ingest.worker.hexly.ai`)                                                                                                                                                                 |
-| `BAT_READ_KEY`         | Read-only API Key for Worker proxy routes                                                                                                                                                                              |
-| `BAT_WRITE_KEY`        | Write API Key — used by Dashboard write proxy routes (webhook CRUD, maintenance CRUD, tags, port allowlist) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
-| `AUTH_SECRET`          | NextAuth secret                                                                                                                                                                                                        |
-| `GOOGLE_CLIENT_ID`     | Google OAuth client ID                                                                                                                                                                                                 |
-| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret                                                                                                                                                                                             |
-| `ALLOWED_EMAILS`       | Comma-separated email allowlist                                                                                                                                                                                        |
-| `USE_SECURE_COOKIES`   | `true` for production                                                                                                                                                                                                  |
-| `PROBE_BIN_DIR`        | Probe binary storage path (default `/app/probe-bin`)                                                                                                                                                                   |
-| `E2E_SKIP_AUTH`        | `1` to bypass auth in E2E tests                                                                                                                                                                                        |
+| Variable               | Purpose                                                                                                                                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BAT_API_URL`          | Worker URL (e.g. `https://bat-ingest.worker.hexly.ai`)                                                                                                                                               |
+| `BAT_READ_KEY`         | Read-only API Key for Worker proxy routes                                                                                                                                                            |
+| `BAT_WRITE_KEY`        | Write API Key — used by Dashboard write proxy routes (webhook CRUD, tags, port allowlist) via `proxyToWorkerWithBody(..., useWriteKey: true)`. Also used by setup page to generate install commands. |
+| `AUTH_SECRET`          | NextAuth secret                                                                                                                                                                                      |
+| `GOOGLE_CLIENT_ID`     | Google OAuth client ID                                                                                                                                                                               |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth client secret                                                                                                                                                                           |
+| `ALLOWED_EMAILS`       | Comma-separated email allowlist                                                                                                                                                                      |
+| `USE_SECURE_COOKIES`   | `true` for production                                                                                                                                                                                |
+| `PROBE_BIN_DIR`        | Probe binary storage path (default `/app/probe-bin`)                                                                                                                                                 |
+| `E2E_SKIP_AUTH`        | `1` to bypass auth in E2E tests                                                                                                                                                                      |
 
 ---
 

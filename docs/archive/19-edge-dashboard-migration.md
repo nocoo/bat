@@ -244,7 +244,7 @@ app.post("/api/ingest", ingestHandler);
 
 ## 3. 操作员写权限
 
-现有写操作（tags, webhooks, maintenance, allowed-ports）：
+现有写操作（tags, webhooks, allowed-ports）：
 - 原方案：Dashboard 代理，用 `BAT_WRITE_KEY`
 - 新方案：浏览器直接调用，用 Access JWT
 
