@@ -12,6 +12,10 @@
 // - every alias shares the single captured server template (metrics, inventory,
 //   processes, tier 2) but gets its own hostname, hid, public address and
 //   interface identities;
+// - the captured server owns two filesystems. Every alias reports the primary
+//   one; the second alias also reports the captured second filesystem so the
+//   demo shows a merged single-donut host and a two-donut host without any
+//   fixture injection;
 // - `*_age_seconds` becomes `anchor - age`; bare source epochs are never stored;
 // - uncaptured aggregate maxima stay NULL instead of being invented;
 // - the single captured workstation keeps its canonical id, one full latest
@@ -42,6 +46,28 @@ export const SERVER_ALIASES = [
 
 const WORKSTATION_INSTALLATION_ID = "30000000-0000-4000-8000-000000000001";
 const WORKSTATION_TOKEN_PREFIX = "batw_fixture";
+
+// The second alias is the demo's two-filesystem host.
+const SECOND_FILESYSTEM_ALIAS_INDEX = 1;
+
+/**
+ * Disk payload for one alias. The captured server exposes two filesystems;
+ * every alias reports the primary one, and the second alias also reports the
+ * captured second filesystem.
+ */
+function aliasDiskPayload(disks, aliasIndex) {
+	if (!Array.isArray(disks) || disks.length === 0) {
+		return [];
+	}
+	if (aliasIndex === SECOND_FILESYSTEM_ALIAS_INDEX) {
+		return disks;
+	}
+	const primary = disks[0]?.device;
+	if (!primary) {
+		return disks;
+	}
+	return disks.filter((disk) => disk.device === primary);
+}
 
 const RAW_SCALARS = `cpu_load1 cpu_load5 cpu_load15 cpu_usage_pct cpu_iowait cpu_steal cpu_count
 mem_total mem_available mem_used_pct swap_total swap_used swap_used_pct uptime_seconds
@@ -318,13 +344,13 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 	);
 }
 
-function rawInsert(alias, point, anchor) {
+function rawInsert(alias, point, anchor, aliasIndex) {
 	const columns = ["host_id", "ts", ...RAW_SCALARS, "disk_json", "net_json", "disk_io_json"];
 	return insert("metrics_raw", columns, [
 		alias.host_id,
 		ageToEpoch(anchor, point.age_seconds),
 		...RAW_SCALARS.map((column) => point[column] ?? null),
-		jsonValue(point.disk ?? []),
+		jsonValue(aliasDiskPayload(point.disk, aliasIndex)),
 		jsonValue(point.net ?? []),
 		jsonValue(point.disk_io ?? []),
 	]);
@@ -337,7 +363,7 @@ function hourlyExtJson(point) {
 	return Object.values(ext).every((value) => value === null) ? null : jsonValue(ext);
 }
 
-function hourlyInsert(alias, point, anchor) {
+function hourlyInsert(alias, point, anchor, aliasIndex) {
 	const fields = [
 		["host_id", alias.host_id],
 		["hour_ts", ageToEpoch(anchor, point.age_seconds)],
@@ -358,7 +384,7 @@ function hourlyInsert(alias, point, anchor) {
 		["swap_used_pct_avg", point.swap_used_pct ?? null],
 		["swap_used_pct_max", null],
 		["uptime_min", point.uptime_seconds ?? null],
-		["disk_json", jsonValue(point.disk ?? [])],
+		["disk_json", jsonValue(aliasDiskPayload(point.disk, aliasIndex))],
 		["net_rx_bytes_avg", point.net_rx_bytes_avg ?? null],
 		["net_rx_bytes_max", point.net_rx_bytes_max ?? null],
 		["net_tx_bytes_avg", point.net_tx_bytes_avg ?? null],
@@ -711,9 +737,10 @@ export function recordedDemoSql(recording, anchor) {
 	for (const [index, alias] of SERVER_ALIASES.entries()) {
 		const target = targets.get(alias.server_id);
 		statements.push(hostInsert(recording, alias, index, target, anchor));
-		for (const point of recording.server.raw.data) statements.push(rawInsert(alias, point, anchor));
+		for (const point of recording.server.raw.data)
+			statements.push(rawInsert(alias, point, anchor, index));
 		for (const point of recording.server.hourly.data)
-			statements.push(hourlyInsert(alias, point, anchor));
+			statements.push(hourlyInsert(alias, point, anchor, index));
 		statements.push(tier2Insert(alias, recording, anchor));
 	}
 	statements.push(...portInserts(recording, anchor));

@@ -15,6 +15,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const migrations = join(root, "packages/worker/migrations");
 const focusedSqlPath = join(root, "scripts/environments/focused.sql");
 const ANCHOR = 1_800_000_000;
+const SECOND_FILESYSTEM_HOST_ID = SERVER_ALIASES[1].host_id;
 
 function migrate() {
 	const db = new Database(":memory:");
@@ -155,7 +156,12 @@ describe("recorded Demo SQL catalog", () => {
 			db.query(`SELECT ${rawColumns} FROM metrics_raw WHERE host_id=? ORDER BY ts`).all(hostId);
 		const alphaRaw = raw("pw-host-alpha");
 		expect(alphaRaw.length).toBe(rawCount);
-		for (const alias of SERVER_ALIASES.slice(1)) expect(raw(alias.host_id)).toEqual(alphaRaw);
+		for (const alias of SERVER_ALIASES.slice(1)) {
+			if (alias.host_id === SECOND_FILESYSTEM_HOST_ID) {
+				continue;
+			}
+			expect(raw(alias.host_id)).toEqual(alphaRaw);
+		}
 
 		const hourlyColumns =
 			"hour_ts,sample_count,cpu_usage_avg,cpu_usage_max,mem_available_min,mem_used_pct_max,net_rx_bytes_max,ext_json";
@@ -165,7 +171,12 @@ describe("recorded Demo SQL catalog", () => {
 				.all(hostId);
 		const alphaHourly = hourly("pw-host-alpha");
 		expect(alphaHourly.length).toBe(hourlyCount);
-		for (const alias of SERVER_ALIASES.slice(1)) expect(hourly(alias.host_id)).toEqual(alphaHourly);
+		for (const alias of SERVER_ALIASES.slice(1)) {
+			if (alias.host_id === SECOND_FILESYSTEM_HOST_ID) {
+				continue;
+			}
+			expect(hourly(alias.host_id)).toEqual(alphaHourly);
+		}
 
 		const tier2 = (hostId) =>
 			db
@@ -176,6 +187,49 @@ describe("recorded Demo SQL catalog", () => {
 		const alphaTier2 = tier2("pw-host-alpha");
 		for (const alias of SERVER_ALIASES.slice(1)) expect(tier2(alias.host_id)).toEqual(alphaTier2);
 		expect(JSON.parse(alphaTier2.software_json).detected.length).toBeGreaterThan(0);
+	});
+
+	test("gives one host two filesystems while the others keep the merged one", () => {
+		const devicesOf = (hostId) =>
+			new Set(
+				db
+					.query("SELECT disk_json FROM metrics_raw WHERE host_id=? ORDER BY ts")
+					.all(hostId)
+					.map((row) =>
+						JSON.parse(row.disk_json)
+							.map((disk) => disk.device)
+							.join(","),
+					),
+			);
+		const devices = (hostId) => {
+			const shapes = devicesOf(hostId);
+			expect(shapes.size).toBe(1);
+			return [...new Set([...shapes][0].split(","))];
+		};
+
+		const second = devices(SECOND_FILESYSTEM_HOST_ID);
+		expect(second.length).toBe(2);
+		for (const alias of SERVER_ALIASES) {
+			if (alias.host_id === SECOND_FILESYSTEM_HOST_ID) {
+				continue;
+			}
+			expect(devices(alias.host_id).length).toBe(1);
+		}
+
+		const mergedMounts = JSON.parse(
+			db
+				.query("SELECT disk_json FROM metrics_raw WHERE host_id='pw-host-alpha' ORDER BY ts")
+				.all("pw-host-alpha")[0].disk_json,
+		);
+		expect(mergedMounts.length).toBeGreaterThan(1);
+		expect(new Set(mergedMounts.map((disk) => disk.device)).size).toBe(1);
+
+		const twoFilesystemMounts = JSON.parse(
+			db
+				.query("SELECT disk_json FROM metrics_raw WHERE host_id=? ORDER BY ts")
+				.all(SECOND_FILESYSTEM_HOST_ID)[0].disk_json,
+		);
+		expect(new Set(twoFilesystemMounts.map((disk) => disk.device)).size).toBe(2);
 	});
 
 	test("maps hourly averages to real columns and leaves uncaptured maxima NULL", () => {
