@@ -8,14 +8,27 @@
 ALTER TABLE hosts ADD COLUMN public_ip_v4 TEXT;
 ALTER TABLE hosts ADD COLUMN public_ip_v6 TEXT;
 
--- Backfill from the single column that existed before the split. Hosts observed
--- by an older probe keep showing their address: the UI reads the family columns
--- only, so without this an existing fleet would appear address-less.
--- Non-destructive: `public_ip` itself is never rewritten here.
-UPDATE hosts SET public_ip_v4 = public_ip
-WHERE public_ip IS NOT NULL AND public_ip NOT LIKE '%:%';
+-- IPv4 family shape: one trim-normalized dotted literal with no whitespace or
+-- shape junk. Octet range validation is intentionally outside the migration:
+-- the historical column came from the echo service and this filter keeps invalid
+-- values out of family columns without maintaining nested SQL string parsing.
+UPDATE hosts SET public_ip_v4 = trim(public_ip)
+WHERE public_ip IS NOT NULL
+  AND trim(public_ip) <> ''
+  AND trim(public_ip) = public_ip
+  AND length(public_ip) BETWEEN 7 AND 15
+  AND public_ip NOT GLOB '*[^0-9.]*'
+  AND length(public_ip) - length(replace(public_ip, '.', '')) = 3;
 
-UPDATE hosts SET public_ip_v6 = public_ip
-WHERE public_ip IS NOT NULL AND public_ip LIKE '%:%';
+-- IPv6 family shape: colon present, only hexadecimal/dot/colon characters,
+-- trim-normalized, and within a literal length bound. Empty, whitespace and
+-- arbitrary junk remain in public_ip only.
+UPDATE hosts SET public_ip_v6 = trim(public_ip)
+WHERE public_ip IS NOT NULL
+  AND trim(public_ip) <> ''
+  AND trim(public_ip) = public_ip
+  AND public_ip GLOB '*:*'
+  AND length(public_ip) <= 45
+  AND public_ip NOT GLOB '*[^0-9A-Fa-f:.]*';
 
 INSERT INTO _migrations(name) VALUES ('0034_public_ip_families') ON CONFLICT(name) DO NOTHING;

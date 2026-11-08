@@ -90,6 +90,62 @@ describe("0034 public address families", () => {
 		db.close();
 	});
 
+	test("empty and invalid historical values stay in public_ip only", () => {
+		const db = databaseBeforeSplit();
+		insertHost(db, "legacy-empty", "");
+		insertHost(db, "legacy-whitespace", "   ");
+		insertHost(db, "legacy-junk", "not-an-ip");
+
+		applyMigration(db);
+
+		expect(readHost(db, "legacy-empty")).toEqual({
+			public_ip: "",
+			public_ip_v4: null,
+			public_ip_v6: null,
+		});
+		expect(readHost(db, "legacy-whitespace")).toEqual({
+			public_ip: "   ",
+			public_ip_v4: null,
+			public_ip_v6: null,
+		});
+		expect(readHost(db, "legacy-junk")).toEqual({
+			public_ip: "not-an-ip",
+			public_ip_v4: null,
+			public_ip_v6: null,
+		});
+
+		db.close();
+	});
+
+	test("junk migration stays junk but a later valid IPv6 becomes preferred", () => {
+		const db = databaseBeforeSplit();
+		insertHost(db, "legacy-mixed", "");
+		insertHost(db, "legacy-junk", "garbage");
+
+		applyMigration(db);
+
+		expect(readHost(db, "legacy-mixed")).toEqual({
+			public_ip: "",
+			public_ip_v4: null,
+			public_ip_v6: null,
+		});
+
+		db.prepare("UPDATE hosts SET public_ip_v6 = ? WHERE host_id = ?").run(
+			"2001:db8::20",
+			"legacy-mixed",
+		);
+		db.prepare(
+			"UPDATE hosts SET public_ip = COALESCE(NULLIF(public_ip_v4, ''), NULLIF(public_ip_v6, '')) WHERE host_id = ?",
+		).run("legacy-mixed");
+
+		expect(readHost(db, "legacy-mixed")).toEqual({
+			public_ip: "2001:db8::20",
+			public_ip_v4: null,
+			public_ip_v6: "2001:db8::20",
+		});
+		db.close();
+	});
+
 	test("the backfill keeps every row and leaves no host without its address", () => {
 		const db = databaseBeforeSplit();
 		insertHost(db, "host-a", "203.0.113.1");

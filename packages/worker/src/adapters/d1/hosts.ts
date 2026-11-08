@@ -339,7 +339,7 @@ ON CONFLICT(host_id) DO UPDATE SET
 			update,
 			this.db
 				.prepare(
-					"UPDATE hosts SET public_ip = COALESCE(public_ip_v4, public_ip_v6) WHERE host_id = ?",
+					"UPDATE hosts SET public_ip = COALESCE(NULLIF(public_ip_v4, ''), NULLIF(public_ip_v6, '')) WHERE host_id = ?",
 				)
 				.bind(hostId),
 		]);

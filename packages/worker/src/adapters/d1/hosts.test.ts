@@ -640,6 +640,22 @@ describe("D1HostsRepository", () => {
 				.first<{ public_ip: string }>();
 			expect(row?.public_ip).toBe("2001:db8::2");
 		});
+		test("empty family columns do not outrank a valid IPv6 fallback", async () => {
+			await seedHost(db, "h1", "h1.example.com");
+			await repo.updateInventory("h1", {
+				public_ip_v4: "",
+				public_ip_v6: "2001:db8::20",
+			});
+			const row = await db
+				.prepare("SELECT public_ip, public_ip_v4, public_ip_v6 FROM hosts WHERE host_id = ?")
+				.bind("h1")
+				.first<{ public_ip: string; public_ip_v4: string; public_ip_v6: string }>();
+			expect(row).toEqual({
+				public_ip: "2001:db8::20",
+				public_ip_v4: "",
+				public_ip_v6: "2001:db8::20",
+			});
+		});
 		test("a payload without family observations keeps writing the wire public_ip", async () => {
 			await seedHost(db, "h1", "h1.example.com");
 			await repo.updateInventory("h1", { public_ip: "198.51.100.7" });
