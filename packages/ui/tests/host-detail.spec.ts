@@ -639,11 +639,15 @@ test.describe("Host detail page", () => {
 	}, testInfo) => {
 		const measurements: Array<{
 			width: number;
-			kernel: number;
-			cpu: number;
-			publicIpv4: number;
-			publicIpv6: number;
-			interfaceAddress: number;
+			rightEdge: number;
+			rows: Array<{ label: string; right: number }>;
+			interfaces: Array<{
+				iface: string;
+				icon: boolean;
+				nameLeft: number;
+				addressRight: number;
+				indent: number;
+			}>;
 		}> = [];
 
 		for (const width of [1440, 1024]) {
@@ -657,39 +661,79 @@ test.describe("Host detail page", () => {
 			const systemBody = systemHeading.locator("xpath=../following-sibling::*[1]");
 			const interfacesPanel = page.getByText("Interfaces", { exact: true }).locator("..");
 
-			const textRight = (locator: ReturnType<typeof page.getByText>) =>
-				locator.evaluate((element) => {
+			// Every labelled value row in System Info, measured on its text edge.
+			const rows = await systemBody.evaluate((root) => {
+				const textRight = (element: Element) => {
 					const range = document.createRange();
 					range.selectNodeContents(element);
-					return Math.round(
-						Math.max(...Array.from(range.getClientRects()).map((rect) => rect.right)),
-					);
-				});
+					const rects = Array.from(range.getClientRects());
+					return rects.length ? Math.round(Math.max(...rects.map((rect) => rect.right))) : null;
+				};
+				const result: Array<{ label: string; right: number }> = [];
+				for (const label of Array.from(root.querySelectorAll("span"))) {
+					const className = label.className || "";
+					if (!className.includes("shrink-0")) {
+						continue;
+					}
+					const row = label.parentElement;
+					if (!row) {
+						continue;
+					}
+					const value =
+						row.querySelector('[data-testid="ip-address-row-value"]') ??
+						(Array.from(row.children).filter((child) => child.tagName === "SPAN") as Element[]).at(
+							-1,
+						);
+					if (!value || value === label) {
+						continue;
+					}
+					const right = textRight(value);
+					if (right === null) {
+						continue;
+					}
+					result.push({ label: (label.textContent ?? "").trim(), right });
+				}
+				return result;
+			});
 
-			const kernel = await textRight(
-				systemBody.getByText("Kernel", { exact: true }).locator("..").locator("span").last(),
-			);
-			const cpu = await textRight(
-				systemBody.getByText("CPU", { exact: true }).locator("..").locator("span").last(),
-			);
-			const publicIpv4 = await textRight(
-				systemBody
-					.getByText("Public IPv4", { exact: true })
-					.locator("..")
-					.getByTestId("ip-address-row-value"),
-			);
-			const publicIpv6 = await textRight(
-				systemBody
-					.getByText("Public IPv6", { exact: true })
-					.locator("..")
-					.getByTestId("ip-address-row-value"),
-			);
-			const interfaceAddress = await textRight(
-				page.getByTestId("host-interface-eth0").getByTestId("ip-address-row-value").first(),
-			);
+			const interfaces = await page
+				.locator('[data-testid^="host-interface-"]')
+				.evaluateAll((nodes) =>
+					nodes.map((node) => {
+						const textRight = (element: Element) => {
+							const range = document.createRange();
+							range.selectNodeContents(element);
+							const rects = Array.from(range.getClientRects());
+							return rects.length ? Math.round(Math.max(...rects.map((rect) => rect.right))) : 0;
+						};
+						const name = node.querySelector("p span");
+						const icon = node.querySelector("p svg");
+						const value = node.querySelector('[data-testid="ip-address-row-value"]');
+						const row = value?.closest('[data-testid="ip-address-row"]');
+						const addressRow = row?.parentElement;
+						return {
+							iface: (name?.textContent ?? "").trim(),
+							icon: Boolean(icon),
+							nameLeft: Math.round(name?.getBoundingClientRect().left ?? 0),
+							addressRight: value ? textRight(value) : 0,
+							indent: Math.round(
+								(addressRow?.getBoundingClientRect().left ?? 0) -
+									(name?.getBoundingClientRect().left ?? 0),
+							),
+						};
+					}),
+				);
 
-			for (const edge of [cpu, publicIpv4, publicIpv6, interfaceAddress]) {
-				expect(Math.abs(edge - kernel)).toBeLessThanOrEqual(1);
+			expect(rows.length).toBeGreaterThan(8);
+			const rightEdge = rows[0]?.right ?? 0;
+			for (const row of rows) {
+				expect(Math.abs(row.right - rightEdge)).toBeLessThanOrEqual(1);
+			}
+			expect(interfaces.length).toBeGreaterThan(0);
+			for (const entry of interfaces) {
+				expect(entry.icon).toBe(true);
+				expect(entry.indent).toBeGreaterThan(0);
+				expect(Math.abs(entry.addressRight - rightEdge)).toBeLessThanOrEqual(1);
 			}
 
 			await systemBody.screenshot({
@@ -699,7 +743,7 @@ test.describe("Host detail page", () => {
 				path: testInfo.outputPath(`interfaces-${width}.png`),
 			});
 
-			measurements.push({ width, kernel, cpu, publicIpv4, publicIpv6, interfaceAddress });
+			measurements.push({ width, rightEdge, rows, interfaces });
 		}
 
 		console.log(`SYSTEM_INFO_MEASUREMENTS ${JSON.stringify(measurements)}`);
