@@ -14,7 +14,7 @@
 
 ### hosts
 
-Host identity and lifecycle state. Written by Worker on ingest (UPSERT `last_seen`) and identity (full overwrite of metadata fields). The public-address columns hold the echo-service observation: `public_ip` is the preferred address (IPv4 first), `public_ip_v4` and `public_ip_v6` keep each family independently, and the echo service has no AAAA record today so `public_ip_v6` is usually null.
+Host identity and lifecycle state. Written by Worker on ingest (UPSERT `last_seen`) and identity (full overwrite of metadata fields). The public-address columns hold the echo-service observation: `public_ip` is the preferred address (IPv4 first), `public_ip_v4` and `public_ip_v6` keep each family independently, and the echo host is dual stack, so `public_ip_v6` is present exactly when the host has working IPv6 egress and null otherwise.
 
 ```sql
 CREATE TABLE hosts (

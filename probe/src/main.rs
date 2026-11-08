@@ -610,8 +610,8 @@ async fn collect_tier2(host_id: &str, include_disk_deep: bool) -> payload::Tier2
 /// Fetch the public address of every family the echo service can be reached on.
 ///
 /// The echo host is resolved once and both families are asked concurrently, each
-/// bounded. Whatever answered is kept: a family that is missing (no AAAA record),
-/// slow or unreachable never discards the other one, and the whole call stays
+/// bounded. Whatever answered is kept: a family whose host has no address of that
+/// family, is slow or unreachable never discards the other one, and the whole call stays
 /// inside [`ECHO_LOOKUP_BUDGET`] including DNS.
 #[cfg_attr(coverage_nightly, coverage(off))]
 async fn fetch_public_ips() -> PublicIps {

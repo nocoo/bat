@@ -250,7 +250,7 @@ Fields S1–S4 reuse existing procfs reads:
 
 - S5 `virtualization` — read 2 sysfs files, map known vendor strings ✅
 - S6 `net_interfaces` — `getifaddrs(3)` for every interface address plus 2 sysfs files per interface for MAC/speed ✅ (IPv4 collected as dotted quad, IPv6 emitted RFC 5952 compressed; `lo` skipped)
-- S6b `public_ip` — fetch from `echo.nocoo.cloud/api/ip` every 1h, pinned per family ✅ (stored as the IPv4-first preferred address; `public_ip_v4` / `public_ip_v6` keep each family separately. The echo host has no AAAA record, so IPv6 is normally absent)
+- S6b `public_ip` — fetch from `echo.nocoo.cloud/api/ip` every 1h, pinned per family ✅ (stored as the IPv4-first preferred address; `public_ip_v4` / `public_ip_v6` keep each family separately. The echo host is dual stack, so IPv6 is present only when the host has working IPv6 egress)
 - S7 `disks` — iterate `/sys/block/`, read 2 files per device ✅
 - S8 `boot_mode` — 1 path existence check ✅
 

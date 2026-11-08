@@ -357,9 +357,9 @@ Collected at startup + every 6 hours via `POST /api/identity` (host identity) an
 Interface addresses come from `getifaddrs(3)`: IPv4 is collected as a dotted quad and IPv6 is
 emitted in RFC 5952 compressed form (`fe80::1`, not `fe80:0:0:0:0:0:0:1`); the probe is the single
 formatter, clients never re-compress. `public_ip` is the preferred address (`public_ip_v4 ??
-public_ip_v6`); `public_ip_v4` and `public_ip_v6` keep each family independently. The echo service
-has no AAAA record today, so `public_ip_v6` is normally absent — that is an honest observation, not
-a failure.
+public_ip_v6`); `public_ip_v4` and `public_ip_v6` keep each family independently. The echo host is
+itself dual stack, so a host with working IPv6 egress reports both families and a host without it
+reports only IPv4 — an absent `public_ip_v6` is an honest observation, not a failure.
 
 Uses 2-state wire semantics: key present = update, key absent = retain.
 
