@@ -164,7 +164,7 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText("0.9.99").first()).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("the lead block shows both public families as compact complete rows", async ({ page }) => {
+	test("the lead block shows both public families as single-line rows", async ({ page }) => {
 		for (const viewport of [
 			{ width: 1440, height: 1000 },
 			{ width: 1024, height: 1000 },
@@ -178,23 +178,72 @@ test.describe("Host detail page", () => {
 			const v4Row = header.getByText("IPv4", { exact: true }).locator("..");
 			const v6Row = header.getByText("IPv6", { exact: true }).locator("..");
 			await expect(v4Row.getByTestId("ip-address-row-value")).toHaveText("203.0.113.10");
-			await expect(v6Row.getByTestId("ip-address-row-value")).toHaveText(publicIpv6);
 			await expect(
 				v6Row.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true }),
 			).toHaveAttribute("title", publicIpv6);
 
+			// The IPv6 stays on one line in the fixed short form: the head and the
+			// tail of the literal, and the full literal stays in title and name.
+			const shown = (await v6Row.getByTestId("ip-address-row-value").textContent()) ?? "";
+			expect(shown).toBe("2001:db8…7348");
+			expect(shown.length).toBeLessThanOrEqual(14);
+			expect(publicIpv6.startsWith(shown.split("…")[0] ?? "")).toBe(true);
+			expect(publicIpv6.endsWith(shown.split("…")[1] ?? "")).toBe(true);
+
 			for (const row of [v4Row, v6Row]) {
 				const box = await row.evaluate((element) => {
 					const rect = element.getBoundingClientRect();
+					const value = element.querySelector('[data-testid="ip-address-row-value"]');
 					return {
 						height: Math.round(rect.height),
 						clipped: element.scrollWidth > element.clientWidth + 1,
+						valueClipped: (value?.scrollWidth ?? 0) > (value?.clientWidth ?? 0) + 1,
 					};
 				});
 				expect(box.clipped).toBe(false);
-				expect(box.height).toBeLessThanOrEqual(220);
+				expect(box.valueClipped).toBe(false);
+				expect(box.height).toBeLessThanOrEqual(28);
 			}
+
+			// The families share one baseline only where the lead column is wide
+			// enough for two meaningful columns.
+			const v4Box = await v4Row.boundingBox();
+			const v6Box = await v6Row.boundingBox();
+			const sideBySide = v4Box !== null && v6Box !== null && Math.abs(v4Box.y - v6Box.y) <= 2;
+			expect(sideBySide).toBe(viewport.width >= 1440);
+
+			// The rows start on the same left edge as the title above them.
+			const titleBox = await header.getByText("Public address", { exact: true }).boundingBox();
+			expect(Math.abs((v4Box?.x ?? 0) - (titleBox?.x ?? 0))).toBeLessThanOrEqual(1);
 		}
+	});
+
+	test("the copy button never covers the address characters", async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 1000 });
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const row = page
+			.getByTestId("host-detail-header")
+			.getByText("IPv6", { exact: true })
+			.locator("..");
+		await expect(row.getByTestId("ip-address-row-value")).toBeVisible({ timeout: 15_000 });
+		const geometry = await row.evaluate((element) => {
+			const value = element.querySelector('[data-testid="ip-address-row-value"]');
+			const button = element.querySelector('[data-testid="ip-address-row-copy"]');
+			if (!value || !button) {
+				return null;
+			}
+			const range = document.createRange();
+			range.selectNodeContents(value);
+			const textRight = Math.max(...Array.from(range.getClientRects()).map((rect) => rect.right));
+			return {
+				textRight: Math.round(textRight),
+				buttonLeft: Math.round(button.getBoundingClientRect().left),
+			};
+		});
+		expect(geometry).not.toBeNull();
+		expect(geometry?.textRight ?? 0).toBeLessThanOrEqual(geometry?.buttonLeft ?? 0);
 	});
 
 	test("hover and keyboard focus reveal the copy button", async ({ page }) => {
@@ -385,6 +434,19 @@ test.describe("Host detail page", () => {
 				});
 				expect(geometry.text).toBeTruthy();
 				expect(geometry.text).not.toContain("…");
+				// The reading columns keep their values whole at 1440 and 1024.
+				expect(geometry.clipped).toBe(false);
+			}
+
+			// The supporting line under each reading stays whole too.
+			const details = await header.evaluate((element) =>
+				Array.from(element.querySelectorAll("p.truncate")).map((node) => ({
+					text: node.textContent ?? "",
+					clipped: node.scrollWidth > node.clientWidth + 1,
+				})),
+			);
+			for (const detail of details) {
+				expect(detail.clipped).toBe(false);
 			}
 
 			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -462,19 +524,23 @@ test.describe("Host detail page", () => {
 		const v4Row = page.getByText("Public IPv4", { exact: true }).locator("..");
 		const v6Row = page.getByText("Public IPv6", { exact: true }).locator("..");
 		await expect(v4Row.getByTestId("ip-address-row-value")).toHaveText("203.0.113.10");
-		await expect(v6Row.getByTestId("ip-address-row-value")).toHaveText(publicIpv6);
+		const systemShown = (await v6Row.getByTestId("ip-address-row-value").textContent()) ?? "";
+		expect(systemShown).toBe("2001:db8…7348");
+		expect(systemShown.length).toBeLessThanOrEqual(14);
+		expect(publicIpv6.startsWith(systemShown.split("…")[0] ?? "")).toBe(true);
+		expect(publicIpv6.endsWith(systemShown.split("…")[1] ?? "")).toBe(true);
 		await expect(v4Row).toBeVisible();
 		await expect(v6Row).toBeVisible();
 	});
 
-	test("interfaces list every literal as a compact row with the interface name as a mono label", async ({
-		page,
-	}) => {
+	test("interfaces name each interface once and indent its addresses", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
 		await expect(page.getByText("Interfaces", { exact: true })).toBeVisible({ timeout: 15_000 });
 		const interfaces = page.getByTestId("host-interface-eth0");
+		await expect(interfaces.getByText("eth0", { exact: true })).toHaveCount(1);
+
 		const rows = interfaces.getByTestId("ip-address-row");
 		await expect(rows).toHaveCount(4);
 		const expected = [
@@ -483,6 +549,7 @@ test.describe("Host detail page", () => {
 			"2001:db8:85a3:8d3:1319:8a2e:370:7349",
 			"fe80::5054:ff:fe12:3456",
 		];
+		const nameBox = await interfaces.getByText("eth0", { exact: true }).boundingBox();
 		for (const address of expected) {
 			const copyButton = interfaces.getByRole("button", {
 				name: `Copy address ${address}`,
@@ -491,9 +558,11 @@ test.describe("Host detail page", () => {
 			await expect(copyButton).toBeVisible();
 			await expect(copyButton).toHaveAttribute("title", address);
 			const row = copyButton.locator("..");
-			await expect(row).toContainText("eth0");
 			const box = await row.boundingBox();
-			expect(box?.height ?? 0).toBeLessThan(60);
+			expect(box?.height ?? 0).toBeLessThanOrEqual(28);
+			// The addresses sit below and indented from the interface name.
+			expect(box?.x ?? 0).toBeGreaterThan(nameBox?.x ?? 0);
+			expect(box?.y ?? 0).toBeGreaterThan(nameBox?.y ?? 0);
 		}
 		const tops = await Promise.all(
 			expected.map((address) =>
@@ -568,8 +637,8 @@ test.describe("Host detail page", () => {
 		const measurements: Array<{
 			width: number;
 			publicV4V6SideBySide: boolean;
-			ipv4Width: number;
-			ipv6Width: number;
+			ipv4Shown: string;
+			ipv6Shown: string;
 			interfacesHeight: number;
 			interfaceRows: number;
 		}> = [];
@@ -583,33 +652,36 @@ test.describe("Host detail page", () => {
 			const v4Row = header.getByText("IPv4", { exact: true }).locator("..");
 			const v6Row = header.getByText("IPv6", { exact: true }).locator("..");
 			await expect(v4Row.getByTestId("ip-address-row-value")).toHaveText(ipv4);
-			await expect(v6Row.getByTestId("ip-address-row-value")).toHaveText(ipv6);
 
 			const v4Box = await v4Row.boundingBox();
 			const v6Box = await v6Row.boundingBox();
 			const sideBySide = v4Box !== null && v6Box !== null && Math.abs(v4Box.y - v6Box.y) <= 2;
-			if (width === 1440 || width === 1024) {
-				expect(sideBySide).toBe(true);
-			}
+			expect(sideBySide).toBe(width >= 1440);
 
 			const valueGeometry = await Promise.all(
 				[v4Row, v6Row].map((row) =>
 					row.getByTestId("ip-address-row-value").evaluate((element) => {
 						const rect = element.getBoundingClientRect();
 						return {
-							text: element.textContent,
+							text: element.textContent ?? "",
 							width: Math.round(rect.width),
+							height: Math.round(rect.height),
 							clipped: element.scrollWidth > element.clientWidth + 1,
 						};
 					}),
 				),
 			);
+			// The IPv4 stays whole; the IPv6 keeps one line in the fixed short form.
 			expect(valueGeometry[0]?.text).toBe(ipv4);
-			expect(valueGeometry[1]?.text).toBe(ipv6);
-			expect(valueGeometry[0]?.clipped).toBe(false);
-			expect(valueGeometry[1]?.clipped).toBe(false);
 			expect(valueGeometry[0]?.text).not.toContain("…");
-			expect(valueGeometry[1]?.text).not.toContain("…");
+			expect(valueGeometry[1]?.text).toBe("2001:0db8…7348");
+			expect(valueGeometry[1]?.text?.length ?? 0).toBeLessThanOrEqual(14);
+			expect(ipv6.startsWith(valueGeometry[1]?.text?.split("…")[0] ?? "")).toBe(true);
+			expect(ipv6.endsWith(valueGeometry[1]?.text?.split("…")[1] ?? "")).toBe(true);
+			for (const geometry of valueGeometry) {
+				expect(geometry?.clipped).toBe(false);
+				expect(geometry?.height ?? 0).toBeLessThanOrEqual(24);
+			}
 
 			const interfacesHeading = page.getByText("Interfaces", { exact: true });
 			await expect(interfacesHeading).toBeVisible({ timeout: 15_000 });
@@ -633,11 +705,24 @@ test.describe("Host detail page", () => {
 				path: testInfo.outputPath(`jp2-${width}-interfaces.png`),
 			});
 
+			// Hover and copied states of the same row.
+			const copyButton = v6Row.getByRole("button", { name: `Copy address ${ipv6}`, exact: true });
+			await copyButton.hover();
+			await expect(copyButton).toHaveCSS("opacity", "1");
+			await header.screenshot({
+				path: testInfo.outputPath(`jp2-${width}-public-address-hover.png`),
+			});
+			await copyButton.click();
+			await expect(copyButton).toHaveAttribute("data-state", "copied");
+			await header.screenshot({
+				path: testInfo.outputPath(`jp2-${width}-public-address-copied.png`),
+			});
+
 			measurements.push({
 				width,
 				publicV4V6SideBySide: sideBySide,
-				ipv4Width: valueGeometry[0]?.width ?? 0,
-				ipv6Width: valueGeometry[1]?.width ?? 0,
+				ipv4Shown: valueGeometry[0]?.text ?? "",
+				ipv6Shown: valueGeometry[1]?.text ?? "",
 				interfacesHeight: Math.round(interfacesBox?.height ?? 0),
 				interfaceRows,
 			});

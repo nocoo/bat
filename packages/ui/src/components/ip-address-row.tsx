@@ -10,7 +10,7 @@ export function IpAddressRow({
 	label,
 	value,
 }: {
-	label: string;
+	label?: string;
 	value: string | null | undefined;
 }) {
 	const [state, setState] = useState<CopyState>("idle");
@@ -72,15 +72,17 @@ export function IpAddressRow({
 	return (
 		<Fragment>
 			<div
-				className="basalt-focus group flex min-h-8 min-w-0 max-w-full items-start gap-basalt-space-xs"
+				className="group relative flex w-fit min-h-basalt-6 max-w-full items-center gap-basalt-space-md"
 				data-testid="ip-address-row"
 				data-state={state}
 			>
-				<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground tabular-nums">
-					{label}
-				</span>
+				{label ? (
+					<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
+						{label}
+					</span>
+				) : null}
 				<span
-					className="min-w-0 flex-1 break-words font-mono text-basalt-base text-basalt-foreground tabular-nums"
+					className="min-w-0 shrink overflow-hidden whitespace-nowrap pr-basalt-control-sm font-mono text-basalt-base text-basalt-foreground tabular-nums"
 					data-testid="ip-address-row-value"
 					title={address}
 				>
@@ -93,26 +95,24 @@ export function IpAddressRow({
 					aria-label={`Copy address ${address}`}
 					data-testid="ip-address-row-copy"
 					data-state={state}
-					className={`basalt-focus flex size-8 shrink-0 items-center justify-center rounded-basalt-sm text-basalt-muted-foreground transition-[opacity,transform] duration-basalt-normal ease-basalt focus-visible:opacity-100 motion-reduce:transition-none ${
-						state === "idle"
-							? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-							: "opacity-100"
+					className={`absolute right-0 top-1/2 flex size-basalt-control-sm -translate-y-1/2 items-center justify-center rounded-basalt-sm text-basalt-muted-foreground transition-opacity duration-basalt-normal ease-basalt group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100 motion-reduce:transition-none ${
+						state === "idle" ? "opacity-0" : "opacity-100"
 					}`}
 				>
 					{state === "copied" ? (
 						<Check
 							aria-hidden="true"
-							className="size-basalt-icon-sm text-basalt-success animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
+							className="size-basalt-icon text-basalt-success animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
 							strokeWidth={2}
 						/>
 					) : state === "failed" ? (
 						<TriangleAlert
 							aria-hidden="true"
-							className="size-basalt-icon-sm text-basalt-warning animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
+							className="size-basalt-icon text-basalt-warning animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
 							strokeWidth={2}
 						/>
 					) : (
-						<Copy aria-hidden="true" className="size-basalt-icon-sm" strokeWidth={1.5} />
+						<Copy aria-hidden="true" className="size-basalt-icon" strokeWidth={1.5} />
 					)}
 				</button>
 			</div>

@@ -1,37 +1,39 @@
-// Fixed character budget for the address row. A 39-character IPv6 literal
-// remains complete; longer literals keep the prefix and suffix visible.
+// The address row shows every IPv6 in one fixed short form: the first two
+// groups, an ellipsis and the last group — `2a0b:9900…232d`. Two groups of
+// four hex digits plus the ellipsis plus one group of four digits is 14
+// characters, so the row keeps the same content at every column width and
+// never depends on a measured width. IPv4 keeps its complete literal.
 
-export const IP_ADDRESS_BUDGET = 39;
+/** Characters the short IPv6 form occupies: head, ellipsis and tail. */
+export const IP_ADDRESS_BUDGET = 14;
 
 const ELLIPSIS = "…";
 
 /**
- * Middle-abbreviate an address for a single-line address row.
+ * Shorten an address for the address row.
  *
- * - IPv4 and literals that already fit are returned unchanged.
- * - A long IPv6 keeps a head and a tail joined by one ellipsis.
- * - Either side is trimmed back to a group boundary, so the ellipsis never
- *   touches a colon (`:…` / `…:` never appear).
- *
- * The result is never longer than `budget`, its head is a prefix of the input
- * and its tail a suffix, so nothing is invented.
+ * - IPv4 stays complete.
+ * - An IPv6 keeps its first two groups and its last group, joined by one
+ *   ellipsis: `2a0b:9900…232d`.
+ * - The tail is the literal's last group and is never cut; the head is the
+ *   literal's first two groups, so the compression marker of a `::` literal is
+ *   normalised away.
+ * - A literal with fewer than three groups is already short and stays whole.
  */
-export function abbreviateAddress(value: string, budget: number = IP_ADDRESS_BUDGET): string {
-	if (!value.includes(":") || value.length <= budget) {
+export function abbreviateAddress(value: string): string {
+	if (!value.includes(":")) {
 		return value;
 	}
 
-	const room = budget - ELLIPSIS.length;
-	if (room < 2) {
-		return ELLIPSIS;
+	const groups = value.split(":").filter((group) => group.length > 0);
+	if (groups.length < 3) {
+		return value;
 	}
 
-	// The head carries the network prefix and reads better with a little more room.
-	const headRoom = Math.ceil((room * 2) / 3);
-	const tailRoom = room - headRoom;
-
-	const head = value.slice(0, headRoom).replace(/:+$/, "");
-	const tail = value.slice(value.length - tailRoom).replace(/^:+/, "");
-
+	const tail = groups[groups.length - 1];
+	let head = `${groups[0]}:${groups[1]}`;
+	if (head.length + ELLIPSIS.length + tail.length > IP_ADDRESS_BUDGET) {
+		head = groups[0];
+	}
 	return `${head}${ELLIPSIS}${tail}`;
 }

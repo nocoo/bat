@@ -148,7 +148,7 @@ export function HostDetailPage() {
 		{
 			label: "Load 1m",
 			value: last?.load1 === null || last?.load1 === undefined ? "—" : last.load1.toFixed(2),
-			detail: "one minute average",
+			detail: "1m average",
 			color: chart.teal,
 			points: trend("load1"),
 		},
@@ -313,7 +313,7 @@ export function HostDetailPage() {
 										{detail?.probe_version && (
 											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
 										)}
-										<div className="grid gap-y-0">
+										<div className="grid gap-y-basalt-space-sm">
 											<IpAddressRow label="Public IPv4" value={detail?.public_ip_v4} />
 											<IpAddressRow label="Public IPv6" value={detail?.public_ip_v6} />
 										</div>
