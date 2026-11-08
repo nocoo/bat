@@ -24,6 +24,14 @@ async function flushAnnouncement() {
 }
 
 describe("IpAddressRow", () => {
+	test("supports right alignment for system-info rows", () => {
+		render(<IpAddressRow label="Public IPv4" value="203.0.113.10" alignment="right" />);
+		const row = screen.getByTestId("ip-address-row");
+		expect(row.getAttribute("data-alignment")).toBe("right");
+		expect(row.className).toContain("w-full");
+		expect(row.className).toContain("justify-between");
+	});
+
 	test("does not render a missing value", () => {
 		const view = render(<IpAddressRow label="IPv6" value={null} />);
 		expect(view.queryByTestId("ip-address-row")).toBeNull();

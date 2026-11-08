@@ -313,8 +313,16 @@ export function HostDetailPage() {
 											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
 										)}
 										<div className="grid gap-y-basalt-space-sm">
-											<IpAddressRow label="Public IPv4" value={detail?.public_ip_v4} />
-											<IpAddressRow label="Public IPv6" value={detail?.public_ip_v6} />
+											<IpAddressRow
+												label="Public IPv4"
+												value={detail?.public_ip_v4}
+												alignment="right"
+											/>
+											<IpAddressRow
+												label="Public IPv6"
+												value={detail?.public_ip_v6}
+												alignment="right"
+											/>
 										</div>
 										<HostInterfaceAddresses interfaces={detail?.net_interfaces} />
 										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />

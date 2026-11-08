@@ -9,9 +9,11 @@ const FEEDBACK_MS = 1400;
 export function IpAddressRow({
 	label,
 	value,
+	alignment = "left",
 }: {
 	label?: string;
 	value: string | null | undefined;
+	alignment?: "left" | "right";
 }) {
 	const [state, setState] = useState<CopyState>("idle");
 	const [announcement, setAnnouncement] = useState("");
@@ -72,9 +74,10 @@ export function IpAddressRow({
 	return (
 		<Fragment>
 			<div
-				className="group relative flex w-fit min-h-basalt-6 max-w-full items-center gap-basalt-space-md"
+				className={`group relative flex min-h-basalt-6 max-w-full items-center gap-basalt-space-md ${alignment === "right" ? "w-full justify-between" : "w-fit"}`}
 				data-testid="ip-address-row"
 				data-state={state}
+				data-alignment={alignment}
 			>
 				{label ? (
 					<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
@@ -82,7 +85,7 @@ export function IpAddressRow({
 					</span>
 				) : null}
 				<span
-					className="min-w-0 shrink overflow-hidden whitespace-nowrap pr-basalt-control-sm font-mono text-basalt-base text-basalt-foreground tabular-nums"
+					className={`relative min-w-0 shrink overflow-hidden whitespace-nowrap pr-basalt-control-sm font-mono text-basalt-base text-basalt-foreground tabular-nums ${alignment === "right" ? "ml-auto text-right" : "text-left"}`}
 					data-testid="ip-address-row-value"
 					title={address}
 				>
