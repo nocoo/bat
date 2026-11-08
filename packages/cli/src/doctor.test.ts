@@ -201,6 +201,7 @@ describe("gatherFacts", () => {
 				api_key: "key",
 				source_key: "source",
 			} as never,
+			fetchLatest: async () => ({ version: "3.2.0" }),
 		});
 		expect(facts.assetsTokenValid).toBeNull();
 	});
