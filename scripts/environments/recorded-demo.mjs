@@ -216,22 +216,33 @@ function aliasMac(mac, aliasIndex) {
 	return `02:00:00:00:00:${last.toString(16).padStart(2, "0")}`;
 }
 
+// The longest possible IPv6 literal (eight full groups). The first alias carries
+// it so the dashboard's abbreviation path is exercised by the demo catalog, not
+// only by tests; it is a documentation address like the rest of the fixture.
+const LONG_IPV6 = "2001:db8:85a3:8d3:1319:8a2e:370:7348";
+
 function aliasInterfaces(detail, aliasIndex, publicIp) {
 	let ipv6Index = 0;
 	let publicAssigned = false;
+	let longAssigned = false;
 	return (detail.net_interfaces ?? []).map((entry) => {
 		const loopback = entry.iface === "lo";
 		const ipv4 = loopback ? (entry.ipv4 ?? []) : publicAssigned ? [] : [publicIp];
 		if (!loopback) publicAssigned = true;
+		const ipv6 = loopback
+			? (entry.ipv6 ?? [])
+			: (entry.ipv6 ?? []).map(
+					() => `2001:db8:${(aliasIndex + 1).toString(16)}::${(++ipv6Index).toString(16)}`,
+				);
+		if (aliasIndex === 0 && !loopback && !longAssigned && ipv6.length > 0) {
+			ipv6.push(LONG_IPV6);
+			longAssigned = true;
+		}
 		return {
 			iface: entry.iface,
 			mac: aliasMac(entry.mac, aliasIndex),
 			ipv4,
-			ipv6: loopback
-				? (entry.ipv6 ?? [])
-				: (entry.ipv6 ?? []).map(
-						() => `2001:db8:${(aliasIndex + 1).toString(16)}::${(++ipv6Index).toString(16)}`,
-					),
+			ipv6,
 			speed_mbps: entry.speed_mbps,
 		};
 	});
@@ -301,7 +312,7 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			jsonValue(detail.dns_search),
 			target.address,
 			target.address,
-			detail.public_ip_v6 ?? null,
+			aliasIndex === 0 ? LONG_IPV6 : (detail.public_ip_v6 ?? null),
 			detail.probe_version,
 			null,
 			null,

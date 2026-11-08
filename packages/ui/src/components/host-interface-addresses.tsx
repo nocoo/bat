@@ -1,14 +1,12 @@
-// Interface addresses of a host, one row per interface.
+// Interface addresses of a host: one chip per literal, one literal per line.
 //
-// The rows use the same anatomy as the Public IPv4/IPv6 rows in the same card:
-// the interface name on the left, its literals right-aligned in monospace. A
-// middle dot separates the literals so their count and boundaries stay legible;
-// each literal wraps at its own separators inside the column instead of
-// truncating. Only families that were observed appear in the row.
+// The chips are full width inside the card, so they share one width and never
+// run together; the interface name sits above its chips as a small label. Only
+// the families that were observed appear, and a chip abbreviates a long IPv6 in
+// the middle while keeping the full literal for copy and hover.
 
 import type { NetInterfaceDTO } from "@bat/shared";
-import { Fragment } from "react";
-import { IpLiteral } from "@/components/ip-literal";
+import { IpAddressChip } from "@/components/ip-address-chip";
 
 export function HostInterfaceAddresses({
 	interfaces,
@@ -21,28 +19,20 @@ export function HostInterfaceAddresses({
 	}
 
 	return (
-		<div className="min-w-0 space-y-basalt-space-xs">
+		<div className="min-w-0 space-y-basalt-space-sm">
 			<p className="text-basalt-sm text-basalt-muted-foreground">Interfaces</p>
 			{rows.map((entry) => (
 				<div
 					key={entry.iface}
 					data-testid={`host-interface-${entry.iface}`}
-					className="flex min-w-0 justify-between gap-basalt-space-sm text-basalt-base"
+					className="min-w-0 space-y-basalt-space-xs"
 				>
-					<span className="shrink-0 text-basalt-muted-foreground">{entry.iface}</span>
-					<span
-						data-testid={`host-interface-addresses-${entry.iface}`}
-						className="min-w-0 wrap-anywhere text-right font-mono tabular-nums"
-					>
-						{[...entry.ipv4, ...entry.ipv6].map((address, index) => (
-							<Fragment key={address}>
-								{index > 0 && <span className="text-basalt-muted-foreground"> · </span>}
-								<span className="wrap-anywhere">
-									<IpLiteral value={address} />
-								</span>
-							</Fragment>
+					<p className="text-basalt-sm text-basalt-muted-foreground">{entry.iface}</p>
+					<div className="space-y-basalt-space-xs">
+						{[...entry.ipv4, ...entry.ipv6].map((address) => (
+							<IpAddressChip key={address} value={address} />
 						))}
-					</span>
+					</div>
 				</div>
 			))}
 		</div>

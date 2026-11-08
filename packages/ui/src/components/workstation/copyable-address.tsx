@@ -2,41 +2,16 @@
 // clipboard is optional in embedded browsers, so a refused copy says so instead
 // of pretending it worked.
 //
-// The address never truncates: it wraps inside the available width at its own
-// separators, so a long IPv6 literal stays readable and fully selectable while
-// remaining one exact address. Callers that render it in a narrow column cap
-// the type size instead of clipping the value.
+// This is the workstation header's display. Host addresses use the address chip
+// (`IpAddressChip`), which is a single-line control with an in-place overlay.
 
 import { Button } from "@nocoo/basalt";
 import { Check, Copy, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
-import { IpLiteral } from "@/components/ip-literal";
 
 type CopyState = "idle" | "copied" | "failed";
 
-export interface CopyableAddressProps {
-	/** The address to show and copy. `null` renders the empty state. */
-	value: string | null;
-	/** Small leading label, e.g. the address family ("IPv4"). */
-	label?: string;
-	/** Text shown when no address was observed. */
-	emptyText?: string;
-	/** Test id of the address element. */
-	testId?: string;
-	/** Font size class for the address. */
-	sizeClassName?: string;
-	/** Show the copy control as an icon only, without the text label. */
-	iconOnly?: boolean;
-}
-
-export function CopyableAddress({
-	value,
-	label,
-	emptyText = "No public IP observed",
-	testId = "workstation-public-ip",
-	sizeClassName = "text-basalt-xl",
-	iconOnly = false,
-}: CopyableAddressProps) {
+export function CopyableAddress({ value }: { value: string | null }) {
 	const [state, setState] = useState<CopyState>("idle");
 
 	useEffect(() => {
@@ -60,24 +35,13 @@ export function CopyableAddress({
 	}
 
 	return (
-		<div className="flex min-w-0 items-start gap-basalt-space-sm">
-			<div className="flex min-w-0 flex-1 items-baseline gap-basalt-space-sm">
-				{label !== undefined && (
-					<span className="shrink-0 text-basalt-xs font-semibold text-basalt-muted-foreground">
-						{label}
-					</span>
-				)}
-				<span
-					className={`min-w-0 wrap-anywhere font-mono ${sizeClassName} font-semibold tabular-nums`}
-					data-testid={testId}
-				>
-					{value === null ? (
-						<span className="text-basalt-muted-foreground">{emptyText}</span>
-					) : (
-						<IpLiteral value={value} />
-					)}
-				</span>
-			</div>
+		<div className="flex min-w-0 items-center gap-basalt-space-sm">
+			<span
+				className="min-w-0 break-all font-mono text-basalt-xl font-semibold tabular-nums"
+				data-testid="workstation-public-ip"
+			>
+				{value ?? "No public IP observed"}
+			</span>
 			{value !== null && (
 				<Button
 					type="button"
@@ -99,8 +63,7 @@ export function CopyableAddress({
 					) : (
 						<Copy aria-hidden="true" strokeWidth={1.5} />
 					)}
-					{!iconOnly &&
-						(state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy")}
+					{state === "copied" ? "Copied" : state === "failed" ? "Copy failed" : "Copy"}
 				</Button>
 			)}
 		</div>

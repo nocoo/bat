@@ -1,33 +1,14 @@
 import { expect, type Locator, test } from "@playwright/test";
 
-/** Rendered line count of a block-level text element. */
-async function lineCount(locator: Locator): Promise<number> {
+/** Width/height and clipping of a chip, measured in the real layout. */
+async function chipBox(locator: Locator) {
 	return locator.evaluate((element) => {
-		const lineHeight = Number.parseFloat(getComputedStyle(element).lineHeight);
-		if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
-			return 0;
-		}
-		return Math.round(element.getBoundingClientRect().height / lineHeight);
-	});
-}
-
-/** Every text segment of a literal element, with its rendered line-box count. */
-async function literalSegmentsOf(locator: Locator): Promise<{ text: string; rects: number }[]> {
-	return locator.evaluate((element) => {
-		const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-		const segments: { text: string; rects: number }[] = [];
-		let node = walker.nextNode();
-		while (node) {
-			const text = node.textContent ?? "";
-			// The middle dot is the separator between literals, not part of one.
-			if (text !== "" && text.trim() !== "·") {
-				const range = document.createRange();
-				range.selectNodeContents(node);
-				segments.push({ text, rects: range.getClientRects().length });
-			}
-			node = walker.nextNode();
-		}
-		return segments;
+		const rect = element.getBoundingClientRect();
+		return {
+			width: Math.round(rect.width),
+			height: Math.round(rect.height),
+			clipped: element.scrollWidth > element.clientWidth + 1,
+		};
 	});
 }
 
@@ -35,7 +16,6 @@ test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
 	const betaHid = "4c494cde";
 	const publicIpv6 = "2001:db8:85a3:8d3:1319:8a2e:370:7348";
-	const interfaceIpv6 = "2001:db8:85a3:8d3:1319:8a2e:370:7349";
 
 	test("network legend uses inbound and outbound labels", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
@@ -195,207 +175,245 @@ test.describe("Host detail page", () => {
 		await expect(page.getByText("0.9.99").first()).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("public address lead block shows both families with copy affordances", async ({ page }) => {
-		await page.setViewportSize({ width: 1440, height: 1000 });
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		const v4 = page.getByTestId("host-public-ip-v4");
-		const v6 = page.getByTestId("host-public-ip-v6");
-		await expect(v4).toHaveText("203.0.113.10", { timeout: 15_000 });
-		await expect(v6).toHaveText(publicIpv6);
-		await expect(page.getByText("IPv4", { exact: true }).first()).toBeVisible();
-		await expect(page.getByText("IPv6", { exact: true }).first()).toBeVisible();
-		await expect(
-			page.getByRole("button", { name: "Copy public address 203.0.113.10", exact: true }),
-		).toBeVisible();
-		await expect(
-			page.getByRole("button", { name: `Copy public address ${publicIpv6}`, exact: true }),
-		).toBeVisible();
-		// The lead cell is a narrow column: the literal wraps instead of being clipped.
-		expect(await v6.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
-			true,
-		);
-		expect(await lineCount(v6)).toBeGreaterThan(1);
-		expect(await v6.evaluate((element) => getComputedStyle(element).textOverflow)).not.toBe(
-			"ellipsis",
-		);
-		const style = await v6.evaluate((element) => {
-			const computed = getComputedStyle(element);
-			return { overflowWrap: computed.overflowWrap, wordBreak: computed.wordBreak };
-		});
-		expect(style.overflowWrap).toBe("anywhere");
-		expect(style.wordBreak).toBe("normal");
-		// The literal is split at its separators only: every segment stays on one
-		// line and the concatenation is still exactly the address.
-		const segments = await literalSegmentsOf(v6);
-		expect(segments.map((segment) => segment.text).join("")).toBe(publicIpv6);
-		expect(segments).toHaveLength(8);
-		for (const segment of segments) {
-			expect(segment.rects).toBe(1);
-		}
-	});
-
-	test("the family label and the copy control stay on the first line of a wrapped literal", async ({
+	test("the lead block shows one chip per family, equal width and never clipped", async ({
 		page,
 	}) => {
 		await page.setViewportSize({ width: 1440, height: 1000 });
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		const value = page.getByTestId("host-public-ip-v6");
-		await expect(value).toHaveText(publicIpv6, { timeout: 15_000 });
-		expect(await lineCount(value)).toBeGreaterThan(1);
+		const header = page.getByTestId("host-detail-header");
+		const ipv4 = header.getByRole("button", { name: "Copy address 203.0.113.10", exact: true });
+		const ipv6 = header.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(ipv4).toBeVisible({ timeout: 15_000 });
+		await expect(ipv6).toBeVisible();
 
-		const label = page.getByText("IPv6", { exact: true }).first();
-		const copy = page.getByRole("button", {
-			name: `Copy public address ${publicIpv6}`,
-			exact: true,
-		});
-		const [valueBox, labelBox, copyBox] = await Promise.all([
-			value.boundingBox(),
-			label.boundingBox(),
-			copy.boundingBox(),
-		]);
-		const lineHeight = await value.evaluate((element) =>
-			Number.parseFloat(getComputedStyle(element).lineHeight),
-		);
-		const firstLineBottom = (valueBox?.y ?? 0) + lineHeight;
+		// IPv4 is shown complete; a long IPv6 is abbreviated in the middle, on one line.
+		await expect(ipv4.getByTestId("ip-address-chip-value")).toHaveText("203.0.113.10");
+		const short = ipv6.getByTestId("ip-address-chip-value");
+		const shown = (await short.textContent()) ?? "";
+		expect(shown).toContain("…");
+		expect(shown.length).toBeLessThanOrEqual(14);
+		expect(publicIpv6.startsWith(shown.split("…")[0] ?? "")).toBe(true);
+		expect(publicIpv6.endsWith(shown.split("…")[1] ?? "")).toBe(true);
 
-		// Neither the label nor the copy control may drift to the vertical centre
-		// of the wrapped block: both belong to the first line.
-		expect(labelBox?.y).toBeGreaterThanOrEqual((valueBox?.y ?? 0) - 2);
-		expect((labelBox?.y ?? 0) + (labelBox?.height ?? 0)).toBeLessThanOrEqual(firstLineBottom + 2);
-		expect(copyBox?.y).toBeLessThanOrEqual(firstLineBottom);
+		// The full literal stays available even though the chip abbreviates.
+		await expect(ipv6).toHaveAttribute("title", publicIpv6);
+
+		const [v4Box, v6Box] = await Promise.all([chipBox(ipv4), chipBox(ipv6)]);
+		expect(v4Box.width).toBe(v6Box.width);
+		expect(v4Box.height).toBe(v6Box.height);
+		expect(v4Box.clipped).toBe(false);
+		expect(v6Box.clipped).toBe(false);
+
+		// Same height as a family label row apart, one line only.
+		expect(v6Box.height).toBeLessThan(60);
 	});
 
-	test("a family without an observation shows a muted dash instead of disappearing", async ({
+	test("hover and keyboard focus replace the address with the copy overlay", async ({ page }) => {
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+		const overlay = chip.getByTestId("ip-address-chip-overlay");
+		await expect(overlay).toHaveCSS("opacity", "0");
+
+		await chip.hover();
+		await expect(overlay).toHaveCSS("opacity", "1");
+		await expect(overlay).toContainText("Copy");
+
+		await page.mouse.move(0, 0);
+		await expect(overlay).toHaveCSS("opacity", "0");
+
+		await chip.focus();
+		await expect(overlay).toHaveCSS("opacity", "1");
+	});
+
+	test("clicking the chip copies the untouched literal and shows the success state", async ({
 		page,
+		context,
 	}) => {
+		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+		expect(await chip.getAttribute("data-state")).toBe("idle");
+
+		await chip.click();
+
+		await expect(chip).toHaveAttribute("data-state", "copied");
+		const overlay = chip.getByTestId("ip-address-chip-overlay");
+		await expect(overlay).toContainText("Copied");
+		await expect(overlay).toHaveCSS("opacity", "1");
+		await expect(chip.locator("svg")).toHaveClass(/text-basalt-success/);
+		expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(publicIpv6);
+
+		// The feedback holds briefly, then fades back to the static address once the
+		// pointer leaves the chip.
+		await expect(chip).toHaveAttribute("data-state", "idle", { timeout: 5_000 });
+		await page.mouse.move(0, 0);
+		await expect(overlay).toHaveCSS("opacity", "0");
+	});
+
+	test("a refused copy shows the warning state instead of pretending", async ({ page }) => {
+		await page.addInitScript(() => {
+			Object.defineProperty(navigator, "clipboard", {
+				configurable: true,
+				value: { writeText: () => Promise.reject(new Error("clipboard denied")) },
+			});
+		});
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+		await chip.click();
+
+		await expect(chip).toHaveAttribute("data-state", "failed");
+		const overlay = chip.getByTestId("ip-address-chip-overlay");
+		await expect(overlay).toContainText("Copy failed");
+		await expect(chip.locator("svg")).toHaveClass(/text-basalt-warning/);
+	});
+
+	test("reduced motion drops the overlay transition and the check animation", async ({ page }) => {
+		await page.emulateMedia({ reducedMotion: "reduce" });
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const overlay = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true })
+			.getByTestId("ip-address-chip-overlay");
+		await expect(overlay).toBeVisible({ timeout: 15_000 });
+		await expect(overlay).toHaveCSS("transition-property", "none");
+	});
+
+	test("keyboard activation copies the literal", async ({ page, context }) => {
+		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+		await page.goto(`/hosts/${alphaHid}`);
+		await page.waitForLoadState("domcontentloaded");
+
+		const chip = page
+			.getByTestId("host-detail-header")
+			.getByRole("button", { name: "Copy address 203.0.113.10", exact: true });
+		await expect(chip).toBeVisible({ timeout: 15_000 });
+		await chip.focus();
+		await chip.press("Enter");
+
+		await expect(chip).toHaveAttribute("data-state", "copied");
+		expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("203.0.113.10");
+	});
+
+	test("a family without an observation is a disabled, non-clickable chip", async ({ page }) => {
 		await page.goto(`/hosts/${betaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		await expect(page.getByTestId("host-public-ip-v4")).toHaveText("198.51.100.20", {
-			timeout: 15_000,
-		});
-		await expect(page.getByTestId("host-public-ip-v6")).toHaveText("—");
+		const header = page.getByTestId("host-detail-header");
+		// Wait for the loaded detail: before it arrives both families are still empty.
+		await expect(
+			header.getByRole("button", { name: "Copy address 198.51.100.20", exact: true }),
+		).toBeVisible({ timeout: 15_000 });
+		const empty = header.getByRole("button", { name: "No address observed", exact: true });
+		await expect(empty).toBeVisible();
+		await expect(empty).toBeDisabled();
+		await expect(empty.getByTestId("ip-address-chip-value")).toHaveText("—");
+		await expect(empty.getByTestId("ip-address-chip-overlay")).toHaveCount(0);
 	});
 
-	test("system info lists public IPv4 and IPv6 separately", async ({ page }) => {
+	test("system info shows both families as equal chips", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		await expect(page.getByText("Public IPv4", { exact: true })).toBeVisible({
-			timeout: 15_000,
-		});
+		await expect(page.getByText("Public IPv4", { exact: true })).toBeVisible({ timeout: 15_000 });
 		await expect(page.getByText("Public IPv6", { exact: true })).toBeVisible();
 		await expect(page.getByText("Public IP", { exact: true })).toHaveCount(0);
 
-		const row = page.getByText("Public IPv6", { exact: true }).locator("..").locator("span").last();
-		const segments = await literalSegmentsOf(row);
-		expect(segments.map((segment) => segment.text).join("")).toBe(publicIpv6);
-		for (const segment of segments) {
-			expect(segment.rects).toBe(1);
-		}
+		// The two chips inside the System Info card share one width.
+		const chips = page.getByTestId("ip-address-chip");
+		const card = page.getByText("Public IPv4", { exact: true }).locator("..");
+		const [v4Chip, v6Chip] = [
+			card.getByRole("button", { name: "Copy address 203.0.113.10", exact: true }),
+			card.getByRole("button", { name: `Copy address ${publicIpv6}`, exact: true }),
+		];
+		await expect(v4Chip).toBeVisible();
+		await expect(v6Chip).toBeVisible();
+		const [v4Box, v6Box] = await Promise.all([chipBox(v4Chip), chipBox(v6Chip)]);
+		expect(v4Box.width).toBe(v6Box.width);
+		expect(v4Box.height).toBe(v6Box.height);
+		expect(v4Box.clipped).toBe(false);
+		expect(v6Box.clipped).toBe(false);
+		await expect(chips.first()).toBeVisible();
 	});
 
-	test("interface addresses render one entry per interface", async ({ page }) => {
+	test("interfaces list every literal as its own chip, one per line and equal width", async ({
+		page,
+	}) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
 		await expect(page.getByText("Interfaces", { exact: true })).toBeVisible({ timeout: 15_000 });
-		await expect(page.getByText("eth0", { exact: true })).toBeVisible();
-		await expect(page.getByText("eth1", { exact: true })).toBeVisible();
-		await expect(page.getByText("10.0.1.10", { exact: true })).toBeVisible();
-		await expect(
-			page.getByTestId("host-interface-addresses-eth0").getByText(interfaceIpv6, {
+		const interfaces = page.getByTestId("host-interface-eth0");
+		await expect(interfaces.getByText("eth0", { exact: true })).toBeVisible();
+
+		const chips = interfaces.getByTestId("ip-address-chip");
+		await expect(chips).toHaveCount(4);
+		const expected = [
+			"10.0.1.10",
+			"203.0.113.10",
+			"2001:db8:85a3:8d3:1319:8a2e:370:7349",
+			"fe80::5054:ff:fe12:3456",
+		];
+		const boxes = [];
+		for (const address of expected) {
+			const chip = interfaces.getByRole("button", {
+				name: `Copy address ${address}`,
 				exact: true,
-			}),
-		).toBeVisible();
-	});
-
-	test("interface literals are separated by a middle dot, right-aligned and wrapped at their separators", async ({
-		page,
-	}) => {
-		for (const viewport of [
-			{ width: 1440, height: 1000 },
-			{ width: 900, height: 1000 },
-		]) {
-			await page.setViewportSize(viewport);
-			await page.goto(`/hosts/${alphaHid}`);
-			await page.waitForLoadState("domcontentloaded");
-
-			const row = page.getByTestId("host-interface-eth0");
-			await expect(row).toBeVisible({ timeout: 15_000 });
-			const name = page.getByText("eth0", { exact: true });
-			const addresses = page.getByTestId("host-interface-addresses-eth0");
-
-			const [rowBox, nameBox, addressesBox] = await Promise.all([
-				row.boundingBox(),
-				name.boundingBox(),
-				addresses.boundingBox(),
-			]);
-			// Interface name on the left, literals right-aligned against the row edge.
-			expect(nameBox?.x).toBeLessThan(addressesBox?.x ?? 0);
-			expect(
-				Math.abs(
-					(addressesBox?.x ?? 0) +
-						(addressesBox?.width ?? 0) -
-						((rowBox?.x ?? 0) + (rowBox?.width ?? 0)),
-				),
-			).toBeLessThanOrEqual(1);
-
-			// A visible middle dot separates the literals, so their count is legible.
-			const literals = ((await addresses.textContent()) ?? "")
-				.split("·")
-				.map((part) => part.trim());
-			expect(literals).toEqual([
-				"10.0.1.10",
-				"203.0.113.10",
-				interfaceIpv6,
-				"fe80::5054:ff:fe12:3456",
-			]);
-
-			for (const address of literals) {
-				const literal = addresses.getByText(address, { exact: true });
-				await expect(literal).toBeVisible();
-				expect(
-					await literal.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
-				).toBe(true);
-				const segments = await literalSegmentsOf(literal);
-				// Nothing is inserted into the literal and every segment stays whole.
-				expect(segments.map((segment) => segment.text).join("")).toBe(address);
-				for (const segment of segments) {
-					expect(segment.rects).toBe(1);
-				}
-			}
-
-			// In the narrow rail the 39 character literal wraps; at 900 it fits on one
-			// line. Neither case may clip or ellipsize.
-			if (viewport.width === 1440) {
-				expect(
-					await lineCount(addresses.getByText(interfaceIpv6, { exact: true })),
-				).toBeGreaterThan(1);
-			}
-			expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-				true,
-			);
+			});
+			await expect(chip).toBeVisible();
+			await expect(chip).toHaveAttribute("title", address);
+			boxes.push(await chipBox(chip));
 		}
+		// Every chip in the list has the same width and sits on its own line.
+		expect(new Set(boxes.map((box) => box.width)).size).toBe(1);
+		expect(new Set(boxes.map((box) => box.height)).size).toBe(1);
+		for (const box of boxes) {
+			expect(box.clipped).toBe(false);
+		}
+		const tops = await Promise.all(
+			expected.map((address) =>
+				interfaces
+					.getByRole("button", { name: `Copy address ${address}`, exact: true })
+					.evaluate((element) => Math.round(element.getBoundingClientRect().top)),
+			),
+		);
+		expect(new Set(tops).size).toBe(tops.length);
 	});
 
-	test("narrow viewport keeps the family rows and their copy controls usable", async ({ page }) => {
-		await page.setViewportSize({ width: 390, height: 900 });
+	test("chips stay clipped-free at a narrow width", async ({ page }) => {
+		await page.setViewportSize({ width: 900, height: 1000 });
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
-		const v6 = page.getByTestId("host-public-ip-v6");
-		await expect(v6).toHaveText(publicIpv6, { timeout: 15_000 });
-		await expect(
-			page.getByRole("button", { name: `Copy public address ${publicIpv6}`, exact: true }),
-		).toBeVisible();
-		expect(await v6.evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(
-			true,
-		);
+		await expect(page.getByTestId("host-interface-eth0")).toBeVisible({ timeout: 15_000 });
+		const chips = page.getByTestId("ip-address-chip");
+		const count = await chips.count();
+		expect(count).toBeGreaterThan(4);
+		for (let index = 0; index < count; index += 1) {
+			const chip = chips.nth(index);
+			await chip.scrollIntoViewIfNeeded();
+			expect(await chip.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
+			const box = await chip.boundingBox();
+			expect(box?.height ?? 0).toBeLessThan(60);
+		}
 		expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
 			true,
 		);

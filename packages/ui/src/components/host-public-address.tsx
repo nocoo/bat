@@ -1,32 +1,18 @@
-// The public address of a host, one row per address family.
+// The public address of a host: one chip per family, stacked and equal width.
 //
-// The families are independent observations: a host that only has IPv4 still
-// shows an IPv6 row with a muted dash, so an absent observation is visible
-// instead of silently missing. The preferred address stays on the host row for
-// the list views; this block is the per-family view.
+// The families are independent observations; a family that was never observed
+// stays visible as a disabled chip so its absence is explicit.
 
 import type { HostDetailItem } from "@bat/shared";
-import { CopyableAddress } from "@/components/workstation/copyable-address";
+import { IpAddressChip } from "@/components/ip-address-chip";
 
 export function HostPublicAddress({ detail }: { detail: HostDetailItem | undefined }) {
 	return (
-		<div className="mt-basalt-space-xs space-y-basalt-space-xs">
-			<CopyableAddress
-				label="IPv4"
-				value={detail?.public_ip_v4 ?? null}
-				emptyText="—"
-				sizeClassName="text-basalt-base"
-				testId="host-public-ip-v4"
-				iconOnly
-			/>
-			<CopyableAddress
-				label="IPv6"
-				value={detail?.public_ip_v6 ?? null}
-				emptyText="—"
-				sizeClassName="text-basalt-base"
-				testId="host-public-ip-v6"
-				iconOnly
-			/>
+		<div className="mt-basalt-space-xs grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-basalt-space-sm gap-y-basalt-space-xs">
+			<span className="text-basalt-xs font-semibold text-basalt-muted-foreground">IPv4</span>
+			<IpAddressChip value={detail?.public_ip_v4 ?? null} />
+			<span className="text-basalt-xs font-semibold text-basalt-muted-foreground">IPv6</span>
+			<IpAddressChip value={detail?.public_ip_v6 ?? null} />
 		</div>
 	);
 }

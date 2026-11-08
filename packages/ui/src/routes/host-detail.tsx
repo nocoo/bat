@@ -25,7 +25,7 @@ import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostPublicAddress } from "@/components/host-public-address";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
-import { IpLiteral } from "@/components/ip-literal";
+import { IpAddressChip } from "@/components/ip-address-chip";
 import { SkeletonChartCard, SkeletonRail } from "@/components/layout/page-skeleton";
 import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
@@ -45,28 +45,11 @@ const TIME_RANGES = [
 	{ label: "90d", seconds: 7776000 },
 ] as const;
 
-function InfoRow({
-	label,
-	value,
-	literal,
-}: {
-	label: string;
-	value: string | null | undefined;
-	/** Render the value as an address literal: wraps at its separators only. */
-	literal?: boolean;
-}) {
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
 	return (
 		<div className="flex justify-between gap-basalt-space-sm text-basalt-base">
 			<span className="shrink-0 text-basalt-muted-foreground">{label}</span>
-			<span className="min-w-0 wrap-anywhere text-right font-mono tabular-nums">
-				{value === null || value === undefined ? (
-					"—"
-				) : literal ? (
-					<IpLiteral value={value} />
-				) : (
-					value
-				)}
-			</span>
+			<span className="min-w-0 text-right font-mono tabular-nums">{value ?? "—"}</span>
 		</div>
 	);
 }
@@ -330,8 +313,12 @@ export function HostDetailPage() {
 										{detail?.probe_version && (
 											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
 										)}
-										<InfoRow label="Public IPv4" value={detail?.public_ip_v4} literal />
-										<InfoRow label="Public IPv6" value={detail?.public_ip_v6} literal />
+										<div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-basalt-space-sm gap-y-basalt-space-xs">
+											<span className="shrink-0 text-basalt-muted-foreground">Public IPv4</span>
+											<IpAddressChip value={detail?.public_ip_v4 ?? null} />
+											<span className="shrink-0 text-basalt-muted-foreground">Public IPv6</span>
+											<IpAddressChip value={detail?.public_ip_v6 ?? null} />
+										</div>
 										<HostInterfaceAddresses interfaces={detail?.net_interfaces} />
 										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
 										<InfoRow label="Boot Time" value={formatBootTime(host.boot_time)} />
