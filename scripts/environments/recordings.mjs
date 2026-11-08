@@ -7,7 +7,7 @@ import { isIP } from "node:net";
 export const SCHEMA_VERSION = 1;
 
 const words = (value) => new Set(value.trim().split(/\s+/));
-const HOST_STATUSES = words("healthy warning critical offline maintenance");
+const HOST_STATUSES = words("healthy warning critical offline");
 const DOCKER_STATES = words("running exited paused restarting created dead");
 const CONNECTIVITY_STATUSES = words("reachable partial timeout unreachable error unsupported");
 const SOFTWARE_CATEGORIES = words(
@@ -27,7 +27,6 @@ const SAFE_MOUNTS = words(
 	"/ /boot /boot/efi /data /home /opt /srv /tmp /usr /var /var/cache /var/lib /var/log /var/tmp",
 );
 const DOC_V4 = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/;
-const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
 const MAC = /^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const KERNEL = /^(\d+\.\d+(?:\.\d+)?)/;
@@ -149,10 +148,6 @@ function cpuLabel(arch) {
 
 function safePath(value) {
 	return typeof value === "string" && SAFE_PATHS.has(value.trim());
-}
-
-function clock(value) {
-	return typeof value === "string" && TIME_OF_DAY.test(value) ? value : null;
 }
 
 function parseArray(value) {
@@ -492,7 +487,6 @@ function sanitizeProcess(ctx, value) {
 
 function sanitizeDetail(ctx, value) {
 	if (!isRecord(value)) return null;
-	const maintenanceReason = value.maintenance_reason;
 	const arch = sanitizeArch(value.arch);
 	return {
 		hid: ctx.hostHid,
@@ -525,9 +519,6 @@ function sanitizeDetail(ctx, value) {
 		cpu_sparkline: sanitizeSparkline(ctx, value.cpu_sparkline),
 		mem_sparkline: sanitizeSparkline(ctx, value.mem_sparkline),
 		net_sparkline: sanitizeSparkline(ctx, value.net_sparkline),
-		maintenance_start: clock(value.maintenance_start),
-		maintenance_end: clock(value.maintenance_end),
-		maintenance_reason: maintenanceReason == null ? null : "Synthetic maintenance window",
 		description: value.description == null ? null : "Synthetic demo server",
 		swap_total_bytes: integer(value.swap_total_bytes),
 		boot_mode: oneOf(value.boot_mode, BOOT_MODES),
