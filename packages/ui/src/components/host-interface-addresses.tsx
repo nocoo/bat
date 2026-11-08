@@ -41,45 +41,54 @@ export function HostInterfaceAddresses({
 	}
 
 	return (
-		<div className="min-w-0 space-y-basalt-space-sm">
-			<p className="text-basalt-sm text-basalt-muted-foreground">Interfaces</p>
-			{rows.map((entry) => {
-				const InterfaceIcon = interfaceIcon(entry.iface);
-				return (
-					<div key={entry.iface} data-testid={`host-interface-${entry.iface}`} className="min-w-0">
-						<p className="flex items-center gap-basalt-space-xs font-mono text-basalt-xs text-basalt-muted-foreground">
-							<InterfaceIcon
-								aria-hidden="true"
-								className="size-basalt-icon shrink-0"
-								strokeWidth={1.5}
-							/>
-							<span>{entry.iface}</span>
-						</p>
-						<div className="ml-basalt-space-lg space-y-0">
-							{entry.ipv4.map((address) => (
-								<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
-									<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
-										v4
-									</span>
-									<div className="min-w-0 flex-1">
-										<IpAddressRow value={address} alignment="right" />
+		<div className="min-w-0">
+			<p className="mb-basalt-space-sm text-basalt-sm text-basalt-muted-foreground">Interfaces</p>
+			<div className="space-y-basalt-space-card">
+				{rows.map((entry) => {
+					const InterfaceIcon = interfaceIcon(entry.iface);
+					return (
+						<div
+							key={entry.iface}
+							data-testid={`host-interface-${entry.iface}`}
+							className="min-w-0"
+						>
+							<p className="flex items-center gap-basalt-space-xs font-mono text-basalt-xs text-basalt-foreground">
+								<InterfaceIcon
+									aria-hidden="true"
+									className="size-basalt-icon shrink-0"
+									strokeWidth={1.5}
+								/>
+								<span>{entry.iface}</span>
+							</p>
+							<div
+								data-testid="host-interface-addresses"
+								className="ml-8 border-l border-basalt-border/70 pl-basalt-space-sm"
+							>
+								{entry.ipv4.map((address) => (
+									<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
+										<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
+											v4
+										</span>
+										<div className="min-w-0 flex-1">
+											<IpAddressRow value={address} alignment="right" />
+										</div>
 									</div>
-								</div>
-							))}
-							{entry.ipv6.map((address) => (
-								<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
-									<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
-										v6
-									</span>
-									<div className="min-w-0 flex-1">
-										<IpAddressRow value={address} alignment="right" />
+								))}
+								{entry.ipv6.map((address) => (
+									<div key={address} className="flex min-w-0 items-center gap-basalt-space-xs">
+										<span className="shrink-0 font-mono text-basalt-xs text-basalt-muted-foreground">
+											v6
+										</span>
+										<div className="min-w-0 flex-1">
+											<IpAddressRow value={address} alignment="right" />
+										</div>
 									</div>
-								</div>
-							))}
+								))}
+							</div>
 						</div>
-					</div>
-				);
-			})}
+					);
+				})}
+			</div>
 		</div>
 	);
 }

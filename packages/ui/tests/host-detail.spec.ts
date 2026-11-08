@@ -697,7 +697,7 @@ test.describe("Host detail page", () => {
 			});
 
 			const interfaces = await page
-				.locator('[data-testid^="host-interface-"]')
+				.locator('[data-testid^="host-interface-"]:not([data-testid="host-interface-addresses"])')
 				.evaluateAll((nodes) =>
 					nodes.map((node) => {
 						const textRight = (element: Element) => {
@@ -707,10 +707,14 @@ test.describe("Host detail page", () => {
 							return rects.length ? Math.round(Math.max(...rects.map((rect) => rect.right))) : 0;
 						};
 						const name = node.querySelector("p span");
+						const nameLine = node.querySelector("p");
 						const icon = node.querySelector("p svg");
+						const list = node.querySelector('[data-testid="host-interface-addresses"]');
+						const guide = list ? getComputedStyle(list) : null;
 						const value = node.querySelector('[data-testid="ip-address-row-value"]');
 						const row = value?.closest('[data-testid="ip-address-row"]');
 						const addressRow = row?.parentElement;
+						const marker = node.querySelector("span.font-mono.text-basalt-xs");
 						return {
 							iface: (name?.textContent ?? "").trim(),
 							icon: Boolean(icon),
@@ -720,6 +724,11 @@ test.describe("Host detail page", () => {
 								(addressRow?.getBoundingClientRect().left ?? 0) -
 									(name?.getBoundingClientRect().left ?? 0),
 							),
+							guideWidth: guide ? Number.parseFloat(guide.borderLeftWidth) : 0,
+							guideColor: guide ? guide.borderLeftColor : "",
+							nameColor: nameLine ? getComputedStyle(nameLine).color : "",
+							addressColor: marker ? getComputedStyle(marker).color : "",
+							markerLeft: Math.round(marker?.getBoundingClientRect().left ?? 0),
 						};
 					}),
 				);
@@ -729,12 +738,20 @@ test.describe("Host detail page", () => {
 			for (const row of rows) {
 				expect(Math.abs(row.right - rightEdge)).toBeLessThanOrEqual(1);
 			}
-			expect(interfaces.length).toBeGreaterThan(0);
+			expect(interfaces.length).toBeGreaterThan(1);
 			for (const entry of interfaces) {
 				expect(entry.icon).toBe(true);
-				expect(entry.indent).toBeGreaterThan(0);
+				// The address list is indented under the interface name.
+				expect(entry.indent).toBeGreaterThanOrEqual(16);
+				// A one-pixel vertical guide marks the indented list.
+				expect(entry.guideWidth).toBe(1);
+				expect(entry.guideColor).not.toBe("rgba(0, 0, 0, 0)");
+				// The family marker stays left of the right-aligned address.
+				expect(entry.markerLeft).toBeGreaterThan(entry.nameLeft);
 				expect(Math.abs(entry.addressRight - rightEdge)).toBeLessThanOrEqual(1);
 			}
+			// The interface name reads stronger than the muted addresses.
+			expect(interfaces[0]?.nameColor).not.toBe(interfaces[0]?.addressColor);
 
 			await systemBody.screenshot({
 				path: testInfo.outputPath(`system-info-${width}.png`),
