@@ -203,7 +203,14 @@ function baseInput() {
 			data: [
 				metricPoint(CAPTURED_AT - 30, {
 					disk_json: JSON.stringify([
-						{ mount: "/", total_bytes: 1000, avail_bytes: 500, used_pct: 50 },
+						{
+							mount: "/",
+							device: "/dev/nvme0n1",
+							fs_type: "ext4",
+							total_bytes: 1000,
+							avail_bytes: 500,
+							used_pct: 50,
+						},
 						{ mount: "/home/alice-canary", total_bytes: 10, avail_bytes: 5, used_pct: 50 },
 					]),
 					net_json: JSON.stringify([
@@ -514,7 +521,11 @@ describe("sanitizeRecording", () => {
 		expect(point.disk_io[0]).toMatchObject({ device: "vda", read_iops: 10 });
 		expect(Object.keys(point.disk_io[0])).not.toContain("secret");
 		expect(point.disk[0].mount).toBe("/");
+		expect(point.disk[0].device).toBe("vda");
+		expect(point.disk[0].fs_type).toBe("ext4");
 		expect(point.disk[1].mount).toMatch(/^\/mnt\/data-\d{2}$/);
+		expect(point.disk[1].device).toBeNull();
+		expect(point.disk[1].fs_type).toBeNull();
 		expect(broken.disk).toEqual([]);
 		expect(broken.net).toEqual([]);
 		expect(broken.disk_io).toEqual([]);

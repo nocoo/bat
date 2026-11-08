@@ -26,6 +26,7 @@ const PUBLIC_USERS = words(
 const SAFE_MOUNTS = words(
 	"/ /boot /boot/efi /data /home /opt /srv /tmp /usr /var /var/cache /var/lib /var/log /var/tmp",
 );
+const FS_TYPES = words("btrfs ext4 f2fs overlay xfs zfs");
 const DOC_V4 = /^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.\d{1,3}$/;
 const MAC = /^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$/;
 const SEMVER = /^\d+\.\d+\.\d+$/;
@@ -539,6 +540,8 @@ function sanitizeMetricPoint(ctx, value) {
 	for (const field of METRIC_FIELDS) point[field] = finite(value[field]);
 	point.disk = parseArray(value.disk_json).map((entry) => ({
 		mount: ctx.mount(entry.mount),
+		device: ctx.device(entry.device),
+		fs_type: oneOf(entry.fs_type, FS_TYPES),
 		total_bytes: integer(entry.total_bytes),
 		avail_bytes: integer(entry.avail_bytes),
 		used_pct: finite(entry.used_pct),
