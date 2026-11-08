@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { abbreviateAddress, IP_CHIP_BUDGET } from "./ip-abbreviation";
+import { abbreviateAddress, IP_ADDRESS_BUDGET } from "./ip-abbreviation";
 
 describe("abbreviateAddress", () => {
 	test("keeps IPv4 complete, whatever its length", () => {
@@ -14,10 +14,16 @@ describe("abbreviateAddress", () => {
 		expect(abbreviateAddress("2a0b:9900::ec0")).toBe("2a0b:9900::ec0");
 	});
 
-	test("abbreviates the middle of a long IPv6", () => {
-		expect(abbreviateAddress("2a0b:9900:1234:5678:9abc:def0:1234:ec0b")).toBe("2a0b:9900…ec0b");
-		expect(abbreviateAddress("2001:db8:85a3:8d3:1319:8a2e:370:7348")).toBe("2001:db8…7348");
-		expect(abbreviateAddress("fe80::5054:ff:fe12:3456")).toBe("fe80::505…3456");
+	test("keeps 39-character IPv6 literals complete", () => {
+		const literals = [
+			"2001:0db8:85a3:0000:0000:8a2e:0370:7348",
+			"2001:0db8:85a3:0000:0000:0000:0000:7348",
+		];
+		for (const literal of literals) {
+			expect(literal).toHaveLength(39);
+			expect(abbreviateAddress(literal)).toBe(literal);
+		}
+		expect(abbreviateAddress("fe80::5054:ff:fe12:3456")).toBe("fe80::5054:ff:fe12:3456");
 	});
 
 	test("never leaves a colon next to the ellipsis", () => {
@@ -39,14 +45,13 @@ describe("abbreviateAddress", () => {
 
 	test("stays inside the budget and keeps the head and tail of the original", () => {
 		const literals = [
-			"2001:db8:85a3:8d3:1319:8a2e:370:7348",
-			"2a0b:9900:1234:5678:9abc:def0:1234:ec0b",
-			"fe80::5054:ff:fe12:3456",
-			"2001:0db8:0000:0000:0000:0000:0000:0001",
+			"2001:0db8:85a3:0000:0000:8a2e:0370:7348:9999",
+			"2001:0db8:0000:0000:0000:0000:0000:0001:9999",
+			"fd7a:115c:a1e0:ab12:4843:cd96:6269:8e0f:9999",
 		];
 		for (const literal of literals) {
 			const short = abbreviateAddress(literal);
-			expect(short.length).toBeLessThanOrEqual(IP_CHIP_BUDGET);
+			expect(short.length).toBeLessThanOrEqual(IP_ADDRESS_BUDGET);
 			const [head, tail] = short.split("…");
 			expect(head).toBeTruthy();
 			expect(tail).toBeTruthy();

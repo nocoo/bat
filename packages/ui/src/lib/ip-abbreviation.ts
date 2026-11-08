@@ -1,16 +1,12 @@
-// Address chips are one fixed-width line, so a long literal cannot be shown in
-// full. IPv4 is short enough to keep complete; IPv6 is abbreviated in the middle
-// (`2a0b:9900…ec0b`) because both the prefix and the interface identifier are
-// meaningful. The full literal always stays available through the chip's title,
-// aria-label and copied text.
+// Fixed character budget for the address row. A 39-character IPv6 literal
+// remains complete; longer literals keep the prefix and suffix visible.
 
-/** Characters an address may occupy on a chip, including the ellipsis. */
-export const IP_CHIP_BUDGET = 14;
+export const IP_ADDRESS_BUDGET = 39;
 
 const ELLIPSIS = "…";
 
 /**
- * Middle-abbreviate an address for a single-line chip.
+ * Middle-abbreviate an address for a single-line address row.
  *
  * - IPv4 and literals that already fit are returned unchanged.
  * - A long IPv6 keeps a head and a tail joined by one ellipsis.
@@ -20,7 +16,7 @@ const ELLIPSIS = "…";
  * The result is never longer than `budget`, its head is a prefix of the input
  * and its tail a suffix, so nothing is invented.
  */
-export function abbreviateAddress(value: string, budget: number = IP_CHIP_BUDGET): string {
+export function abbreviateAddress(value: string, budget: number = IP_ADDRESS_BUDGET): string {
 	if (!value.includes(":") || value.length <= budget) {
 		return value;
 	}

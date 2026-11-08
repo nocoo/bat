@@ -2,8 +2,8 @@
 // clipboard is optional in embedded browsers, so a refused copy says so instead
 // of pretending it worked.
 //
-// This is the workstation header's display. Host addresses use the address chip
-// (`IpAddressChip`), which is a single-line control with an in-place overlay.
+// This is the workstation header's display. Host addresses use the `IpAddressRow`
+// control with a muted family label and an in-place copy affordance.
 
 import { Button } from "@nocoo/basalt";
 import { Check, Copy, TriangleAlert } from "lucide-react";

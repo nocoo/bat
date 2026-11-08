@@ -25,7 +25,7 @@ import { MaintenancePanel } from "@/components/host-maintenance-panel";
 import { HostPublicAddress } from "@/components/host-public-address";
 import { HostTagsPanel } from "@/components/host-tags-panel";
 import { SoftwarePanel, WebsitesPanel } from "@/components/host-tier2-panels";
-import { IpAddressChip } from "@/components/ip-address-chip";
+import { IpAddressRow } from "@/components/ip-address-row";
 import { SkeletonChartCard, SkeletonRail } from "@/components/layout/page-skeleton";
 import { type ReadingItem, Readings } from "@/components/layout/reading";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
@@ -313,15 +313,9 @@ export function HostDetailPage() {
 										{detail?.probe_version && (
 											<InfoRow label="Probe Version" value={`v${detail.probe_version}`} />
 										)}
-										<div className="grid gap-y-basalt-space-xs">
-											<div className="space-y-basalt-space-xs">
-												<span className="block text-basalt-muted-foreground">Public IPv4</span>
-												<IpAddressChip value={detail?.public_ip_v4 ?? null} />
-											</div>
-											<div className="space-y-basalt-space-xs">
-												<span className="block text-basalt-muted-foreground">Public IPv6</span>
-												<IpAddressChip value={detail?.public_ip_v6 ?? null} />
-											</div>
+										<div className="grid gap-y-0">
+											<IpAddressRow label="Public IPv4" value={detail?.public_ip_v4} />
+											<IpAddressRow label="Public IPv6" value={detail?.public_ip_v6} />
 										</div>
 										<HostInterfaceAddresses interfaces={detail?.net_interfaces} />
 										<InfoRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
