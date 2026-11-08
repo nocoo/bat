@@ -137,6 +137,8 @@ pub struct SwapMetrics {
 #[derive(Debug, Serialize)]
 pub struct DiskMetric {
     pub mount: String,
+    pub device: String,
+    pub fs_type: String,
     pub total_bytes: u64,
     pub avail_bytes: u64,
     pub used_pct: f64,
@@ -607,6 +609,8 @@ mod tests {
             },
             disk: vec![DiskMetric {
                 mount: "/".into(),
+                device: "/dev/vda1".into(),
+                fs_type: "ext4".into(),
                 total_bytes: 50_000_000_000,
                 avail_bytes: 30_000_000_000,
                 used_pct: 40.0,
@@ -1114,6 +1118,8 @@ mod tests {
             disk: vec![
                 DiskMetric {
                     mount: "/".into(),
+                    device: "/dev/vda1".into(),
+                    fs_type: "ext4".into(),
                     total_bytes: 100_000_000_000,
                     avail_bytes: 50_000_000_000,
                     used_pct: 50.0,
@@ -1123,6 +1129,8 @@ mod tests {
                 },
                 DiskMetric {
                     mount: "/data".into(),
+                    device: "/dev/vdb1".into(),
+                    fs_type: "xfs".into(),
                     total_bytes: 500_000_000_000,
                     avail_bytes: 200_000_000_000,
                     used_pct: 60.0,
@@ -1132,6 +1140,8 @@ mod tests {
                 },
                 DiskMetric {
                     mount: "/boot".into(),
+                    device: "/dev/vda2".into(),
+                    fs_type: "ext4".into(),
                     total_bytes: 1_000_000_000,
                     avail_bytes: 500_000_000,
                     used_pct: 50.0,

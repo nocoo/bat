@@ -482,6 +482,123 @@ test.describe("Host detail page", () => {
 		}
 	});
 
+	test("disk fixtures render one same-device donut or separate two-device donuts", async ({
+		page,
+	}, testInfo) => {
+		const fixtures = [
+			{
+				name: "same-device",
+				disks: [
+					{
+						mount: "/mnt/data-01",
+						device: "/dev/vda1",
+						fs_type: "ext4",
+						used_pct: 82,
+						total_bytes: 1000,
+						avail_bytes: 180,
+					},
+					{
+						mount: "/",
+						device: "/dev/vda1",
+						fs_type: "ext4",
+						used_pct: 82,
+						total_bytes: 1000,
+						avail_bytes: 180,
+					},
+					{
+						mount: "/home",
+						device: "/dev/vda1",
+						fs_type: "ext4",
+						used_pct: 82,
+						total_bytes: 1000,
+						avail_bytes: 180,
+					},
+				],
+				expected: 1,
+			},
+			{
+				name: "two-device",
+				disks: [
+					{
+						mount: "/",
+						device: "/dev/vda1",
+						fs_type: "ext4",
+						used_pct: 72,
+						total_bytes: 1000,
+						avail_bytes: 280,
+					},
+					{
+						mount: "/data",
+						device: "/dev/vdb1",
+						fs_type: "xfs",
+						used_pct: 95,
+						total_bytes: 2000,
+						avail_bytes: 100,
+					},
+				],
+				expected: 2,
+			},
+		] as const;
+
+		for (const fixture of fixtures) {
+			await page.route("**/api/hosts/*/metrics?*", async (route) => {
+				const response = await route.fetch();
+				const original = await response.json();
+				await route.fulfill({
+					response,
+					json: {
+						...original,
+						data: [
+							{
+								...original.data[0],
+								disk_json: JSON.stringify(fixture.disks),
+							},
+						],
+					},
+				});
+			});
+
+			for (const width of [1440, 1024, 900]) {
+				await page.setViewportSize({ width, height: 1000 });
+				await page.goto(`/hosts/${alphaHid}`);
+				await expect(page.getByText("Disk Usage", { exact: true })).toBeVisible({
+					timeout: 15_000,
+				});
+
+				const donuts = page.getByTestId("disk-donut");
+				await expect(donuts).toHaveCount(fixture.expected);
+				for (let index = 0; index < fixture.expected; index += 1) {
+					await expect(donuts.nth(index)).toBeVisible();
+				}
+
+				const v4Row = page.getByText("Public IPv4", { exact: true }).locator("..");
+				const v6Row = page.getByText("Public IPv6", { exact: true }).locator("..");
+				const v4Right = await v4Row
+					.getByTestId("ip-address-row-value")
+					.evaluate((element) => element.getBoundingClientRect().right);
+				const v6Right = await v6Row
+					.getByTestId("ip-address-row-value")
+					.evaluate((element) => element.getBoundingClientRect().right);
+				expect(Math.abs(v4Right - v6Right)).toBeLessThanOrEqual(1);
+
+				const eth0 = page.getByTestId("host-interface-eth0");
+				await expect(eth0.getByText("eth0", { exact: true })).toBeVisible();
+				await expect(eth0.locator("svg").first()).toBeVisible();
+				await expect(eth0.getByText("v4", { exact: true }).first()).toBeVisible();
+				await expect(eth0.getByText("v6", { exact: true }).first()).toBeVisible();
+
+				await page
+					.getByText("Disk Usage", { exact: true })
+					.locator("..")
+					.screenshot({
+						path: testInfo.outputPath(`disk-${fixture.name}-${width}.png`),
+					});
+			}
+
+			await page.unrouteAll({ behavior: "wait" });
+		}
+	});
+
 	test("keyboard activation copies the literal", async ({ page, context }) => {
 		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
 		await page.goto(`/hosts/${alphaHid}`);

@@ -4,10 +4,8 @@ const REAL_FS_TYPES: &[&str] = &["ext4", "xfs", "btrfs", "overlay", "zfs", "f2fs
 /// A parsed mount entry from `/proc/mounts`.
 #[derive(Debug, Clone)]
 pub struct MountEntry {
-    #[allow(dead_code)]
     pub device: String,
     pub mount_point: String,
-    #[allow(dead_code)]
     pub fs_type: String,
 }
 
@@ -106,6 +104,8 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
 
             results.push(DiskInfo {
                 mount: mount.mount_point.clone(),
+                device: mount.device.clone(),
+                fs_type: mount.fs_type.clone(),
                 total_bytes: total,
                 avail_bytes: avail,
                 used_pct,
@@ -123,6 +123,8 @@ pub fn collect_disk(mounts: &[MountEntry]) -> Vec<DiskInfo> {
 #[derive(Debug)]
 pub struct DiskInfo {
     pub mount: String,
+    pub device: String,
+    pub fs_type: String,
     pub total_bytes: u64,
     pub avail_bytes: u64,
     pub used_pct: f64,

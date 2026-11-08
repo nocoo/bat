@@ -73,12 +73,76 @@ describe("transformNetData", () => {
 });
 
 describe("transformDiskData", () => {
-	test("uses last data point's disk_json", () => {
+	test("uses the latest disk_json and groups same-device mounts", () => {
 		const json = JSON.stringify([
-			{ mount: "/", used_pct: 80, total_bytes: 1000, avail_bytes: 200 },
+			{
+				mount: "/mnt/data-01",
+				device: "/dev/vda1",
+				fs_type: "ext4",
+				used_pct: 80,
+				total_bytes: 1000,
+				avail_bytes: 200,
+			},
+			{
+				mount: "/",
+				device: "/dev/vda1",
+				fs_type: "ext4",
+				used_pct: 80,
+				total_bytes: 1000,
+				avail_bytes: 200,
+			},
+			{
+				mount: "/home",
+				device: "/dev/vda1",
+				fs_type: "ext4",
+				used_pct: 80,
+				total_bytes: 1000,
+				avail_bytes: 200,
+			},
 		]);
 		expect(transformDiskData([dp({ ts: 1 }), dp({ ts: 2, disk_json: json })])).toEqual([
-			{ mount: "/", used_pct: 80, total_bytes: 1000, avail_bytes: 200 },
+			{
+				key: "device:/dev/vda1",
+				mounts: ["/", "/home", "/mnt/data-01"],
+				device: "/dev/vda1",
+				fs_type: "ext4",
+				used_pct: 80,
+				total_bytes: 1000,
+				avail_bytes: 200,
+			},
+		]);
+	});
+
+	test("keeps different devices separate even with identical sizes", () => {
+		const json = JSON.stringify([
+			{ mount: "/data", device: "/dev/vdb1", used_pct: 60, total_bytes: 1000, avail_bytes: 400 },
+			{ mount: "/", device: "/dev/vda1", used_pct: 40, total_bytes: 1000, avail_bytes: 600 },
+		]);
+		expect(transformDiskData([dp({ disk_json: json })]).map((disk) => disk.mounts)).toEqual([
+			["/"],
+			["/data"],
+		]);
+	});
+
+	test("falls back to unambiguous size pairs for legacy data", () => {
+		const json = JSON.stringify([
+			{ mount: "/", used_pct: 40, total_bytes: 1000, avail_bytes: 600 },
+			{ mount: "/data", used_pct: 60, total_bytes: 2000, avail_bytes: 800 },
+		]);
+		expect(transformDiskData([dp({ disk_json: json })]).map((disk) => disk.mounts)).toEqual([
+			["/"],
+			["/data"],
+		]);
+	});
+
+	test("does not collapse ambiguous legacy size pairs", () => {
+		const json = JSON.stringify([
+			{ mount: "/", used_pct: 50, total_bytes: 1000, avail_bytes: 500 },
+			{ mount: "/home", used_pct: 50, total_bytes: 1000, avail_bytes: 500 },
+		]);
+		expect(transformDiskData([dp({ disk_json: json })]).map((disk) => disk.mounts)).toEqual([
+			["/"],
+			["/home"],
 		]);
 	});
 

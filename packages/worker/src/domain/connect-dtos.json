@@ -717,6 +717,12 @@
 			"mount": {
 				"type": "string"
 			},
+			"device": {
+				"type": "string"
+			},
+			"fs_type": {
+				"type": "string"
+			},
 			"total_bytes": {
 				"type": "number"
 			},

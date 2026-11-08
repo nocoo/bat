@@ -81,9 +81,12 @@ export function transformNetData(
 	});
 }
 
-// --- Disk Bars ---
+// --- Disk Usage ---
 export interface DiskBarEntry {
-	mount: string;
+	key: string;
+	mounts: string[];
+	device?: string;
+	fs_type?: string;
 	used_pct: number;
 	total_bytes: number;
 	avail_bytes: number;
@@ -91,21 +94,24 @@ export interface DiskBarEntry {
 
 interface DiskJsonEntry {
 	mount: string;
+	device?: string;
+	fs_type?: string;
 	used_pct: number;
 	total_bytes: number;
-	avail_bytes: number;
+	avail_bytes?: number;
+	available_bytes?: number;
 }
 
 /**
- * Parse disk_json from the latest data point.
- * Returns parsed disk entries or empty array on parse failure.
+ * Parse disk_json from the latest data point and group mounts that identify
+ * the same filesystem. Legacy entries are grouped only when their size pair
+ * is unambiguous.
  */
 export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
 	if (data.length === 0) {
 		return [];
 	}
 
-	// Use last data point for current disk status
 	const latest = data[data.length - 1];
 	if (!latest?.disk_json) {
 		return [];
@@ -113,12 +119,59 @@ export function transformDiskData(data: MetricsDataPoint[]): DiskBarEntry[] {
 
 	try {
 		const entries = JSON.parse(latest.disk_json) as DiskJsonEntry[];
-		return entries.map((e) => ({
-			mount: e.mount,
-			used_pct: e.used_pct ?? 0,
-			total_bytes: e.total_bytes ?? 0,
-			avail_bytes: e.avail_bytes ?? 0,
-		}));
+		const normalized = entries
+			.map((entry) => ({
+				mount: entry.mount,
+				device: entry.device?.trim() || undefined,
+				fs_type: entry.fs_type?.trim() || undefined,
+				used_pct: entry.used_pct ?? 0,
+				total_bytes: entry.total_bytes ?? 0,
+				avail_bytes: entry.avail_bytes ?? entry.available_bytes ?? 0,
+			}))
+			.sort((a, b) => a.mount.localeCompare(b.mount));
+
+		const groups = new Map<string, DiskBarEntry>();
+		const legacyCounts = new Map<string, number>();
+		for (const entry of normalized) {
+			if (!entry.device) {
+				const sizeKey = `${entry.total_bytes}:${entry.avail_bytes}`;
+				legacyCounts.set(sizeKey, (legacyCounts.get(sizeKey) ?? 0) + 1);
+			}
+		}
+
+		for (const entry of normalized) {
+			let key: string;
+			if (entry.device) {
+				key = `device:${entry.device}`;
+			} else {
+				const sizeKey = `${entry.total_bytes}:${entry.avail_bytes}`;
+				key = (legacyCounts.get(sizeKey) ?? 0) === 1 ? `size:${sizeKey}` : `mount:${entry.mount}`;
+			}
+
+			const existing = groups.get(key);
+			if (existing) {
+				if (!existing.mounts.includes(entry.mount)) {
+					existing.mounts.push(entry.mount);
+				}
+				existing.mounts.sort((a, b) => a.localeCompare(b));
+			} else {
+				groups.set(key, {
+					key,
+					mounts: [entry.mount],
+					device: entry.device,
+					fs_type: entry.fs_type,
+					used_pct: entry.used_pct,
+					total_bytes: entry.total_bytes,
+					avail_bytes: entry.avail_bytes,
+				});
+			}
+		}
+
+		return [...groups.values()].sort((a, b) => {
+			const mountA = a.mounts[0] ?? "";
+			const mountB = b.mounts[0] ?? "";
+			return mountA.localeCompare(mountB);
+		});
 	} catch {
 		return [];
 	}

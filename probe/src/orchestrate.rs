@@ -202,6 +202,8 @@ pub fn convert_disk_infos(infos: Vec<collectors::disk::DiskInfo>) -> Vec<DiskMet
         .into_iter()
         .map(|d| DiskMetric {
             mount: d.mount,
+            device: d.device,
+            fs_type: d.fs_type,
             total_bytes: d.total_bytes,
             avail_bytes: d.avail_bytes,
             used_pct: d.used_pct,
@@ -1074,6 +1076,8 @@ mod tests {
         };
         let disk = vec![DiskMetric {
             mount: "/".into(),
+            device: "/dev/vda1".into(),
+            fs_type: "ext4".into(),
             total_bytes: 100,
             avail_bytes: 50,
             used_pct: 50.0,
@@ -1194,6 +1198,8 @@ mod tests {
         use collectors::disk::DiskInfo;
         let infos = vec![DiskInfo {
             mount: "/data".into(),
+            device: "/dev/vdb1".into(),
+            fs_type: "xfs".into(),
             total_bytes: 1000,
             avail_bytes: 400,
             used_pct: 60.0,
@@ -1204,6 +1210,8 @@ mod tests {
         let metrics = convert_disk_infos(infos);
         assert_eq!(metrics.len(), 1);
         assert_eq!(metrics[0].mount, "/data");
+        assert_eq!(metrics[0].device, "/dev/vdb1");
+        assert_eq!(metrics[0].fs_type, "xfs");
         assert_eq!(metrics[0].total_bytes, 1000);
     }
 

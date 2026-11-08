@@ -56,6 +56,8 @@ export interface SwapMetrics {
 
 export interface DiskMetric {
 	mount: string;
+	device?: string;
+	fs_type?: string;
 	total_bytes: number;
 	avail_bytes: number;
 	used_pct: number;
