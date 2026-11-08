@@ -98,7 +98,7 @@ try {
 		).json();
 		assert.equal(raw.resolution, "raw");
 		assert.equal(raw.data.length, 120);
-		rawHistory.push(raw.data);
+		rawHistory.push({ host_id: host.host_id, data: raw.data });
 
 		const hourly = await (
 			await fetch(
@@ -107,7 +107,7 @@ try {
 		).json();
 		assert.equal(hourly.resolution, "hourly");
 		assert.equal(hourly.data.length, 24);
-		hourlyHistory.push(hourly.data);
+		hourlyHistory.push({ host_id: host.host_id, data: hourly.data });
 
 		const tier2Response = await fetch(`${prefix}/api/hosts/${host.host_id}/tier2`);
 		assert.equal(tier2Response.status, 200);
@@ -116,8 +116,27 @@ try {
 	const template = hostsProjection(details[0]);
 	for (const detail of details.slice(1)) assert.deepEqual(hostsProjection(detail), template);
 	assert.equal(new Set(details.map((detail) => detail.public_ip)).size, 8);
-	for (const history of rawHistory.slice(1)) assert.deepEqual(history, rawHistory[0]);
-	for (const history of hourlyHistory.slice(1)) assert.deepEqual(history, hourlyHistory[0]);
+	// The second alias also reports the captured second filesystem; every other
+	// alias shares the merged primary filesystem.
+	const secondFilesystemHostId = SERVER_ALIASES[1].host_id;
+	const primaryRaw = rawHistory.find((entry) => entry.host_id !== secondFilesystemHostId);
+	const primaryHourly = hourlyHistory.find((entry) => entry.host_id !== secondFilesystemHostId);
+	for (const entry of rawHistory) {
+		if (entry.host_id === secondFilesystemHostId) {
+			continue;
+		}
+		assert.deepEqual(entry.data, primaryRaw.data);
+	}
+	for (const entry of hourlyHistory) {
+		if (entry.host_id === secondFilesystemHostId) {
+			continue;
+		}
+		assert.deepEqual(entry.data, primaryHourly.data);
+	}
+	for (const entry of rawHistory) {
+		const devices = new Set(JSON.parse(entry.data.at(-1).disk_json).map((disk) => disk.device));
+		assert.equal(devices.size, entry.host_id === secondFilesystemHostId ? 2 : 1);
+	}
 	for (const tier2 of tier2History.slice(1)) {
 		assert.deepEqual({ ...tier2, host_id: null }, { ...tier2History[0], host_id: null });
 	}
