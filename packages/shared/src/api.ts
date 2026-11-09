@@ -77,6 +77,12 @@ export interface HostOverviewItem {
 	cpu_load1: number | null;
 	swap_used_pct: number | null;
 	disk_root_used_pct: number | null;
+	/** Size of the root mount's filesystem in bytes. Null when the probe
+	 *  reported no root filesystem. */
+	disk_root_total_bytes: number | null;
+	/** Free-text note about the host (at most 200 characters). Null when the
+	 *  host carries none — the list then shows no description affordance. */
+	description: string | null;
 	net_rx_rate: number | null; // bytes/sec aggregate
 	net_tx_rate: number | null; // bytes/sec aggregate
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
