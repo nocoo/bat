@@ -20,7 +20,7 @@ import {
 } from "@/components/charts";
 import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
-import { HostCostCard } from "@/components/host-cost-card";
+import { HostContractCard } from "@/components/host-contract-card";
 import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { HostInterfaceAddresses } from "@/components/host-interface-addresses";
 import { HostPublicAddress } from "@/components/host-public-address";
@@ -344,7 +344,7 @@ export function HostDetailPage() {
 							</LayerCard>
 						)}
 						{detail && (
-							<HostCostCard
+							<HostContractCard
 								hid={hid}
 								billing={{
 									cost_amount_cny: detail.cost_amount_cny,

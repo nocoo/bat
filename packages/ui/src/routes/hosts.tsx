@@ -192,10 +192,9 @@ export function HostsPage() {
 				title="Hosts"
 				description="Monitored servers and real-time infrastructure status."
 				actions={
-					<div className="flex flex-wrap items-center gap-basalt-space-lg">
-						<HostsViewSwitch view={view} onChange={handleViewChange} />
+					<div className="flex items-center justify-end gap-basalt-space-md whitespace-nowrap">
 						<Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
-							<SelectTrigger aria-label="Sort hosts">
+							<SelectTrigger aria-label="Sort hosts" className="w-[9.5rem] shrink-0">
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -206,6 +205,7 @@ export function HostsPage() {
 								))}
 							</SelectContent>
 						</Select>
+						<HostsViewSwitch view={view} onChange={handleViewChange} />
 					</div>
 				}
 				filters={
@@ -249,7 +249,10 @@ export function HostsPage() {
 					</div>
 				</div>
 			) : (
-				<LayerCard data-testid="host-list">
+				<LayerCard
+					data-testid="host-list"
+					className="animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
+				>
 					<LayerCard.Header>
 						<h2>Servers</h2>
 						<span className="text-basalt-sm text-basalt-muted-foreground">

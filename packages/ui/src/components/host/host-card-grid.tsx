@@ -11,6 +11,9 @@ import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
 	dailyCostCny,
 	daysUntilRenewal,
+	formatBandwidthMbps,
+	formatResetDay,
+	formatTrafficQuotaGb,
 	hashHostId,
 	renewalBadgeLabel,
 	renewalTone,
@@ -125,7 +128,7 @@ export function HostCardGrid({
 			className="grid auto-rows-fr grid-cols-1 items-stretch gap-basalt-layout-sm sm:grid-cols-2 2xl:grid-cols-3"
 			data-testid="host-card-grid"
 		>
-			{hosts.map((host) => {
+			{hosts.map((host, index) => {
 				const tags = tagsFor(host.host_id) ?? [];
 				const visibleTags = tags.slice(0, MAX_VISIBLE_TAGS);
 				const daysLeft = daysUntilRenewal(host.renews_at, today);
@@ -136,9 +139,11 @@ export function HostCardGrid({
 				return (
 					<LayerCard
 						key={host.host_id}
-						className="group relative h-full"
+						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
 						padding="sm"
 						data-testid="host-card"
+						data-view-enter="true"
+						style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
 					>
 						<Link
 							to={`/hosts/${hashHostId(host.host_id)}`}
@@ -238,6 +243,15 @@ export function HostCardGrid({
 									value={`↓ ${formatNetRate(host.net_rx_rate)} · ↑ ${formatNetRate(host.net_tx_rate)}`}
 								/>
 								<MetricRow label="Uptime" value={formatUptime(host.uptime_seconds)} />
+								<MetricRow
+									label="Bandwidth"
+									value={formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}
+								/>
+								<MetricRow
+									label="Traffic"
+									value={formatTrafficQuotaGb(host.traffic_quota_gb) ?? "—"}
+								/>
+								<MetricRow label="Reset" value={formatResetDay(host.traffic_reset_day) ?? "—"} />
 							</div>
 						</div>
 					</LayerCard>

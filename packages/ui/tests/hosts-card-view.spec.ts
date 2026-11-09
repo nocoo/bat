@@ -33,6 +33,31 @@ async function overflowDelta(page: import("@playwright/test").Page): Promise<num
 }
 
 test.describe("Hosts card view", () => {
+	test("the header keeps sort and the view switch on one row", async ({ page }) => {
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 900 });
+			await page.goto("/hosts");
+			await expect(page.getByTestId("host-row").first()).toBeVisible({ timeout: 15_000 });
+
+			const geometry = await page.evaluate(() => {
+				const sort = document.querySelector('[aria-label="Sort hosts"]');
+				const view = document.querySelector('[aria-label="Hosts view"]');
+				if (!sort || !view) return null;
+				const a = sort.getBoundingClientRect();
+				const b = view.getBoundingClientRect();
+				return {
+					sameRow: Math.abs(a.y - b.y) <= 2,
+					sortLeftOfView: a.right <= b.left,
+					gap: Math.round(b.left - a.right),
+					sortWidth: Math.round(a.width),
+				};
+			});
+			expect(geometry).not.toBeNull();
+			expect(geometry?.sameRow).toBe(true);
+			expect(geometry?.sortLeftOfView).toBe(true);
+		}
+	});
+
 	test("the switch swaps views and persists across reloads", async ({ page }) => {
 		await page.goto("/hosts");
 		const table = page.getByRole("table", { name: "Servers" });
@@ -85,6 +110,15 @@ test.describe("Hosts card view", () => {
 		await expect(tooltip).toContainText("Primary ingress");
 		await expect(page).toHaveURL(/\/hosts$/);
 
+		// The contract rows sit after the live metrics, formatted by the
+		// shared formatters, dashed when the host carries no contract.
+		const beta = grid.getByTestId("host-card").filter({ hasText: "beta.test.local" });
+		await expect(alpha.getByText("Bandwidth", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("Traffic", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("Reset", { exact: true })).toBeVisible();
+		await expect(beta.getByText("Bandwidth", { exact: true })).toBeVisible();
+		await expect(beta).toContainText("—");
+
 		// The card itself is one link to the detail page.
 		await grid.getByTestId("host-card").filter({ hasText: "beta.test.local" }).click();
 		await expect(page).toHaveURL(new RegExp(`/hosts/${betaHid}`));
@@ -131,6 +165,8 @@ test.describe("Hosts card view", () => {
 
 		for (const width of [1440, 1024]) {
 			await page.setViewportSize({ width, height: 900 });
+			// Let the staggered entrance settle before measuring geometry.
+			await page.waitForTimeout(500);
 			await expect.poll(() => overflowDelta(page)).toBeLessThanOrEqual(0);
 
 			const geometry = await grid.evaluate((element) => {
@@ -172,6 +208,40 @@ test.describe("Hosts card view", () => {
 				fullPage: true,
 			});
 		}
+	});
+
+	test("switching views animates the entrance and honors reduced motion", async ({ page }) => {
+		await page.goto("/hosts");
+		await expect(page.getByTestId("host-row").first()).toBeVisible({ timeout: 15_000 });
+
+		await page.getByTestId("hosts-view-cards").click();
+		const cards = page.getByTestId("host-card");
+		await expect(cards.first()).toBeVisible();
+		await expect(cards.first()).toHaveClass(/animate-in/);
+
+		// A short stagger — 30ms per index — and one 180ms fade for all.
+		const delays = await cards.evaluateAll((nodes) =>
+			nodes.map((node) => getComputedStyle(node).animationDelay),
+		);
+		const durations = await cards.evaluateAll((nodes) =>
+			nodes.map((node) => getComputedStyle(node).animationDuration),
+		);
+		expect(delays).toEqual(["0s", "0.03s"]);
+		expect(durations).toEqual(["0.18s", "0.18s"]);
+
+		// Switching back fades the table in the same way.
+		await page.getByTestId("hosts-view-table").click();
+		await expect(page.getByTestId("host-list")).toHaveClass(/animate-in/);
+
+		// Under reduced motion nothing moves and nothing staggers.
+		await page.emulateMedia({ reducedMotion: "reduce" });
+		await page.getByTestId("hosts-view-cards").click();
+		await expect(cards.first()).toBeVisible();
+		const names = await cards.evaluateAll((nodes) =>
+			nodes.map((node) => getComputedStyle(node).animationName),
+		);
+		expect(names).toEqual(["none", "none"]);
+		await page.emulateMedia({ reducedMotion: "no-preference" });
 	});
 
 	test("the card view drops the table island and carries the fleet total", async ({ page }) => {
