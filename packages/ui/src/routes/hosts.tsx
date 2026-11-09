@@ -9,15 +9,18 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@nocoo/basalt/components/select";
-import { AlertTriangle, Server } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@nocoo/basalt/components/toggle-group";
+import { AlertTriangle, LayoutGrid, Server, Table2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { FleetCostTotal } from "@/components/host/fleet-cost-total";
+import { HostCardGrid } from "@/components/host/host-card-grid";
 import { HostTable } from "@/components/host/host-table";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { useHosts, useHostTags, useTags } from "@/hooks";
-import { fleetCostSummary, formatCny } from "@/lib/billing-format";
+import { type HostsView, isHostsView, loadHostsView, saveHostsView } from "@/lib/host-view";
 import { chart } from "@/lib/palette";
 
 type SortKey = "name-asc" | "name-desc" | "cpu" | "mem" | "disk";
@@ -103,25 +106,31 @@ function summaryItems(hosts: readonly HostOverviewItem[]): ReadingItem[] {
 	];
 }
 
-/** The daily cost of the visible fleet and its monthly equivalent. */
-function FleetCost({ hosts }: { hosts: readonly HostOverviewItem[] }) {
-	const summary = fleetCostSummary(hosts);
-	if (summary.pricedHosts === 0) {
-		return null;
-	}
+/** The table / cards switch for the hosts list. */
+function HostsViewSwitch({
+	view,
+	onChange,
+}: {
+	view: HostsView;
+	onChange: (view: HostsView) => void;
+}) {
 	return (
-		<div
-			className="flex flex-wrap items-baseline gap-basalt-space-sm text-basalt-sm"
-			data-testid="fleet-cost"
+		<ToggleGroup
+			type="single"
+			value={view}
+			onValueChange={(next) => {
+				// A single-toggle group can also be deselected; keep a view chosen.
+				if (isHostsView(next)) onChange(next);
+			}}
+			aria-label="Hosts view"
 		>
-			<span className="font-mono text-basalt-base font-semibold tabular-nums">
-				{formatCny(summary.dailyCny)}/day
-			</span>
-			<span className="text-basalt-muted-foreground">≈ {formatCny(summary.monthlyCny)}/month</span>
-			<span className="text-basalt-muted-foreground">
-				{summary.pricedHosts}/{summary.totalHosts} priced
-			</span>
-		</div>
+			<ToggleGroupItem value="table" aria-label="Table view" data-testid="hosts-view-table">
+				<Table2 className="size-4" strokeWidth={1.5} aria-hidden="true" />
+			</ToggleGroupItem>
+			<ToggleGroupItem value="cards" aria-label="Card view" data-testid="hosts-view-cards">
+				<LayoutGrid className="size-4" strokeWidth={1.5} aria-hidden="true" />
+			</ToggleGroupItem>
+		</ToggleGroup>
 	);
 }
 
@@ -131,11 +140,17 @@ export function HostsPage() {
 	const { data: allTags } = useTags();
 	const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 	const [sortKey, setSortKey] = useState<SortKey>("name-asc");
+	const [view, setView] = useState<HostsView>(loadHostsView);
 
 	const handleToggleTag = useCallback((tagId: number) => {
 		setSelectedTagIds((prev) =>
 			prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId],
 		);
+	}, []);
+
+	const handleViewChange = useCallback((next: HostsView) => {
+		setView(next);
+		saveHostsView(next);
 	}, []);
 
 	const filteredHosts = useMemo(() => {
@@ -178,7 +193,7 @@ export function HostsPage() {
 				description="Monitored servers and real-time infrastructure status."
 				actions={
 					<div className="flex flex-wrap items-center gap-basalt-space-lg">
-						<FleetCost hosts={filteredHosts} />
+						<HostsViewSwitch view={view} onChange={handleViewChange} />
 						<Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
 							<SelectTrigger aria-label="Sort hosts">
 								<SelectValue />
@@ -219,6 +234,17 @@ export function HostsPage() {
 							Clear filters
 						</Button>
 					</LayerCard.Body>
+				) : view === "cards" ? (
+					<div className="flex flex-col gap-basalt-layout-sm">
+						<HostCardGrid
+							hosts={filteredHosts}
+							tagsFor={(hostId) => hostTagsMap?.[hostId]}
+							now={now}
+						/>
+						<div className="flex justify-end" data-testid="host-card-footer">
+							<FleetCostTotal hosts={filteredHosts} />
+						</div>
+					</div>
 				) : (
 					<HostTable hosts={filteredHosts} tagsFor={(hostId) => hostTagsMap?.[hostId]} now={now} />
 				)}
