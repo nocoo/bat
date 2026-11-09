@@ -419,6 +419,49 @@ describe("recorded Demo SQL catalog", () => {
 		}
 	});
 
+	test("gives the aliases varied contract data with independent fields", () => {
+		const rows = db
+			.query(
+				"SELECT host_id,bandwidth_mbps,traffic_quota_gb,traffic_reset_day FROM hosts ORDER BY host_id",
+			)
+			.all();
+		const byHost = new Map(rows.map((row) => [row.host_id, row]));
+
+		// Every display state is visible: Mbps below the gigabit switch, at it,
+		// and a fractional gigabit above it.
+		const bandwidths = rows.map((row) => row.bandwidth_mbps).filter((value) => value !== null);
+		expect(bandwidths).toContain(100);
+		expect(bandwidths).toContain(500);
+		expect(bandwidths).toContain(1000);
+		expect(bandwidths).toContain(2500);
+
+		// Quotas in GB and several reset days, each independent of the rest.
+		const quotas = rows.map((row) => row.traffic_quota_gb).filter((value) => value !== null);
+		expect(quotas).toContain(500);
+		expect(quotas).toContain(1000);
+		expect(quotas).toContain(2000);
+		const resetDays = rows.map((row) => row.traffic_reset_day).filter((value) => value !== null);
+		for (const day of [1, 5, 15, 28]) {
+			expect(resetDays).toContain(day);
+		}
+
+		// A host may carry a bandwidth without a quota or reset day.
+		const beta = byHost.get("pw-host-beta");
+		expect(beta.bandwidth_mbps).toBe(100);
+		expect(beta.traffic_quota_gb).toBeNull();
+		expect(beta.traffic_reset_day).toBeNull();
+
+		// Two aliases carry no contract data at all — one with billing, one
+		// without, so partial states never read as the whole story.
+		const empty = rows.filter(
+			(row) =>
+				row.bandwidth_mbps === null &&
+				row.traffic_quota_gb === null &&
+				row.traffic_reset_day === null,
+		);
+		expect(empty.length).toBe(2);
+	});
+
 	test("seeds varied tags and a few descriptions so the list shows both", () => {
 		const tags = db.query("SELECT id,name,color FROM tags ORDER BY id").all();
 		expect(tags.length).toBeGreaterThanOrEqual(8);

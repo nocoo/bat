@@ -61,6 +61,21 @@ const BILLING_BY_HOST = {
 	"demo-server-08": { amount: 30, paidOffsetDays: -15, renewsOffsetDays: 15 },
 };
 
+// Manual contract inputs per demo alias, so a reviewer sees every display
+// state at once: Mbps below and above the gigabit switch, a fractional
+// gigabit, quotas in GB, several reset days — and aliases that carry none of
+// it, or only part of it, because each field is independent of the others.
+const CONTRACT_BY_HOST = {
+	"pw-host-alpha": { bandwidthMbps: 2500, trafficQuotaGb: 500, resetDay: 1 },
+	"pw-host-beta": { bandwidthMbps: 100, trafficQuotaGb: null, resetDay: null },
+	"demo-server-03": { bandwidthMbps: 500, trafficQuotaGb: 1000, resetDay: 15 },
+	"demo-server-04": { bandwidthMbps: 100, trafficQuotaGb: 500, resetDay: 5 },
+	"demo-server-05": null,
+	"demo-server-06": null,
+	"demo-server-07": { bandwidthMbps: 1000, trafficQuotaGb: 2000, resetDay: 28 },
+	"demo-server-08": { bandwidthMbps: 500, trafficQuotaGb: null, resetDay: 15 },
+};
+
 const WORKSTATION_INSTALLATION_ID = "30000000-0000-4000-8000-000000000001";
 const WORKSTATION_TOKEN_PREFIX = "batw_fixture";
 
@@ -357,10 +372,21 @@ function aliasBilling(alias, anchor) {
 	};
 }
 
+/** The contract fields of one alias — each one independent, nulls when unset. */
+function aliasContract(alias) {
+	const contract = CONTRACT_BY_HOST[alias.host_id];
+	return {
+		bandwidth_mbps: contract?.bandwidthMbps ?? null,
+		traffic_quota_gb: contract?.trafficQuotaGb ?? null,
+		traffic_reset_day: contract?.resetDay ?? null,
+	};
+}
+
 function hostInsert(recording, alias, aliasIndex, target, anchor) {
 	const detail = recording.server.detail;
 	const lastSeen = ageToEpoch(anchor, detail.last_seen_age_seconds);
 	const billing = aliasBilling(alias, anchor);
+	const contract = aliasContract(alias);
 	return insert(
 		"hosts",
 		[
@@ -396,6 +422,9 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			"cost_amount_cny",
 			"paid_at",
 			"renews_at",
+			"bandwidth_mbps",
+			"traffic_quota_gb",
+			"traffic_reset_day",
 		],
 		[
 			alias.host_id,
@@ -430,6 +459,9 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			billing.cost_amount_cny,
 			billing.paid_at,
 			billing.renews_at,
+			contract.bandwidth_mbps,
+			contract.traffic_quota_gb,
+			contract.traffic_reset_day,
 		],
 	);
 }
