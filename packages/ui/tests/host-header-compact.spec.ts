@@ -78,7 +78,7 @@ for (const theme of ["light", "dark"] as const) {
 		const add = tags.getByRole("button", { name: "Host tags", exact: true });
 		const time = header.getByRole("radiogroup", { name: "Time range", exact: true });
 		const remove = header.getByRole("button", { name: "Delete host", exact: true });
-		await expect(chips).toHaveCount(2);
+		await expect(chips).toHaveCount(3);
 		await expect(add).toHaveText("+ Add");
 		await expect(tags.getByText("Tags", { exact: true })).toHaveCount(0);
 		await expect(tags.locator("svg.lucide-tags")).toHaveCount(0);

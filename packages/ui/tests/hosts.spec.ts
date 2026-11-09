@@ -274,4 +274,31 @@ test.describe("Hosts list page", () => {
 				.toBe(true);
 		}
 	});
+
+	test("the list keeps the identity cell whole at 1024", async ({ page }) => {
+		await page.goto("/hosts");
+		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
+		await expect(alpha).toBeVisible({ timeout: 15_000 });
+
+		await page.setViewportSize({ width: 1280, height: 900 });
+		const table = page.getByRole("table", { name: "Servers" });
+		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeVisible();
+		for (const tag of ["production", "us-east", "edge"]) {
+			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
+		}
+
+		await page.setViewportSize({ width: 1024, height: 900 });
+		// The load column gives way instead of truncating the identity cell.
+		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeHidden();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Expiry" })).toBeVisible();
+		const hostname = alpha.getByRole("link", { name: "alpha.test.local" });
+		await expect(hostname).toBeVisible();
+		await expect
+			.poll(() => hostname.evaluate((element) => element.scrollWidth <= element.clientWidth))
+			.toBe(true);
+		await expect(alpha.getByText("edge", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("production", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("us-east", { exact: true })).toBeHidden();
+		await expect(alpha.getByText("+1", { exact: true })).toBeVisible();
+	});
 });

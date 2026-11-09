@@ -25,12 +25,15 @@ VALUES
 INSERT OR REPLACE INTO tags (id, name, color) VALUES
   (1, 'production', 0),
   (2, 'staging', 3),
-  (3, 'us-east', 5);
+  (3, 'us-east', 5),
+  (4, 'edge', 6);
 
--- Tag assignments
+-- Tag assignments. Alpha carries three tags so the list's wide/narrow tag
+-- caps (three tags at xl, two below) both have a host to exercise.
 INSERT OR REPLACE INTO host_tags (host_id, tag_id) VALUES
   ('pw-host-alpha', 1),
   ('pw-host-alpha', 3),
+  ('pw-host-alpha', 4),
   ('pw-host-beta', 2);
 
 -- Alert states for alpha
