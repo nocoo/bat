@@ -121,20 +121,24 @@ export function renewalTone(days: number | null): RenewalTone {
 	return "muted";
 }
 
-/** Countdown for the detail card: `112 天`, `今天到期`, `已过期 3 天`. */
+/** Countdown for the detail card: `Renews in 112 days`, `Due today`,
+ *  `Overdue by 3 days`. */
 export function renewalCountdownLabel(days: number | null): string | null {
 	if (days === null) return null;
-	if (days < 0) return `已过期 ${-days} 天`;
-	if (days === 0) return "今天到期";
-	return `${days} 天`;
+	if (days < 0) {
+		const late = -days;
+		return `Overdue by ${late} ${late === 1 ? "day" : "days"}`;
+	}
+	if (days === 0) return "Due today";
+	return `Renews in ${days} ${days === 1 ? "day" : "days"}`;
 }
 
-/** Countdown badge for the host list: `剩 112 天`, `今天到期`, `已过期 3 天`. */
+/** Countdown badge for the host list: `112d left`, `due today`, `3d overdue`. */
 export function renewalBadgeLabel(days: number | null): string | null {
 	if (days === null) return null;
-	if (days < 0) return `已过期 ${-days} 天`;
-	if (days === 0) return "今天到期";
-	return `剩 ${days} 天`;
+	if (days < 0) return `${-days}d overdue`;
+	if (days === 0) return "due today";
+	return `${days}d left`;
 }
 
 /** Days in an average year — the bridge from a daily rate to a monthly one. */
@@ -289,24 +293,39 @@ export function formatTrafficQuotaGb(gb: number | null | undefined): string | nu
 	return `${gb} GB`;
 }
 
+/** The day of month as an English ordinal: `1st`, `2nd`, `3rd`, `21st`. */
+export function ordinalDayOfMonth(day: number | null | undefined): string | null {
+	if (day === null || day === undefined || !Number.isInteger(day)) return null;
+	const tens = day % 100;
+	if (tens >= 11 && tens <= 13) return `${day}th`;
+	switch (day % 10) {
+		case 1:
+			return `${day}st`;
+		case 2:
+			return `${day}nd`;
+		case 3:
+			return `${day}rd`;
+		default:
+			return `${day}th`;
+	}
+}
+
 /**
- * The day the traffic counter resets, in the dashboard's calendar words:
- * `每月 1 日`. The countdown labels are Chinese, so the contract day speaks
- * the same language everywhere it appears.
+ * The day the traffic counter resets, compactly: `1st`. Cells that have
+ * room use the sentence form instead.
  */
 export function formatResetDayCompact(day: number | null | undefined): string | null {
-	if (day === null || day === undefined || !Number.isInteger(day)) return null;
-	return `每月 ${day} 日`;
+	return ordinalDayOfMonth(day);
 }
 
-/** The reset-day sentence of the contract card: `每月 1 日重置`. */
+/** The reset-day sentence of the contract card: `resets on the 1st`. */
 export function formatResetDay(day: number | null | undefined): string | null {
-	const compact = formatResetDayCompact(day);
-	return compact === null ? null : `${compact}重置`;
+	const ordinal = ordinalDayOfMonth(day);
+	return ordinal === null ? null : `resets on the ${ordinal}`;
 }
 
-/** The monthly traffic allowance with its period: `500 GB/月`. */
+/** The monthly traffic allowance with its period: `500 GB/mo`. */
 export function formatMonthlyTrafficGb(gb: number | null | undefined): string | null {
 	const quota = formatTrafficQuotaGb(gb);
-	return quota === null ? null : `${quota}/月`;
+	return quota === null ? null : `${quota}/mo`;
 }

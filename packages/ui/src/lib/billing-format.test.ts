@@ -44,7 +44,7 @@ describe("hostCostView", () => {
 		expect(view.periodDays).toBe(365);
 		expect(view.dailyCny).toBeCloseTo(1, 10);
 		expect(view.daysLeft).toBe(102);
-		expect(view.label).toBe("102 天");
+		expect(view.label).toBe("Renews in 102 days");
 		expect(view.tone).toBe("muted");
 	});
 
@@ -54,7 +54,7 @@ describe("hostCostView", () => {
 			"2026-02-03",
 		);
 		expect(view.daysLeft).toBe(-3);
-		expect(view.label).toBe("已过期 3 天");
+		expect(view.label).toBe("Overdue by 3 days");
 		expect(view.tone).toBe("overdue");
 	});
 

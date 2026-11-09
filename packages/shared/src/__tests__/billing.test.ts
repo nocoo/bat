@@ -130,18 +130,18 @@ describe("daysUntilRenewal", () => {
 
 describe("countdown labels", () => {
 	test("labels the remaining days", () => {
-		expect(renewalCountdownLabel(112)).toBe("112 天");
-		expect(renewalBadgeLabel(112)).toBe("剩 112 天");
+		expect(renewalCountdownLabel(112)).toBe("Renews in 112 days");
+		expect(renewalBadgeLabel(112)).toBe("112d left");
 	});
 
 	test("labels the renewal day", () => {
-		expect(renewalCountdownLabel(0)).toBe("今天到期");
-		expect(renewalBadgeLabel(0)).toBe("今天到期");
+		expect(renewalCountdownLabel(0)).toBe("Due today");
+		expect(renewalBadgeLabel(0)).toBe("due today");
 	});
 
 	test("labels an overdue renewal", () => {
-		expect(renewalCountdownLabel(-3)).toBe("已过期 3 天");
-		expect(renewalBadgeLabel(-3)).toBe("已过期 3 天");
+		expect(renewalCountdownLabel(-3)).toBe("Overdue by 3 days");
+		expect(renewalBadgeLabel(-3)).toBe("3d overdue");
 	});
 
 	test("has no label without a countdown", () => {
@@ -413,25 +413,25 @@ describe("formatTrafficQuotaGb", () => {
 
 describe("reset-day labels", () => {
 	test("the compact form names the day of month", () => {
-		expect(formatResetDayCompact(1)).toBe("每月 1 日");
-		expect(formatResetDayCompact(15)).toBe("每月 15 日");
-		expect(formatResetDayCompact(28)).toBe("每月 28 日");
-		expect(formatResetDayCompact(31)).toBe("每月 31 日");
+		expect(formatResetDayCompact(1)).toBe("1st");
+		expect(formatResetDayCompact(15)).toBe("15th");
+		expect(formatResetDayCompact(28)).toBe("28th");
+		expect(formatResetDayCompact(31)).toBe("31st");
 		expect(formatResetDayCompact(null)).toBeNull();
 	});
 
 	test("the sentence form is consistent", () => {
-		expect(formatResetDay(1)).toBe("每月 1 日重置");
-		expect(formatResetDay(15)).toBe("每月 15 日重置");
-		expect(formatResetDay(28)).toBe("每月 28 日重置");
+		expect(formatResetDay(1)).toBe("resets on the 1st");
+		expect(formatResetDay(15)).toBe("resets on the 15th");
+		expect(formatResetDay(28)).toBe("resets on the 28th");
 		expect(formatResetDay(null)).toBeNull();
 	});
 });
 
 describe("formatMonthlyTrafficGb", () => {
 	test("keeps the allowance and its period together", () => {
-		expect(formatMonthlyTrafficGb(500)).toBe("500 GB/月");
-		expect(formatMonthlyTrafficGb(2000)).toBe("2000 GB/月");
+		expect(formatMonthlyTrafficGb(500)).toBe("500 GB/mo");
+		expect(formatMonthlyTrafficGb(2000)).toBe("2000 GB/mo");
 		expect(formatMonthlyTrafficGb(null)).toBeNull();
 	});
 });
