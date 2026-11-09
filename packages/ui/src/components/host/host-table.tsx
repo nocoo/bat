@@ -92,11 +92,11 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 				<Button
 					variant="ghost"
 					size="sm"
-					className="size-5 shrink-0 rounded-basalt-full p-0 text-basalt-muted-foreground hover:text-basalt-foreground"
+					className="size-4 shrink-0 rounded-basalt-full p-0 text-basalt-muted-foreground hover:text-basalt-foreground"
 					aria-label={`Description of ${hostname}`}
 					data-testid="host-description"
 				>
-					<Info className="size-4" strokeWidth={1.5} aria-hidden="true" />
+					<Info className="size-3.5" strokeWidth={1.5} aria-hidden="true" />
 				</Button>
 			</TooltipTrigger>
 			<TooltipContent
@@ -176,17 +176,17 @@ export function HostTable({
 			>
 				<TableHeader>
 					<TableRow>
-						<TableHead className="lg:w-[28%] xl:w-[28%] 2xl:w-[24%]">Server</TableHead>
+						<TableHead className="lg:w-[31.5%] xl:w-[28%] 2xl:w-[24%]">Server</TableHead>
 						<TableHead className="lg:w-[11%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
 							Status
 						</TableHead>
-						<TableHead className="lg:w-[10%] xl:w-[10%] 2xl:w-[10%]" textAlign="end">
+						<TableHead className="lg:w-[10%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
 							CPU
 						</TableHead>
-						<TableHead className="lg:w-[11.5%] xl:w-[12%] 2xl:w-[12%]" textAlign="end">
+						<TableHead className="lg:w-[7.5%] xl:w-[10%] 2xl:w-[11%]" textAlign="end">
 							Memory
 						</TableHead>
-						<TableHead className="lg:w-[8%] xl:w-[7.5%] 2xl:w-[7%]" textAlign="end">
+						<TableHead className="lg:w-[7.5%] xl:w-[7.5%] 2xl:w-[7%]" textAlign="end">
 							Disk
 						</TableHead>
 						<TableHead className="hidden 2xl:table-cell 2xl:w-[7%]" textAlign="end">
@@ -195,10 +195,10 @@ export function HostTable({
 						<TableHead className="lg:w-[11%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
 							Expiry
 						</TableHead>
-						<TableHead className="lg:w-[12%] xl:w-[11%] 2xl:w-[10%]" textAlign="end">
+						<TableHead className="lg:w-[11.5%] xl:w-[11%] 2xl:w-[10%]" textAlign="end">
 							Cost
 						</TableHead>
-						<TableHead className="lg:w-[10%] xl:w-[13.5%] 2xl:w-[16%]" textAlign="end">
+						<TableHead className="lg:w-[10%] xl:w-[13.5%] 2xl:w-[14%]" textAlign="end">
 							Link
 						</TableHead>
 					</TableRow>
@@ -212,7 +212,7 @@ export function HostTable({
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
-									<div className="flex min-w-0 items-start gap-basalt-space-md">
+									<div className="flex min-w-0 items-start gap-basalt-space-xs">
 										<span
 											aria-hidden="true"
 											className={`mt-basalt-space-md size-2 shrink-0 rounded-basalt-full ${statusDotColor(host.status)}`}
