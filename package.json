@@ -26,7 +26,8 @@
 		"test:environments": "bun scripts/environments/verify.mjs",
 		"test:environments:unit": "bun test scripts/environments/",
 		"capture:environments": "bun scripts/environments/capture.mjs",
-		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive"
+		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive",
+		"test:l1-gate": "bun scripts/verify-l1-gate.mjs"
 	},
 	"trustedDependencies": [
 		"@biomejs/biome",
