@@ -116,6 +116,38 @@ try {
 	const template = hostsProjection(details[0]);
 	for (const detail of details.slice(1)) assert.deepEqual(hostsProjection(detail), template);
 	assert.equal(new Set(details.map((detail) => detail.public_ip)).size, 8);
+
+	// The demo catalog carries varied billing: every alias that has billing
+	// data shows the three inputs together, and the priced count matches the
+	// number of aliases the catalog seeds.
+	const pricedHosts = hosts.filter((host) => host.renews_at !== null);
+	assert.equal(pricedHosts.length, 6);
+	assert.equal(hosts.length - pricedHosts.length, 2);
+	for (const detail of details) {
+		const set = [detail.cost_amount_cny, detail.paid_at, detail.renews_at].filter(
+			(value) => value !== null,
+		).length;
+		assert.equal(set, detail.renews_at === null ? 0 : 3);
+	}
+	const remaining = pricedHosts.map((host) => {
+		const today = new Date(anchor * 1000);
+		const midnight = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+		const renewal = Date.parse(`${host.renews_at}T00:00:00Z`);
+		assert.ok(Number.isFinite(renewal));
+		return Math.round((renewal - midnight) / 86400000);
+	});
+	assert.ok(
+		remaining.some((days) => days < 0),
+		"a renewal is overdue",
+	);
+	assert.ok(
+		remaining.some((days) => days >= 0 && days <= 7),
+		"a renewal is due this week",
+	);
+	assert.ok(
+		remaining.some((days) => days > 7),
+		"a renewal is still far away",
+	);
 	// The second alias also reports the captured second filesystem; every other
 	// alias shares the merged primary filesystem.
 	const secondFilesystemHostId = SERVER_ALIASES[1].host_id;

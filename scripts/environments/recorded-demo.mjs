@@ -44,6 +44,23 @@ export const SERVER_ALIASES = [
 	{ server_id: "server-08", host_id: "demo-server-08", hostname: "server-08.example.test" },
 ];
 
+// Manual billing inputs per demo alias, so a reviewer sees every countdown
+// state at once: an annual plan, a monthly plan, a quarterly plan, a renewal
+// already overdue, a renewal inside the week, a renewal today, and two
+// aliases that carry no billing data at all.
+//
+// The offsets are calendar days relative to the seed anchor, so the catalog
+// stays meaningful whenever it is seeded. The paid date and the renewal date
+// are chosen together — their distance is the billing period.
+const BILLING_BY_HOST = {
+	"pw-host-alpha": { amount: 3650, paidOffsetDays: -253, renewsOffsetDays: 112 },
+	"pw-host-beta": { amount: 45, paidOffsetDays: -25, renewsOffsetDays: 5 },
+	"demo-server-03": { amount: 300, paidOffsetDays: -94, renewsOffsetDays: -3 },
+	"demo-server-04": { amount: 88.5, paidOffsetDays: -30, renewsOffsetDays: 0 },
+	"demo-server-07": { amount: 2190, paidOffsetDays: -125, renewsOffsetDays: 240 },
+	"demo-server-08": { amount: 30, paidOffsetDays: -15, renewsOffsetDays: 15 },
+};
+
 const WORKSTATION_INSTALLATION_ID = "30000000-0000-4000-8000-000000000001";
 const WORKSTATION_TOKEN_PREFIX = "batw_fixture";
 
@@ -274,9 +291,37 @@ function aliasInterfaces(detail, aliasIndex, publicIp) {
 	});
 }
 
+const padDate = (value) => String(value).padStart(2, "0");
+
+/**
+ * The calendar day `days` away from the anchor, in the machine's own time
+ * zone. The demo dashboard reads "today" from the same clock, so the
+ * countdown of a seeded host matches what the reviewer sees.
+ */
+export function calendarDateFromAnchor(anchor, days) {
+	const local = new Date(anchor * 1000);
+	const midnight = Date.UTC(local.getFullYear(), local.getMonth(), local.getDate());
+	const shifted = new Date(midnight + days * 86400000);
+	return `${shifted.getUTCFullYear()}-${padDate(shifted.getUTCMonth() + 1)}-${padDate(
+		shifted.getUTCDate(),
+	)}`;
+}
+
+/** The billing triple of one alias, or nulls when the alias has no billing. */
+function aliasBilling(alias, anchor) {
+	const billing = BILLING_BY_HOST[alias.host_id];
+	if (!billing) return { cost_amount_cny: null, paid_at: null, renews_at: null };
+	return {
+		cost_amount_cny: billing.amount,
+		paid_at: calendarDateFromAnchor(anchor, billing.paidOffsetDays),
+		renews_at: calendarDateFromAnchor(anchor, billing.renewsOffsetDays),
+	};
+}
+
 function hostInsert(recording, alias, aliasIndex, target, anchor) {
 	const detail = recording.server.detail;
 	const lastSeen = ageToEpoch(anchor, detail.last_seen_age_seconds);
+	const billing = aliasBilling(alias, anchor);
 	return insert(
 		"hosts",
 		[
@@ -309,6 +354,9 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			"description",
 			"top_processes_json",
 			"top_processes_ts",
+			"cost_amount_cny",
+			"paid_at",
+			"renews_at",
 		],
 		[
 			alias.host_id,
@@ -340,6 +388,9 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			null,
 			jsonValue(detail.top_processes ?? []),
 			ageToEpoch(anchor, detail.top_processes_age_seconds),
+			billing.cost_amount_cny,
+			billing.paid_at,
+			billing.renews_at,
 		],
 	);
 }

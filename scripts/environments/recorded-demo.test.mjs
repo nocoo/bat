@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { fixtureSql } from "./fixtures.mjs";
 import {
+	calendarDateFromAnchor,
 	readRecordedRecording,
 	reconstructRtts,
 	recordedDemoSql,
@@ -376,6 +377,58 @@ describe("recorded Demo SQL catalog", () => {
 			expect(entry.received).toBe(row.received);
 			expect(entry.status).toBe(row.status);
 			expect(entry.rtts_ms).toEqual(JSON.parse(row.rtts));
+		}
+	});
+
+	test("gives the aliases varied billing so every countdown state is visible", () => {
+		const rows = db
+			.query("SELECT host_id,cost_amount_cny,paid_at,renews_at FROM hosts ORDER BY host_id")
+			.all();
+		const byHost = new Map(rows.map((row) => [row.host_id, row]));
+		const days = (from, to) =>
+			Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+
+		const priced = rows.filter((row) => row.renews_at !== null);
+		expect(priced.length).toBe(6);
+		expect(rows.length - priced.length).toBe(2);
+
+		const periods = priced.map((row) => days(row.paid_at, row.renews_at));
+		// One annual, one quarterly and the rest monthly plans.
+		expect(periods).toContain(365);
+		expect(periods).toContain(91);
+		expect(periods.filter((period) => period === 30).length).toBe(3);
+		for (const row of priced) {
+			expect(row.cost_amount_cny).toBeGreaterThan(0);
+			expect(days(row.paid_at, row.renews_at)).toBeGreaterThan(0);
+		}
+
+		// One renewal is overdue, one falls inside the week and one is due today.
+		const today = calendarDateFromAnchor(ANCHOR, 0);
+		const remaining = priced.map((row) => days(today, row.renews_at));
+		expect(remaining.some((value) => value < 0)).toBe(true);
+		expect(remaining.some((value) => value >= 0 && value <= 7)).toBe(true);
+		expect(remaining).toContain(0);
+		expect(remaining.some((value) => value > 7)).toBe(true);
+
+		// The two aliases without billing data stay empty.
+		for (const hostId of ["demo-server-05", "demo-server-06"]) {
+			const row = byHost.get(hostId);
+			expect(row.cost_amount_cny).toBeNull();
+			expect(row.paid_at).toBeNull();
+			expect(row.renews_at).toBeNull();
+		}
+	});
+
+	test("keeps the demo catalog complete", () => {
+		const rows = db
+			.query("SELECT host_id,cost_amount_cny,paid_at,renews_at FROM hosts ORDER BY host_id")
+			.all();
+		expect(rows.length).toBe(SERVER_ALIASES.length);
+		for (const row of rows) {
+			const set = [row.cost_amount_cny, row.paid_at, row.renews_at].filter(
+				(value) => value !== null,
+			).length;
+			expect(set).toBe(row.renews_at === null ? 0 : 3);
 		}
 	});
 
