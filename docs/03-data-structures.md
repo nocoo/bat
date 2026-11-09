@@ -37,6 +37,23 @@ CREATE TABLE hosts (
 - `host_id` is immutable — it's the primary key. If a machine's `host_id` changes (new config), it appears as a new host.
 - `last_seen` uses **Worker time** (`Date.now()` at request time), NOT Probe time. See [Time source policy](#time-source-policy).
 - `is_active` controls visibility. See [Host lifecycle and retirement](#host-lifecycle-and-retirement).
+- The billing columns (`cost_amount_cny`, `paid_at`, `renews_at`) are added by migration `0036_host_billing.sql`. They are manual inputs, never written by ingest: see [Host billing](#host-billing).
+
+### Host billing
+
+Three nullable columns carry what an operator paid for a host:
+
+```sql
+ALTER TABLE hosts ADD COLUMN cost_amount_cny REAL;  -- amount paid for the current period, in yuan
+ALTER TABLE hosts ADD COLUMN paid_at TEXT;          -- last payment date, YYYY-MM-DD
+ALTER TABLE hosts ADD COLUMN renews_at TEXT;        -- next payment / expiry date, YYYY-MM-DD
+```
+
+**Key semantics**:
+- The three columns are **all-or-nothing**: either every one of them carries a value or every one of them is null. The write path (`PATCH /api/hosts/:id/billing`) enforces it and rejects a mixed triple with 400.
+- Dates are **calendar dates**, not instants. They are parsed as UTC midnight, so a countdown never shifts with the reader's time zone and a period is always a whole number of days.
+- Nothing else is stored. The period length, the daily cost and the renewal countdown are derived from the three columns by `packages/shared/src/billing.ts`, so the Worker and the dashboard can never disagree.
+- There is no currency column: the amount is always CNY. See [10-host-inventory.md § Billing](./10-host-inventory.md#billing) for why the model stops here.
 
 ### metrics_raw
 
@@ -542,10 +559,16 @@ interface HostOverviewItem {
 	net_tx_rate: number | null; // bytes/sec aggregate
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
 	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
+	// Manual billing inputs (null when the host carries no billing data)
+	renews_at: string | null; // next payment / expiry date, YYYY-MM-DD
+	cost_amount_cny: number | null; // amount paid for the current period, in yuan
+	paid_at: string | null; // last payment date, YYYY-MM-DD
 }
 ```
 
 **Status derivation**: `"offline"` if `last_seen` stale > 120s → `"critical"` if any critical alert → `"warning"` if any warning alert → `"healthy"`. Query strategy in [05-worker.md § GET /api/hosts](./05-worker.md).
+
+**Billing fields**: the list carries the three billing inputs so it can render the renewal countdown and total the daily cost of the fleet without fetching every host detail. See [Host billing](#host-billing).
 
 ### GET /api/hosts/:id → `HostDetailItem`
 
@@ -562,10 +585,30 @@ interface HostDetailItem extends HostOverviewItem {
 	dns_search: string[] | null;
 	net_interfaces: NetInterfaceDTO[] | null;
 	disks: BlockDeviceDTO[] | null;
+	cost_amount_cny: number | null; // amount paid for the current period, in yuan
+	paid_at: string | null; // last payment date, YYYY-MM-DD
+	renews_at: string | null; // next payment / expiry date, YYYY-MM-DD
 }
 ```
 
-Extends the overview item with full identity fields and host inventory data. Used by the host detail page.
+Extends the overview item with full identity fields and host inventory data. Used by the host detail page. The billing fields are the manual inputs of the cost card; the period, the daily rate and the countdown are derived from them.
+
+### PATCH /api/hosts/:id/billing
+
+Manual billing inputs. The body carries the three fields; they are all-or-nothing.
+
+```typescript
+// @bat/shared — packages/shared/src/billing.ts
+interface BillingFields {
+	cost_amount_cny: number | null; // finite, non-negative, at most two decimals
+	paid_at: string | null; // YYYY-MM-DD, a real calendar day
+	renews_at: string | null; // YYYY-MM-DD, strictly after paid_at
+}
+```
+
+- `204` on success, `400` with a specific message on an invalid triple, `404` for an unknown host, `403` for a retired host.
+- Reads need the read key, the write needs the write key — the same policy as the description route.
+- The validation lives in `validateBillingInput` (`packages/shared/src/billing.ts`), so the dashboard form and the API agree on the rules.
 
 ### GET /api/hosts/:id/tier2 → `Tier2Snapshot`
 

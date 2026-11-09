@@ -63,6 +63,22 @@ These fields can change without reboot but do so infrequently. Sent with `POST /
 | D2  | `dns_resolvers` | `/etc/resolv.conf`                                  | extract `nameserver` lines      | `["1.1.1.1","8.8.8.8"]`       |
 | D3  | `dns_search`    | `/etc/resolv.conf`                                  | extract `search` line           | `["example.com"]`             |
 
+### Category B — Manual Billing Fields (Dashboard → D1)
+
+These fields are **not collected by the probe**. An operator records them once per host through the dashboard, and the worker stores them verbatim. They answer the questions the collected fields cannot: what does this host cost, and when does it expire?
+
+| #   | Field            | Source          | Parse                         | Example Value |
+| --- | ---------------- | --------------- | ----------------------------- | ------------- |
+| B1  | `cost_amount_cny` | Operator input | non-negative, ≤ 2 decimals    | `3650.00`     |
+| B2  | `paid_at`        | Operator input  | `YYYY-MM-DD`, a calendar day  | `2026-01-01`  |
+| B3  | `renews_at`      | Operator input  | `YYYY-MM-DD`, a calendar day  | `2027-01-01`  |
+
+**Why they are manual**: the amount paid and the payment dates are facts about a purchase, not observations of a running machine. No probe can read them off the host, and guessing them would be worse than leaving them empty.
+
+**Why they are calendar dates, not instants**: a countdown must not shift with the reader's time zone. The dates are parsed as UTC midnight, so the difference between two of them is always a whole number of days.
+
+**Why the three travel together**: an amount without a period has no daily rate, and a renewal date without a payment date has no period either. The write path (`PATCH /api/hosts/:id/billing`) accepts the three fields all set or all null and rejects a mixed triple.
+
 ### What We Explicitly Skip
 
 These are available but not worth the complexity/cost right now:
@@ -77,6 +93,41 @@ These are available but not worth the complexity/cost right now:
 | Hugepages/NUMA/cgroup version    | Niche — matters for DB tuning, not general fleet monitoring                                                                                                                                              |
 | Kernel cmdline                   | Raw string, hard to display meaningfully                                                                                                                                                                 |
 | CPU frequency governor           | Not universally available (especially on VMs), unreliable reads                                                                                                                                          |
+
+## Billing
+
+### Derivation
+
+Everything the dashboard shows about a host's cost is derived from the three manual inputs. The math lives in `packages/shared/src/billing.ts` — one implementation, unit tested, shared by the worker and the dashboard so the two cannot drift.
+
+| Helper                 | Meaning                                                                                              |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| `billingPeriodDays`    | Whole calendar days from the payment date to the renewal date. Null when a date is missing or the order is wrong. |
+| `dailyCostCny`         | Amount ÷ period days. Null when the period is not positive. The raw quotient is returned; rounding happens at the display edge. |
+| `daysUntilRenewal`     | Whole calendar days from today to the renewal date. Negative when overdue, 0 on the day itself.         |
+| `renewalCountdownLabel` | `112 天`, `今天到期`, `已过期 3 天` — the detail card never shows a raw timestamp.                      |
+| `renewalBadgeLabel`    | `剩 112 天`, `今天到期`, `已过期 3 天` — the list badge.                                               |
+| `monthlyEquivalentCny` | Daily rate → monthly rate, using a 365.25 day year.                                                    |
+
+A renewal inside the next seven days is a warning, an overdue one is destructive, and everything else stays muted. Hosts without billing data show nothing at all — no empty badge, no zero in the fleet total.
+
+The fleet total on the hosts page sums the daily rate of the priced hosts only, and states how many of the visible hosts carry billing data, so a partial number cannot be mistaken for the whole fleet.
+
+### Why only part of komari's model
+
+The reference implementation [komari](https://github.com/komari-monitor/komari) stores a richer billing model on its `Client` row: `Price`, `BillingCycle` (a day count bucketed into months, quarters and years), `Currency`, `ExpiredAt`, `AutoRenewal` and `TrafficLimit`. We borrowed the idea — a per-host cost with an expiry — and deliberately took only the part the owner asked for:
+
+| komari field   | Here                | Why                                                                                                                                                                    |
+| -------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Price`        | `cost_amount_cny`   | The amount paid for the current period.                                                                                                                                  |
+| `ExpiredAt`    | `renews_at`         | The next payment / expiry date.                                                                                                                                         |
+| —              | `paid_at`           | komari infers the period from `BillingCycle`; we ask for the payment date and derive the period from it, so a plan bought early still shows the right daily rate.            |
+| `BillingCycle` | —                   | A nominal month or year cannot describe a period that was actually 27 or 95 days long. The period is the distance between two real dates.                                 |
+| `Currency`     | —                   | The fleet is billed in CNY. A currency column would multiply the stored amount, the display and the fleet aggregate for no information.                                   |
+| `AutoRenewal`  | —                   | Renewing a server is a purchase decision, not a monitoring decision. The dashboard shows the countdown; it never spends money or moves a date.                            |
+| `TrafficLimit` | —                   | Traffic quota belongs to the plan, not to the host observation, and it needs its own accounting. It stays out of this round.                                                |
+
+The result is three nullable columns, one derivation and one countdown — no currency switch, no automatic renewal, no traffic quota yet.
 
 ## Data Flow Changes
 
@@ -130,6 +181,18 @@ ALTER TABLE hosts ADD COLUMN dns_search       TEXT;  -- JSON array
 ```
 
 `net_interfaces`, `disks`, `dns_resolvers`, `dns_search` are stored as JSON text in SQLite (D1). This avoids junction tables and keeps the schema flat.
+
+The manual billing fields arrive through their own migration (`0036_host_billing.sql`) and their own route — they are never written by ingest:
+
+```sql
+ALTER TABLE hosts ADD COLUMN cost_amount_cny REAL;
+ALTER TABLE hosts ADD COLUMN paid_at         TEXT;
+ALTER TABLE hosts ADD COLUMN renews_at       TEXT;
+```
+
+### Billing Write Path
+
+`PATCH /api/hosts/:id/billing` takes the three fields in one body. They are all-or-nothing: the route rejects a mixed triple, a malformed date, a negative amount, an amount with more than two decimals and a renewal that is not after the payment, each with its own message. The rules live in `validateBillingInput` (`packages/shared/src/billing.ts`), so the dashboard form and the API cannot disagree.
 
 ### Merge Semantics (Identity + Tier 2 → hosts table)
 
@@ -238,6 +301,27 @@ Add rows for the new fields:
 | DNS            | 1.1.1.1, 8.8.8.8                           |
 | Timezone       | UTC                                        |
 | Disks          | sda: 500 GB SSD                            |
+
+### Host Detail — Cost Card (right rail)
+
+Next to System Info, one compact card carries what the host costs:
+
+```
+┌ Cost ──────────────────────── [Edit] ┐
+│ 112 天                               │  ← the countdown, the prominent value
+│ Amount        ¥3,650.00               │
+│ Daily cost    ¥10.00/day              │
+│ Period        365 days                │
+│ Last payment  2026-01-01              │
+│ Next payment  2027-01-01              │
+└───────────────────────────────────────┘
+```
+
+Editing opens one form with the three inputs. A host without billing data shows an empty state that invites the operator to fill them in.
+
+### Host List — Renewal Countdown
+
+The list carries an `Expiry` column with the countdown badge: `剩 112 天`, `今天到期`, `已过期 3 天`. Overdue is destructive, a renewal inside the week is a warning, everything else is muted. A host without billing data shows nothing in that cell at all.
 
 ## Implementation Phases
 
