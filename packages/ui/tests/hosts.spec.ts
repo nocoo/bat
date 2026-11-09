@@ -209,4 +209,69 @@ test.describe("Hosts list page", () => {
 		await page.waitForLoadState("domcontentloaded");
 		await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible({ timeout: 15_000 });
 	});
+
+	test("the list shows machine specs and drops the traffic columns", async ({ page }) => {
+		await page.goto("/hosts");
+		const table = page.getByRole("table", { name: "Servers" });
+		await expect(table).toBeVisible({ timeout: 15_000 });
+
+		const headers = (await table.getByRole("columnheader").allInnerTexts()).map((text) =>
+			text.trim(),
+		);
+		expect(headers).toEqual(["Server", "Status", "CPU", "Memory", "Disk", "Load 1m", "Expiry"]);
+
+		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
+		await expect(alpha).toContainText("8 cores");
+		await expect(alpha).toContainText("8 GB");
+		await expect(alpha).toContainText("50 GB");
+
+		const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
+		await expect(beta).toContainText("4 cores");
+		await expect(beta).toContainText("4 GB");
+		await expect(beta).toContainText("20 GB");
+	});
+
+	test("the description affordance only appears for hosts that carry one", async ({ page }) => {
+		await page.goto("/hosts");
+		const rows = page.getByTestId("host-row");
+		await expect(rows).toHaveCount(2);
+
+		const alpha = rows.filter({ hasText: "alpha.test.local" });
+		const alphaHint = alpha.getByRole("button", { name: "Description of alpha.test.local" });
+		await expect(alphaHint).toBeVisible();
+
+		const beta = rows.filter({ hasText: "beta.test.local" });
+		await expect(beta.getByRole("button", { name: /^Description of/ })).toHaveCount(0);
+
+		await alphaHint.hover();
+		const tooltip = page.getByRole("tooltip");
+		await expect(tooltip).toBeVisible();
+		await expect(tooltip).toContainText("Primary ingress for the focused browser scenarios");
+
+		// The hint is a sibling of the hostname link, so the link keeps its target.
+		await expect(alpha.getByRole("link", { name: "alpha.test.local" })).toBeVisible();
+		await alphaHint.focus();
+		await expect(tooltip).toBeVisible();
+	});
+
+	test("the list fits its card at 1440 and 1024 without horizontal overflow", async ({ page }) => {
+		await page.goto("/hosts");
+		await expect(page.getByTestId("host-row")).toHaveCount(2);
+
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 900 });
+			const table = page.getByRole("table", { name: "Servers" });
+			await expect
+				.poll(() => table.evaluate((element) => element.scrollWidth <= element.clientWidth))
+				.toBe(true);
+			await expect
+				.poll(() =>
+					table.evaluate((element) => {
+						const card = element.closest("[data-basalt-table-container]")?.parentElement;
+						return card ? element.getBoundingClientRect().width <= card.clientWidth : false;
+					}),
+				)
+				.toBe(true);
+		}
+	});
 });
