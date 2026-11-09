@@ -235,9 +235,8 @@ test.describe("Hosts list page", () => {
 			"Memory",
 			"Disk",
 			"Load 1m",
-			"Expiry",
-			"Cost",
 			"Link",
+			"Billing",
 		]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
@@ -310,7 +309,7 @@ test.describe("Hosts list page", () => {
 		await page.setViewportSize({ width: 1280, height: 900 });
 		// The load column gives way instead of truncating the identity cell.
 		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeHidden();
-		await expect(table.getByRole("columnheader").filter({ hasText: "Expiry" })).toBeVisible();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
 		const hostname = alpha.getByRole("link", { name: "alpha.test.local" });
 		await expect(hostname).toBeVisible();
 		await expect
@@ -322,7 +321,7 @@ test.describe("Hosts list page", () => {
 
 		// Below `xl` the tag trail narrows to two so the name stays readable.
 		await page.setViewportSize({ width: 1024, height: 900 });
-		await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
 		await expect(table.getByRole("columnheader").filter({ hasText: "Link" })).toBeVisible();
 		await expect
 			.poll(() => hostname.evaluate((element) => element.scrollWidth <= element.clientWidth))
@@ -352,7 +351,7 @@ test.describe("Hosts list page", () => {
 			// One column, two lines: the bandwidth on top, the quota and the
 			// reset day together underneath.
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB · 每月 1 日");
+			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB · 1st");
 
 			// A host without contract data keeps its dashes in the same column.
 			await expect(beta.getByTestId("host-contract")).toContainText("—");
@@ -360,7 +359,7 @@ test.describe("Hosts list page", () => {
 			// At 1024 the cell shows the bandwidth only.
 			await page.setViewportSize({ width: 1024, height: 900 });
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract").getByText("500 GB · 每月 1 日")).toBeHidden();
+			await expect(alpha.getByTestId("host-contract").getByText("500 GB · 1st")).toBeHidden();
 		} finally {
 			await page.request.patch("/api/hosts/f0d3fd30/billing", {
 				data: {
@@ -372,7 +371,7 @@ test.describe("Hosts list page", () => {
 		}
 	});
 
-	test("the cost column prices every host and dashes the unpriced", async ({ page }) => {
+	test("the billing column prices every host and dashes the unpriced", async ({ page }) => {
 		await page.goto("/hosts");
 		const rows = page.getByTestId("host-row");
 		await expect(rows).toHaveCount(2);
@@ -388,8 +387,9 @@ test.describe("Hosts list page", () => {
 		expect(response.ok()).toBe(true);
 		try {
 			await page.reload();
-			// No billing data is a dash, never ¥0.
-			await expect(beta.getByTestId("host-daily-cost")).toHaveText("—");
+			// No billing data is a single dash, never ¥0.
+			await expect(beta.getByTestId("host-billing")).toHaveText("—");
+			await expect(beta.getByTestId("host-daily-cost")).toHaveCount(0);
 			await expect(alpha.getByTestId("host-daily-cost")).toHaveText("¥10.00/day");
 		} finally {
 			await page.request.patch("/api/hosts/4c494cde/billing", {
@@ -482,7 +482,7 @@ test.describe("Hosts list page", () => {
 		}
 	});
 
-	test("the footer totals the fleet under the cost column", async ({ page }) => {
+	test("the footer totals the fleet under the billing column", async ({ page }) => {
 		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto("/hosts");
 		const table = page.getByRole("table", { name: "Servers" });
@@ -490,7 +490,7 @@ test.describe("Hosts list page", () => {
 
 		const footer = page.getByTestId("host-table-footer");
 		await expect(footer).toBeVisible();
-		const total = footer.getByTestId("fleet-cost");
+		const total = footer.getByTestId("fleet-cost").filter({ visible: true });
 		await expect(total).toContainText("¥11.50/day");
 		await expect(total).toContainText("/month");
 		await expect(total).toContainText("2 / 2 hosts");
@@ -500,7 +500,7 @@ test.describe("Hosts list page", () => {
 			const total = document.querySelector(
 				'[data-testid="host-table-footer"] [data-testid="fleet-cost"]',
 			);
-			const last = document.querySelector('[data-testid="host-contract"]');
+			const last = document.querySelector('[data-testid="host-billing"]');
 			if (!total || !last) return null;
 			const padding = Number.parseFloat(getComputedStyle(last).paddingInlineEnd || "0");
 			return total.getBoundingClientRect().right - (last.getBoundingClientRect().right - padding);

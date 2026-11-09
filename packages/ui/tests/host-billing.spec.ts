@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { countdownLabels } from "./countdown";
 
 // The focused catalog seeds one annual plan (alpha, due in 112 days) and one
 // monthly plan (beta, due in 2 days). The overdue state is produced through
@@ -40,12 +41,17 @@ test.describe("Host billing", () => {
 			await expect(card.getByText("Contract", { exact: true })).toBeVisible();
 
 			// One annual plan of ¥3,650.00 — the countdown is the prominent value.
-			await expect(card.getByTestId("cost-countdown")).toHaveText("112 天");
+			const labels = await countdownLabels(page, alphaHid);
+			await expect(card.getByTestId("cost-countdown")).toHaveText(labels.detail);
 			await expect(card.getByText("¥3,650.00", { exact: true })).toBeVisible();
 			await expect(card.getByText("¥10.00/day", { exact: true })).toBeVisible();
 			await expect(card.getByText("365 days", { exact: true })).toBeVisible();
-			await expect(card.getByText(localDate(-253), { exact: true })).toBeVisible();
-			await expect(card.getByText(localDate(112), { exact: true })).toBeVisible();
+			const stored = (await (await page.request.get(`/api/hosts/${alphaHid}`)).json()) as {
+				paid_at: string;
+				renews_at: string;
+			};
+			await expect(card.getByText(stored.paid_at, { exact: true })).toBeVisible();
+			await expect(card.getByText(stored.renews_at, { exact: true })).toBeVisible();
 
 			// The card sits in the right rail, next to System Info.
 			const infoCard = page
@@ -73,9 +79,13 @@ test.describe("Host billing", () => {
 
 			const form = page.getByTestId("contract-form");
 			await expect(form).toBeVisible();
+			const stored = (await (await page.request.get(`/api/hosts/${alphaHid}`)).json()) as {
+				paid_at: string;
+				renews_at: string;
+			};
 			await expect(form.getByLabel("Amount (¥)")).toHaveValue("3650");
-			await expect(form.getByLabel("Last payment date")).toHaveValue(localDate(-253));
-			await expect(form.getByLabel("Next payment date")).toHaveValue(localDate(112));
+			await expect(form.getByLabel("Last payment date")).toHaveValue(stored.paid_at);
+			await expect(form.getByLabel("Next payment date")).toHaveValue(stored.renews_at);
 			await form.screenshot({ path: testInfo.outputPath(`contract-form-${width}.png`) });
 
 			if (width === 1440) {
@@ -84,7 +94,7 @@ test.describe("Host billing", () => {
 				await form.getByLabel("Next payment date").fill(localDate(2));
 				await form.getByRole("button", { name: "Save" }).click();
 
-				await expect(card.getByTestId("cost-countdown")).toHaveText("2 天");
+				await expect(card.getByTestId("cost-countdown")).toHaveText("Renews in 2 days");
 				await expect(card.getByText("¥1,200.00", { exact: true })).toBeVisible();
 				await expect(card.getByText("30 days", { exact: true })).toBeVisible();
 
@@ -140,8 +150,8 @@ test.describe("Host billing", () => {
 		// and the reset day becomes the ordinal sentence.
 		await expect(card.getByTestId("contract-bandwidth-value")).toHaveText("2.5 Gbps");
 		await expect(card.getByText("500 GB", { exact: true })).toBeVisible();
-		await expect(card.getByText("每月 1 日重置", { exact: true })).toBeVisible();
-		await expect(card.getByTestId("contract-reset-value")).toHaveText("每月 1 日重置");
+		await expect(card.getByText("resets on the 1st", { exact: true })).toBeVisible();
+		await expect(card.getByTestId("contract-reset-value")).toHaveText("resets on the 1st");
 		await card.screenshot({ path: testInfo.outputPath("contract-card-read.png") });
 
 		// Every rejection path of the three counters.
@@ -185,8 +195,9 @@ test.describe("Host billing", () => {
 			const alphaRow = rows.filter({ hasText: "alpha.test.local" });
 			const betaRow = rows.filter({ hasText: "beta.test.local" });
 
-			await expect(alphaRow.getByTestId("host-countdown")).toHaveText("剩 112 天");
-			await expect(betaRow.getByTestId("host-countdown")).toHaveText("剩 2 天");
+			const alphaLabels = await countdownLabels(page, alphaHid);
+			await expect(alphaRow.getByTestId("host-countdown")).toHaveText(alphaLabels.list);
+			await expect(betaRow.getByTestId("host-countdown")).toHaveText("2d left");
 
 			await setBilling(page, betaHid, {
 				cost_amount_cny: 45,
@@ -194,7 +205,7 @@ test.describe("Host billing", () => {
 				renews_at: localDate(-3),
 			});
 			await page.reload();
-			await expect(betaRow.getByTestId("host-countdown")).toHaveText("已过期 3 天");
+			await expect(betaRow.getByTestId("host-countdown")).toHaveText("3d overdue");
 			await betaRow.screenshot({ path: testInfo.outputPath(`host-list-overdue-${width}.png`) });
 
 			await setBilling(page, betaHid, {
@@ -203,7 +214,9 @@ test.describe("Host billing", () => {
 				renews_at: null,
 			});
 			await page.reload();
-			await expect(betaRow.getByTestId("host-countdown")).toHaveText("");
+			// Without billing the merged column shows one dash, not an empty cell.
+			await expect(betaRow.getByTestId("host-billing")).toHaveText("—");
+			await expect(betaRow.getByTestId("host-countdown")).toHaveCount(0);
 			await betaRow.screenshot({ path: testInfo.outputPath(`host-list-no-billing-${width}.png`) });
 		}
 
@@ -221,15 +234,15 @@ test.describe("Host billing", () => {
 			await page.waitForLoadState("domcontentloaded");
 
 			const footer = page.getByTestId("host-table-footer");
-			const fleetCost = footer.getByTestId("fleet-cost");
+			const fleetCost = footer.getByTestId("fleet-cost").filter({ visible: true });
 			await expect(footer).toBeVisible({ timeout: 15_000 });
 			await expect(fleetCost).toContainText("¥11.50/day");
 			await expect(fleetCost).toContainText("/month");
 			await expect(fleetCost).toContainText("2 / 2 hosts");
 
-			// The total sits under the cost column, which stays visible at every width.
+			// The total sits under the billing column, which stays visible at every width.
 			const table = page.getByRole("table", { name: "Servers" });
-			await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
+			await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
 			await footer.screenshot({ path: testInfo.outputPath(`fleet-cost-${width}.png`) });
 		}
 	});

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { countdownLabels } from "./countdown";
 
 // The card view of the hosts page: the same overview data as the table, the
 // reference dashboard's card anatomy, and a switch that survives reloads.
@@ -107,7 +108,8 @@ test.describe("Hosts card view", () => {
 		const alpha = grid.getByTestId("host-card").filter({ hasText: "alpha.test.local" });
 		await expect(alpha.getByTestId("status-badge")).toBeVisible();
 		await expect(alpha.getByText("¥10.00/day", { exact: true })).toBeVisible();
-		await expect(alpha.getByTestId("host-countdown")).toHaveText("剩 112 天");
+		const labels = await countdownLabels(page, "f0d3fd30");
+		await expect(alpha.getByTestId("host-countdown")).toHaveText(labels.list);
 		for (const tag of ["production", "us-east", "edge"]) {
 			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
 		}
@@ -132,8 +134,8 @@ test.describe("Hosts card view", () => {
 		await expect(alpha.getByText("Traffic", { exact: true })).toBeVisible();
 		await expect(alpha.getByText("Reset", { exact: true })).toBeVisible();
 		// The traffic row carries its period, the reset day its calendar.
-		await expect(alpha.getByText("500 GB/月", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("每月 1 日", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("500 GB/mo", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("1st", { exact: true })).toBeVisible();
 		await expect(beta.getByText("Bandwidth", { exact: true })).toBeVisible();
 		await expect(beta).toContainText("—");
 
@@ -160,7 +162,7 @@ test.describe("Hosts card view", () => {
 		await page.goto("/hosts");
 		await page.getByTestId("hosts-view-cards").click();
 		const beta = page.getByTestId("host-card").filter({ hasText: "beta.test.local" });
-		await expect(beta.getByTestId("host-countdown")).toHaveText("已过期 3 天");
+		await expect(beta.getByTestId("host-countdown")).toHaveText("3d overdue");
 		await expect(beta.getByTestId("host-countdown")).toHaveClass(/text-basalt-destructive/);
 
 		await setBilling(page, betaHid, {
