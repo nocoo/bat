@@ -3,13 +3,20 @@
 // colour, a 24 hour CPU trend and honest dashes for missing readings.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
-import { daysUntilRenewal, hashHostId, renewalBadgeLabel, renewalTone } from "@bat/shared";
+import {
+	dailyCostCny,
+	daysUntilRenewal,
+	hashHostId,
+	renewalBadgeLabel,
+	renewalTone,
+} from "@bat/shared";
 import { LineChart } from "@nocoo/basalt/charts/line";
 import { Button } from "@nocoo/basalt/components/button";
 import {
 	Table,
 	TableBody,
 	TableCell,
+	TableFooter,
 	TableHead,
 	TableHeader,
 	TableRow,
@@ -17,8 +24,9 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@nocoo/basalt/components/tooltip";
 import { Info } from "lucide-react";
 import { Link } from "react-router";
+import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { StatusBadge } from "@/components/status-badge";
-import { renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
+import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
 import { getValueColor, statusDotColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
@@ -153,24 +161,27 @@ export function HostTable({
 			<Table aria-label="Servers" className="lg:table-fixed">
 				<TableHeader>
 					<TableRow>
-						<TableHead className="lg:w-[33%] lg:min-w-[14rem] xl:w-[26%]">Server</TableHead>
-						<TableHead className="lg:w-[12%]" textAlign="end">
+						<TableHead className="lg:w-[27%] lg:min-w-[12rem] xl:w-[28%]">Server</TableHead>
+						<TableHead className="lg:w-[11%] xl:w-[12%]" textAlign="end">
 							Status
 						</TableHead>
-						<TableHead className="lg:w-[16%]" textAlign="end">
+						<TableHead className="lg:w-[13%] xl:w-[14%]" textAlign="end">
 							CPU
 						</TableHead>
-						<TableHead className="lg:w-[15%] xl:w-[14%]" textAlign="end">
+						<TableHead className="lg:w-[13%] xl:w-[14%]" textAlign="end">
 							Memory
 						</TableHead>
-						<TableHead className="lg:w-[10%] xl:w-[9%]" textAlign="end">
+						<TableHead className="lg:w-[9%] xl:w-[10%]" textAlign="end">
 							Disk
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-[9%]" textAlign="end">
+						<TableHead className="hidden 2xl:table-cell 2xl:w-[8%]" textAlign="end">
 							Load 1m
 						</TableHead>
-						<TableHead className="lg:w-[14%]" textAlign="end">
+						<TableHead className="lg:w-[13%] xl:w-[12%]" textAlign="end">
 							Expiry
+						</TableHead>
+						<TableHead className="lg:w-[14%] xl:w-[10%]" textAlign="end">
+							Cost
 						</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -179,6 +190,7 @@ export function HostTable({
 						const tags = tagsFor(host.host_id) ?? [];
 						const daysLeft = daysUntilRenewal(host.renews_at, today);
 						const countdown = renewalBadgeLabel(daysLeft);
+						const dailyCost = dailyCostCny(host.cost_amount_cny, host.paid_at, host.renews_at);
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
@@ -252,7 +264,7 @@ export function HostTable({
 										<Spec value={formatSpecSize(host.disk_root_total_bytes)} />
 									</div>
 								</TableCell>
-								<TableCell textAlign="end" className={cn(NUMERIC, "hidden xl:table-cell")}>
+								<TableCell textAlign="end" className={cn(NUMERIC, "hidden 2xl:table-cell")}>
 									<div className="flex flex-col items-end">
 										{host.cpu_load1 === null ? (
 											<span className="text-basalt-muted-foreground">—</span>
@@ -277,10 +289,32 @@ export function HostTable({
 										<span className={renewalToneClass(renewalTone(daysLeft))}>{countdown}</span>
 									)}
 								</TableCell>
+								<TableCell
+									textAlign="end"
+									className="whitespace-nowrap font-mono text-basalt-sm tabular-nums"
+									data-testid="host-daily-cost"
+								>
+									{dailyCost === null ? (
+										<span className="text-basalt-muted-foreground">—</span>
+									) : (
+										`${formatCny(dailyCost)}/day`
+									)}
+								</TableCell>
 							</TableRow>
 						);
 					})}
 				</TableBody>
+				<TableFooter>
+					<TableRow data-testid="host-table-footer">
+						<TableCell
+							colSpan={8}
+							textAlign="end"
+							className="border-t border-basalt-border py-basalt-space-md"
+						>
+							<FleetCostTotal hosts={hosts} />
+						</TableCell>
+					</TableRow>
+				</TableFooter>
 			</Table>
 		</div>
 	);

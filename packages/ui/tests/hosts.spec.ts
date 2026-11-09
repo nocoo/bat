@@ -1,5 +1,14 @@
 import { expect, test } from "@playwright/test";
 
+function billingDate(offsetDays: number): string {
+	const date = new Date();
+	const midnight = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+	midnight.setDate(midnight.getDate() + offsetDays);
+	const month = String(midnight.getMonth() + 1).padStart(2, "0");
+	const day = String(midnight.getDate()).padStart(2, "0");
+	return `${midnight.getFullYear()}-${month}-${day}`;
+}
+
 test.describe("Hosts list page", () => {
 	test("standard sort select supports pointer and keyboard selection", async ({ page }) => {
 		await page.goto("/hosts");
@@ -211,6 +220,7 @@ test.describe("Hosts list page", () => {
 	});
 
 	test("the list shows machine specs and drops the traffic columns", async ({ page }) => {
+		await page.setViewportSize({ width: 1536, height: 900 });
 		await page.goto("/hosts");
 		const table = page.getByRole("table", { name: "Servers" });
 		await expect(table).toBeVisible({ timeout: 15_000 });
@@ -218,7 +228,16 @@ test.describe("Hosts list page", () => {
 		const headers = (await table.getByRole("columnheader").allInnerTexts()).map((text) =>
 			text.trim(),
 		);
-		expect(headers).toEqual(["Server", "Status", "CPU", "Memory", "Disk", "Load 1m", "Expiry"]);
+		expect(headers).toEqual([
+			"Server",
+			"Status",
+			"CPU",
+			"Memory",
+			"Disk",
+			"Load 1m",
+			"Expiry",
+			"Cost",
+		]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
 		await expect(alpha).toContainText("8 cores");
@@ -280,14 +299,14 @@ test.describe("Hosts list page", () => {
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
 		await expect(alpha).toBeVisible({ timeout: 15_000 });
 
-		await page.setViewportSize({ width: 1280, height: 900 });
+		await page.setViewportSize({ width: 1536, height: 900 });
 		const table = page.getByRole("table", { name: "Servers" });
 		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeVisible();
 		for (const tag of ["production", "us-east", "edge"]) {
 			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
 		}
 
-		await page.setViewportSize({ width: 1024, height: 900 });
+		await page.setViewportSize({ width: 1280, height: 900 });
 		// The load column gives way instead of truncating the identity cell.
 		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeHidden();
 		await expect(table.getByRole("columnheader").filter({ hasText: "Expiry" })).toBeVisible();
@@ -298,7 +317,82 @@ test.describe("Hosts list page", () => {
 			.toBe(true);
 		await expect(alpha.getByText("edge", { exact: true })).toBeVisible();
 		await expect(alpha.getByText("production", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("us-east", { exact: true })).toBeVisible();
+
+		// Below `xl` the tag trail narrows to two so the name stays readable.
+		await page.setViewportSize({ width: 1024, height: 900 });
+		await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
+		await expect
+			.poll(() => hostname.evaluate((element) => element.scrollWidth <= element.clientWidth))
+			.toBe(true);
 		await expect(alpha.getByText("us-east", { exact: true })).toBeHidden();
 		await expect(alpha.getByText("+1", { exact: true })).toBeVisible();
+	});
+
+	test("the cost column prices every host and dashes the unpriced", async ({ page }) => {
+		await page.goto("/hosts");
+		const rows = page.getByTestId("host-row");
+		await expect(rows).toHaveCount(2);
+
+		const alpha = rows.filter({ hasText: "alpha.test.local" });
+		const beta = rows.filter({ hasText: "beta.test.local" });
+		await expect(alpha.getByTestId("host-daily-cost")).toHaveText("¥10.00/day");
+		await expect(beta.getByTestId("host-daily-cost")).toHaveText("¥1.50/day");
+
+		const response = await page.request.patch("/api/hosts/4c494cde/billing", {
+			data: { cost_amount_cny: null, paid_at: null, renews_at: null },
+		});
+		expect(response.ok()).toBe(true);
+		try {
+			await page.reload();
+			// No billing data is a dash, never ¥0.
+			await expect(beta.getByTestId("host-daily-cost")).toHaveText("—");
+			await expect(alpha.getByTestId("host-daily-cost")).toHaveText("¥10.00/day");
+		} finally {
+			await page.request.patch("/api/hosts/4c494cde/billing", {
+				data: {
+					cost_amount_cny: 45,
+					paid_at: billingDate(-28),
+					renews_at: billingDate(2),
+				},
+			});
+		}
+	});
+
+	test("the footer totals the fleet under the cost column", async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
+		await page.goto("/hosts");
+		const table = page.getByRole("table", { name: "Servers" });
+		await expect(table).toBeVisible({ timeout: 15_000 });
+
+		const footer = page.getByTestId("host-table-footer");
+		await expect(footer).toBeVisible();
+		const total = footer.getByTestId("fleet-cost");
+		await expect(total).toContainText("¥11.50/day");
+		await expect(total).toContainText("/month");
+		await expect(total).toContainText("2 / 2 hosts");
+
+		// The total line ends exactly where the cost figures do.
+		const gap = await page.evaluate(() => {
+			const total = document.querySelector(
+				'[data-testid="host-table-footer"] [data-testid="fleet-cost"]',
+			);
+			const cost = document.querySelector('[data-testid="host-daily-cost"]');
+			if (!total || !cost) return null;
+			const padding = Number.parseFloat(getComputedStyle(cost).paddingInlineEnd || "0");
+			return total.getBoundingClientRect().right - (cost.getBoundingClientRect().right - padding);
+		});
+		expect(gap).not.toBeNull();
+		expect(Math.abs(gap ?? 0)).toBeLessThanOrEqual(2);
+
+		await page.setViewportSize({ width: 1024, height: 900 });
+		await expect
+			.poll(() =>
+				page.evaluate(() => {
+					const scrolling = document.scrollingElement;
+					return scrolling ? scrolling.scrollWidth - scrolling.clientWidth : 0;
+				}),
+			)
+			.toBeLessThanOrEqual(0);
 	});
 });

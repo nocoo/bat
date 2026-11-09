@@ -162,18 +162,23 @@ test.describe("Host billing", () => {
 		});
 	});
 
-	test("the fleet header totals the daily cost of the priced hosts", async ({ page }, testInfo) => {
+	test("the table footer totals the daily cost of the priced hosts", async ({ page }, testInfo) => {
 		for (const width of [1440, 1024]) {
 			await page.setViewportSize({ width, height: 1000 });
 			await page.goto("/hosts");
 			await page.waitForLoadState("domcontentloaded");
 
-			const fleetCost = page.getByTestId("fleet-cost");
-			await expect(fleetCost).toBeVisible({ timeout: 15_000 });
+			const footer = page.getByTestId("host-table-footer");
+			const fleetCost = footer.getByTestId("fleet-cost");
+			await expect(footer).toBeVisible({ timeout: 15_000 });
 			await expect(fleetCost).toContainText("¥11.50/day");
 			await expect(fleetCost).toContainText("/month");
-			await expect(fleetCost).toContainText("2/2 priced");
-			await fleetCost.screenshot({ path: testInfo.outputPath(`fleet-cost-${width}.png`) });
+			await expect(fleetCost).toContainText("2 / 2 hosts");
+
+			// The total sits under the cost column, which stays visible at every width.
+			const table = page.getByRole("table", { name: "Servers" });
+			await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
+			await footer.screenshot({ path: testInfo.outputPath(`fleet-cost-${width}.png`) });
 		}
 	});
 });
