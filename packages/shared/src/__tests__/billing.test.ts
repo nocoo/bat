@@ -3,7 +3,11 @@ import {
 	billingPeriodDays,
 	dailyCostCny,
 	daysUntilRenewal,
+	formatBandwidthMbps,
+	formatResetDay,
+	formatTrafficQuotaGb,
 	monthlyEquivalentCny,
+	ordinalDayOfMonth,
 	parseCalendarDate,
 	renewalBadgeLabel,
 	renewalCountdownLabel,
@@ -166,10 +170,15 @@ describe("validateBillingInput", () => {
 		paid_at: "2026-01-01",
 		renews_at: "2027-01-01",
 	};
+	const cleared = {
+		bandwidth_mbps: null,
+		traffic_quota_gb: null,
+		traffic_reset_day: null,
+	};
 
 	test("accepts a complete billing triple", () => {
 		const result = validateBillingInput(valid);
-		expect(result).toEqual({ ok: true, value: valid });
+		expect(result).toEqual({ ok: true, value: { ...cleared, ...valid } });
 	});
 
 	test("accepts an all-null triple as a clear", () => {
@@ -180,7 +189,7 @@ describe("validateBillingInput", () => {
 		});
 		expect(result).toEqual({
 			ok: true,
-			value: { cost_amount_cny: null, paid_at: null, renews_at: null },
+			value: { ...cleared, cost_amount_cny: null, paid_at: null, renews_at: null },
 		});
 	});
 
@@ -246,5 +255,181 @@ describe("validateBillingInput", () => {
 		const result = validateBillingInput({ ...valid, renews_at: 20270101 });
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.error).toContain("renews_at");
+	});
+});
+
+describe("validateBillingInput: contract fields", () => {
+	const valid = {
+		cost_amount_cny: 365,
+		paid_at: "2026-01-01",
+		renews_at: "2027-01-01",
+	};
+
+	test("accepts the three contract fields alongside the triple", () => {
+		const result = validateBillingInput({
+			...valid,
+			bandwidth_mbps: 2500,
+			traffic_quota_gb: 500,
+			traffic_reset_day: 1,
+		});
+		expect(result).toEqual({
+			ok: true,
+			value: {
+				...valid,
+				bandwidth_mbps: 2500,
+				traffic_quota_gb: 500,
+				traffic_reset_day: 1,
+			},
+		});
+	});
+
+	test("accepts each contract field on its own — nulls elsewhere", () => {
+		const result = validateBillingInput({ ...valid, bandwidth_mbps: 100 });
+		expect(result).toEqual({
+			ok: true,
+			value: {
+				...valid,
+				bandwidth_mbps: 100,
+				traffic_quota_gb: null,
+				traffic_reset_day: null,
+			},
+		});
+	});
+
+	test("accepts a contract without any billing triple", () => {
+		const result = validateBillingInput({
+			cost_amount_cny: null,
+			paid_at: null,
+			renews_at: null,
+			traffic_quota_gb: 1000,
+		});
+		expect(result).toEqual({
+			ok: true,
+			value: {
+				cost_amount_cny: null,
+				paid_at: null,
+				renews_at: null,
+				bandwidth_mbps: null,
+				traffic_quota_gb: 1000,
+				traffic_reset_day: null,
+			},
+		});
+	});
+
+	test("a missing contract key reads as null", () => {
+		const result = validateBillingInput(valid);
+		expect(result.ok).toBe(true);
+		if (result.ok) {
+			expect(result.value.bandwidth_mbps).toBeNull();
+			expect(result.value.traffic_quota_gb).toBeNull();
+			expect(result.value.traffic_reset_day).toBeNull();
+		}
+	});
+
+	test("rejects zero, negative and fractional counters", () => {
+		for (const [key, value] of [
+			["bandwidth_mbps", 0],
+			["bandwidth_mbps", -100],
+			["bandwidth_mbps", 100.5],
+			["traffic_quota_gb", 0],
+			["traffic_quota_gb", -1],
+			["traffic_quota_gb", 0.5],
+		] as const) {
+			const result = validateBillingInput({ ...valid, [key]: value });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain(key);
+		}
+	});
+
+	test("rejects a counter above one million", () => {
+		for (const [key, value] of [
+			["bandwidth_mbps", 1_000_001],
+			["traffic_quota_gb", 1_000_001],
+		] as const) {
+			const result = validateBillingInput({ ...valid, [key]: value });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain(key);
+		}
+		const edge = validateBillingInput({ ...valid, bandwidth_mbps: 1_000_000 });
+		expect(edge.ok).toBe(true);
+	});
+
+	test("rejects reset days outside the calendar", () => {
+		for (const day of [0, 32, -1, 1.5]) {
+			const result = validateBillingInput({ ...valid, traffic_reset_day: day });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain("traffic_reset_day");
+		}
+		for (const day of [1, 15, 31]) {
+			const result = validateBillingInput({ ...valid, traffic_reset_day: day });
+			expect(result.ok).toBe(true);
+		}
+	});
+
+	test("rejects a non-numeric counter", () => {
+		for (const [key, value] of [
+			["bandwidth_mbps", "500"],
+			["traffic_quota_gb", "500"],
+			["traffic_reset_day", "1"],
+		] as const) {
+			const result = validateBillingInput({ ...valid, [key]: value });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain(key);
+		}
+	});
+});
+
+describe("formatBandwidthMbps", () => {
+	test("keeps Mbps below one gigabit", () => {
+		expect(formatBandwidthMbps(100)).toBe("100 Mbps");
+		expect(formatBandwidthMbps(999)).toBe("999 Mbps");
+	});
+
+	test("switches to gigabits at 1000 without a trailing .0", () => {
+		expect(formatBandwidthMbps(1000)).toBe("1 Gbps");
+		expect(formatBandwidthMbps(2500)).toBe("2.5 Gbps");
+		expect(formatBandwidthMbps(5000)).toBe("5 Gbps");
+		expect(formatBandwidthMbps(1234)).toBe("1.2 Gbps");
+	});
+
+	test("has nothing to say without a value", () => {
+		expect(formatBandwidthMbps(null)).toBeNull();
+		expect(formatBandwidthMbps(Number.NaN)).toBeNull();
+	});
+});
+
+describe("formatTrafficQuotaGb", () => {
+	test("shows the allowance exactly as entered", () => {
+		expect(formatTrafficQuotaGb(500)).toBe("500 GB");
+		expect(formatTrafficQuotaGb(1000)).toBe("1000 GB");
+		expect(formatTrafficQuotaGb(2000)).toBe("2000 GB");
+	});
+
+	test("has nothing to say without a value", () => {
+		expect(formatTrafficQuotaGb(null)).toBeNull();
+	});
+});
+
+describe("reset-day labels", () => {
+	test("ordinals follow English convention", () => {
+		expect(ordinalDayOfMonth(1)).toBe("1st");
+		expect(ordinalDayOfMonth(2)).toBe("2nd");
+		expect(ordinalDayOfMonth(3)).toBe("3rd");
+		expect(ordinalDayOfMonth(4)).toBe("4th");
+		expect(ordinalDayOfMonth(11)).toBe("11th");
+		expect(ordinalDayOfMonth(12)).toBe("12th");
+		expect(ordinalDayOfMonth(13)).toBe("13th");
+		expect(ordinalDayOfMonth(21)).toBe("21st");
+		expect(ordinalDayOfMonth(22)).toBe("22nd");
+		expect(ordinalDayOfMonth(23)).toBe("23rd");
+		expect(ordinalDayOfMonth(31)).toBe("31st");
+		expect(ordinalDayOfMonth(null)).toBeNull();
+	});
+
+	test("the sentence form is consistent", () => {
+		expect(formatResetDay(1)).toBe("resets on the 1st");
+		expect(formatResetDay(15)).toBe("resets on the 15th");
+		expect(formatResetDay(28)).toBe("resets on the 28th");
+		expect(formatResetDay(null)).toBeNull();
 	});
 });

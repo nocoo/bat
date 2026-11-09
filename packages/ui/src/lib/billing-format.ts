@@ -2,7 +2,7 @@
 // host's cost comes from the shared derivation helpers — this file only
 // decides how a number is written down.
 
-import type { BillingFields, HostOverviewItem } from "@bat/shared";
+import type { BillingFields, ContractFields, HostOverviewItem } from "@bat/shared";
 import {
 	billingPeriodDays,
 	dailyCostCny,
@@ -99,50 +99,89 @@ export function renewalToneClass(tone: RenewalTone): string {
 	return "text-basalt-muted-foreground";
 }
 
-/** The three inputs of the edit form, as typed. */
+/** The inputs of the edit form, as typed. The contract fields are
+ *  independent: each one may be filled or empty on its own. */
 export interface BillingDraft {
 	amount: string;
 	paidAt: string;
 	renewsAt: string;
+	bandwidth: string;
+	trafficGb: string;
+	resetDay: string;
 }
 
-export type BillingDraftResult = { ok: true; value: BillingFields } | { ok: false; error: string };
+export type BillingDraftResult =
+	| { ok: true; value: BillingFields & ContractFields }
+	| { ok: false; error: string };
 
-/** The empty form clears the billing data of the host. */
+/** The empty form clears every stored contract field. */
 export function emptyBillingDraft(): BillingDraft {
-	return { amount: "", paidAt: "", renewsAt: "" };
+	return { amount: "", paidAt: "", renewsAt: "", bandwidth: "", trafficGb: "", resetDay: "" };
 }
 
-/** The form draft of a host that already carries billing data. */
-export function billingDraftFrom(fields: BillingFields): BillingDraft {
+/** The form draft of a host that already carries contract data. */
+export function billingDraftFrom(fields: BillingFields & ContractFields): BillingDraft {
 	return {
 		amount: fields.cost_amount_cny === null ? "" : String(fields.cost_amount_cny),
 		paidAt: fields.paid_at ?? "",
 		renewsAt: fields.renews_at ?? "",
+		bandwidth: fields.bandwidth_mbps === null ? "" : String(fields.bandwidth_mbps),
+		trafficGb: fields.traffic_quota_gb === null ? "" : String(fields.traffic_quota_gb),
+		resetDay: fields.traffic_reset_day === null ? "" : String(fields.traffic_reset_day),
 	};
 }
 
+/** One optional counter field: empty means null, otherwise a whole number
+ *  between 1 and `max`, as an operator-facing sentence on failure. */
+function parseDraftCount(
+	text: string,
+	label: string,
+	max: number,
+): { ok: true; value: number | null } | { ok: false; error: string } {
+	if (text === "") return { ok: true, value: null };
+	const parsed = Number(text);
+	if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+		return {
+			ok: false,
+			error: `${label} must be a whole number between 1 and ${max.toLocaleString("en-US")}.`,
+		};
+	}
+	return { ok: true, value: parsed };
+}
+
 /**
- * Validate the edit form. The rules live in the shared validator — the form
- * only translates them into an operator-facing sentence.
+ * Validate the edit form. The amount/date rules live in the shared validator
+ * — the form only translates them into operator-facing sentences — while the
+ * three contract fields parse independently, so a host can carry a bandwidth
+ * without a quota or a price.
  */
 export function validateBillingDraft(draft: BillingDraft): BillingDraftResult {
 	const amountText = draft.amount.trim();
 	const paidAt = draft.paidAt.trim();
 	const renewsAt = draft.renewsAt.trim();
-	if (amountText === "" && paidAt === "" && renewsAt === "") {
-		return { ok: true, value: { cost_amount_cny: null, paid_at: null, renews_at: null } };
-	}
-	if (amountText === "" || paidAt === "" || renewsAt === "") {
+	const bandwidthText = draft.bandwidth.trim();
+	const trafficText = draft.trafficGb.trim();
+	const resetDayText = draft.resetDay.trim();
+	const trioEmpty = amountText === "" && paidAt === "" && renewsAt === "";
+	if (!trioEmpty && (amountText === "" || paidAt === "" || renewsAt === "")) {
 		return {
 			ok: false,
 			error: "Amount, last payment date and next payment date are all required.",
 		};
 	}
+	const bandwidth = parseDraftCount(bandwidthText, "Bandwidth", 1_000_000);
+	if (!bandwidth.ok) return bandwidth;
+	const traffic = parseDraftCount(trafficText, "Traffic quota", 1_000_000);
+	if (!traffic.ok) return traffic;
+	const resetDay = parseDraftCount(resetDayText, "Reset day", 31);
+	if (!resetDay.ok) return resetDay;
 	const parsed = validateBillingInput({
-		cost_amount_cny: Number(amountText),
-		paid_at: paidAt,
-		renews_at: renewsAt,
+		cost_amount_cny: trioEmpty ? null : Number(amountText),
+		paid_at: trioEmpty ? null : paidAt,
+		renews_at: trioEmpty ? null : renewsAt,
+		bandwidth_mbps: bandwidth.value,
+		traffic_quota_gb: traffic.value,
+		traffic_reset_day: resetDay.value,
 	});
 	if (!parsed.ok) {
 		return {

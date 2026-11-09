@@ -113,28 +113,37 @@ describe("fleetCostSummary", () => {
 });
 
 describe("billing drafts", () => {
-	test("an empty draft clears the billing data", () => {
+	const empty = emptyBillingDraft();
+	const cleared = {
+		cost_amount_cny: null,
+		paid_at: null,
+		renews_at: null,
+		bandwidth_mbps: null,
+		traffic_quota_gb: null,
+		traffic_reset_day: null,
+	};
+
+	test("an empty draft clears every contract field", () => {
 		const result = validateBillingDraft(emptyBillingDraft());
-		expect(result).toEqual({
-			ok: true,
-			value: { cost_amount_cny: null, paid_at: null, renews_at: null },
-		});
+		expect(result).toEqual({ ok: true, value: cleared });
 	});
 
 	test("a filled draft becomes the billing triple", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "365",
 			paidAt: "2026-01-01",
 			renewsAt: "2027-01-01",
 		});
 		expect(result).toEqual({
 			ok: true,
-			value: { cost_amount_cny: 365, paid_at: "2026-01-01", renews_at: "2027-01-01" },
+			value: { ...cleared, cost_amount_cny: 365, paid_at: "2026-01-01", renews_at: "2027-01-01" },
 		});
 	});
 
 	test("a partial draft is refused", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "365",
 			paidAt: "2026-01-01",
 			renewsAt: "",
@@ -144,6 +153,7 @@ describe("billing drafts", () => {
 
 	test("a negative amount is refused", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "-1",
 			paidAt: "2026-01-01",
 			renewsAt: "2027-01-01",
@@ -154,6 +164,7 @@ describe("billing drafts", () => {
 
 	test("an amount with three decimals is refused", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "12.345",
 			paidAt: "2026-01-01",
 			renewsAt: "2027-01-01",
@@ -163,6 +174,7 @@ describe("billing drafts", () => {
 
 	test("a date that is not a calendar day is refused", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "365",
 			paidAt: "2026-02-30",
 			renewsAt: "2027-01-01",
@@ -172,6 +184,7 @@ describe("billing drafts", () => {
 
 	test("a renewal before the payment is refused", () => {
 		const result = validateBillingDraft({
+			...empty,
 			amount: "365",
 			paidAt: "2026-01-01",
 			renewsAt: "2025-12-31",
@@ -180,18 +193,70 @@ describe("billing drafts", () => {
 		if (!result.ok) expect(result.error).toContain("after the last payment date");
 	});
 
-	test("a stored triple becomes an editable draft", () => {
+	test("contract fields validate without any billing triple", () => {
+		const result = validateBillingDraft({
+			...empty,
+			bandwidth: "2500",
+			trafficGb: "500",
+			resetDay: "1",
+		});
+		expect(result).toEqual({
+			ok: true,
+			value: {
+				...cleared,
+				bandwidth_mbps: 2500,
+				traffic_quota_gb: 500,
+				traffic_reset_day: 1,
+			},
+		});
+	});
+
+	test("each contract field stands on its own", () => {
+		const result = validateBillingDraft({ ...empty, bandwidth: "100" });
+		expect(result).toEqual({
+			ok: true,
+			value: { ...cleared, bandwidth_mbps: 100 },
+		});
+	});
+
+	test("a fractional bandwidth is refused", () => {
+		const result = validateBillingDraft({ ...empty, bandwidth: "100.5" });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toContain("Bandwidth");
+	});
+
+	test("a zero quota is refused", () => {
+		const result = validateBillingDraft({ ...empty, trafficGb: "0" });
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.error).toContain("Traffic quota");
+	});
+
+	test("a reset day outside the calendar is refused", () => {
+		for (const resetDay of ["0", "32", "1.5", "first"]) {
+			const result = validateBillingDraft({ ...empty, resetDay });
+			expect(result.ok).toBe(false);
+			if (!result.ok) expect(result.error).toContain("Reset day");
+		}
+	});
+
+	test("a stored contract becomes an editable draft", () => {
 		expect(
 			billingDraftFrom({
 				cost_amount_cny: 365,
 				paid_at: "2026-01-01",
 				renews_at: "2027-01-01",
+				bandwidth_mbps: 2500,
+				traffic_quota_gb: null,
+				traffic_reset_day: 15,
 			}),
-		).toEqual({ amount: "365", paidAt: "2026-01-01", renewsAt: "2027-01-01" });
-		expect(billingDraftFrom({ cost_amount_cny: null, paid_at: null, renews_at: null })).toEqual({
-			amount: "",
-			paidAt: "",
-			renewsAt: "",
+		).toEqual({
+			amount: "365",
+			paidAt: "2026-01-01",
+			renewsAt: "2027-01-01",
+			bandwidth: "2500",
+			trafficGb: "",
+			resetDay: "15",
 		});
+		expect(billingDraftFrom(cleared)).toEqual(emptyBillingDraft());
 	});
 });

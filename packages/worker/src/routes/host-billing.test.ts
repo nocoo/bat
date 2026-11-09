@@ -101,6 +101,99 @@ describe("PATCH /api/hosts/:id/billing", () => {
 		expect(detail.renews_at).toBeNull();
 	});
 
+	test("stores the three contract fields next to the billing triple", async () => {
+		const res = await patch(app, "host-001", {
+			cost_amount_cny: 365,
+			paid_at: "2026-01-01",
+			renews_at: "2027-01-01",
+			bandwidth_mbps: 2500,
+			traffic_quota_gb: 500,
+			traffic_reset_day: 1,
+		});
+		expect(res.status).toBe(204);
+
+		const detail = (await (
+			await app.request("http://localhost/api/hosts/host-001")
+		).json()) as HostDetailItem;
+		expect(detail.bandwidth_mbps).toBe(2500);
+		expect(detail.traffic_quota_gb).toBe(500);
+		expect(detail.traffic_reset_day).toBe(1);
+
+		const hosts = (await (
+			await app.request("http://localhost/api/hosts")
+		).json()) as HostOverviewItem[];
+		expect(hosts[0]?.bandwidth_mbps).toBe(2500);
+		expect(hosts[0]?.traffic_reset_day).toBe(1);
+	});
+
+	test("accepts a contract without any billing triple", async () => {
+		const res = await patch(app, "host-001", {
+			cost_amount_cny: null,
+			paid_at: null,
+			renews_at: null,
+			bandwidth_mbps: 100,
+		});
+		expect(res.status).toBe(204);
+
+		const detail = (await (
+			await app.request("http://localhost/api/hosts/host-001")
+		).json()) as HostDetailItem;
+		expect(detail.cost_amount_cny).toBeNull();
+		expect(detail.bandwidth_mbps).toBe(100);
+		expect(detail.traffic_quota_gb).toBeNull();
+	});
+
+	test("a body without contract keys clears whatever was stored", async () => {
+		await patch(app, "host-001", {
+			cost_amount_cny: 365,
+			paid_at: "2026-01-01",
+			renews_at: "2027-01-01",
+			bandwidth_mbps: 500,
+			traffic_quota_gb: 1000,
+			traffic_reset_day: 15,
+		});
+		const res = await patch(app, "host-001", {
+			cost_amount_cny: 365,
+			paid_at: "2026-01-01",
+			renews_at: "2027-01-01",
+		});
+		expect(res.status).toBe(204);
+
+		const detail = (await (
+			await app.request("http://localhost/api/hosts/host-001")
+		).json()) as HostDetailItem;
+		expect(detail.bandwidth_mbps).toBeNull();
+		expect(detail.traffic_quota_gb).toBeNull();
+		expect(detail.traffic_reset_day).toBeNull();
+	});
+
+	test("rejects contract values that are not whole positive numbers", async () => {
+		for (const [key, value] of [
+			["bandwidth_mbps", 0],
+			["bandwidth_mbps", -100],
+			["bandwidth_mbps", 100.5],
+			["bandwidth_mbps", 1_000_001],
+			["bandwidth_mbps", "500"],
+			["traffic_quota_gb", 0],
+			["traffic_quota_gb", 0.5],
+			["traffic_quota_gb", 1_000_001],
+			["traffic_reset_day", 0],
+			["traffic_reset_day", 32],
+			["traffic_reset_day", 1.5],
+			["traffic_reset_day", "1"],
+		] as const) {
+			const res = await patch(app, "host-001", {
+				cost_amount_cny: 365,
+				paid_at: "2026-01-01",
+				renews_at: "2027-01-01",
+				[key]: value,
+			});
+			expect(res.status).toBe(400);
+			const body = (await res.json()) as { error: string };
+			expect(body.error).toContain(key);
+		}
+	});
+
 	test("accepts a host addressed by its opaque hid", async () => {
 		const res = await patch(app, hashHostId("host-001"), {
 			cost_amount_cny: 88.5,

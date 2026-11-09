@@ -98,6 +98,14 @@ export interface HostOverviewItem {
 	cost_amount_cny: number | null;
 	/** Last payment date (`YYYY-MM-DD`). Null when unset. */
 	paid_at: string | null;
+	/** Port bandwidth as entered, in Mbps. Null when unset — independent of
+	 *  the billing trio. */
+	bandwidth_mbps: number | null;
+	/** Monthly traffic allowance, in GB. Null when unset. */
+	traffic_quota_gb: number | null;
+	/** Calendar day of month the traffic counter resets (1–31). Null when
+	 *  unset. */
+	traffic_reset_day: number | null;
 }
 
 /** GET /api/hosts/:id → HostDetailItem */

@@ -23,6 +23,20 @@ export interface BillingFields {
 }
 
 /**
+ * The contract inputs a host stores next to its billing. Unlike the billing
+ * trio they are independent: each one is set or null on its own, so a host
+ * can carry a price but no bandwidth, or a quota without a reset day.
+ */
+export interface ContractFields {
+	/** Port bandwidth as entered, in Mbps. */
+	bandwidth_mbps: number | null;
+	/** Monthly traffic allowance, in GB. */
+	traffic_quota_gb: number | null;
+	/** Calendar day of month the traffic counter resets (1–31). */
+	traffic_reset_day: number | null;
+}
+
+/**
  * Parse a `YYYY-MM-DD` calendar date into UTC midnight.
  * Returns null for anything that is not a real calendar day
  * (`2026-02-30`, `2026-13-01`, `20260101`, …).
@@ -137,17 +151,28 @@ function hasAtMostTwoDecimals(value: number): boolean {
 	return Math.abs(scaled - Math.round(scaled)) < 1e-9;
 }
 
-export type BillingValidation = { ok: true; value: BillingFields } | { ok: false; error: string };
+export type BillingValidation =
+	| { ok: true; value: BillingFields & ContractFields }
+	| { ok: false; error: string };
 
 const BILLING_KEYS = ["cost_amount_cny", "paid_at", "renews_at"] as const;
+const CONTRACT_KEYS = ["bandwidth_mbps", "traffic_quota_gb", "traffic_reset_day"] as const;
+
+/** Upper bound of the two counter fields: one million Mbps / GB. */
+const CONTRACT_COUNT_MAX = 1_000_000;
 
 /**
  * Validate the body of `PATCH /api/hosts/:id/billing`.
  *
- * The three fields are all-or-nothing: either every one of them is null
- * (billing cleared) or every one of them carries a value. Amounts are finite,
- * non-negative and carry at most two decimals; dates are real calendar days
- * and the renewal date falls strictly after the payment date.
+ * The three billing fields are all-or-nothing: either every one of them is
+ * null (billing cleared) or every one of them carries a value. Amounts are
+ * finite, non-negative and carry at most two decimals; dates are real
+ * calendar days and the renewal date falls strictly after the payment date.
+ *
+ * The three contract fields are optional and independent: a missing key
+ * means null, and each present value must be a positive integer up to one
+ * million (the reset day only up to 31). The route replaces the whole
+ * contract, so a body without contract keys clears whatever was stored.
  */
 export function validateBillingInput(body: unknown): BillingValidation {
 	if (typeof body !== "object" || body === null || Array.isArray(body)) {
@@ -162,9 +187,16 @@ export function validateBillingInput(body: unknown): BillingValidation {
 	const amount = record.cost_amount_cny;
 	const paidAt = record.paid_at;
 	const renewsAt = record.renews_at;
+	const contract = validateContractFields(record);
+	if (typeof contract === "string") {
+		return { ok: false, error: contract };
+	}
 	const nullCount = [amount, paidAt, renewsAt].filter((value) => value === null).length;
 	if (nullCount === BILLING_KEYS.length) {
-		return { ok: true, value: { cost_amount_cny: null, paid_at: null, renews_at: null } };
+		return {
+			ok: true,
+			value: { ...contract, cost_amount_cny: null, paid_at: null, renews_at: null },
+		};
 	}
 	if (nullCount > 0) {
 		return {
@@ -192,5 +224,90 @@ export function validateBillingInput(body: unknown): BillingValidation {
 	if (renewsAt <= paidAt) {
 		return { ok: false, error: "renews_at must be after paid_at" };
 	}
-	return { ok: true, value: { cost_amount_cny: amount, paid_at: paidAt, renews_at: renewsAt } };
+	return {
+		ok: true,
+		value: { ...contract, cost_amount_cny: amount, paid_at: paidAt, renews_at: renewsAt },
+	};
+}
+
+/** Validate one optional contract counter: null (or missing), or a whole
+ *  number inside `[1, max]` — never zero, never fractional. */
+function validateContractCount(
+	record: Record<string, unknown>,
+	key: (typeof CONTRACT_KEYS)[number],
+	max: number,
+): number | null | string {
+	if (!(key in record) || record[key] === null) return null;
+	const value = record[key];
+	if (typeof value !== "number" || !Number.isFinite(value)) {
+		return `${key} must be a whole number`;
+	}
+	if (!Number.isInteger(value)) {
+		return `${key} must be a whole number, not a fraction`;
+	}
+	if (value < 1 || value > max) {
+		return `${key} must be between 1 and ${max}`;
+	}
+	return value;
+}
+
+/**
+ * Validate the three independent contract fields. A missing key reads as
+ * null; every present value must be a positive integer (the reset day inside
+ * 1–31, the counters up to one million).
+ */
+function validateContractFields(record: Record<string, unknown>): ContractFields | string {
+	const bandwidth = validateContractCount(record, "bandwidth_mbps", CONTRACT_COUNT_MAX);
+	if (typeof bandwidth === "string") return bandwidth;
+	const quota = validateContractCount(record, "traffic_quota_gb", CONTRACT_COUNT_MAX);
+	if (typeof quota === "string") return quota;
+	const resetDay = validateContractCount(record, "traffic_reset_day", 31);
+	if (typeof resetDay === "string") return resetDay;
+	return {
+		bandwidth_mbps: bandwidth,
+		traffic_quota_gb: quota,
+		traffic_reset_day: resetDay,
+	};
+}
+
+/**
+ * Bandwidth as the reader expects it: below one gigabit the Mbps figure
+ * stands (`500 Mbps`); from 1000 up it becomes gigabits with a single
+ * decimal at most and no trailing `.0` (`1 Gbps`, `2.5 Gbps`).
+ */
+export function formatBandwidthMbps(mbps: number | null | undefined): string | null {
+	if (mbps === null || mbps === undefined || !Number.isFinite(mbps)) return null;
+	if (mbps < 1000) return `${mbps} Mbps`;
+	const gbps = mbps / 1000;
+	if (Number.isInteger(gbps)) return `${gbps} Gbps`;
+	return `${Math.round(gbps * 10) / 10} Gbps`;
+}
+
+/** The monthly traffic allowance exactly as entered: `500 GB`, `1000 GB`. */
+export function formatTrafficQuotaGb(gb: number | null | undefined): string | null {
+	if (gb === null || gb === undefined || !Number.isFinite(gb)) return null;
+	return `${gb} GB`;
+}
+
+/** The day of month as an ordinal: `1st`, `2nd`, `3rd`, `4th`, `21st`, `31st`. */
+export function ordinalDayOfMonth(day: number | null | undefined): string | null {
+	if (day === null || day === undefined || !Number.isInteger(day)) return null;
+	const tens = day % 100;
+	if (tens >= 11 && tens <= 13) return `${day}th`;
+	switch (day % 10) {
+		case 1:
+			return `${day}st`;
+		case 2:
+			return `${day}nd`;
+		case 3:
+			return `${day}rd`;
+		default:
+			return `${day}th`;
+	}
+}
+
+/** The reset-day sentence of the contract card: `resets on the 1st`. */
+export function formatResetDay(day: number | null | undefined): string | null {
+	const ordinal = ordinalDayOfMonth(day);
+	return ordinal === null ? null : `resets on the ${ordinal}`;
 }

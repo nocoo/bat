@@ -110,6 +110,59 @@ describe("L2: host billing", () => {
 		);
 	});
 
+	test("PATCH /api/hosts/:id/billing → stores the contract fields independently", async () => {
+		await registerHost();
+
+		const res = await patchBilling({
+			cost_amount_cny: null,
+			paid_at: null,
+			renews_at: null,
+			bandwidth_mbps: 2500,
+			traffic_quota_gb: 500,
+			traffic_reset_day: 1,
+		});
+		expect(res.status).toBe(204);
+
+		const detail = (await (
+			await fetch(`${BASE}/api/hosts/${hashHostId(HID)}`, { headers: readHeaders() })
+		).json()) as HostDetailItem;
+		expect(detail.cost_amount_cny).toBeNull();
+		expect(detail.bandwidth_mbps).toBe(2500);
+		expect(detail.traffic_quota_gb).toBe(500);
+		expect(detail.traffic_reset_day).toBe(1);
+
+		const hosts = (await (
+			await fetch(`${BASE}/api/hosts`, { headers: readHeaders() })
+		).json()) as HostOverviewItem[];
+		const mine = hosts.find((host) => host.host_id === HID);
+		expect(mine?.bandwidth_mbps).toBe(2500);
+		expect(mine?.traffic_reset_day).toBe(1);
+	});
+
+	test("PATCH /api/hosts/:id/billing → 400 on an invalid contract field", async () => {
+		await registerHost();
+
+		for (const [key, value] of [
+			["bandwidth_mbps", 0],
+			["bandwidth_mbps", 100.5],
+			["bandwidth_mbps", 1_000_001],
+			["bandwidth_mbps", "500"],
+			["traffic_quota_gb", -1],
+			["traffic_reset_day", 0],
+			["traffic_reset_day", 32],
+			["traffic_reset_day", "1"],
+		] as const) {
+			const res = await patchBilling({
+				cost_amount_cny: null,
+				paid_at: null,
+				renews_at: null,
+				[key]: value,
+			});
+			expect(res.status).toBe(400);
+			expect(((await res.json()) as { error: string }).error).toContain(key);
+		}
+	});
+
 	test("PATCH /api/hosts/:id/billing → 404 on an unknown host", async () => {
 		const res = await fetch(`${BASE}/api/hosts/nonexistent-billing-host/billing`, {
 			method: "PATCH",

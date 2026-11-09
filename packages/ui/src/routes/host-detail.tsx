@@ -1,4 +1,4 @@
-import type { BillingFields } from "@bat/shared";
+import type { BillingFields, ContractFields } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
 import { InlineEditable } from "@nocoo/basalt/components/inline-editable";
@@ -116,7 +116,7 @@ export function HostDetailPage() {
 	);
 
 	const handleBillingSaved = useCallback(
-		(billing: BillingFields) => {
+		(billing: BillingFields & ContractFields) => {
 			if (detail) {
 				mutateDetail({ ...detail, ...billing }, false);
 			}
@@ -350,6 +350,9 @@ export function HostDetailPage() {
 									cost_amount_cny: detail.cost_amount_cny,
 									paid_at: detail.paid_at,
 									renews_at: detail.renews_at,
+									bandwidth_mbps: detail.bandwidth_mbps,
+									traffic_quota_gb: detail.traffic_quota_gb,
+									traffic_reset_day: detail.traffic_reset_day,
 								}}
 								onSaved={handleBillingSaved}
 							/>

@@ -1,6 +1,7 @@
 {
   "alert_count": 1,
   "arch": "x86_64",
+  "bandwidth_mbps": null,
   "boot_mode": "uefi",
   "boot_time": "<TS>",
   "cost_amount_cny": 365,
@@ -58,6 +59,8 @@
   "timezone": null,
   "top_processes_json": null,
   "top_processes_ts": null,
+  "traffic_quota_gb": null,
+  "traffic_reset_day": null,
   "uptime_seconds": "<DURATION>",
   "virtualization": "kvm"
 }

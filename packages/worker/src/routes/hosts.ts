@@ -181,6 +181,9 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			renews_at: host.renews_at,
 			cost_amount_cny: host.cost_amount_cny,
 			paid_at: host.paid_at,
+			bandwidth_mbps: host.bandwidth_mbps,
+			traffic_quota_gb: host.traffic_quota_gb,
+			traffic_reset_day: host.traffic_reset_day,
 		};
 	});
 

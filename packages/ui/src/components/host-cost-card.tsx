@@ -4,7 +4,7 @@
 // derived. Editing follows the inline description pattern: one form, one
 // save, one error line.
 
-import type { BillingFields } from "@bat/shared";
+import type { BillingFields, ContractFields } from "@bat/shared";
 import { Button, Field, Input } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Pencil, Wallet } from "lucide-react";
@@ -35,8 +35,8 @@ export function HostCostCard({
 	onSaved,
 }: {
 	hid: string;
-	billing: BillingFields;
-	onSaved: (billing: BillingFields) => void;
+	billing: BillingFields & ContractFields;
+	onSaved: (billing: BillingFields & ContractFields) => void;
 }) {
 	const [editing, setEditing] = useState(false);
 	const [draft, setDraft] = useState<BillingDraft>(() => billingDraftFrom(billing));
