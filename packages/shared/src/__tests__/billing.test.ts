@@ -4,10 +4,11 @@ import {
 	dailyCostCny,
 	daysUntilRenewal,
 	formatBandwidthMbps,
+	formatMonthlyTrafficGb,
 	formatResetDay,
+	formatResetDayCompact,
 	formatTrafficQuotaGb,
 	monthlyEquivalentCny,
-	ordinalDayOfMonth,
 	parseCalendarDate,
 	renewalBadgeLabel,
 	renewalCountdownLabel,
@@ -411,25 +412,26 @@ describe("formatTrafficQuotaGb", () => {
 });
 
 describe("reset-day labels", () => {
-	test("ordinals follow English convention", () => {
-		expect(ordinalDayOfMonth(1)).toBe("1st");
-		expect(ordinalDayOfMonth(2)).toBe("2nd");
-		expect(ordinalDayOfMonth(3)).toBe("3rd");
-		expect(ordinalDayOfMonth(4)).toBe("4th");
-		expect(ordinalDayOfMonth(11)).toBe("11th");
-		expect(ordinalDayOfMonth(12)).toBe("12th");
-		expect(ordinalDayOfMonth(13)).toBe("13th");
-		expect(ordinalDayOfMonth(21)).toBe("21st");
-		expect(ordinalDayOfMonth(22)).toBe("22nd");
-		expect(ordinalDayOfMonth(23)).toBe("23rd");
-		expect(ordinalDayOfMonth(31)).toBe("31st");
-		expect(ordinalDayOfMonth(null)).toBeNull();
+	test("the compact form names the day of month", () => {
+		expect(formatResetDayCompact(1)).toBe("每月 1 日");
+		expect(formatResetDayCompact(15)).toBe("每月 15 日");
+		expect(formatResetDayCompact(28)).toBe("每月 28 日");
+		expect(formatResetDayCompact(31)).toBe("每月 31 日");
+		expect(formatResetDayCompact(null)).toBeNull();
 	});
 
 	test("the sentence form is consistent", () => {
-		expect(formatResetDay(1)).toBe("resets on the 1st");
-		expect(formatResetDay(15)).toBe("resets on the 15th");
-		expect(formatResetDay(28)).toBe("resets on the 28th");
+		expect(formatResetDay(1)).toBe("每月 1 日重置");
+		expect(formatResetDay(15)).toBe("每月 15 日重置");
+		expect(formatResetDay(28)).toBe("每月 28 日重置");
 		expect(formatResetDay(null)).toBeNull();
+	});
+});
+
+describe("formatMonthlyTrafficGb", () => {
+	test("keeps the allowance and its period together", () => {
+		expect(formatMonthlyTrafficGb(500)).toBe("500 GB/月");
+		expect(formatMonthlyTrafficGb(2000)).toBe("2000 GB/月");
+		expect(formatMonthlyTrafficGb(null)).toBeNull();
 	});
 });

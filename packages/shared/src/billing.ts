@@ -289,25 +289,24 @@ export function formatTrafficQuotaGb(gb: number | null | undefined): string | nu
 	return `${gb} GB`;
 }
 
-/** The day of month as an ordinal: `1st`, `2nd`, `3rd`, `4th`, `21st`, `31st`. */
-export function ordinalDayOfMonth(day: number | null | undefined): string | null {
+/**
+ * The day the traffic counter resets, in the dashboard's calendar words:
+ * `每月 1 日`. The countdown labels are Chinese, so the contract day speaks
+ * the same language everywhere it appears.
+ */
+export function formatResetDayCompact(day: number | null | undefined): string | null {
 	if (day === null || day === undefined || !Number.isInteger(day)) return null;
-	const tens = day % 100;
-	if (tens >= 11 && tens <= 13) return `${day}th`;
-	switch (day % 10) {
-		case 1:
-			return `${day}st`;
-		case 2:
-			return `${day}nd`;
-		case 3:
-			return `${day}rd`;
-		default:
-			return `${day}th`;
-	}
+	return `每月 ${day} 日`;
 }
 
-/** The reset-day sentence of the contract card: `resets on the 1st`. */
+/** The reset-day sentence of the contract card: `每月 1 日重置`. */
 export function formatResetDay(day: number | null | undefined): string | null {
-	const ordinal = ordinalDayOfMonth(day);
-	return ordinal === null ? null : `resets on the ${ordinal}`;
+	const compact = formatResetDayCompact(day);
+	return compact === null ? null : `${compact}重置`;
+}
+
+/** The monthly traffic allowance with its period: `500 GB/月`. */
+export function formatMonthlyTrafficGb(gb: number | null | undefined): string | null {
+	const quota = formatTrafficQuotaGb(gb);
+	return quota === null ? null : `${quota}/月`;
 }

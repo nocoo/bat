@@ -349,20 +349,18 @@ test.describe("Hosts list page", () => {
 			const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
 			await expect(alpha.getByTestId("host-contract")).toBeVisible();
 
-			// One column, three stacked lines: bandwidth switches to gigabits,
-			// the quota stays GB, the reset day shows its ordinal.
+			// One column, two lines: the bandwidth on top, the quota and the
+			// reset day together underneath.
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB");
-			await expect(alpha.getByTestId("host-contract")).toContainText("1st");
+			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB · 每月 1 日");
 
 			// A host without contract data keeps its dashes in the same column.
 			await expect(beta.getByTestId("host-contract")).toContainText("—");
 
-			// At 1024 only the reset-day line gives way.
+			// At 1024 the cell shows the bandwidth only.
 			await page.setViewportSize({ width: 1024, height: 900 });
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB");
-			await expect(alpha.getByTestId("host-contract").getByText("1st")).toBeHidden();
+			await expect(alpha.getByTestId("host-contract").getByText("500 GB · 每月 1 日")).toBeHidden();
 		} finally {
 			await page.request.patch("/api/hosts/f0d3fd30/billing", {
 				data: {
@@ -401,6 +399,86 @@ test.describe("Hosts list page", () => {
 					renews_at: billingDate(2),
 				},
 			});
+		}
+	});
+
+	test("the identity cell keeps its room and the cells never touch at 1024", async ({ page }) => {
+		// A long hostname is the hard case: it must stay complete while the
+		// expiry and cost cells keep a gap between them. Alpha borrows the
+		// longer name for the measurement and gives it back afterwards.
+		const rename = async (hostname: string) => {
+			const res = await page.request.post("/api/identity", {
+				headers: {
+					Authorization: `Bearer ${process.env.BAT_E2E_WRITE_KEY}`,
+					"Content-Type": "application/json",
+				},
+				data: {
+					host_id: "pw-host-alpha",
+					hostname,
+					os: "Ubuntu 24.04.2 LTS",
+					kernel: "6.8.0-45-generic",
+					arch: "x86_64",
+					cpu_model: "Intel Xeon E5-2680 v4",
+					uptime_seconds: 86400,
+					boot_time: Math.floor(Date.now() / 1000) - 86400,
+				},
+			});
+			expect(res.status()).toBe(204);
+		};
+		await rename("alpha.example.test");
+
+		try {
+			for (const width of [1440, 1024]) {
+				await page.setViewportSize({ width, height: 900 });
+				await page.goto("/hosts");
+				await expect(page.getByTestId("host-row").first()).toBeVisible({ timeout: 15_000 });
+
+				const table = page.getByRole("table", { name: "Servers" });
+				const long = page.getByRole("link", { name: "alpha.example.test" });
+				await expect(long).toBeVisible();
+				await expect
+					.poll(() => long.evaluate((element) => element.scrollWidth <= element.clientWidth))
+					.toBe(true);
+
+				const geometry = await table.evaluate((element) => {
+					const rows = Array.from(element.querySelectorAll("tbody tr"));
+					const first = rows[0] as HTMLElement;
+					// The row that carries a countdown — the gap between the expiry
+					// text and the cost cell is what must stay open.
+					const counted = (rows.find((row) => row.querySelector("td:nth-child(7) span")) ??
+						first) as HTMLElement;
+					const cells = Array.from(counted.querySelectorAll("td"));
+					const expiry = cells[6] as HTMLElement;
+					const cost = cells[7] as HTMLElement;
+					const expiryText = expiry.querySelector("span")?.getBoundingClientRect();
+					return {
+						tableOverflow: element.scrollWidth - element.clientWidth,
+						rowHeight: Math.round(first.getBoundingClientRect().height),
+						identityWidth: Math.round((cells[0] as HTMLElement).getBoundingClientRect().width),
+						expiryWidth: Math.round(expiry.getBoundingClientRect().width),
+						costWidth: Math.round(cost.getBoundingClientRect().width),
+						expiryCostGap: expiryText
+							? Math.round(cost.getBoundingClientRect().left - expiryText.right)
+							: null,
+						cellOverflow: Math.max(
+							...cells.map(
+								(cell) => (cell as HTMLElement).scrollWidth - (cell as HTMLElement).clientWidth,
+							),
+						),
+					};
+				});
+				expect(geometry.tableOverflow).toBeLessThanOrEqual(0);
+				expect(geometry.cellOverflow).toBeLessThanOrEqual(0);
+				// The identity cell keeps a usable width at every viewport.
+				expect(geometry.identityWidth).toBeGreaterThanOrEqual(180);
+				// The expiry and the cost never touch.
+				expect(geometry.expiryCostGap ?? 0).toBeGreaterThanOrEqual(4);
+				// Two lines of contract keep the row compact.
+				expect(geometry.rowHeight).toBeLessThanOrEqual(60);
+			}
+		} finally {
+			// The longer name must not leak into the specs that follow.
+			await rename("alpha.test.local");
 		}
 	});
 

@@ -19,7 +19,14 @@ function billingDate(offsetDays: number): string {
 async function setBilling(
 	page: import("@playwright/test").Page,
 	hid: string,
-	billing: { cost_amount_cny: number | null; paid_at: string | null; renews_at: string | null },
+	billing: {
+		cost_amount_cny: number | null;
+		paid_at: string | null;
+		renews_at: string | null;
+		bandwidth_mbps?: number | null;
+		traffic_quota_gb?: number | null;
+		traffic_reset_day?: number | null;
+	},
 ) {
 	const response = await page.request.patch(`/api/hosts/${hid}/billing`, { data: billing });
 	expect(response.ok()).toBe(true);
@@ -84,6 +91,14 @@ test.describe("Hosts card view", () => {
 	});
 
 	test("a card carries the full anatomy and navigates to the detail page", async ({ page }) => {
+		await setBilling(page, "f0d3fd30", {
+			cost_amount_cny: 3650,
+			paid_at: billingDate(-253),
+			renews_at: billingDate(112),
+			bandwidth_mbps: 2500,
+			traffic_quota_gb: 500,
+			traffic_reset_day: 1,
+		});
 		await page.goto("/hosts");
 		await page.getByTestId("hosts-view-cards").click();
 		const grid = page.getByTestId("host-card-grid");
@@ -116,12 +131,22 @@ test.describe("Hosts card view", () => {
 		await expect(alpha.getByText("Bandwidth", { exact: true })).toBeVisible();
 		await expect(alpha.getByText("Traffic", { exact: true })).toBeVisible();
 		await expect(alpha.getByText("Reset", { exact: true })).toBeVisible();
+		// The traffic row carries its period, the reset day its calendar.
+		await expect(alpha.getByText("500 GB/月", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("每月 1 日", { exact: true })).toBeVisible();
 		await expect(beta.getByText("Bandwidth", { exact: true })).toBeVisible();
 		await expect(beta).toContainText("—");
 
 		// The card itself is one link to the detail page.
 		await grid.getByTestId("host-card").filter({ hasText: "beta.test.local" }).click();
 		await expect(page).toHaveURL(new RegExp(`/hosts/${betaHid}`));
+
+		// The contract data must not leak into the specs that follow.
+		await setBilling(page, "f0d3fd30", {
+			cost_amount_cny: 3650,
+			paid_at: billingDate(-253),
+			renews_at: billingDate(112),
+		});
 	});
 
 	test("an overdue host turns the countdown destructive; an unpriced host shows no badge", async ({

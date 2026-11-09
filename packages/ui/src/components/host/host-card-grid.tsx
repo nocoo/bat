@@ -12,8 +12,8 @@ import {
 	dailyCostCny,
 	daysUntilRenewal,
 	formatBandwidthMbps,
-	formatResetDay,
-	formatTrafficQuotaGb,
+	formatMonthlyTrafficGb,
+	formatResetDayCompact,
 	hashHostId,
 	renewalBadgeLabel,
 	renewalTone,
@@ -249,9 +249,12 @@ export function HostCardGrid({
 								/>
 								<MetricRow
 									label="Traffic"
-									value={formatTrafficQuotaGb(host.traffic_quota_gb) ?? "—"}
+									value={formatMonthlyTrafficGb(host.traffic_quota_gb) ?? "—"}
 								/>
-								<MetricRow label="Reset" value={formatResetDay(host.traffic_reset_day) ?? "—"} />
+								<MetricRow
+									label="Reset"
+									value={formatResetDayCompact(host.traffic_reset_day) ?? "—"}
+								/>
 							</div>
 						</div>
 					</LayerCard>

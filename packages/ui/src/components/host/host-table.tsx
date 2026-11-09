@@ -7,9 +7,9 @@ import {
 	dailyCostCny,
 	daysUntilRenewal,
 	formatBandwidthMbps,
+	formatResetDayCompact,
 	formatTrafficQuotaGb,
 	hashHostId,
-	ordinalDayOfMonth,
 	renewalBadgeLabel,
 	renewalTone,
 } from "@bat/shared";
@@ -149,6 +149,15 @@ function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	);
 }
 
+/** The second line of the Link column: quota and reset day in one string,
+ *  or a dash when the host carries neither. */
+function contractLine(quotaGb: number | null, resetDay: number | null): string {
+	const quota = formatTrafficQuotaGb(quotaGb);
+	const reset = formatResetDayCompact(resetDay);
+	if (quota && reset) return `${quota} · ${reset}`;
+	return quota ?? reset ?? "—";
+}
+
 export function HostTable({
 	hosts,
 	tagsFor,
@@ -161,32 +170,35 @@ export function HostTable({
 	const today = todayCalendarDate(new Date(now * 1000));
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
-			<Table aria-label="Servers" className="lg:table-fixed">
+			<Table
+				aria-label="Servers"
+				className="lg:table-fixed lg:[&_th]:!px-basalt-space-md lg:[&_td]:!px-basalt-space-md"
+			>
 				<TableHeader>
 					<TableRow>
-						<TableHead className="lg:w-[24%] xl:w-[26%] 2xl:w-[22%]">Server</TableHead>
-						<TableHead className="lg:w-[10.75%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
+						<TableHead className="lg:w-[28%] xl:w-[28%] 2xl:w-[24%]">Server</TableHead>
+						<TableHead className="lg:w-[11%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
 							Status
 						</TableHead>
-						<TableHead className="lg:w-[11.5%] xl:w-[12%] 2xl:w-[12%]" textAlign="end">
+						<TableHead className="lg:w-[10%] xl:w-[10%] 2xl:w-[10%]" textAlign="end">
 							CPU
 						</TableHead>
 						<TableHead className="lg:w-[11.5%] xl:w-[12%] 2xl:w-[12%]" textAlign="end">
 							Memory
 						</TableHead>
-						<TableHead className="lg:w-[8%] xl:w-[8%] 2xl:w-[8%]" textAlign="end">
+						<TableHead className="lg:w-[8%] xl:w-[7.5%] 2xl:w-[7%]" textAlign="end">
 							Disk
 						</TableHead>
 						<TableHead className="hidden 2xl:table-cell 2xl:w-[7%]" textAlign="end">
 							Load 1m
 						</TableHead>
-						<TableHead className="lg:w-[10%] xl:w-[11%] 2xl:w-[10%]" textAlign="end">
+						<TableHead className="lg:w-[11%] xl:w-[10%] 2xl:w-[9%]" textAlign="end">
 							Expiry
 						</TableHead>
-						<TableHead className="lg:w-[12.25%] xl:w-[11%] 2xl:w-[10%]" textAlign="end">
+						<TableHead className="lg:w-[12%] xl:w-[11%] 2xl:w-[10%]" textAlign="end">
 							Cost
 						</TableHead>
-						<TableHead className="lg:w-[12%] xl:w-[10%] 2xl:w-[10%]" textAlign="end">
+						<TableHead className="lg:w-[10%] xl:w-[13.5%] 2xl:w-[16%]" textAlign="end">
 							Link
 						</TableHead>
 					</TableRow>
@@ -313,10 +325,11 @@ export function HostTable({
 								>
 									<div className="flex flex-col items-end gap-basalt-space-xs">
 										<span>{formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}</span>
-										<span>{formatTrafficQuotaGb(host.traffic_quota_gb) ?? "—"}</span>
-										<span className="hidden xl:inline">
-											{ordinalDayOfMonth(host.traffic_reset_day) ?? "—"}
-										</span>
+										{contractLine(host.traffic_quota_gb, host.traffic_reset_day) !== "—" && (
+											<span className="hidden xl:inline">
+												{contractLine(host.traffic_quota_gb, host.traffic_reset_day)}
+											</span>
+										)}
 									</div>
 								</TableCell>
 							</TableRow>
