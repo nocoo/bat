@@ -86,6 +86,12 @@ export interface HostOverviewItem {
 	/** Next payment / expiry date (`YYYY-MM-DD`). Null when the host carries
 	 *  no billing data — the list renders no countdown for it. */
 	renews_at: string | null;
+	/** Amount paid for the current period, in yuan. Null when unset. The list
+	 *  carries it so the fleet cost summary can derive the daily rate without
+	 *  fetching every host detail. */
+	cost_amount_cny: number | null;
+	/** Last payment date (`YYYY-MM-DD`). Null when unset. */
+	paid_at: string | null;
 }
 
 /** GET /api/hosts/:id → HostDetailItem */

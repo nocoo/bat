@@ -172,6 +172,8 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			net_sparkline: netSparkline,
 			load_sparkline: sparklines && sparklines.load.length > 0 ? sparklines.load : null,
 			renews_at: host.renews_at,
+			cost_amount_cny: host.cost_amount_cny,
+			paid_at: host.paid_at,
 		};
 	});
 

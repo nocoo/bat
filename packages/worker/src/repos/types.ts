@@ -170,6 +170,10 @@ export interface HostOverviewRow {
 	probe_version: string | null;
 	/** Next payment / expiry date (`YYYY-MM-DD`). */
 	renews_at: string | null;
+	/** Amount paid for the current period, in yuan. */
+	cost_amount_cny: number | null;
+	/** Last payment date (`YYYY-MM-DD`). */
+	paid_at: string | null;
 }
 
 /** Subset used for status derivation (fleet + monitoring). */

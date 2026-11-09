@@ -18,7 +18,7 @@ import type {
 } from "../../repos/types.js";
 
 const HOST_OVERVIEW_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version, renews_at";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version, renews_at, cost_amount_cny, paid_at";
 
 const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen";
 
