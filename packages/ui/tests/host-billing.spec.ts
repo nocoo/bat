@@ -150,8 +150,9 @@ test.describe("Host billing", () => {
 		// and the reset day becomes the ordinal sentence.
 		await expect(card.getByTestId("contract-bandwidth-value")).toHaveText("2.5 Gbps");
 		await expect(card.getByText("500 GB", { exact: true })).toBeVisible();
-		await expect(card.getByText("resets on the 1st", { exact: true })).toBeVisible();
-		await expect(card.getByTestId("contract-reset-value")).toHaveText("resets on the 1st");
+		// The label already says "Traffic reset" — the value is the bare day.
+		await expect(card.getByText("Traffic reset", { exact: true })).toBeVisible();
+		await expect(card.getByTestId("contract-reset-value")).toHaveText("1st");
 		await card.screenshot({ path: testInfo.outputPath("contract-card-read.png") });
 
 		// Every rejection path of the three counters.

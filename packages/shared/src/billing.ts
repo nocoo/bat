@@ -318,12 +318,6 @@ export function formatResetDayCompact(day: number | null | undefined): string | 
 	return ordinalDayOfMonth(day);
 }
 
-/** The reset-day sentence of the contract card: `resets on the 1st`. */
-export function formatResetDay(day: number | null | undefined): string | null {
-	const ordinal = ordinalDayOfMonth(day);
-	return ordinal === null ? null : `resets on the ${ordinal}`;
-}
-
 /** The monthly traffic allowance with its period: `500 GB/mo`. */
 export function formatMonthlyTrafficGb(gb: number | null | undefined): string | null {
 	const quota = formatTrafficQuotaGb(gb);

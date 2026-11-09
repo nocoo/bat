@@ -6,7 +6,7 @@
 // form, one save, one error line.
 
 import type { BillingFields, ContractFields } from "@bat/shared";
-import { formatBandwidthMbps, formatResetDay, formatTrafficQuotaGb } from "@bat/shared";
+import { formatBandwidthMbps, formatResetDayCompact, formatTrafficQuotaGb } from "@bat/shared";
 import { Button, Field, Input } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Pencil, Wallet } from "lucide-react";
@@ -262,7 +262,7 @@ export function HostContractCard({
 							/>
 							<ContractRow
 								label="Traffic reset"
-								value={formatResetDay(billing.traffic_reset_day) ?? "—"}
+								value={formatResetDayCompact(billing.traffic_reset_day) ?? "—"}
 								valueTestId="contract-reset-value"
 							/>
 						</div>

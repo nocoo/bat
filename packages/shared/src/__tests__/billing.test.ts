@@ -5,7 +5,6 @@ import {
 	daysUntilRenewal,
 	formatBandwidthMbps,
 	formatMonthlyTrafficGb,
-	formatResetDay,
 	formatResetDayCompact,
 	formatTrafficQuotaGb,
 	monthlyEquivalentCny,
@@ -418,13 +417,6 @@ describe("reset-day labels", () => {
 		expect(formatResetDayCompact(28)).toBe("28th");
 		expect(formatResetDayCompact(31)).toBe("31st");
 		expect(formatResetDayCompact(null)).toBeNull();
-	});
-
-	test("the sentence form is consistent", () => {
-		expect(formatResetDay(1)).toBe("resets on the 1st");
-		expect(formatResetDay(15)).toBe("resets on the 15th");
-		expect(formatResetDay(28)).toBe("resets on the 28th");
-		expect(formatResetDay(null)).toBeNull();
 	});
 });
 
