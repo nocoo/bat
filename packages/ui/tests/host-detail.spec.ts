@@ -1,5 +1,43 @@
-import { readFileSync } from "node:fs";
+import type { NetInterfaceDTO } from "@bat/shared";
 import { expect, test } from "@playwright/test";
+
+// Sixteen interfaces with mixed families: enough rows to prove the nesting stays
+// readable and the address column keeps its right edge. Synthetic literals only.
+const manyInterfaces: NetInterfaceDTO[] = [
+	{
+		iface: "eth0",
+		mac: "aa:bb:cc:00:00:01",
+		ipv4: ["192.0.2.10"],
+		ipv6: ["2001:db8:2::a", "2001:db8:2::1a"],
+		speed_mbps: 10000,
+	},
+	{
+		iface: "tailscale0",
+		mac: "",
+		ipv4: ["100.64.0.1"],
+		ipv6: ["fd7a:115c:a1e0::1"],
+		speed_mbps: null,
+	},
+	{ iface: "docker0", mac: "aa:bb:cc:00:00:02", ipv4: ["172.17.0.1"], ipv6: [], speed_mbps: null },
+	...[
+		["br-000000000001", "172.18.0.1"],
+		["br-000000000002", "172.19.0.1"],
+		["br-000000000003", "172.20.0.1"],
+	].map(([iface, ipv4], index) => ({
+		iface: iface as string,
+		mac: `aa:bb:cc:00:01:0${index}`,
+		ipv4: [ipv4 as string],
+		ipv6: [`fe80::1${index}`],
+		speed_mbps: 10000,
+	})),
+	...Array.from({ length: 9 }, (_, index) => ({
+		iface: `veth0000000${index + 1}`,
+		mac: `aa:bb:cc:00:02:0${index}`,
+		ipv4: [],
+		ipv6: [`fe80::2${index}`],
+		speed_mbps: 10000,
+	})),
+];
 
 test.describe("Host detail page", () => {
 	const alphaHid = "f0d3fd30";
@@ -884,7 +922,7 @@ test.describe("Host detail page", () => {
 		context,
 	}, testInfo) => {
 		await context.grantPermissions(["clipboard-read", "clipboard-write"]);
-		const ifaces = JSON.parse(readFileSync("/tmp/jp2-ifaces.json", "utf8")) as unknown[];
+		const ifaces = manyInterfaces;
 		const ipv4 = "123.123.123.123";
 		const ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7348";
 
