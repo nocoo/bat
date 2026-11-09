@@ -67,11 +67,11 @@ These fields can change without reboot but do so infrequently. Sent with `POST /
 
 These fields are **not collected by the probe**. An operator records them once per host through the dashboard, and the worker stores them verbatim. They answer the questions the collected fields cannot: what does this host cost, and when does it expire?
 
-| #   | Field            | Source          | Parse                         | Example Value |
-| --- | ---------------- | --------------- | ----------------------------- | ------------- |
-| B1  | `cost_amount_cny` | Operator input | non-negative, ≤ 2 decimals    | `3650.00`     |
-| B2  | `paid_at`        | Operator input  | `YYYY-MM-DD`, a calendar day  | `2026-01-01`  |
-| B3  | `renews_at`      | Operator input  | `YYYY-MM-DD`, a calendar day  | `2027-01-01`  |
+| #   | Field             | Source         | Parse                        | Example Value |
+| --- | ----------------- | -------------- | ---------------------------- | ------------- |
+| B1  | `cost_amount_cny` | Operator input | non-negative, ≤ 2 decimals   | `3650.00`     |
+| B2  | `paid_at`         | Operator input | `YYYY-MM-DD`, a calendar day | `2026-01-01`  |
+| B3  | `renews_at`       | Operator input | `YYYY-MM-DD`, a calendar day | `2027-01-01`  |
 
 **Why they are manual**: the amount paid and the payment dates are facts about a purchase, not observations of a running machine. No probe can read them off the host, and guessing them would be worse than leaving them empty.
 
@@ -100,14 +100,14 @@ These are available but not worth the complexity/cost right now:
 
 Everything the dashboard shows about a host's cost is derived from the three manual inputs. The math lives in `packages/shared/src/billing.ts` — one implementation, unit tested, shared by the worker and the dashboard so the two cannot drift.
 
-| Helper                 | Meaning                                                                                              |
-| ---------------------- | ---------------------------------------------------------------------------------------------------- |
-| `billingPeriodDays`    | Whole calendar days from the payment date to the renewal date. Null when a date is missing or the order is wrong. |
-| `dailyCostCny`         | Amount ÷ period days. Null when the period is not positive. The raw quotient is returned; rounding happens at the display edge. |
-| `daysUntilRenewal`     | Whole calendar days from today to the renewal date. Negative when overdue, 0 on the day itself.         |
-| `renewalCountdownLabel` | `112 天`, `今天到期`, `已过期 3 天` — the detail card never shows a raw timestamp.                      |
-| `renewalBadgeLabel`    | `剩 112 天`, `今天到期`, `已过期 3 天` — the list badge.                                               |
-| `monthlyEquivalentCny` | Daily rate → monthly rate, using a 365.25 day year.                                                    |
+| Helper                  | Meaning                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `billingPeriodDays`     | Whole calendar days from the payment date to the renewal date. Null when a date is missing or the order is wrong.               |
+| `dailyCostCny`          | Amount ÷ period days. Null when the period is not positive. The raw quotient is returned; rounding happens at the display edge. |
+| `daysUntilRenewal`      | Whole calendar days from today to the renewal date. Negative when overdue, 0 on the day itself.                                 |
+| `renewalCountdownLabel` | `112 天`, `今天到期`, `已过期 3 天` — the detail card never shows a raw timestamp.                                              |
+| `renewalBadgeLabel`     | `剩 112 天`, `今天到期`, `已过期 3 天` — the list badge.                                                                        |
+| `monthlyEquivalentCny`  | Daily rate → monthly rate, using a 365.25 day year.                                                                             |
 
 A renewal inside the next seven days is a warning, an overdue one is destructive, and everything else stays muted. Hosts without billing data show nothing at all — no empty badge, no zero in the fleet total.
 
@@ -117,15 +117,15 @@ The fleet total on the hosts page sums the daily rate of the priced hosts only, 
 
 The reference implementation [komari](https://github.com/komari-monitor/komari) stores a richer billing model on its `Client` row: `Price`, `BillingCycle` (a day count bucketed into months, quarters and years), `Currency`, `ExpiredAt`, `AutoRenewal` and `TrafficLimit`. We borrowed the idea — a per-host cost with an expiry — and deliberately took only the part the owner asked for:
 
-| komari field   | Here                | Why                                                                                                                                                                    |
-| -------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Price`        | `cost_amount_cny`   | The amount paid for the current period.                                                                                                                                  |
-| `ExpiredAt`    | `renews_at`         | The next payment / expiry date.                                                                                                                                         |
-| —              | `paid_at`           | komari infers the period from `BillingCycle`; we ask for the payment date and derive the period from it, so a plan bought early still shows the right daily rate.            |
-| `BillingCycle` | —                   | A nominal month or year cannot describe a period that was actually 27 or 95 days long. The period is the distance between two real dates.                                 |
-| `Currency`     | —                   | The fleet is billed in CNY. A currency column would multiply the stored amount, the display and the fleet aggregate for no information.                                   |
-| `AutoRenewal`  | —                   | Renewing a server is a purchase decision, not a monitoring decision. The dashboard shows the countdown; it never spends money or moves a date.                            |
-| `TrafficLimit` | —                   | Traffic quota belongs to the plan, not to the host observation, and it needs its own accounting. It stays out of this round.                                                |
+| komari field   | Here              | Why                                                                                                                                                               |
+| -------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Price`        | `cost_amount_cny` | The amount paid for the current period.                                                                                                                           |
+| `ExpiredAt`    | `renews_at`       | The next payment / expiry date.                                                                                                                                   |
+| —              | `paid_at`         | komari infers the period from `BillingCycle`; we ask for the payment date and derive the period from it, so a plan bought early still shows the right daily rate. |
+| `BillingCycle` | —                 | A nominal month or year cannot describe a period that was actually 27 or 95 days long. The period is the distance between two real dates.                         |
+| `Currency`     | —                 | The fleet is billed in CNY. A currency column would multiply the stored amount, the display and the fleet aggregate for no information.                           |
+| `AutoRenewal`  | —                 | Renewing a server is a purchase decision, not a monitoring decision. The dashboard shows the countdown; it never spends money or moves a date.                    |
+| `TrafficLimit` | —                 | Traffic quota belongs to the plan, not to the host observation, and it needs its own accounting. It stays out of this round.                                      |
 
 The result is three nullable columns, one derivation and one countdown — no currency switch, no automatic renewal, no traffic quota yet.
 
