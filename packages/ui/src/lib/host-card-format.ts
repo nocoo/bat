@@ -3,6 +3,7 @@
 // Lives in `lib/` (not in the component file) so the rules can be unit-tested
 // without rendering React, and so the View stays presentation-only (MVVM).
 import type { SparklinePoint } from "@bat/shared";
+import { chart } from "./palette";
 
 // ---------------------------------------------------------------------------
 // Formatters
@@ -109,15 +110,19 @@ export function formatDiskUsage(pct: number | null): string {
 // Theming
 // ---------------------------------------------------------------------------
 
-/** Tailwind bg class for a 0–100 resource value (success / warning / destructive). */
-export function getBarColor(value: number): string {
+/**
+ * Inline fill colour for the host-card usage bars: a neutral chart blue
+ * below the warning threshold so the bar reads as a magnitude, not a
+ * verdict; warning from 60, destructive from 80.
+ */
+export function usageBarFill(value: number): string {
 	if (value >= 80) {
-		return "bg-basalt-destructive";
+		return "hsl(var(--basalt-destructive))";
 	}
 	if (value >= 60) {
-		return "bg-basalt-warning";
+		return "hsl(var(--basalt-warning))";
 	}
-	return "bg-basalt-success";
+	return chart.sky;
 }
 
 /** Tailwind text class matching {@link getBarColor}. */

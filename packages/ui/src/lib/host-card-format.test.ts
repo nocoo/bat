@@ -8,10 +8,10 @@ import {
 	formatMemoryUsage,
 	formatNetRate,
 	formatUptime,
-	getBarColor,
 	getValueColor,
 	statusDotColor,
 	toPolyline,
+	usageBarFill,
 } from "./host-card-format";
 
 describe("formatUptime", () => {
@@ -104,11 +104,13 @@ describe("formatDiskUsage", () => {
 	});
 });
 
-describe("getBarColor / getValueColor / statusDotColor", () => {
-	test("bar color thresholds", () => {
-		expect(getBarColor(20)).toBe("bg-basalt-success");
-		expect(getBarColor(60)).toBe("bg-basalt-warning");
-		expect(getBarColor(80)).toBe("bg-basalt-destructive");
+describe("usageBarFill / getValueColor / statusDotColor", () => {
+	test("bar fill stays a neutral chart blue until the warning threshold", () => {
+		expect(usageBarFill(0)).toBe("hsl(var(--bat-chart-2))");
+		expect(usageBarFill(32)).toBe("hsl(var(--bat-chart-2))");
+		expect(usageBarFill(59.9)).toBe("hsl(var(--bat-chart-2))");
+		expect(usageBarFill(60)).toBe("hsl(var(--basalt-warning))");
+		expect(usageBarFill(80)).toBe("hsl(var(--basalt-destructive))");
 	});
 	test("value color thresholds", () => {
 		expect(getValueColor(20)).toBe("text-basalt-success");

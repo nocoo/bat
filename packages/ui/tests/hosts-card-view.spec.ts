@@ -135,27 +135,36 @@ test.describe("Hosts card view", () => {
 
 			const geometry = await grid.evaluate((element) => {
 				const cards = Array.from(element.children);
-				const rows = new Map<number, number[]>();
+				const rows = new Map<number, { heights: number[]; metricTops: number[] }>();
 				for (const card of cards) {
 					const box = card.getBoundingClientRect();
-					const row = rows.get(box.top) ?? [];
-					row.push(box.height);
+					const metrics = card.querySelector('[role="progressbar"]')?.parentElement;
+					const metricTop = metrics?.getBoundingClientRect().top ?? -1;
+					const row = rows.get(box.top) ?? { heights: [], metricTops: [] };
+					row.heights.push(box.height);
+					row.metricTops.push(metricTop);
 					rows.set(box.top, row);
 				}
 				return {
 					cards: cards.length,
 					rows: Array.from(rows.values()),
-					columns: Math.max(...Array.from(rows.values()).map((heights) => heights.length)),
+					columns: Math.max(...Array.from(rows.values()).map((row) => row.heights.length)),
 					scrollWidth: element.scrollWidth,
 					clientWidth: element.clientWidth,
 				};
 			});
 			expect(geometry.cards).toBe(2);
 			expect(geometry.columns).toBe(2);
-			for (const heights of geometry.rows) {
-				const maxHeight = Math.max(...heights);
-				for (const height of heights) {
+			for (const row of geometry.rows) {
+				// Cards in one row share their height and their metric block
+				// offset, however many tags each host carries.
+				const maxHeight = Math.max(...row.heights);
+				const firstMetricTop = Math.min(...row.metricTops);
+				for (const height of row.heights) {
 					expect(Math.abs(height - maxHeight)).toBeLessThanOrEqual(1);
+				}
+				for (const top of row.metricTops) {
+					expect(Math.abs(top - firstMetricTop)).toBeLessThanOrEqual(1);
 				}
 			}
 			await page.screenshot({
@@ -165,26 +174,30 @@ test.describe("Hosts card view", () => {
 		}
 	});
 
-	test("the card view carries the same fleet total as the table footer", async ({ page }) => {
+	test("the card view drops the table island and carries the fleet total", async ({ page }) => {
 		await page.goto("/hosts");
 		await page.getByTestId("hosts-view-cards").click();
 		const footer = page.getByTestId("host-card-footer").getByTestId("fleet-cost");
 		await expect(footer).toBeVisible();
+
+		// No table container: each card stands on its own surface.
+		await expect(page.getByTestId("host-list")).toHaveCount(0);
+		await expect(page.getByRole("heading", { name: "Servers" })).toHaveCount(0);
+
 		await expect(footer).toContainText("¥11.50/day");
 		await expect(footer).toContainText("/month");
 		await expect(footer).toContainText("2 / 2 hosts");
 
-		// The footer line ends where the island ends.
-		const footerBox = await footer.boundingBox();
-		const islandBox = await page.getByTestId("host-list").boundingBox();
-		expect(footerBox).not.toBeNull();
-		expect(islandBox).not.toBeNull();
-		expect(
-			Math.abs(
-				(footerBox?.x ?? 0) +
-					(footerBox?.width ?? 0) -
-					((islandBox?.x ?? 0) + (islandBox?.width ?? 0)),
-			),
-		).toBeLessThanOrEqual(2);
+		// The muted line ends where the grid ends.
+		const gap = await page.evaluate(() => {
+			const footer = document.querySelector(
+				'[data-testid="host-card-footer"] [data-testid="fleet-cost"]',
+			);
+			const grid = document.querySelector('[data-testid="host-card-grid"]');
+			if (!footer || !grid) return null;
+			return footer.getBoundingClientRect().right - grid.getBoundingClientRect().right;
+		});
+		expect(gap).not.toBeNull();
+		expect(Math.abs(gap ?? 0)).toBeLessThanOrEqual(2);
 	});
 });

@@ -29,8 +29,8 @@ import {
 	formatMemoryUsage,
 	formatNetRate,
 	formatUptime,
-	getBarColor,
 	getValueColor,
+	usageBarFill,
 } from "@/lib/host-card-format";
 import { formatCoreCount } from "@/lib/host-spec-format";
 import { cn } from "@/lib/utils";
@@ -72,7 +72,7 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 	);
 }
 
-/** Label on the left, value on the right, thin usage bar underneath. */
+/** Label on the left, value on the right, the usage bar hugging the line. */
 function MetricRow({
 	label,
 	value,
@@ -83,14 +83,14 @@ function MetricRow({
 	pct?: number | null;
 }) {
 	return (
-		<div className="flex flex-col gap-basalt-space-xs">
+		<div className="flex flex-col">
 			<div className="flex min-w-0 items-baseline justify-between gap-basalt-space-sm">
 				<span className="shrink-0 text-basalt-sm text-basalt-muted-foreground">{label}</span>
 				<span className={cn("min-w-0 truncate text-right", NUMERIC)}>{value}</span>
 			</div>
 			{pct !== undefined && pct !== null && (
 				<div
-					className="h-1 overflow-hidden rounded-basalt-full bg-basalt-muted"
+					className="mt-basalt-space-xs h-1 overflow-hidden rounded-basalt-full bg-basalt-muted"
 					role="progressbar"
 					aria-label={`${label} usage`}
 					aria-valuemin={0}
@@ -98,8 +98,11 @@ function MetricRow({
 					aria-valuenow={Math.round(pct)}
 				>
 					<div
-						className={cn("h-full rounded-basalt-full", getBarColor(pct))}
-						style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+						className="h-full rounded-basalt-full"
+						style={{
+							width: `${Math.min(100, Math.max(0, pct))}%`,
+							backgroundColor: usageBarFill(pct),
+						}}
 					/>
 				</div>
 			)}
@@ -119,7 +122,7 @@ export function HostCardGrid({
 	const today = todayCalendarDate(new Date(now * 1000));
 	return (
 		<div
-			className="grid grid-cols-1 items-stretch gap-basalt-layout-sm sm:grid-cols-2 2xl:grid-cols-3"
+			className="grid auto-rows-fr grid-cols-1 items-stretch gap-basalt-layout-sm sm:grid-cols-2 2xl:grid-cols-3"
 			data-testid="host-card-grid"
 		>
 			{hosts.map((host) => {
@@ -142,7 +145,7 @@ export function HostCardGrid({
 							className="absolute inset-0 z-20 rounded-basalt-lg"
 							aria-label={`Open ${host.hostname}`}
 						/>
-						<div className="pointer-events-none relative flex h-full flex-col gap-basalt-space-md">
+						<div className="pointer-events-none relative flex h-full flex-col gap-basalt-space-sm">
 							<div className="flex min-w-0 items-center gap-basalt-space-xs">
 								<span className="min-w-0 truncate font-medium" title={host.hostname}>
 									{host.hostname}
@@ -186,7 +189,7 @@ export function HostCardGrid({
 									)}
 								</div>
 							)}
-							<div className="grid gap-basalt-space-md">
+							<div className="mt-auto grid gap-basalt-space-sm">
 								<MetricRow
 									label="CPU"
 									value={

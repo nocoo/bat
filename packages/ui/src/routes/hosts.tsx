@@ -217,15 +217,15 @@ export function HostsPage() {
 
 			<PageSummary items={summaryItems(filteredHosts)} />
 
-			<LayerCard data-testid="host-list">
-				<LayerCard.Header>
-					<h2>Servers</h2>
-					<span className="text-basalt-sm text-basalt-muted-foreground">
-						{filteredHosts.length} of {hosts.length}
-						{selectedTagIds.length > 0 ? " · filtered by tags" : ""}
-					</span>
-				</LayerCard.Header>
-				{filteredHosts.length === 0 ? (
+			{filteredHosts.length === 0 ? (
+				<LayerCard data-testid="host-list">
+					<LayerCard.Header>
+						<h2>Servers</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">
+							{filteredHosts.length} of {hosts.length}
+							{selectedTagIds.length > 0 ? " · filtered by tags" : ""}
+						</span>
+					</LayerCard.Header>
 					<LayerCard.Body className="space-y-basalt-space-md">
 						<p className="text-basalt-sm text-basalt-muted-foreground">
 							No hosts match the selected tags.
@@ -234,21 +234,32 @@ export function HostsPage() {
 							Clear filters
 						</Button>
 					</LayerCard.Body>
-				) : view === "cards" ? (
-					<div className="flex flex-col gap-basalt-layout-sm">
-						<HostCardGrid
-							hosts={filteredHosts}
-							tagsFor={(hostId) => hostTagsMap?.[hostId]}
-							now={now}
-						/>
-						<div className="flex justify-end" data-testid="host-card-footer">
-							<FleetCostTotal hosts={filteredHosts} />
-						</div>
+				</LayerCard>
+			) : view === "cards" ? (
+				// The card view stands on its own surfaces — no table island and
+				// no header; the fleet total is one muted line below the grid.
+				<div className="flex flex-col gap-basalt-space-md" data-testid="host-card-view">
+					<HostCardGrid
+						hosts={filteredHosts}
+						tagsFor={(hostId) => hostTagsMap?.[hostId]}
+						now={now}
+					/>
+					<div className="flex justify-end" data-testid="host-card-footer">
+						<FleetCostTotal hosts={filteredHosts} />
 					</div>
-				) : (
+				</div>
+			) : (
+				<LayerCard data-testid="host-list">
+					<LayerCard.Header>
+						<h2>Servers</h2>
+						<span className="text-basalt-sm text-basalt-muted-foreground">
+							{filteredHosts.length} of {hosts.length}
+							{selectedTagIds.length > 0 ? " · filtered by tags" : ""}
+						</span>
+					</LayerCard.Header>
 					<HostTable hosts={filteredHosts} tagsFor={(hostId) => hostTagsMap?.[hostId]} now={now} />
-				)}
-			</LayerCard>
+				</LayerCard>
+			)}
 		</div>
 	);
 }
