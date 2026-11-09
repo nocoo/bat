@@ -1,5 +1,38 @@
 # Changelog
 
+## v4.0.1
+
+### Added
+
+- Give one demo host a second filesystem
+- Group disk usage into per-device donuts
+- Remove maintenance window implementation
+- Remove maintenance window schema and fixtures
+- Ship compact fixed IPv6 address rows
+- Replace address chips with borderless rows
+
+### Changed
+
+- Encode the demo second-filesystem host in the verifier
+- Measure every system info value row and interface edge
+- Keep the doctor assets check off the network
+- Carry disk device and fs type in the recorded catalog
+- Correct the echo host address families
+
+### Fixed
+
+- Inline the synthetic interface fixture
+- Centre the disk donut row
+- Make the interface hierarchy explicit
+- Render disk usage as per-device donuts
+- Reserve the copy button width only while it is visible
+- Nest interface addresses with icons
+- Right-align system IP addresses
+
+### Removed
+
+- Remove maintenance window documentation
+
 ## v4.0.0
 
 ### Added
