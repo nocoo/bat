@@ -22,10 +22,12 @@ import { renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
 import { getValueColor, statusDotColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import { formatPercent } from "@/lib/workstation-format";
 
 const NUMERIC = "whitespace-nowrap font-mono text-basalt-sm tabular-nums";
 const MAX_VISIBLE_TAGS = 3;
+const TAG_NAME_MAX_WIDTH = "max-w-40";
 
 function MiniTrend({
 	points,
@@ -97,23 +99,38 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 	);
 }
 
-/** Tags stay on the subtitle row: capped, dotted and never pushing the name. */
+/**
+ * Tags stay on the subtitle row: capped, dotted and never pushing the name.
+ * Wide viewports show three tags; below `xl` the trail narrows to two so
+ * every visible name stays readable instead of collapsing to a letter.
+ */
 function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	const visible = tags.slice(0, MAX_VISIBLE_TAGS);
 	return (
-		<span className="flex min-w-0 items-center gap-basalt-space-md overflow-hidden">
-			{visible.map((tag) => (
-				<span key={tag.id} className="flex min-w-0 items-center gap-basalt-space-xs">
+		<span className="flex shrink-0 items-center gap-basalt-space-md">
+			{visible.map((tag, index) => (
+				<span
+					key={tag.id}
+					className={cn(
+						"items-center gap-basalt-space-xs",
+						index === MAX_VISIBLE_TAGS - 1 ? "hidden xl:flex" : "flex",
+					)}
+				>
 					<span
 						aria-hidden="true"
 						className="size-1.5 shrink-0 rounded-basalt-full"
 						style={{ backgroundColor: getSwatchColor(tag.color) }}
 					/>
-					<span className="truncate text-basalt-foreground">{tag.name}</span>
+					<span className={cn("truncate text-basalt-foreground", TAG_NAME_MAX_WIDTH)}>
+						{tag.name}
+					</span>
 				</span>
 			))}
+			{tags.length > 2 && (
+				<span className="shrink-0 text-basalt-muted-foreground xl:hidden">+{tags.length - 2}</span>
+			)}
 			{tags.length > MAX_VISIBLE_TAGS && (
-				<span className="shrink-0 text-basalt-muted-foreground">
+				<span className="hidden shrink-0 text-basalt-muted-foreground xl:inline">
 					+{tags.length - MAX_VISIBLE_TAGS}
 				</span>
 			)}
@@ -136,20 +153,20 @@ export function HostTable({
 			<Table aria-label="Servers" className="lg:table-fixed">
 				<TableHeader>
 					<TableRow>
-						<TableHead className="lg:w-[26%]">Server</TableHead>
+						<TableHead className="lg:w-[33%] lg:min-w-[14rem] xl:w-[26%]">Server</TableHead>
 						<TableHead className="lg:w-[12%]" textAlign="end">
 							Status
 						</TableHead>
 						<TableHead className="lg:w-[16%]" textAlign="end">
 							CPU
 						</TableHead>
-						<TableHead className="lg:w-[14%]" textAlign="end">
+						<TableHead className="lg:w-[15%] xl:w-[14%]" textAlign="end">
 							Memory
 						</TableHead>
-						<TableHead className="lg:w-[9%]" textAlign="end">
+						<TableHead className="lg:w-[10%] xl:w-[9%]" textAlign="end">
 							Disk
 						</TableHead>
-						<TableHead className="lg:w-[9%]" textAlign="end">
+						<TableHead className="hidden xl:table-cell xl:w-[9%]" textAlign="end">
 							Load 1m
 						</TableHead>
 						<TableHead className="lg:w-[14%]" textAlign="end">
@@ -186,8 +203,13 @@ export function HostTable({
 													/>
 												)}
 											</div>
-											<div className="flex min-w-0 items-center gap-basalt-space-md text-basalt-sm">
-												<span className="min-w-0 truncate text-basalt-muted-foreground">
+											<div className="flex min-w-0 items-center gap-basalt-space-md overflow-hidden text-basalt-sm">
+												<span
+													className={cn(
+														"min-w-0 truncate text-basalt-muted-foreground",
+														tags.length > 0 && "hidden xl:inline",
+													)}
+												>
 													{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
 												</span>
 												<TagTrail tags={tags} />
@@ -230,7 +252,7 @@ export function HostTable({
 										<Spec value={formatSpecSize(host.disk_root_total_bytes)} />
 									</div>
 								</TableCell>
-								<TableCell textAlign="end" className={NUMERIC}>
+								<TableCell textAlign="end" className={cn(NUMERIC, "hidden xl:table-cell")}>
 									<div className="flex flex-col items-end">
 										{host.cpu_load1 === null ? (
 											<span className="text-basalt-muted-foreground">—</span>
