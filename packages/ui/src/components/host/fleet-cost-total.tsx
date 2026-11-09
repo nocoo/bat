@@ -6,13 +6,19 @@
 import type { HostOverviewItem } from "@bat/shared";
 import { fleetCostSummary, formatCny } from "@/lib/billing-format";
 
-export function FleetCostTotal({ hosts }: { hosts: readonly HostOverviewItem[] }) {
+export function FleetCostTotal({
+	hosts,
+	testId = "fleet-cost",
+}: {
+	hosts: readonly HostOverviewItem[];
+	testId?: string;
+}) {
 	const summary = fleetCostSummary(hosts);
 	const hasPriced = summary.pricedHosts > 0;
 	return (
 		<span
 			className="flex flex-wrap items-baseline justify-end gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground"
-			data-testid="fleet-cost"
+			data-testid={testId}
 		>
 			<span className="font-mono tabular-nums">
 				{hasPriced ? `${formatCny(summary.dailyCny)}/day` : "—"}
