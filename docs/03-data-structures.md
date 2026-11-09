@@ -555,6 +555,8 @@ interface HostOverviewItem {
 	cpu_load1: number | null;
 	swap_used_pct: number | null;
 	disk_root_used_pct: number | null;
+	disk_root_total_bytes: number | null; // size of the root mount's filesystem
+	description: string | null; // free-text note, at most 200 characters
 	net_rx_rate: number | null; // bytes/sec aggregate
 	net_tx_rate: number | null; // bytes/sec aggregate
 	cpu_sparkline: SparklinePoint[] | null; // 24h hourly CPU usage
