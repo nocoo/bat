@@ -11,6 +11,7 @@
   "cpu_sparkline": null,
   "cpu_usage_pct": 25.5,
   "description": "bl-baseline-desc",
+  "disk_root_total_bytes": 100000000000,
   "disk_root_used_pct": 90,
   "disks": [
     {
