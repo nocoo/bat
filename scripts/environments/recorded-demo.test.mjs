@@ -419,6 +419,46 @@ describe("recorded Demo SQL catalog", () => {
 		}
 	});
 
+	test("seeds varied tags and a few descriptions so the list shows both", () => {
+		const tags = db.query("SELECT id,name,color FROM tags ORDER BY id").all();
+		expect(tags.length).toBeGreaterThanOrEqual(8);
+		for (const tag of tags) {
+			expect(tag.name).toMatch(/^[a-z-]+$/);
+			expect(tag.color).toBeGreaterThanOrEqual(0);
+			expect(tag.color).toBeLessThan(10);
+		}
+
+		const assignments = db
+			.query("SELECT host_id,tag_id FROM host_tags ORDER BY host_id,tag_id")
+			.all();
+		const perHost = new Map();
+		for (const row of assignments) {
+			perHost.set(row.host_id, (perHost.get(row.host_id) ?? 0) + 1);
+		}
+		// Some aliases carry several tags, others carry none.
+		expect(Math.max(...perHost.values())).toBeGreaterThanOrEqual(3);
+		expect(Math.min(...perHost.values())).toBeLessThanOrEqual(2);
+		const untagged = SERVER_ALIASES.filter((alias) => !perHost.has(alias.host_id));
+		expect(untagged.length).toBeGreaterThanOrEqual(1);
+		const tagIds = new Set(tags.map((tag) => tag.id));
+		for (const row of assignments) {
+			expect(tagIds.has(row.tag_id)).toBe(true);
+		}
+
+		const described = db
+			.query("SELECT host_id,description FROM hosts WHERE description IS NOT NULL")
+			.all();
+		expect(described.length).toBeGreaterThanOrEqual(2);
+		for (const row of described) {
+			expect(row.description.length).toBeGreaterThan(10);
+			expect(row.description.length).toBeLessThanOrEqual(200);
+		}
+		const withoutDescription = db
+			.query("SELECT host_id FROM hosts WHERE description IS NULL")
+			.all();
+		expect(withoutDescription.length).toBeGreaterThanOrEqual(1);
+	});
+
 	test("keeps the demo catalog complete", () => {
 		const rows = db
 			.query("SELECT host_id,cost_amount_cny,paid_at,renews_at FROM hosts ORDER BY host_id")

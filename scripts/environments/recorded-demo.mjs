@@ -64,6 +64,45 @@ const BILLING_BY_HOST = {
 const WORKSTATION_INSTALLATION_ID = "30000000-0000-4000-8000-000000000001";
 const WORKSTATION_TOKEN_PREFIX = "batw_fixture";
 
+// Tag labels for the demo fleet. The recording carries no tags, so the demo
+// seeds its own reviewer-facing set: every label is synthetic, the palette
+// index matches the dashboard swatch order, and the distribution shows both
+// the inline tag trail and the "+N" overflow.
+const TAG_COLORS = {
+	production: 0,
+	staging: 3,
+	edge: 5,
+	database: 7,
+	cdn: 2,
+	storage: 6,
+	backup: 4,
+	canary: 8,
+	observability: 1,
+	"eu-west": 9,
+};
+
+const TAGS_BY_HOST = {
+	"pw-host-alpha": ["production", "edge", "eu-west"],
+	"pw-host-beta": ["staging", "canary"],
+	"demo-server-03": [],
+	"demo-server-04": ["production", "database"],
+	"demo-server-05": ["edge", "cdn"],
+	"demo-server-06": [],
+	"demo-server-07": ["production", "edge", "storage", "backup"],
+	"demo-server-08": ["staging", "observability"],
+};
+
+// Short notes about the demo aliases. They are reviewer-facing prose, not
+// captured data, and stay well inside the 200 character limit.
+const DESCRIPTIONS_BY_HOST = {
+	"pw-host-alpha":
+		"Public ingress for the demo fleet: terminates TLS and fronts the application hosts.",
+	"demo-server-04":
+		"Primary database host. Runs the Postgres primary plus the nightly base backups.",
+	"demo-server-07":
+		"Object storage node with the bulk archives. Serves the demo recordings and the nightly tarballs, and mirrors them to an offline drive; the dataset grows a few gigabytes every week.",
+};
+
 // The second alias is the demo's two-filesystem host.
 const SECOND_FILESYSTEM_ALIAS_INDEX = 1;
 
@@ -385,7 +424,7 @@ function hostInsert(recording, alias, aliasIndex, target, anchor) {
 			target.address,
 			aliasIndex === 0 ? LONG_IPV6 : (detail.public_ip_v6 ?? null),
 			detail.probe_version,
-			null,
+			DESCRIPTIONS_BY_HOST[alias.host_id] ?? null,
 			jsonValue(detail.top_processes ?? []),
 			ageToEpoch(anchor, detail.top_processes_age_seconds),
 			billing.cost_amount_cny,
@@ -542,6 +581,22 @@ function portInserts(recording, anchor) {
 					[alias.host_id, port.port, port.reason, ageToEpoch(anchor, port.created_at_age_seconds)],
 				),
 			);
+		}
+	}
+	return statements;
+}
+
+/** The demo tag catalog plus the per-host assignments. */
+function tagStatements() {
+	const names = Object.keys(TAG_COLORS);
+	const statements = names.map((name, index) =>
+		insert("tags", ["id", "name", "color"], [index + 1, name, TAG_COLORS[name]]),
+	);
+	for (const alias of SERVER_ALIASES) {
+		for (const name of TAGS_BY_HOST[alias.host_id] ?? []) {
+			const id = names.indexOf(name) + 1;
+			if (id < 1) throw new Error(`Unknown demo tag ${name}`);
+			statements.push(insert("host_tags", ["host_id", "tag_id"], [alias.host_id, id]));
 		}
 	}
 	return statements;
@@ -795,6 +850,7 @@ export function recordedDemoSql(recording, anchor) {
 		statements.push(tier2Insert(alias, recording, anchor));
 	}
 	statements.push(...portInserts(recording, anchor));
+	statements.push(...tagStatements());
 	statements.push(...workstationStatements(recording, anchor));
 	return statements.join("\n");
 }
