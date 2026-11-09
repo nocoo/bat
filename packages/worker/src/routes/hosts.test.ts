@@ -293,7 +293,7 @@ describe("GET /api/hosts", () => {
 				now,
 				JSON.stringify([
 					{ mount: "/data", used_pct: 10 },
-					{ mount: "/", used_pct: 77.5 },
+					{ mount: "/", used_pct: 77.5, total_bytes: 53687091200 },
 				]),
 				JSON.stringify([
 					{ rx_bytes: 1000, tx_bytes: 500 },
@@ -306,8 +306,43 @@ describe("GET /api/hosts", () => {
 		const body = (await res.json()) as HostOverviewItem[];
 		const host = body.find((h) => h.host_id === "host-disk");
 		expect(host?.disk_root_used_pct).toBe(77.5);
+		expect(host?.disk_root_total_bytes).toBe(53687091200);
 		expect(host?.net_rx_rate).toBe(1200);
 		expect(host?.net_tx_rate).toBe(600);
+	});
+
+	test("disk_root_total_bytes is null when the root mount carries no size", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await insertHost(db, "host-disk-nosize", "disk-host-nosize", now);
+		await db
+			.prepare(
+				`INSERT INTO metrics_raw (host_id, ts, cpu_usage_pct, mem_used_pct, uptime_seconds,
+       cpu_load1, cpu_load5, cpu_load15, cpu_iowait, cpu_steal, cpu_count,
+       mem_total, mem_available, swap_total, swap_used, swap_used_pct, disk_json, net_json)
+     VALUES (?, ?, 10, 20, 100, 0, 0, 0, 0, 0, 4, 1, 1, 1, 0, 0, ?, '[]')`,
+			)
+			.bind("host-disk-nosize", now, JSON.stringify([{ mount: "/", used_pct: 40 }]))
+			.run();
+
+		const res = await get(app);
+		const body = (await res.json()) as HostOverviewItem[];
+		const host = body.find((h) => h.host_id === "host-disk-nosize");
+		expect(host?.disk_root_total_bytes).toBeNull();
+	});
+
+	test("description is carried into the overview payload", async () => {
+		const now = Math.floor(Date.now() / 1000);
+		await db
+			.prepare(
+				"INSERT INTO hosts (host_id, hostname, last_seen, is_active, description) VALUES (?, ?, ?, 1, ?)",
+			)
+			.bind("host-desc", "desc-host", now, "Runs the edge ingress for the demo fleet.")
+			.run();
+
+		const res = await get(app);
+		const body = (await res.json()) as HostOverviewItem[];
+		const host = body.find((h) => h.host_id === "host-desc");
+		expect(host?.description).toBe("Runs the edge ingress for the demo fleet.");
 	});
 
 	test("port allowlist suppresses public_port warning → status healthy", async () => {

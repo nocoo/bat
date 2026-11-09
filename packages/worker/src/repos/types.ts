@@ -168,6 +168,8 @@ export interface HostOverviewRow {
 	public_ip_v4: string | null;
 	public_ip_v6: string | null;
 	probe_version: string | null;
+	/** Free-text note about the host (at most 200 characters). */
+	description: string | null;
 	/** Next payment / expiry date (`YYYY-MM-DD`). */
 	renews_at: string | null;
 	/** Amount paid for the current period, in yuan. */

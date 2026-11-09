@@ -3,7 +3,11 @@ import type { HostOverviewItem, SparklinePoint } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
 import { tryReadCache, writeCache } from "../lib/dashboard-cache.js";
-import { extractNetRates, extractRootDiskPct } from "../lib/json-helpers.js";
+import {
+	extractNetRates,
+	extractRootDiskPct,
+	extractRootDiskTotalBytes,
+} from "../lib/json-helpers.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
 import { buildAlertsByHost } from "./monitoring.js";
@@ -135,6 +139,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 		const lastSeen = host.last_seen;
 		const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts);
 		const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
+		const diskRootTotalBytes = extractRootDiskTotalBytes(metrics?.disk_json ?? null);
 		const netRates = extractNetRates(metrics?.net_json ?? null);
 		const sparklines = sparklinesByHost.get(host.host_id);
 
@@ -165,6 +170,8 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			cpu_load1: metrics?.cpu_load1 ?? null,
 			swap_used_pct: metrics?.swap_used_pct ?? null,
 			disk_root_used_pct: diskRootPct,
+			disk_root_total_bytes: diskRootTotalBytes,
+			description: host.description,
 			net_rx_rate: netRates.rx,
 			net_tx_rate: netRates.tx,
 			cpu_sparkline: sparklines && sparklines.cpu.length > 0 ? sparklines.cpu : null,

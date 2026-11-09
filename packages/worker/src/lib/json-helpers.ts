@@ -22,6 +22,16 @@ export function safeParse<T>(json: string | null): T | null {
 interface DiskJsonEntry {
 	mount: string;
 	used_pct: number;
+	total_bytes?: number;
+}
+
+/** Parse `disk_json` into entries, or `null` when it is absent or not a list. */
+function parseDiskEntries(diskJson: string | null): DiskJsonEntry[] | null {
+	const parsed = safeParse<unknown>(diskJson);
+	if (!Array.isArray(parsed)) {
+		return null;
+	}
+	return parsed as DiskJsonEntry[];
 }
 
 /**
@@ -29,12 +39,26 @@ interface DiskJsonEntry {
  * or `null` if the JSON is missing/invalid or no root mount is present.
  */
 export function extractRootDiskPct(diskJson: string | null): number | null {
-	const disks = safeParse<DiskJsonEntry[]>(diskJson);
+	const disks = parseDiskEntries(diskJson);
 	if (!disks) {
 		return null;
 	}
 	const root = disks.find((d) => d.mount === "/");
 	return root?.used_pct ?? null;
+}
+
+/**
+ * Parse `disk_json` and return the `total_bytes` of the root mount (`/`),
+ * or `null` if the JSON is missing/invalid, no root mount is present or the
+ * root entry carries no size.
+ */
+export function extractRootDiskTotalBytes(diskJson: string | null): number | null {
+	const disks = parseDiskEntries(diskJson);
+	if (!disks) {
+		return null;
+	}
+	const root = disks.find((d) => d.mount === "/");
+	return root?.total_bytes ?? null;
 }
 
 interface NetJsonEntry {

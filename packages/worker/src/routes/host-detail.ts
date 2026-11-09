@@ -2,7 +2,12 @@
 import type { HostDetailItem } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import type { Context } from "hono";
-import { extractNetRates, extractRootDiskPct, safeParse } from "../lib/json-helpers.js";
+import {
+	extractNetRates,
+	extractRootDiskPct,
+	extractRootDiskTotalBytes,
+	safeParse,
+} from "../lib/json-helpers.js";
 import { resolveHostIdByHash } from "../lib/resolve-host.js";
 import { deriveHostStatus } from "../services/status.js";
 import type { AppEnv } from "../types.js";
@@ -34,6 +39,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 	const lastSeen = host.last_seen;
 	const status = deriveHostStatus(lastSeen, now, alerts, allowedPorts);
 	const diskRootPct = extractRootDiskPct(metrics?.disk_json ?? null);
+	const diskRootTotalBytes = extractRootDiskTotalBytes(metrics?.disk_json ?? null);
 	const netRates = extractNetRates(metrics?.net_json ?? null);
 
 	const item: HostDetailItem = {
@@ -62,6 +68,7 @@ export async function hostDetailRoute(c: Context<AppEnv, "/api/hosts/:id">) {
 		cpu_load1: metrics?.cpu_load1 ?? null,
 		swap_used_pct: metrics?.swap_used_pct ?? null,
 		disk_root_used_pct: diskRootPct,
+		disk_root_total_bytes: diskRootTotalBytes,
 		net_rx_rate: netRates.rx,
 		net_tx_rate: netRates.tx,
 		cpu_sparkline: null, // detail page uses its own metrics endpoint

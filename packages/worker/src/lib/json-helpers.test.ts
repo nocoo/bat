@@ -1,5 +1,10 @@
 import { describe, expect, test } from "vitest";
-import { extractNetRates, extractRootDiskPct, safeParse } from "./json-helpers";
+import {
+	extractNetRates,
+	extractRootDiskPct,
+	extractRootDiskTotalBytes,
+	safeParse,
+} from "./json-helpers";
 
 describe("safeParse", () => {
 	test("returns null on null/empty input", () => {
@@ -41,6 +46,42 @@ describe("extractRootDiskPct", () => {
 
 	test("returns null when used_pct is missing on root", () => {
 		expect(extractRootDiskPct(JSON.stringify([{ mount: "/" }]))).toBeNull();
+	});
+
+	test("returns null when the payload is not a list", () => {
+		expect(extractRootDiskPct(JSON.stringify({ mount: "/" }))).toBeNull();
+	});
+});
+
+describe("extractRootDiskTotalBytes", () => {
+	test("returns null when input is null/invalid", () => {
+		expect(extractRootDiskTotalBytes(null)).toBeNull();
+		expect(extractRootDiskTotalBytes("garbage")).toBeNull();
+	});
+
+	test("returns null when the payload is not a list", () => {
+		expect(extractRootDiskTotalBytes(JSON.stringify({ mount: "/" }))).toBeNull();
+	});
+
+	test("returns null when there is no root mount", () => {
+		expect(
+			extractRootDiskTotalBytes(JSON.stringify([{ mount: "/data", total_bytes: 50 }])),
+		).toBeNull();
+	});
+
+	test("returns the root mount's total_bytes", () => {
+		expect(
+			extractRootDiskTotalBytes(
+				JSON.stringify([
+					{ mount: "/data", total_bytes: 1024 },
+					{ mount: "/", total_bytes: 53687091200 },
+				]),
+			),
+		).toBe(53687091200);
+	});
+
+	test("returns null when total_bytes is missing on root", () => {
+		expect(extractRootDiskTotalBytes(JSON.stringify([{ mount: "/" }]))).toBeNull();
 	});
 });
 
