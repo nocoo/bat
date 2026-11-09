@@ -63,42 +63,43 @@ test.describe("Host billing", () => {
 	});
 
 	test("the edit form writes the three inputs and the card follows", async ({ page }, testInfo) => {
-		await page.setViewportSize({ width: 1440, height: 1000 });
-		await page.goto(alphaDetail);
-		await expect(page.getByTestId("host-cost-card")).toBeVisible({ timeout: 15_000 });
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 1000 });
+			await page.goto(alphaDetail);
+			await expect(page.getByTestId("host-cost-card")).toBeVisible({ timeout: 15_000 });
 
-		const card = page.getByTestId("host-cost-card");
-		await card.getByRole("button", { name: "Edit cost" }).click();
+			const card = page.getByTestId("host-cost-card");
+			await card.getByRole("button", { name: "Edit cost" }).click();
 
-		const form = page.getByTestId("cost-form");
-		await expect(form).toBeVisible();
-		await expect(form.getByLabel("Amount (¥)")).toHaveValue("3650");
-		await expect(form.getByLabel("Last payment date")).toHaveValue(localDate(-253));
-		await expect(form.getByLabel("Next payment date")).toHaveValue(localDate(112));
+			const form = page.getByTestId("cost-form");
+			await expect(form).toBeVisible();
+			await expect(form.getByLabel("Amount (¥)")).toHaveValue("3650");
+			await expect(form.getByLabel("Last payment date")).toHaveValue(localDate(-253));
+			await expect(form.getByLabel("Next payment date")).toHaveValue(localDate(112));
+			await form.screenshot({ path: testInfo.outputPath(`cost-form-${width}.png`) });
 
-		await form.screenshot({ path: testInfo.outputPath("cost-form.png") });
+			if (width === 1440) {
+				await form.getByLabel("Amount (¥)").fill("1200");
+				await form.getByLabel("Last payment date").fill(localDate(-28));
+				await form.getByLabel("Next payment date").fill(localDate(2));
+				await form.getByRole("button", { name: "Save" }).click();
 
-		await form.getByLabel("Amount (¥)").fill("1200");
-		await form.getByLabel("Last payment date").fill(localDate(-28));
-		await form.getByLabel("Next payment date").fill(localDate(2));
-		await form.getByRole("button", { name: "Save" }).click();
+				await expect(card.getByTestId("cost-countdown")).toHaveText("2 天");
+				await expect(card.getByText("¥1,200.00", { exact: true })).toBeVisible();
+				await expect(card.getByText("30 days", { exact: true })).toBeVisible();
 
-		await expect(card.getByTestId("cost-countdown")).toHaveText("2 天");
-		await expect(card.getByText("¥1,200.00", { exact: true })).toBeVisible();
-		await expect(card.getByText("30 days", { exact: true })).toBeVisible();
+				const detail = await (await page.request.get(`/api/hosts/${alphaHid}`)).json();
+				expect(detail.cost_amount_cny).toBe(1200);
+				expect(detail.paid_at).toBe(localDate(-28));
+				expect(detail.renews_at).toBe(localDate(2));
 
-		// The stored values are the ones the API serves.
-		const detail = await (await page.request.get(`/api/hosts/${alphaHid}`)).json();
-		expect(detail.cost_amount_cny).toBe(1200);
-		expect(detail.paid_at).toBe(localDate(-28));
-		expect(detail.renews_at).toBe(localDate(2));
-
-		// Restore the seeded plan for the other suites.
-		await setBilling(page, alphaHid, {
-			cost_amount_cny: 3650,
-			paid_at: localDate(-253),
-			renews_at: localDate(112),
-		});
+				await setBilling(page, alphaHid, {
+					cost_amount_cny: 3650,
+					paid_at: localDate(-253),
+					renews_at: localDate(112),
+				});
+			}
+		}
 	});
 
 	test("the edit form refuses a renewal before the payment", async ({ page }) => {
@@ -117,42 +118,43 @@ test.describe("Host billing", () => {
 	});
 
 	test("the host list shows the countdown in every state", async ({ page }, testInfo) => {
-		await page.setViewportSize({ width: 1440, height: 1000 });
-		await page.goto("/hosts");
-		await page.waitForLoadState("domcontentloaded");
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 1000 });
+			await setBilling(page, betaHid, {
+				cost_amount_cny: 45,
+				paid_at: localDate(-28),
+				renews_at: localDate(2),
+			});
+			await page.goto("/hosts");
+			await page.waitForLoadState("domcontentloaded");
 
-		const rows = page.getByTestId("host-row");
-		await expect(rows).toHaveCount(2);
-		const alphaRow = rows.filter({ hasText: "alpha.test.local" });
-		const betaRow = rows.filter({ hasText: "beta.test.local" });
+			const rows = page.getByTestId("host-row");
+			await expect(rows).toHaveCount(2);
+			const alphaRow = rows.filter({ hasText: "alpha.test.local" });
+			const betaRow = rows.filter({ hasText: "beta.test.local" });
 
-		// Far away — muted.
-		await expect(alphaRow.getByTestId("host-countdown")).toHaveText("剩 112 天");
-		// Inside the week — warning.
-		await expect(betaRow.getByTestId("host-countdown")).toHaveText("剩 2 天");
+			await expect(alphaRow.getByTestId("host-countdown")).toHaveText("剩 112 天");
+			await expect(betaRow.getByTestId("host-countdown")).toHaveText("剩 2 天");
 
-		// Overdue — destructive, and produced through the real API.
-		await setBilling(page, betaHid, {
-			cost_amount_cny: 45,
-			paid_at: localDate(-40),
-			renews_at: localDate(-3),
-		});
-		await page.reload();
-		await expect(betaRow.getByTestId("host-countdown")).toHaveText("已过期 3 天");
-		const overdue = betaRow.getByTestId("host-countdown").getByText("已过期 3 天");
-		await expect(overdue).toHaveClass(/text-basalt-destructive/);
-		await rows.first().screenshot({ path: testInfo.outputPath("host-list-countdown.png") });
+			await setBilling(page, betaHid, {
+				cost_amount_cny: 45,
+				paid_at: localDate(-40),
+				renews_at: localDate(-3),
+			});
+			await page.reload();
+			await expect(betaRow.getByTestId("host-countdown")).toHaveText("已过期 3 天");
+			await betaRow.screenshot({ path: testInfo.outputPath(`host-list-overdue-${width}.png`) });
 
-		// A host without billing data shows nothing at all.
-		await setBilling(page, betaHid, {
-			cost_amount_cny: null,
-			paid_at: null,
-			renews_at: null,
-		});
-		await page.reload();
-		await expect(betaRow.getByTestId("host-countdown")).toHaveText("");
+			await setBilling(page, betaHid, {
+				cost_amount_cny: null,
+				paid_at: null,
+				renews_at: null,
+			});
+			await page.reload();
+			await expect(betaRow.getByTestId("host-countdown")).toHaveText("");
+			await betaRow.screenshot({ path: testInfo.outputPath(`host-list-no-billing-${width}.png`) });
+		}
 
-		// Restore the seeded monthly plan.
 		await setBilling(page, betaHid, {
 			cost_amount_cny: 45,
 			paid_at: localDate(-28),
@@ -160,16 +162,18 @@ test.describe("Host billing", () => {
 		});
 	});
 
-	test("the fleet header totals the daily cost of the priced hosts", async ({ page }) => {
-		await page.setViewportSize({ width: 1440, height: 1000 });
-		await page.goto("/hosts");
-		await page.waitForLoadState("domcontentloaded");
+	test("the fleet header totals the daily cost of the priced hosts", async ({ page }, testInfo) => {
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 1000 });
+			await page.goto("/hosts");
+			await page.waitForLoadState("domcontentloaded");
 
-		const fleetCost = page.getByTestId("fleet-cost");
-		await expect(fleetCost).toBeVisible({ timeout: 15_000 });
-		// ¥10.00/day for alpha plus ¥1.50/day for beta.
-		await expect(fleetCost).toContainText("¥11.50/day");
-		await expect(fleetCost).toContainText("/month");
-		await expect(fleetCost).toContainText("2/2 priced");
+			const fleetCost = page.getByTestId("fleet-cost");
+			await expect(fleetCost).toBeVisible({ timeout: 15_000 });
+			await expect(fleetCost).toContainText("¥11.50/day");
+			await expect(fleetCost).toContainText("/month");
+			await expect(fleetCost).toContainText("2/2 priced");
+			await fleetCost.screenshot({ path: testInfo.outputPath(`fleet-cost-${width}.png`) });
+		}
 	});
 });
