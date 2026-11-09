@@ -16,9 +16,8 @@ import { HostTable } from "@/components/host/host-table";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
-import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
+import { useHosts, useHostTags, useTags } from "@/hooks";
 import { fleetCostSummary, formatCny } from "@/lib/billing-format";
-import { countOpenPublicPorts } from "@/lib/host-card-ports";
 import { chart } from "@/lib/palette";
 
 type SortKey = "name-asc" | "name-desc" | "cpu" | "mem" | "disk";
@@ -130,7 +129,6 @@ export function HostsPage() {
 	const { data: hosts, error, isLoading } = useHosts();
 	const { data: hostTagsMap } = useHostTags();
 	const { data: allTags } = useTags();
-	const { data: alerts } = useAlerts();
 	const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 	const [sortKey, setSortKey] = useState<SortKey>("name-asc");
 
@@ -222,12 +220,7 @@ export function HostsPage() {
 						</Button>
 					</LayerCard.Body>
 				) : (
-					<HostTable
-						hosts={filteredHosts}
-						tagsFor={(hostId) => hostTagsMap?.[hostId]}
-						now={now}
-						openPortsFor={(hostId) => countOpenPublicPorts(alerts, hostId)}
-					/>
+					<HostTable hosts={filteredHosts} tagsFor={(hostId) => hostTagsMap?.[hostId]} now={now} />
 				)}
 			</LayerCard>
 		</div>

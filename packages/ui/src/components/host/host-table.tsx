@@ -5,6 +5,7 @@
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import { daysUntilRenewal, hashHostId, renewalBadgeLabel, renewalTone } from "@bat/shared";
 import { LineChart } from "@nocoo/basalt/charts/line";
+import { Button } from "@nocoo/basalt/components/button";
 import {
 	Table,
 	TableBody,
@@ -13,28 +14,18 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nocoo/basalt/components/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@nocoo/basalt/components/tooltip";
+import { Info } from "lucide-react";
 import { Link } from "react-router";
 import { StatusBadge } from "@/components/status-badge";
 import { renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
-import { formatLastSeen, getValueColor, statusDotColor } from "@/lib/host-card-format";
+import { getValueColor, statusDotColor } from "@/lib/host-card-format";
+import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { formatPercent } from "@/lib/workstation-format";
 
 const NUMERIC = "whitespace-nowrap font-mono text-basalt-sm tabular-nums";
-
-function formatBytesPerSecond(value: number | null): string {
-	if (value === null || !Number.isFinite(value)) {
-		return "—";
-	}
-	const units = ["B", "KB", "MB", "GB"];
-	let scaled = value;
-	let unit = 0;
-	while (scaled >= 1024 && unit < units.length - 1) {
-		scaled /= 1024;
-		unit += 1;
-	}
-	return `${Math.round(scaled * 10) / 10} ${units[unit]}/s`;
-}
+const MAX_VISIBLE_TAGS = 3;
 
 function MiniTrend({
 	points,
@@ -53,7 +44,7 @@ function MiniTrend({
 			data={points.map((point) => ({ x: point.ts, value: point.v }))}
 			series={[{ key: "value", color }]}
 			ariaLabel={label}
-			className="mt-basalt-space-xs h-4 w-16"
+			className="h-4 w-16 max-w-16 lg:min-w-0 lg:flex-1"
 			showAxes={false}
 			showLegend={false}
 			accessibilityLayer={false}
@@ -73,33 +64,97 @@ function Pct({ value }: { value: number | null }) {
 	return <span className={pressureClass(value)}>{formatPercent(value)}</span>;
 }
 
+/** The machine's own size, shown under the utilisation it belongs to. */
+function Spec({ value }: { value: string }) {
+	return (
+		<span className="whitespace-nowrap text-basalt-sm text-basalt-muted-foreground">{value}</span>
+	);
+}
+
+/** Description affordance — a circled `i` that reveals the host description. */
+function DescriptionHint({ hostname, description }: { hostname: string; description: string }) {
+	return (
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<Button
+					variant="ghost"
+					size="sm"
+					className="size-5 shrink-0 rounded-basalt-full p-0 text-basalt-muted-foreground hover:text-basalt-foreground"
+					aria-label={`Description of ${hostname}`}
+					data-testid="host-description"
+				>
+					<Info className="size-4" strokeWidth={1.5} aria-hidden="true" />
+				</Button>
+			</TooltipTrigger>
+			<TooltipContent
+				side="top"
+				sideOffset={6}
+				className="max-w-64 whitespace-pre-wrap break-words text-basalt-sm"
+			>
+				{description}
+			</TooltipContent>
+		</Tooltip>
+	);
+}
+
+/** Tags stay on the subtitle row: capped, dotted and never pushing the name. */
+function TagTrail({ tags }: { tags: readonly HostTag[] }) {
+	const visible = tags.slice(0, MAX_VISIBLE_TAGS);
+	return (
+		<span className="flex min-w-0 items-center gap-basalt-space-md overflow-hidden">
+			{visible.map((tag) => (
+				<span key={tag.id} className="flex min-w-0 items-center gap-basalt-space-xs">
+					<span
+						aria-hidden="true"
+						className="size-1.5 shrink-0 rounded-basalt-full"
+						style={{ backgroundColor: getSwatchColor(tag.color) }}
+					/>
+					<span className="truncate text-basalt-foreground">{tag.name}</span>
+				</span>
+			))}
+			{tags.length > MAX_VISIBLE_TAGS && (
+				<span className="shrink-0 text-basalt-muted-foreground">
+					+{tags.length - MAX_VISIBLE_TAGS}
+				</span>
+			)}
+		</span>
+	);
+}
+
 export function HostTable({
 	hosts,
 	tagsFor,
-	openPortsFor,
 	now,
 }: {
 	hosts: readonly HostOverviewItem[];
 	tagsFor: (hostId: string) => HostTag[] | undefined;
-	openPortsFor: (hostId: string) => number;
 	now: number;
 }) {
 	const today = todayCalendarDate(new Date(now * 1000));
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
-			<Table aria-label="Servers">
+			<Table aria-label="Servers" className="lg:table-fixed">
 				<TableHeader>
 					<TableRow>
-						<TableHead>Server</TableHead>
-						<TableHead>Status</TableHead>
-						<TableHead textAlign="end">CPU</TableHead>
-						<TableHead textAlign="end">Memory</TableHead>
-						<TableHead textAlign="end">Disk</TableHead>
-						<TableHead textAlign="end">Load 1m</TableHead>
-						<TableHead textAlign="end">Net</TableHead>
-						<TableHead textAlign="end">Ports</TableHead>
-						<TableHead textAlign="end">Last seen</TableHead>
-						<TableHead textAlign="end">Expiry</TableHead>
+						<TableHead className="lg:w-[26%]">Server</TableHead>
+						<TableHead className="lg:w-[12%]" textAlign="end">
+							Status
+						</TableHead>
+						<TableHead className="lg:w-[16%]" textAlign="end">
+							CPU
+						</TableHead>
+						<TableHead className="lg:w-[14%]" textAlign="end">
+							Memory
+						</TableHead>
+						<TableHead className="lg:w-[9%]" textAlign="end">
+							Disk
+						</TableHead>
+						<TableHead className="lg:w-[9%]" textAlign="end">
+							Load 1m
+						</TableHead>
+						<TableHead className="lg:w-[14%]" textAlign="end">
+							Expiry
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -115,33 +170,28 @@ export function HostTable({
 											aria-hidden="true"
 											className={`mt-basalt-space-md size-2 shrink-0 rounded-basalt-full ${statusDotColor(host.status)}`}
 										/>
-										<div className="min-w-0">
-											<Link
-												to={`/hosts/${hashHostId(host.host_id)}`}
-												className="block truncate font-medium underline-offset-4 hover:underline"
-												title={host.hostname}
-											>
-												{host.hostname}
-											</Link>
-											<span className="flex min-w-0 items-center gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground">
-												<span className="truncate">
+										<div className="min-w-0 flex-1">
+											<div className="flex min-w-0 items-center gap-basalt-space-xs">
+												<Link
+													to={`/hosts/${hashHostId(host.host_id)}`}
+													className="min-w-0 truncate font-medium underline-offset-4 hover:underline"
+													title={host.hostname}
+												>
+													{host.hostname}
+												</Link>
+												{host.description && (
+													<DescriptionHint
+														hostname={host.hostname}
+														description={host.description}
+													/>
+												)}
+											</div>
+											<div className="flex min-w-0 items-center gap-basalt-space-md text-basalt-sm">
+												<span className="min-w-0 truncate text-basalt-muted-foreground">
 													{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
 												</span>
-												{tags.slice(0, 3).map((tag) => (
-													<span
-														key={tag.id}
-														className="flex shrink-0 items-center gap-basalt-space-xs"
-													>
-														<span
-															aria-hidden="true"
-															className="size-1.5 rounded-basalt-full"
-															style={{ backgroundColor: getSwatchColor(tag.color) }}
-														/>
-														<span className="truncate">{tag.name}</span>
-													</span>
-												))}
-												{tags.length > 3 && <span>+{tags.length - 3}</span>}
-											</span>
+												<TagTrail tags={tags} />
+											</div>
 										</div>
 									</div>
 								</TableCell>
@@ -151,25 +201,34 @@ export function HostTable({
 								<TableCell textAlign="end" className={NUMERIC}>
 									<div className="flex flex-col items-end">
 										<Pct value={host.cpu_usage_pct} />
-										<MiniTrend
-											points={host.cpu_sparkline}
-											color={chart.pink}
-											label={`${host.hostname} 24 hour CPU`}
-										/>
+										<div className="flex w-full items-center justify-end gap-basalt-space-sm">
+											<MiniTrend
+												points={host.cpu_sparkline}
+												color={chart.pink}
+												label={`${host.hostname} 24 hour CPU`}
+											/>
+											<Spec value={formatCoreCount(host.cpu_logical)} />
+										</div>
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
 									<div className="flex flex-col items-end">
 										<Pct value={host.mem_used_pct} />
-										<MiniTrend
-											points={host.mem_sparkline}
-											color={chart.sky}
-											label={`${host.hostname} 24 hour memory`}
-										/>
+										<div className="flex w-full items-center justify-end gap-basalt-space-sm">
+											<MiniTrend
+												points={host.mem_sparkline}
+												color={chart.sky}
+												label={`${host.hostname} 24 hour memory`}
+											/>
+											<Spec value={formatSpecSize(host.mem_total_bytes)} />
+										</div>
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
-									<Pct value={host.disk_root_used_pct} />
+									<div className="flex flex-col items-end">
+										<Pct value={host.disk_root_used_pct} />
+										<Spec value={formatSpecSize(host.disk_root_total_bytes)} />
+									</div>
 								</TableCell>
 								<TableCell textAlign="end" className={NUMERIC}>
 									<div className="flex flex-col items-end">
@@ -178,33 +237,14 @@ export function HostTable({
 										) : (
 											(host.cpu_load1 as number).toFixed(2)
 										)}
-										<MiniTrend
-											points={host.load_sparkline}
-											color={chart.teal}
-											label={`${host.hostname} 24 hour load`}
-										/>
+										<div className="flex w-full items-center justify-end">
+											<MiniTrend
+												points={host.load_sparkline}
+												color={chart.teal}
+												label={`${host.hostname} 24 hour load`}
+											/>
+										</div>
 									</div>
-								</TableCell>
-								<TableCell textAlign="end" className={`${NUMERIC} text-basalt-sm`}>
-									<span className="text-basalt-muted-foreground">↓</span>{" "}
-									{formatBytesPerSecond(host.net_rx_rate)}{" "}
-									<span className="text-basalt-muted-foreground">↑</span>{" "}
-									{formatBytesPerSecond(host.net_tx_rate)}
-								</TableCell>
-								<TableCell textAlign="end" className={NUMERIC}>
-									{openPortsFor(host.host_id) > 0 ? (
-										<span className="text-basalt-warning">{openPortsFor(host.host_id)}</span>
-									) : (
-										<span className="text-basalt-muted-foreground">—</span>
-									)}
-								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap text-basalt-sm">
-									{formatLastSeen(host.last_seen, now)}
-									{host.alert_count > 0 && (
-										<span className="ms-basalt-space-sm text-basalt-destructive">
-											{host.alert_count} alert{host.alert_count === 1 ? "" : "s"}
-										</span>
-									)}
 								</TableCell>
 								<TableCell
 									textAlign="end"
