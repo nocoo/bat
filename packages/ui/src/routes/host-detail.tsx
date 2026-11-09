@@ -1,3 +1,4 @@
+import type { BillingFields } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
 import { InlineEditable } from "@nocoo/basalt/components/inline-editable";
@@ -19,6 +20,7 @@ import {
 } from "@/components/charts";
 import { HostAlertsCard } from "@/components/host-alerts-card";
 import { AllowedPortsPanel } from "@/components/host-allowed-ports";
+import { HostCostCard } from "@/components/host-cost-card";
 import { HostDeleteDialog } from "@/components/host-delete-dialog";
 import { HostInterfaceAddresses } from "@/components/host-interface-addresses";
 import { HostPublicAddress } from "@/components/host-public-address";
@@ -108,6 +110,15 @@ export function HostDetailPage() {
 		(desc: string | null) => {
 			if (detail) {
 				mutateDetail({ ...detail, description: desc }, false);
+			}
+		},
+		[detail, mutateDetail],
+	);
+
+	const handleBillingSaved = useCallback(
+		(billing: BillingFields) => {
+			if (detail) {
+				mutateDetail({ ...detail, ...billing }, false);
 			}
 		},
 		[detail, mutateDetail],
@@ -331,6 +342,17 @@ export function HostDetailPage() {
 									</div>
 								</LayerCard.Body>
 							</LayerCard>
+						)}
+						{detail && (
+							<HostCostCard
+								hid={hid}
+								billing={{
+									cost_amount_cny: detail.cost_amount_cny,
+									paid_at: detail.paid_at,
+									renews_at: detail.renews_at,
+								}}
+								onSaved={handleBillingSaved}
+							/>
 						)}
 						{host && (
 							<AllowedPortsPanel

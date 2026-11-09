@@ -3,7 +3,7 @@
 // colour, a 24 hour CPU trend and honest dashes for missing readings.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
-import { hashHostId } from "@bat/shared";
+import { daysUntilRenewal, hashHostId, renewalBadgeLabel, renewalTone } from "@bat/shared";
 import { LineChart } from "@nocoo/basalt/charts/line";
 import {
 	Table,
@@ -15,6 +15,7 @@ import {
 } from "@nocoo/basalt/components/table";
 import { Link } from "react-router";
 import { StatusBadge } from "@/components/status-badge";
+import { renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
 import { formatLastSeen, getValueColor, statusDotColor } from "@/lib/host-card-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { formatPercent } from "@/lib/workstation-format";
@@ -83,6 +84,7 @@ export function HostTable({
 	openPortsFor: (hostId: string) => number;
 	now: number;
 }) {
+	const today = todayCalendarDate(new Date(now * 1000));
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
 			<Table aria-label="Servers">
@@ -97,11 +99,14 @@ export function HostTable({
 						<TableHead textAlign="end">Net</TableHead>
 						<TableHead textAlign="end">Ports</TableHead>
 						<TableHead textAlign="end">Last seen</TableHead>
+						<TableHead textAlign="end">Expiry</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
 					{hosts.map((host) => {
 						const tags = tagsFor(host.host_id) ?? [];
+						const daysLeft = daysUntilRenewal(host.renews_at, today);
+						const countdown = renewalBadgeLabel(daysLeft);
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
@@ -199,6 +204,15 @@ export function HostTable({
 										<span className="ms-basalt-space-sm text-basalt-destructive">
 											{host.alert_count} alert{host.alert_count === 1 ? "" : "s"}
 										</span>
+									)}
+								</TableCell>
+								<TableCell
+									textAlign="end"
+									className="whitespace-nowrap text-basalt-sm"
+									data-testid="host-countdown"
+								>
+									{countdown && (
+										<span className={renewalToneClass(renewalTone(daysLeft))}>{countdown}</span>
 									)}
 								</TableCell>
 							</TableRow>

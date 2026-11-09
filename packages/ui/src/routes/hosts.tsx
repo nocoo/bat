@@ -17,6 +17,7 @@ import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleto
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { useAlerts, useHosts, useHostTags, useTags } from "@/hooks";
+import { fleetCostSummary, formatCny } from "@/lib/billing-format";
 import { countOpenPublicPorts } from "@/lib/host-card-ports";
 import { chart } from "@/lib/palette";
 
@@ -103,6 +104,28 @@ function summaryItems(hosts: readonly HostOverviewItem[]): ReadingItem[] {
 	];
 }
 
+/** The daily cost of the visible fleet and its monthly equivalent. */
+function FleetCost({ hosts }: { hosts: readonly HostOverviewItem[] }) {
+	const summary = fleetCostSummary(hosts);
+	if (summary.pricedHosts === 0) {
+		return null;
+	}
+	return (
+		<div
+			className="flex flex-wrap items-baseline gap-basalt-space-sm text-basalt-sm"
+			data-testid="fleet-cost"
+		>
+			<span className="font-mono text-basalt-base font-semibold tabular-nums">
+				{formatCny(summary.dailyCny)}/day
+			</span>
+			<span className="text-basalt-muted-foreground">≈ {formatCny(summary.monthlyCny)}/month</span>
+			<span className="text-basalt-muted-foreground">
+				{summary.pricedHosts}/{summary.totalHosts} priced
+			</span>
+		</div>
+	);
+}
+
 export function HostsPage() {
 	const { data: hosts, error, isLoading } = useHosts();
 	const { data: hostTagsMap } = useHostTags();
@@ -156,18 +179,21 @@ export function HostsPage() {
 				title="Hosts"
 				description="Monitored servers and real-time infrastructure status."
 				actions={
-					<Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
-						<SelectTrigger aria-label="Sort hosts">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{SORT_OPTIONS.map((opt) => (
-								<SelectItem key={opt.value} value={opt.value}>
-									{opt.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
+					<div className="flex flex-wrap items-center gap-basalt-space-lg">
+						<FleetCost hosts={filteredHosts} />
+						<Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
+							<SelectTrigger aria-label="Sort hosts">
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{SORT_OPTIONS.map((opt) => (
+									<SelectItem key={opt.value} value={opt.value}>
+										{opt.label}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
 				}
 				filters={
 					showFilterBar ? (
