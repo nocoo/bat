@@ -98,6 +98,7 @@ export {
 	validateOptionalString,
 	validateString,
 } from "./assets.js";
+export * from "./billing.js";
 export * from "./connect.js";
 // Constants
 export {
