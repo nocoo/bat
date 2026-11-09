@@ -20,6 +20,7 @@ import type {
 	AssetMapResponse,
 	AssetRow,
 	AssetsOverview,
+	BillingFields,
 	BindingItem,
 	CliTokenRow,
 	CliTokenScope,
@@ -114,6 +115,9 @@ export interface HostsRepository {
 	updateTier2Inventory(hostId: string, fields: HostTier2Inventory): Promise<void>;
 	/** Update the host's free-form description (or clear it with null). */
 	updateDescription(hostId: string, description: string | null): Promise<void>;
+	/** Replace the host's billing inputs. All three columns move together —
+	 *  either every one of them carries a value or every one of them is null. */
+	updateBilling(hostId: string, fields: BillingFields): Promise<void>;
 	/** Ensure a host row exists for FK targets (no last_seen bump if it
 	 *  already does). Used by `/api/tier2` before its alert/inventory
 	 *  writes. `nowSeconds` is only consumed on the first-seen path. */
@@ -164,6 +168,8 @@ export interface HostOverviewRow {
 	public_ip_v4: string | null;
 	public_ip_v6: string | null;
 	probe_version: string | null;
+	/** Next payment / expiry date (`YYYY-MM-DD`). */
+	renews_at: string | null;
 }
 
 /** Subset used for status derivation (fleet + monitoring). */
@@ -199,6 +205,12 @@ export interface HostDetailRow {
 	public_ip_v4: string | null;
 	public_ip_v6: string | null;
 	description: string | null;
+	/** Amount paid for the current period, in yuan. */
+	cost_amount_cny: number | null;
+	/** Last payment date (`YYYY-MM-DD`). */
+	paid_at: string | null;
+	/** Next payment / expiry date (`YYYY-MM-DD`). */
+	renews_at: string | null;
 	top_processes_json: string | null;
 	top_processes_ts: number | null;
 }

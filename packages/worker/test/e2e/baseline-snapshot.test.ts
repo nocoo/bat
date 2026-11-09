@@ -474,6 +474,18 @@ async function seedBaselineDataset(): Promise<void> {
 	});
 	assertStatus(descRes.status, 204, "seed description");
 
+	// Billing sets H1 to a known stable triple (the snapshot relies on it)
+	const billingRes = await fetch(`${BASE}/api/hosts/${HIDS[H1]}/billing`, {
+		method: "PATCH",
+		headers: writeHeaders(),
+		body: JSON.stringify({
+			cost_amount_cny: 365,
+			paid_at: "2026-01-01",
+			renews_at: "2027-01-01",
+		}),
+	});
+	assertStatus(billingRes.status, 204, "seed billing");
+
 	// 3 metric points on H1 — last one trips disk_full (used_pct = 90 > 85)
 	for (let i = 0; i < 3; i++) {
 		const ts = NOW - 90 + i * 30;

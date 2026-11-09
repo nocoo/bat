@@ -42,6 +42,7 @@ function extractBearerToken(header: string | undefined): string | null {
 /** Check if a request requires BAT_WRITE_KEY based on method + path */
 export function isWriteRequest(method: string, path: string): boolean {
 	if (method === "PATCH" && /^\/api\/hosts\/[^/]+\/description$/.test(path)) return true;
+	if (method === "PATCH" && /^\/api\/hosts\/[^/]+\/billing$/.test(path)) return true;
 	// Probe ingest routes
 	if (WRITE_ROUTES.includes(path)) {
 		return true;

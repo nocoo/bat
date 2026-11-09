@@ -83,11 +83,20 @@ export interface HostOverviewItem {
 	mem_sparkline: SparklinePoint[] | null; // 24h hourly Memory usage
 	net_sparkline: SparklinePoint[] | null; // 24h hourly Network usage (normalized 0–100)
 	load_sparkline: SparklinePoint[] | null; // 24h hourly load average (1m)
+	/** Next payment / expiry date (`YYYY-MM-DD`). Null when the host carries
+	 *  no billing data — the list renders no countdown for it. */
+	renews_at: string | null;
 }
 
 /** GET /api/hosts/:id → HostDetailItem */
 export interface HostDetailItem extends HostOverviewItem {
 	description: string | null;
+	/** Amount paid for the current period, in yuan. Null when unset. */
+	cost_amount_cny: number | null;
+	/** Last payment date (`YYYY-MM-DD`). Null when unset. */
+	paid_at: string | null;
+	/** Next payment / expiry date (`YYYY-MM-DD`). Null when unset. */
+	renews_at: string | null;
 	probe_version: string | null;
 	/** Public IPv4 literal, null when the host never reported one. */
 	public_ip_v4: string | null;

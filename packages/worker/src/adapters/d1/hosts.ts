@@ -3,6 +3,7 @@
 // `lib/resolve-host.ts`. Pure status / sparkline derivation stays in
 // the routes (which still own the wire-DTO shape) or in `services/`.
 
+import type { BillingFields } from "@bat/shared";
 import { loadHostMeta, storeHostMeta } from "../../lib/host-meta-cache.js";
 import { publicAddressLiteral, resolvePublicAddresses } from "../../lib/public-address.js";
 import type {
@@ -17,12 +18,12 @@ import type {
 } from "../../repos/types.js";
 
 const HOST_OVERVIEW_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, cpu_logical, cpu_physical, mem_total_bytes, virtualization, public_ip, public_ip_v4, public_ip_v6, probe_version, renews_at";
 
 const HOST_STATUS_COLUMNS = "host_id, hostname, last_seen";
 
 const HOST_DETAIL_COLUMNS =
-	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6, description, top_processes_json, top_processes_ts";
+	"host_id, hostname, os, kernel, arch, cpu_model, boot_time, last_seen, probe_version, cpu_logical, cpu_physical, mem_total_bytes, swap_total_bytes, virtualization, net_interfaces, disks, boot_mode, timezone, dns_resolvers, dns_search, public_ip, public_ip_v4, public_ip_v6, description, top_processes_json, top_processes_ts, cost_amount_cny, paid_at, renews_at";
 
 const LATEST_METRICS_COLUMNS =
 	"cpu_usage_pct, mem_used_pct, uptime_seconds, cpu_load1, swap_used_pct, disk_json, net_json";
@@ -363,6 +364,13 @@ ON CONFLICT(host_id) DO UPDATE SET
 		await this.db
 			.prepare("UPDATE hosts SET description = ? WHERE host_id = ?")
 			.bind(description, hostId)
+			.run();
+	}
+
+	async updateBilling(hostId: string, fields: BillingFields): Promise<void> {
+		await this.db
+			.prepare("UPDATE hosts SET cost_amount_cny = ?, paid_at = ?, renews_at = ? WHERE host_id = ?")
+			.bind(fields.cost_amount_cny, fields.paid_at, fields.renews_at, hostId)
 			.run();
 	}
 

@@ -171,6 +171,7 @@ export async function hostsListRoute(c: Context<AppEnv>) {
 			mem_sparkline: sparklines && sparklines.mem.length > 0 ? sparklines.mem : null,
 			net_sparkline: netSparkline,
 			load_sparkline: sparklines && sparklines.load.length > 0 ? sparklines.load : null,
+			renews_at: host.renews_at,
 		};
 	});
 
