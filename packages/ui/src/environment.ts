@@ -36,6 +36,11 @@ function storageWrite(storage: Storage, key: string, value: string) {
 		storage.setItem(key, value);
 	} catch {}
 }
+function storageRemove(storage: Storage, key: string) {
+	try {
+		storage.removeItem(key);
+	} catch {}
+}
 export async function initializeEnvironment() {
 	const config = window.__BAT_LOCAL__;
 	if (!config) return;
@@ -57,6 +62,7 @@ export async function initializeEnvironment() {
 			environment = await response.json();
 			return;
 		}
+		storageRemove(sessionStorage, instanceKey);
 	}
 	const mode = config.initial ?? (["demo", "e2e", "prod"].includes(saved ?? "") ? saved : "demo");
 	await selectEnvironment(mode as EnvironmentMode, false);
@@ -64,11 +70,20 @@ export async function initializeEnvironment() {
 export async function selectEnvironment(mode: EnvironmentMode, remember = true) {
 	const config = window.__BAT_LOCAL__;
 	if (!config || config.locked) throw new Error("Environment switching is unavailable");
-	const response = await fetch("/__bat/environment", {
-		method: "POST",
-		headers: { "Content-Type": "application/json", "X-Bat-Local": config.capability },
-		body: JSON.stringify({ mode, previous: environment?.id }),
-	});
+	const request = (previous?: string) =>
+		fetch("/__bat/environment", {
+			method: "POST",
+			headers: { "Content-Type": "application/json", "X-Bat-Local": config.capability },
+			body: JSON.stringify({ mode, previous }),
+		});
+	let response = await request(environment?.id);
+	// A launcher restart or an expired instance left the stored id stale;
+	// drop it and retry once instead of bricking the tab.
+	if (response.status === 410) {
+		environment = null;
+		storageRemove(sessionStorage, instanceKey);
+		response = await request();
+	}
 	const result = await response.json();
 	if (!response.ok) throw new Error(result.error ?? "Environment switch failed");
 	environment = result as EnvironmentInstance;
