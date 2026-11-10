@@ -13,6 +13,7 @@ import {
 	AppSkipLink,
 	AppShell as BasaltAppShell,
 } from "@nocoo/basalt/components/app-shell";
+import { LinkButton } from "@nocoo/basalt/components/button";
 import { Menu } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
@@ -96,7 +97,7 @@ function AppShellInner({ children }: AppShellProps) {
 									aria-label="Open navigation menu"
 									className={resolved ? undefined : "md:hidden"}
 								>
-									<Menu className="size-4" aria-hidden="true" strokeWidth={1.5} />
+									<Menu aria-hidden="true" strokeWidth={1.5} />
 								</Button>
 							</HeaderTooltip>
 						) : undefined
@@ -105,16 +106,16 @@ function AppShellInner({ children }: AppShellProps) {
 						<>
 							<EnvironmentSwitch />
 							<HeaderTooltip label="GitHub repository">
-								<Button asChild variant="ghost" size="icon">
-									<a
-										href="https://github.com/nocoo/bat"
-										target="_blank"
-										rel="noopener noreferrer"
-										aria-label="GitHub repository"
-									>
-										<Github className="size-4" aria-hidden="true" strokeWidth={1.5} />
-									</a>
-								</Button>
+								<LinkButton
+									variant="ghost"
+									size="icon"
+									href="https://github.com/nocoo/bat"
+									target="_blank"
+									rel="noopener noreferrer"
+									aria-label="GitHub repository"
+								>
+									<Github aria-hidden="true" strokeWidth={1.5} />
+								</LinkButton>
 							</HeaderTooltip>
 							<HexlyLink />
 							<ThemeToggle aria-label="Toggle theme" />
