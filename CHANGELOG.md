@@ -1,5 +1,85 @@
 # Changelog
 
+## v4.1.0
+
+### Added
+
+- Visual disk, cost tooltip and aligned countdown bars
+- Split link and billing into visual columns
+- Unfold the fleet table onto one line per column
+- Give the fleet table one fixed rhythm
+- Merge expiry and cost into one billing column, compact the table
+- Speak the renewal and the contract in English
+- Carry the host contract through every view
+- Store and serve the host contract fields
+- Add a switchable card view to the hosts page
+- Price each host in the table and total the fleet in a footer
+- Add the hosts view preference store
+- Seed demo tags and host descriptions
+- Show machine specs on the host list
+- Expose disk size and description in overview
+- Add disk size and description to host overview
+- Seed the demo hosts with billing states
+- Show the cost card, renewal countdown and fleet cost
+- Carry the priced billing inputs in the host list
+- Store and serve per-host billing
+- Derive billing period, daily cost and countdown
+
+### Changed
+
+- Format the billing key semantics
+- Pin the single-line fleet table rhythm
+- Record the three 503 causes
+- Follow the merged billing column and the English copy
+- Seed varied host contract data across the catalog
+- Cover the responsive host identity cell
+- Note the overview disk size and description
+- Refresh the overview baseline snapshots
+- Cover the host list columns and description
+- Capture the billing evidence at both widths
+- Format the billing inventory tables
+- Record the manual billing fields and the komari subset
+- Cover the cost card, the countdown and the fleet cost
+- Use basalt PageHeader on workstation detail
+- 侧栏折叠展开按钮回归 basalt 默认
+- 侧栏导航项沿用 basalt 链接与折叠默认形态
+- 侧栏导航组改用 basalt SidebarGroup 默认结构
+- Pin base-ci to v2026.10
+- Bump version 4.0.1 → 4.0.2
+- Bump @xyflow/react 12.12.0 → 12.12.1
+- Bump @playwright/test 1.64.1 → 1.65.0
+- Bump @biomejs/biome 2.6.4 → 2.6.6
+- Bump vitest 5.0.5 → 5.1.0 and @vitest/coverage-v8 5.0.5 → 5.1.0
+- Bump tailwindcss 4.3.3 → 4.3.5 and @tailwindcss/vite 4.3.3 → 4.3.5
+- Bump lucide-react 1.61.0 → 1.70.0
+- Bump @cfworker/json-schema 4.1.4 → 4.1.6
+- Bump hono 4.13.13 → 4.13.17
+- Align SidebarFooter user with basalt catalog
+- Use basalt LinkButton in AppHeader actions
+- Feed AppHeader breadcrumbs from one hook
+- Align sidebar header mark with basalt catalog
+- Run pre-push L2/G2 under bash for husky
+- Record index-snapshot pre-commit enforcement in AGENTS.md
+- Add pre-commit index-snapshot probes
+- Run L1 on git index snapshot
+
+### Fixed
+
+- Widen Disk for its whole qualifier and set the badge pill height
+- Trade whole columns at 1024 instead of hollow cells
+- Give the identity cell its lines and the edges their padding
+- Own the store check and tear down on signal
+- Detect store holders regardless of the lock file
+- Expire dead instances on environment revalidation
+- Retry an expired environment switch once
+- Recover local environments from restarts and dead workers
+- Isolate instance assets and own worker process group
+- Say the reset day once in the contract card
+- Give the identity cell back the room the description icon took
+- Speak the reset day in Chinese and give the table its room back
+- Let the card view stand alone, equalize and tighten its cards
+- Keep the host identity whole at 1024
+
 ## v4.0.1
 
 ### Added
