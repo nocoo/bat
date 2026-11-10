@@ -17,7 +17,7 @@ export function FleetCostTotal({
 	const hasPriced = summary.pricedHosts > 0;
 	return (
 		<span
-			className="flex flex-wrap items-baseline justify-end gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground"
+			className="flex w-full flex-wrap items-baseline justify-end gap-basalt-space-md text-basalt-sm text-basalt-muted-foreground"
 			data-testid={testId}
 		>
 			<span className="font-mono tabular-nums">

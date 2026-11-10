@@ -541,7 +541,7 @@ export function HostTable({
 					    row per column count to span them all. */}
 					<TableRow className="xl:hidden">
 						<TableCell
-							colSpan={5}
+							colSpan={6}
 							textAlign="end"
 							className="border-t border-basalt-border py-basalt-space-lg"
 						>
@@ -550,7 +550,7 @@ export function HostTable({
 					</TableRow>
 					<TableRow className="hidden xl:table-row">
 						<TableCell
-							colSpan={7}
+							colSpan={9}
 							textAlign="end"
 							className="border-t border-basalt-border py-basalt-space-lg"
 						>
