@@ -1,9 +1,10 @@
-// Fleet table for the hosts page: one clean line per column in the UI font
-// (tabular numerals keep the columns honest), a lucide anchor on each
-// header, and a fixed 40×14 trend slot right of the value so the numbers
-// never move. Spec qualifiers and trend slots give way below `xl`; the
-// state stays readable from the coloured badge icon and tone-coded
-// countdown at every width.
+// Fleet table for the hosts page: one clean line per numeric column in the
+// UI font (tabular numerals keep the columns honest), a lucide anchor on
+// each header, and a fixed 40×14 trend slot right of the value so the
+// numbers never move. The identity cell keeps two lines — hostname and
+// description icon, then architecture or whole-word tags. Spec qualifiers
+// and trend slots give way below `xl`; the state stays readable from the
+// coloured badge icon and tone-coded countdown at every width.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
@@ -58,6 +59,10 @@ const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums"
 /** The qualifier beside it — 12px muted, wide-view only for machine specs. */
 const CELL_SPEC =
 	"hidden max-w-28 truncate text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
+/** The Link qualifier: bandwidth plus traffic, whole words only — the
+ *  reset day folds away below `2xl` and the full string lives in `title`. */
+const CELL_LINK_SPEC =
+	"hidden shrink-0 whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
 const MAX_VISIBLE_TAGS = 3;
 
 /** One header cell: a small muted lucide anchor next to the 12px label.
@@ -143,9 +148,9 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 }
 
 /**
- * Tags share the identity line: colour dots always, names from `xl` up so
- * the hostname stays complete on narrow viewports. Capped at three with a
- * `+N` counter, never pushing the name around.
+ * Tags share the subtitle line: colour dots always, whole names from `xl`
+ * up — a tag is never narrower than its full word. Capped at three with a
+ * `+N` counter, never pushing the hostname around.
  */
 function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	const visible = tags.slice(0, MAX_VISIBLE_TAGS);
@@ -161,11 +166,7 @@ function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 						)}
 						style={{ backgroundColor: getSwatchColor(tag.color) }}
 					/>
-					<span
-						className={cn(
-							"hidden min-w-8 max-w-24 truncate text-basalt-xs text-basalt-muted-foreground xl:inline",
-						)}
-					>
+					<span className="hidden shrink-0 whitespace-nowrap text-basalt-xs text-basalt-muted-foreground xl:inline">
 						{tag.name}
 					</span>
 				</Fragment>
@@ -184,13 +185,19 @@ function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	);
 }
 
-/** The qualifier of the Link column: quota and reset day in one string,
- *  or a dash when the host carries neither. */
-function contractLine(quotaGb: number | null, resetDay: number | null): string {
-	const quota = formatTrafficQuotaGb(quotaGb);
-	const reset = formatResetDayCompact(resetDay);
-	if (quota && reset) return `${quota} · ${reset}`;
-	return quota ?? reset ?? "—";
+/** The Link cell always keeps its full contract in `title`: the visible
+ *  line folds the quota below `xl` and the reset day below `2xl`. */
+function contractTitle(
+	bandwidthMbps: number | null,
+	quotaGb: number | null,
+	resetDay: number | null,
+): string {
+	const parts = [
+		formatBandwidthMbps(bandwidthMbps),
+		formatTrafficQuotaGb(quotaGb),
+		formatResetDayCompact(resetDay),
+	].filter((part): part is string => part !== null);
+	return parts.length > 0 ? parts.join(" · ") : "—";
 }
 
 export function HostTable({
@@ -214,23 +221,22 @@ export function HostTable({
 						<TableHead>
 							<HeadLabel icon={Server}>Server</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-12 xl:w-24">Status</TableHead>
+						<TableHead className="lg:w-12 xl:w-24">
+							<HeadLabel icon={Activity}>Status</HeadLabel>
+						</TableHead>
 						<TableHead className="lg:w-17 xl:w-39" textAlign="end">
 							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
 						<TableHead className="lg:w-17 xl:w-37" textAlign="end">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-15 xl:w-26" textAlign="end">
+						<TableHead className="lg:w-14 xl:w-26" textAlign="end">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden 2xl:table-cell 2xl:w-26" textAlign="end">
-							<HeadLabel icon={Activity}>Load 1m</HeadLabel>
-						</TableHead>
-						<TableHead className="lg:w-18 xl:w-37" textAlign="end">
+						<TableHead className="lg:w-19 xl:w-39 2xl:w-44" textAlign="end">
 							<HeadLabel icon={Network}>Link</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-35 2xl:w-41" textAlign="end">
+						<TableHead className="lg:w-39 2xl:w-44" textAlign="end">
 							<HeadLabel icon={Wallet}>Billing</HeadLabel>
 						</TableHead>
 					</TableRow>
@@ -241,30 +247,41 @@ export function HostTable({
 						const daysLeft = daysUntilRenewal(host.renews_at, today);
 						const countdown = renewalBadgeLabel(daysLeft);
 						const dailyCost = dailyCostCny(host.cost_amount_cny, host.paid_at, host.renews_at);
-						const contract = contractLine(host.traffic_quota_gb, host.traffic_reset_day);
+						const quota = host.traffic_quota_gb;
+						const reset = host.traffic_reset_day;
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
-									<div className="flex min-w-0 items-center gap-basalt-space-sm">
-										<Link
-											to={`/hosts/${hashHostId(host.host_id)}`}
-											className="[flex-shrink:0.001] min-w-0 truncate font-medium underline-offset-4 hover:underline"
-											title={host.hostname}
-										>
-											{host.hostname}
-										</Link>
-										{host.description && (
-											<DescriptionHint hostname={host.hostname} description={host.description} />
-										)}
-										<span
-											className={cn(
-												"[flex-shrink:100] min-w-0 truncate text-basalt-xs text-basalt-muted-foreground",
-												tags.length > 0 && "hidden xl:inline",
+									<div className="flex min-w-0 flex-col gap-basalt-space-xs">
+										<div className="flex min-w-0 items-center gap-basalt-space-sm">
+											<Link
+												to={`/hosts/${hashHostId(host.host_id)}`}
+												className="[flex-shrink:0.001] min-w-0 truncate font-medium underline-offset-4 hover:underline"
+												title={host.hostname}
+											>
+												{host.hostname}
+											</Link>
+											{host.description && (
+												<DescriptionHint hostname={host.hostname} description={host.description} />
 											)}
+										</div>
+										<div
+											className="flex min-w-0 items-center gap-basalt-space-sm overflow-hidden text-basalt-xs text-basalt-muted-foreground"
+											style={{
+												minHeight: "calc(var(--basalt-text-xs) * var(--basalt-leading-body))",
+											}}
+											data-testid="host-subtitle"
 										>
-											{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
-										</span>
-										<TagTrail tags={tags} />
+											<span
+												className={cn(
+													"[flex-shrink:100] min-w-0 truncate",
+													tags.length > 0 && "hidden",
+												)}
+											>
+												{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
+											</span>
+											<TagTrail tags={tags} />
+										</div>
 									</div>
 								</TableCell>
 								<TableCell>
@@ -300,39 +317,32 @@ export function HostTable({
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="hidden 2xl:table-cell"
-									data-testid="host-load"
-								>
-									<div className="flex items-center justify-end gap-basalt-space-md">
-										{host.cpu_load1 === null ? (
-											<span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>
-										) : (
-											<span className={CELL_VALUE}>{host.cpu_load1.toFixed(2)}</span>
-										)}
-										<TrendSlot
-											points={host.load_sparkline}
-											color={chart.teal}
-											label={`${host.hostname} 24 hour load`}
-										/>
-									</div>
-								</TableCell>
-								<TableCell
-									textAlign="end"
 									className="whitespace-nowrap"
 									data-testid="host-contract"
+									title={contractTitle(host.bandwidth_mbps, quota, reset)}
 								>
 									<div className="flex items-center justify-end gap-basalt-space-md">
 										<span className={CELL_VALUE}>
 											{formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}
 										</span>
-										{contract !== "—" && <span className={CELL_SPEC}>{contract}</span>}
+										{quota !== null && (
+											<span className={CELL_LINK_SPEC}>
+												· {formatTrafficQuotaGb(quota)}
+												{reset !== null && (
+													<span className="hidden 2xl:inline">
+														{" "}
+														· {formatResetDayCompact(reset)}
+													</span>
+												)}
+											</span>
+										)}
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-billing">
 									{countdown === null && dailyCost === null ? (
 										<span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>
 									) : (
-										<div className="flex items-center justify-end gap-basalt-space-md">
+										<div className="flex items-center justify-end gap-basalt-space-lg">
 											{dailyCost !== null && (
 												<span className={CELL_VALUE} data-testid="host-daily-cost">
 													{`${formatCny(dailyCost)}/day`}
@@ -359,24 +369,13 @@ export function HostTable({
 					})}
 				</TableBody>
 				<TableFooter data-testid="host-table-footer">
-					{/* The load column only joins the table at 2xl, so the total
-					    needs one row per column count to span them all. */}
-					<TableRow className="hidden lg:table-row 2xl:hidden">
+					<TableRow>
 						<TableCell
 							colSpan={7}
 							textAlign="end"
 							className="border-t border-basalt-border py-basalt-space-lg"
 						>
-							<FleetCostTotal hosts={hosts} testId="fleet-cost" />
-						</TableCell>
-					</TableRow>
-					<TableRow className="hidden 2xl:table-row">
-						<TableCell
-							colSpan={8}
-							textAlign="end"
-							className="border-t border-basalt-border py-basalt-space-lg"
-						>
-							<FleetCostTotal hosts={hosts} testId="fleet-cost-wide" />
+							<FleetCostTotal hosts={hosts} />
 						</TableCell>
 					</TableRow>
 				</TableFooter>

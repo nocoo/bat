@@ -228,16 +228,7 @@ test.describe("Hosts list page", () => {
 		const headers = (await table.getByRole("columnheader").allInnerTexts()).map((text) =>
 			text.trim(),
 		);
-		expect(headers).toEqual([
-			"Server",
-			"Status",
-			"CPU",
-			"Memory",
-			"Disk",
-			"Load 1m",
-			"Link",
-			"Billing",
-		]);
+		expect(headers).toEqual(["Server", "Status", "CPU", "Memory", "Disk", "Link", "Billing"]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
 		await expect(alpha).toContainText("8 cores");
@@ -294,7 +285,7 @@ test.describe("Hosts list page", () => {
 		}
 	});
 
-	test("the fleet table holds one 48px line per column", async ({ page }) => {
+	test("the fleet table holds one measured rhythm per column", async ({ page }) => {
 		await page.goto("/hosts");
 		await expect(page.getByTestId("host-row")).toHaveCount(2);
 
@@ -305,6 +296,40 @@ test.describe("Hosts list page", () => {
 				const rows = Array.from(
 					element.querySelectorAll<HTMLElement>('tbody tr[data-testid="host-row"]'),
 				);
+				const headerCount = element.querySelectorAll("thead th").length;
+				const bodyCount = rows[0] ? rows[0].querySelectorAll("td").length : 0;
+				const cellWidths = rows[0]
+					? Array.from(rows[0].querySelectorAll("td")).map((cell) =>
+							Math.round(cell.getBoundingClientRect().width),
+						)
+					: [];
+				const subtitleEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-subtitle"]');
+				const subtitleWords = subtitleEl
+					? Array.from(subtitleEl.querySelectorAll<HTMLElement>("span"))
+							.filter(
+								(span) =>
+									getComputedStyle(span).display !== "none" && span.textContent.trim().length > 0,
+							)
+							.map((span) => span.textContent.trim())
+					: [];
+				const money = rows[0]?.querySelector<HTMLElement>('[data-testid="host-daily-cost"]');
+				const countdownEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-countdown"]');
+				const moneyGap =
+					money && countdownEl
+						? Math.round(
+								countdownEl.getBoundingClientRect().left - money.getBoundingClientRect().right,
+							)
+						: null;
+				const linkLine = rows[0]?.querySelector<HTMLElement>('[data-testid="host-contract"] > div');
+				const billingLine = rows[0]?.querySelector<HTMLElement>(
+					'[data-testid="host-billing"] > div',
+				);
+				const linkBillingGap =
+					linkLine && billingLine
+						? Math.round(
+								billingLine.getBoundingClientRect().left - linkLine.getBoundingClientRect().right,
+							)
+						: null;
 				const cpuCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cpu"]');
 				const serverCell = rows[0]?.querySelector<HTMLElement>("td");
 				const value = rows[0]?.querySelector<HTMLElement>(
@@ -382,15 +407,26 @@ test.describe("Hosts list page", () => {
 							? 1
 							: 0,
 					),
+					headerCount,
+					bodyCount,
+					cellWidths,
+					subtitleWords,
+					moneyGap,
+					linkBillingGap,
 					tableOverflow: element.scrollWidth - element.clientWidth,
 					columns,
 					trendSlots,
 				};
 			});
 
-			// One 48px line per row, uniform across the fleet.
-			expect(new Set(rhythm.rowHeights).size).toBe(1);
-			for (const height of rhythm.rowHeights) expect(height).toBe(48);
+			// One two-line identity cell drives a uniform row height.
+			const tallest = Math.max(...rhythm.rowHeights);
+			const shortest = Math.min(...rhythm.rowHeights);
+			expect(tallest - shortest).toBeLessThanOrEqual(1);
+			for (const height of rhythm.rowHeights) {
+				expect(height).toBeGreaterThanOrEqual(54);
+				expect(height).toBeLessThanOrEqual(57);
+			}
 			// 8px cell padding, with the identity cell a step wider on the left.
 			expect(rhythm.padding).toEqual({ block: "8px", inline: "8px" });
 			expect(rhythm.serverInlineStart).toBe("16px");
@@ -406,6 +442,16 @@ test.describe("Hosts list page", () => {
 			expect(rhythm.badgeIcon).toBe(true);
 			// Hairline between rows, none after the last.
 			expect(rhythm.separators).toEqual([1, 0]);
+			// Header and body agree on the column count, with no phantom cell.
+			expect(rhythm.headerCount).toBe(7);
+			expect(rhythm.bodyCount).toBe(7);
+			for (const width of rhythm.cellWidths) expect(width).toBeGreaterThan(0);
+			// The subtitle keeps whole words; the money and its countdown
+			// never touch, and neither do the Link and Billing figures.
+			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
+			expect(rhythm.subtitleWords.length).toBeGreaterThan(0);
+			expect(rhythm.moneyGap).toBeGreaterThanOrEqual(8);
+			expect(rhythm.linkBillingGap).toBeGreaterThanOrEqual(16);
 			// Every column keeps one right edge and no cell overflows.
 			for (const column of rhythm.columns) {
 				expect(column.edges).toHaveLength(1);
@@ -437,14 +483,11 @@ test.describe("Hosts list page", () => {
 
 		await page.setViewportSize({ width: 1536, height: 900 });
 		const table = page.getByRole("table", { name: "Servers" });
-		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeVisible();
 		for (const tag of ["production", "us-east", "edge"]) {
 			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
 		}
 
 		await page.setViewportSize({ width: 1280, height: 900 });
-		// The load column gives way instead of truncating the identity cell.
-		await expect(table.getByRole("columnheader").filter({ hasText: "Load 1m" })).toBeHidden();
 		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
 		const hostname = alpha.getByRole("link", { name: "alpha.test.local" });
 		await expect(hostname).toBeVisible();
@@ -484,18 +527,39 @@ test.describe("Hosts list page", () => {
 			const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
 			await expect(alpha.getByTestId("host-contract")).toBeVisible();
 
-			// One line: the bandwidth as the value, the quota and the reset
-			// day as the qualifier beside it.
-			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB · 1st");
+			// One line: the bandwidth as the value, the quota as the qualifier.
+			// The reset day only joins at 2xl; the full contract always
+			// travels in the cell's title.
+			const contract = alpha.getByTestId("host-contract");
+			await expect(contract).toContainText("2.5 Gbps");
+			await expect(contract).toContainText("500 GB");
+			const folding = await contract.evaluate((cell) => {
+				const spans = [...cell.querySelectorAll<HTMLElement>("span")];
+				const quota = spans.find((span) => span.textContent?.includes("500 GB"));
+				const reset = spans.find((span) => span.textContent?.trim() === "· 1st");
+				return {
+					quotaVisible: quota ? getComputedStyle(quota).display !== "none" : false,
+					resetVisible: reset ? getComputedStyle(reset).display !== "none" : false,
+					title: cell.getAttribute("title"),
+				};
+			});
+			expect(folding.quotaVisible).toBe(true);
+			expect(folding.resetVisible).toBe(false);
+			expect(folding.title).toBe("2.5 Gbps · 500 GB · 1st");
 
-			// A host without contract data keeps its dashes in the same column.
+			// A host without contract data keeps its dash in the same column.
 			await expect(beta.getByTestId("host-contract")).toContainText("—");
 
 			// At 1024 the qualifier gives way and the cell shows the bandwidth only.
 			await page.setViewportSize({ width: 1024, height: 900 });
-			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
-			await expect(alpha.getByTestId("host-contract").getByText("500 GB · 1st")).toBeHidden();
+			await expect(contract).toContainText("2.5 Gbps");
+			const narrowQuotaVisible = await contract.evaluate((cell) => {
+				const quota = [...cell.querySelectorAll<HTMLElement>("span")].find((span) =>
+					span.textContent?.includes("500 GB"),
+				);
+				return quota ? getComputedStyle(quota).display !== "none" : false;
+			});
+			expect(narrowQuotaVisible).toBe(false);
 		} finally {
 			await page.request.patch("/api/hosts/f0d3fd30/billing", {
 				data: {
@@ -611,8 +675,8 @@ test.describe("Hosts list page", () => {
 				expect(geometry.identityWidth).toBeGreaterThanOrEqual(180);
 				// The link line and the billing figures never touch.
 				expect(geometry.linkBillingGap ?? 0).toBeGreaterThanOrEqual(4);
-				// One 48px line per column keeps the row compact.
-				expect(geometry.rowHeight).toBeLessThanOrEqual(52);
+				// One two-line identity cell keeps the row compact.
+				expect(geometry.rowHeight).toBeLessThanOrEqual(60);
 			}
 		} finally {
 			// The longer name must not leak into the specs that follow.
