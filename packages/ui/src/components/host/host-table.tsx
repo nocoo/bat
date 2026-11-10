@@ -238,7 +238,7 @@ export function HostTable({
 						<TableHead className="lg:w-24 xl:w-37" textAlign="end">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-25 xl:w-26" textAlign="end">
+						<TableHead className="lg:w-29 xl:w-26" textAlign="end">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
 						<TableHead className="hidden xl:table-cell xl:w-39 2xl:w-44" textAlign="end">

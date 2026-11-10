@@ -33,7 +33,7 @@ export function StatusBadge({ status }: { status: HostStatus }) {
 	return (
 		<Badge
 			variant={config.variant}
-			className="shrink-0 gap-basalt-space-sm whitespace-nowrap"
+			className="h-basalt-control-sm shrink-0 gap-basalt-space-sm whitespace-nowrap"
 			data-testid="status-badge"
 			title={config.label}
 			aria-label={config.label}
