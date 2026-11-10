@@ -16,7 +16,7 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"@cfworker/json-schema": "4.1.4",
+		"@cfworker/json-schema": "4.1.6",
 		"hono": "4.13.17",
 		"jose": "^6.2.14"
 	},
