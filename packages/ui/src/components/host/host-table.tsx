@@ -41,12 +41,11 @@ import {
 	Timer,
 	Wallet,
 } from "lucide-react";
-import { Fragment } from "react";
 import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
-import { StatusBadge } from "@/components/status-badge";
+import { hostStatusLabel, StatusBadge } from "@/components/status-badge";
 import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
-import { getValueColor } from "@/lib/host-card-format";
+import { getValueColor, statusDotColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { cn } from "@/lib/utils";
@@ -57,8 +56,7 @@ import { formatPercent } from "@/lib/workstation-format";
  *  size and colour utilities apart and would drop one of them. */
 const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums";
 /** The qualifier beside it — 12px muted, wide-view only for machine specs. */
-const CELL_SPEC =
-	"hidden max-w-28 truncate text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
+const CELL_SPEC = "max-w-28 truncate text-basalt-xs tabular-nums text-basalt-muted-foreground";
 /** The Link qualifier: bandwidth plus traffic, whole words only — the
  *  reset day folds away below `2xl` and the full string lives in `title`. */
 const CELL_LINK_SPEC =
@@ -152,28 +150,38 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
  * up — a tag is never narrower than its full word. Capped at three with a
  * `+N` counter, never pushing the hostname around.
  */
+/**
+ * Tags share the subtitle line as dot+name pairs: the first tag is always
+ * a full word — a colour dot alone is never an acceptable rendering — and
+ * from `xl` up two more join, capped with a `+N` counter that counts what
+ * folded. Pairs never shrink; on very long hostnames the name yields last.
+ */
 function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	const visible = tags.slice(0, MAX_VISIBLE_TAGS);
 	return (
-		<span className="[flex-shrink:100] flex min-w-0 items-center gap-basalt-space-sm overflow-hidden">
+		<span className="flex min-w-0 shrink-0 items-center gap-basalt-space-sm">
 			{visible.map((tag, index) => (
-				<Fragment key={tag.id}>
+				<span
+					key={tag.id}
+					className={
+						index > 0
+							? "hidden items-center gap-basalt-space-xs xl:flex"
+							: "flex items-center gap-basalt-space-xs"
+					}
+				>
 					<span
 						aria-hidden="true"
-						className={cn(
-							"size-1.5 shrink-0 rounded-basalt-full",
-							index === MAX_VISIBLE_TAGS - 1 && "hidden xl:block",
-						)}
+						className="size-1.5 shrink-0 rounded-basalt-full"
 						style={{ backgroundColor: getSwatchColor(tag.color) }}
 					/>
-					<span className="hidden shrink-0 whitespace-nowrap text-basalt-xs text-basalt-muted-foreground xl:inline">
+					<span className="shrink-0 whitespace-nowrap text-basalt-xs text-basalt-muted-foreground">
 						{tag.name}
 					</span>
-				</Fragment>
+				</span>
 			))}
-			{tags.length > 2 && (
+			{tags.length > 1 && (
 				<span className="shrink-0 text-basalt-xs text-basalt-muted-foreground xl:hidden">
-					+{tags.length - 2}
+					+{tags.length - 1}
 				</span>
 			)}
 			{tags.length > MAX_VISIBLE_TAGS && (
@@ -221,19 +229,19 @@ export function HostTable({
 						<TableHead>
 							<HeadLabel icon={Server}>Server</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-12 xl:w-24">
+						<TableHead className="hidden xl:table-cell xl:w-24">
 							<HeadLabel icon={Activity}>Status</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-17 xl:w-39" textAlign="end">
+						<TableHead className="lg:w-28 xl:w-39" textAlign="end">
 							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-17 xl:w-37" textAlign="end">
+						<TableHead className="lg:w-24 xl:w-37" textAlign="end">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-14 xl:w-26" textAlign="end">
+						<TableHead className="lg:w-25 xl:w-26" textAlign="end">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-19 xl:w-39 2xl:w-44" textAlign="end">
+						<TableHead className="hidden xl:table-cell xl:w-39 2xl:w-44" textAlign="end">
 							<HeadLabel icon={Network}>Link</HeadLabel>
 						</TableHead>
 						<TableHead className="lg:w-39 2xl:w-44" textAlign="end">
@@ -254,6 +262,12 @@ export function HostTable({
 								<TableCell>
 									<div className="flex min-w-0 flex-col gap-basalt-space-xs">
 										<div className="flex min-w-0 items-center gap-basalt-space-sm">
+											<span
+												role="img"
+												aria-label={hostStatusLabel(host.status)}
+												title={hostStatusLabel(host.status)}
+												className={`size-2 shrink-0 rounded-basalt-full xl:hidden ${statusDotColor(host.status)}`}
+											/>
 											<Link
 												to={`/hosts/${hashHostId(host.host_id)}`}
 												className="[flex-shrink:0.001] min-w-0 truncate font-medium underline-offset-4 hover:underline"
@@ -262,7 +276,12 @@ export function HostTable({
 												{host.hostname}
 											</Link>
 											{host.description && (
-												<DescriptionHint hostname={host.hostname} description={host.description} />
+												<span className="hidden xl:contents">
+													<DescriptionHint
+														hostname={host.hostname}
+														description={host.description}
+													/>
+												</span>
 											)}
 										</div>
 										<div
@@ -284,8 +303,8 @@ export function HostTable({
 										</div>
 									</div>
 								</TableCell>
-								<TableCell>
-									<StatusBadge status={host.status} responsiveLabel={true} />
+								<TableCell className="hidden xl:table-cell">
+									<StatusBadge status={host.status} />
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-cpu">
 									<div className="flex items-center justify-end gap-basalt-space-md">
@@ -317,7 +336,7 @@ export function HostTable({
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="whitespace-nowrap"
+									className="hidden whitespace-nowrap xl:table-cell"
 									data-testid="host-contract"
 									title={contractTitle(host.bandwidth_mbps, quota, reset)}
 								>
@@ -369,13 +388,24 @@ export function HostTable({
 					})}
 				</TableBody>
 				<TableFooter data-testid="host-table-footer">
-					<TableRow>
+					{/* Status and Link only join from `xl`, so the total needs one
+					    row per column count to span them all. */}
+					<TableRow className="xl:hidden">
+						<TableCell
+							colSpan={5}
+							textAlign="end"
+							className="border-t border-basalt-border py-basalt-space-lg"
+						>
+							<FleetCostTotal hosts={hosts} />
+						</TableCell>
+					</TableRow>
+					<TableRow className="hidden xl:table-row">
 						<TableCell
 							colSpan={7}
 							textAlign="end"
 							className="border-t border-basalt-border py-basalt-space-lg"
 						>
-							<FleetCostTotal hosts={hosts} />
+							<FleetCostTotal hosts={hosts} testId="fleet-cost-wide" />
 						</TableCell>
 					</TableRow>
 				</TableFooter>

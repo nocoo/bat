@@ -235,7 +235,10 @@ test.describe("Host billing", () => {
 			await page.waitForLoadState("domcontentloaded");
 
 			const footer = page.getByTestId("host-table-footer");
-			const fleetCost = footer.getByTestId("fleet-cost").filter({ visible: true });
+			const fleetCost = footer
+				.getByTestId("fleet-cost")
+				.or(footer.getByTestId("fleet-cost-wide"))
+				.filter({ visible: true });
 			await expect(footer).toBeVisible({ timeout: 15_000 });
 			await expect(fleetCost).toContainText("¥11.50/day");
 			await expect(fleetCost).toContainText("/month");

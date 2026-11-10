@@ -289,6 +289,7 @@ test.describe("Hosts list page", () => {
 		await page.goto("/hosts");
 		await expect(page.getByTestId("host-row")).toHaveCount(2);
 
+		let badgeLabel: string | null = null;
 		for (const width of [1440, 1024]) {
 			await page.setViewportSize({ width, height: 900 });
 			const table = page.getByRole("table", { name: "Servers" });
@@ -296,12 +297,26 @@ test.describe("Hosts list page", () => {
 				const rows = Array.from(
 					element.querySelectorAll<HTMLElement>('tbody tr[data-testid="host-row"]'),
 				);
-				const headerCount = element.querySelectorAll("thead th").length;
-				const bodyCount = rows[0] ? rows[0].querySelectorAll("td").length : 0;
+				const headerCount = Array.from(element.querySelectorAll("thead th")).filter(
+					(th) => th.getBoundingClientRect().width > 0,
+				).length;
+				const cellText = (id: string) =>
+					Array.from(rows[0]?.querySelectorAll<HTMLElement>(`[data-testid="${id}"] span`) ?? [])
+						.filter((span) => span.getBoundingClientRect().width > 0)
+						.map((span) => span.textContent.trim())
+						.filter(Boolean)
+						.join(" ");
+				const statusDotEl = rows[0]?.querySelector<HTMLElement>('td span[role="img"]');
+				const badgeEl = rows[0]?.querySelector<HTMLElement>('[data-testid="status-badge"]');
+				const bodyCount = rows[0]
+					? Array.from(rows[0].querySelectorAll("td")).filter(
+							(td) => td.getBoundingClientRect().width > 0,
+						).length
+					: 0;
 				const cellWidths = rows[0]
-					? Array.from(rows[0].querySelectorAll("td")).map((cell) =>
-							Math.round(cell.getBoundingClientRect().width),
-						)
+					? Array.from(rows[0].querySelectorAll("td"))
+							.filter((cell) => cell.getBoundingClientRect().width > 0)
+							.map((cell) => Math.round(cell.getBoundingClientRect().width))
 					: [];
 				const subtitleEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-subtitle"]');
 				const subtitleWords = subtitleEl
@@ -407,6 +422,13 @@ test.describe("Hosts list page", () => {
 							? 1
 							: 0,
 					),
+					statusDotVisible: statusDotEl ? statusDotEl.getBoundingClientRect().width > 0 : false,
+					statusDotLabel: statusDotEl?.getAttribute("aria-label") ?? null,
+					badgeLabel: badgeEl?.getAttribute("aria-label") ?? null,
+					badgeVisible: badgeEl ? badgeEl.getBoundingClientRect().width > 0 : false,
+					cpuText: cellText("host-cpu"),
+					memoryText: cellText("host-memory"),
+					diskText: cellText("host-disk"),
 					headerCount,
 					bodyCount,
 					cellWidths,
@@ -443,9 +465,31 @@ test.describe("Hosts list page", () => {
 			// Hairline between rows, none after the last.
 			expect(rhythm.separators).toEqual([1, 0]);
 			// Header and body agree on the column count, with no phantom cell.
-			expect(rhythm.headerCount).toBe(7);
-			expect(rhythm.bodyCount).toBe(7);
-			for (const width of rhythm.cellWidths) expect(width).toBeGreaterThan(0);
+			// Below xl the Status and Link columns give way entirely — the
+			// state moves to a titled dot before the hostname — instead of
+			// hollowing cells out.
+			const expectedColumns = width === 1440 ? 7 : 5;
+			expect(rhythm.headerCount).toBe(expectedColumns);
+			expect(rhythm.bodyCount).toBe(expectedColumns);
+			for (const cellWidth of rhythm.cellWidths) expect(cellWidth).toBeGreaterThan(0);
+			if (width === 1440) {
+				expect(rhythm.statusDotVisible).toBe(false);
+				expect(rhythm.badgeVisible).toBe(true);
+				badgeLabel = rhythm.badgeLabel;
+			} else {
+				// The dot that replaces the column carries the same state name.
+				expect(rhythm.statusDotVisible).toBe(true);
+				expect(rhythm.statusDotLabel).toBe(badgeLabel);
+				expect(rhythm.badgeVisible).toBe(false);
+			}
+			// The spec qualifiers never fold: the machine's own size stays
+			// beside its reading at every width, and the first tag keeps its
+			// full word — a colour dot alone is never acceptable.
+			expect(rhythm.cpuText).toBe("42.1% 8 cores");
+			expect(rhythm.memoryText).toBe("40.6% 8 GB");
+			expect(rhythm.diskText).toBe("42.3% 50 GB");
+			expect(rhythm.subtitleWords.join(" ")).toContain("production");
+			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
 			// The subtitle keeps whole words; the money and its countdown
 			// never touch, and neither do the Link and Billing figures.
 			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
@@ -494,19 +538,24 @@ test.describe("Hosts list page", () => {
 		await expect
 			.poll(() => hostname.evaluate((element) => element.scrollWidth <= element.clientWidth))
 			.toBe(true);
+		// 1280 leaves the identity column ~108px, so the trail shows its
+		// first full word; the two wider names fold until 1440.
 		await expect(alpha.getByText("edge", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("production", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("us-east", { exact: true })).toBeVisible();
 
-		// Below `xl` the tag trail narrows to two so the name stays readable.
+		// Below `xl` the Status and Link columns leave the table (the state
+		// moves to the dot before the name) and the tag trail narrows to one
+		// full word plus a counter.
 		await page.setViewportSize({ width: 1024, height: 900 });
 		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
-		await expect(table.getByRole("columnheader").filter({ hasText: "Link" })).toBeVisible();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Link" })).toBeHidden();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Status" })).toBeHidden();
 		await expect
 			.poll(() => hostname.evaluate((element) => element.scrollWidth <= element.clientWidth))
 			.toBe(true);
+		await expect(alpha.getByText("edge", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("production", { exact: true })).toBeHidden();
 		await expect(alpha.getByText("us-east", { exact: true })).toBeHidden();
-		await expect(alpha.getByText("+1", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("+2", { exact: true })).toBeVisible();
 	});
 
 	test("the Link column carries the contract beside the bandwidth", async ({ page }) => {
@@ -692,16 +741,19 @@ test.describe("Hosts list page", () => {
 
 		const footer = page.getByTestId("host-table-footer");
 		await expect(footer).toBeVisible();
-		const total = footer.getByTestId("fleet-cost").filter({ visible: true });
+		const total = footer
+			.getByTestId("fleet-cost")
+			.or(footer.getByTestId("fleet-cost-wide"))
+			.filter({ visible: true });
 		await expect(total).toContainText("¥11.50/day");
 		await expect(total).toContainText("/month");
 		await expect(total).toContainText("2 / 2 hosts");
 
 		// The total line ends exactly where the last column's figures do.
 		const gap = await page.evaluate(() => {
-			const total = document.querySelector(
-				'[data-testid="host-table-footer"] [data-testid="fleet-cost"]',
-			);
+			const total = Array.from(
+				document.querySelectorAll('[data-testid="host-table-footer"] [data-testid]'),
+			).find((el) => el.getBoundingClientRect().width > 0);
 			const last = document.querySelector('[data-testid="host-billing"]');
 			if (!total || !last) return null;
 			const padding = Number.parseFloat(getComputedStyle(last).paddingInlineEnd || "0");

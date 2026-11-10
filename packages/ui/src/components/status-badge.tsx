@@ -22,15 +22,12 @@ const STATUS_CONFIG: Record<
 	offline: { label: "Offline", variant: "secondary", icon: CircleOff },
 };
 
-export function StatusBadge({
-	status,
-	responsiveLabel = false,
-}: {
-	status: HostStatus;
-	/** Hide the word below `xl`, leaving the coloured icon to carry the state
-	 *  (the label stays in `title` / `aria-label`). */
-	responsiveLabel?: boolean;
-}) {
+/** The state's accessible name — also carried by the list's status dot. */
+export function hostStatusLabel(status: HostStatus): string {
+	return STATUS_CONFIG[status].label;
+}
+
+export function StatusBadge({ status }: { status: HostStatus }) {
 	const config = STATUS_CONFIG[status];
 	const Icon = config.icon;
 	return (
@@ -42,7 +39,7 @@ export function StatusBadge({
 			aria-label={config.label}
 		>
 			<Icon className="size-3 shrink-0" strokeWidth={2} aria-hidden="true" />
-			{responsiveLabel ? <span className="hidden xl:inline">{config.label}</span> : config.label}
+			{config.label}
 		</Badge>
 	);
 }
