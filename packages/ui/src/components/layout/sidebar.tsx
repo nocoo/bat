@@ -27,7 +27,7 @@ import {
 	Tag,
 	Webhook,
 } from "lucide-react";
-import { Link as RouterLink, useLocation } from "react-router";
+import { useLocation } from "react-router";
 import { useMe } from "@/hooks";
 import { getDisplayName } from "@/lib/avatar-color";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ const NAV_GROUPS = [
 		],
 	},
 ];
+
+const NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
 
 const SIDEBAR_MARK_SLOT_CLASS = "flex w-full items-center";
 
@@ -128,54 +130,54 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 				</Button>
 			) : null}
 			<SidebarNav>
-				{NAV_GROUPS.map((group) =>
-					compact ? (
-						group.items.map((item) => (
-							<Tooltip key={item.href}>
-								<TooltipTrigger asChild={true}>
+				{compact
+					? NAV_ITEMS.map((item) => (
+							<Tooltip key={item.href} delayDuration={0}>
+								<TooltipTrigger asChild>
 									<Button
-										asChild={true}
+										asChild
 										variant="ghost"
 										size="icon"
 										className="basalt-nav-item"
 										data-basalt-hover-item=""
 										data-hover-selected={active(item.href)}
 									>
-										<RouterLink
-											to={item.href}
+										<Link
+											href={item.href}
 											onClick={closeMobile}
 											aria-label={item.label}
 											aria-current={active(item.href) ? "page" : undefined}
 										>
 											<item.icon aria-hidden="true" strokeWidth={1.5} />
 											<span className="sr-only">{item.label}</span>
-										</RouterLink>
+										</Link>
 									</Button>
 								</TooltipTrigger>
-								<TooltipContent side="right">{item.label}</TooltipContent>
+								<TooltipContent side="right" sideOffset={8}>
+									{item.label}
+								</TooltipContent>
 							</Tooltip>
 						))
-					) : (
-						<SidebarGroup key={group.label} label={group.label}>
-							{group.items.map((item) => (
-								<EditableNavItem
-									key={item.href}
-									label={item.label}
-									href={item.href}
-									selected={active(item.href)}
-									onSelect={closeMobile}
-									icon={<item.icon strokeWidth={1.5} />}
-								/>
-							))}
-						</SidebarGroup>
-					),
-				)}
+					: NAV_GROUPS.map((group) => (
+							<SidebarGroup key={group.label} label={group.label}>
+								{group.items.map((item) => (
+									<EditableNavItem
+										key={item.href}
+										label={item.label}
+										href={item.href}
+										selected={active(item.href)}
+										onSelect={closeMobile}
+										icon={<item.icon strokeWidth={1.5} aria-hidden="true" />}
+									/>
+								))}
+							</SidebarGroup>
+						))}
 			</SidebarNav>
 			<SidebarFooter>
 				{compact ? (
 					<>
 						<Tooltip delayDuration={0}>
-							<TooltipTrigger asChild={true}>{userAvatar}</TooltipTrigger>
+							<TooltipTrigger asChild>{userAvatar}</TooltipTrigger>
 							<TooltipContent side="right" sideOffset={8}>
 								{name}
 							</TooltipContent>
