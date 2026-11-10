@@ -294,6 +294,142 @@ test.describe("Hosts list page", () => {
 		}
 	});
 
+	test("the fleet table holds one 48px line per column", async ({ page }) => {
+		await page.goto("/hosts");
+		await expect(page.getByTestId("host-row")).toHaveCount(2);
+
+		for (const width of [1440, 1024]) {
+			await page.setViewportSize({ width, height: 900 });
+			const table = page.getByRole("table", { name: "Servers" });
+			const rhythm = await table.evaluate((element) => {
+				const rows = Array.from(
+					element.querySelectorAll<HTMLElement>('tbody tr[data-testid="host-row"]'),
+				);
+				const cpuCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cpu"]');
+				const serverCell = rows[0]?.querySelector<HTMLElement>("td");
+				const value = rows[0]?.querySelector<HTMLElement>(
+					'[data-testid="host-cpu"] span.font-medium',
+				);
+				const qualifier = rows[0]?.querySelector<HTMLElement>(
+					'[data-testid="host-cpu"] span.text-basalt-xs',
+				);
+				const header = element.querySelector<HTMLElement>("th:nth-child(3)");
+				const hostname = rows[0]?.querySelector<HTMLAnchorElement>("a");
+				const badge = rows[0]?.querySelector<HTMLElement>('[data-testid="status-badge"]');
+				const badgeLabel = badge?.querySelector<HTMLElement>("span") ?? null;
+				const columns = [
+					"host-cpu",
+					"host-memory",
+					"host-disk",
+					"host-contract",
+					"host-billing",
+				].map((id) => {
+					// The single line is right-aligned, so its right edge is the column's edge.
+					const edges = [
+						...new Set(
+							Array.from(element.querySelectorAll<HTMLElement>(`[data-testid="${id}"] > div`)).map(
+								(line) => Math.round(line.getBoundingClientRect().right),
+							),
+						),
+					];
+					const overflow = Array.from(
+						element.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`),
+					).some((cell) => cell.scrollWidth > cell.clientWidth);
+					return { id, edges, overflow };
+				});
+				const trendSlots = rows.map((row) => {
+					const slot = row.querySelector<HTMLElement>('[data-testid="host-cpu"] span.w-10');
+					if (!slot) return null;
+					const box = slot.getBoundingClientRect();
+					return {
+						display: getComputedStyle(slot).display,
+						width: Math.round(box.width),
+						height: Math.round(box.height),
+						chart: Boolean(slot.querySelector(".basalt-chart")),
+					};
+				});
+				return {
+					rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
+					padding: cpuCell
+						? {
+								block: getComputedStyle(cpuCell).paddingBlock,
+								inline: getComputedStyle(cpuCell).paddingInline,
+							}
+						: null,
+					serverInlineStart: serverCell ? getComputedStyle(serverCell).paddingInlineStart : null,
+					value: value
+						? {
+								size: getComputedStyle(value).fontSize,
+								weight: getComputedStyle(value).fontWeight,
+								family: getComputedStyle(value).fontFamily,
+							}
+						: null,
+					qualifier: qualifier
+						? {
+								size: getComputedStyle(qualifier).fontSize,
+								weight: getComputedStyle(qualifier).fontWeight,
+								family: getComputedStyle(qualifier).fontFamily,
+							}
+						: null,
+					headerSize: header ? getComputedStyle(header).fontSize : null,
+					headerIcon: Boolean(header?.querySelector("svg[aria-hidden='true']")),
+					badgeIcon: Boolean(badge?.querySelector("svg")),
+					badgeLabelDisplay: badgeLabel ? getComputedStyle(badgeLabel).display : null,
+					hostnameComplete: hostname ? hostname.scrollWidth <= hostname.clientWidth : false,
+					hostnameFamily: hostname ? getComputedStyle(hostname).fontFamily : null,
+					separators: rows.map((row) =>
+						getComputedStyle(row.querySelector("td") as HTMLElement).borderBottomWidth === "1px"
+							? 1
+							: 0,
+					),
+					tableOverflow: element.scrollWidth - element.clientWidth,
+					columns,
+					trendSlots,
+				};
+			});
+
+			// One 48px line per row, uniform across the fleet.
+			expect(new Set(rhythm.rowHeights).size).toBe(1);
+			for (const height of rhythm.rowHeights) expect(height).toBe(48);
+			// 8px cell padding, with the identity cell a step wider on the left.
+			expect(rhythm.padding).toEqual({ block: "8px", inline: "8px" });
+			expect(rhythm.serverInlineStart).toBe("16px");
+			// One font family for values, qualifiers and names; 14px/500 over 12px/400.
+			expect(rhythm.value?.family).not.toMatch(/mono/i);
+			expect(rhythm.value?.family).toBe(rhythm.qualifier?.family);
+			expect(rhythm.value?.family).toBe(rhythm.hostnameFamily);
+			expect(rhythm.value).toMatchObject({ size: "14px", weight: "500" });
+			expect(rhythm.qualifier).toMatchObject({ size: "12px", weight: "400" });
+			expect(rhythm.headerSize).toBe("12px");
+			// Every column carries a lucide anchor, the badge its state icon.
+			expect(rhythm.headerIcon).toBe(true);
+			expect(rhythm.badgeIcon).toBe(true);
+			// Hairline between rows, none after the last.
+			expect(rhythm.separators).toEqual([1, 0]);
+			// Every column keeps one right edge and no cell overflows.
+			for (const column of rhythm.columns) {
+				expect(column.edges).toHaveLength(1);
+				expect(column.overflow).toBe(false);
+			}
+			expect(rhythm.hostnameComplete).toBe(true);
+			expect(rhythm.tableOverflow).toBeLessThanOrEqual(0);
+			// The trend slot is a reserved 40×14 box right of the value above 1280
+			// (alpha carries hourly history, beta an empty slot) and hides below.
+			if (width === 1440) {
+				expect(rhythm.trendSlots[0]).toMatchObject({
+					display: "flex",
+					width: 40,
+					height: 14,
+					chart: true,
+				});
+				expect(rhythm.trendSlots[1]).toMatchObject({ display: "flex", width: 40, height: 14 });
+			} else {
+				for (const slot of rhythm.trendSlots) {
+					expect(slot?.display).toBe("none");
+				}
+			}
+		}
+	});
 	test("the list keeps the identity cell whole at 1024", async ({ page }) => {
 		await page.goto("/hosts");
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
@@ -330,7 +466,7 @@ test.describe("Hosts list page", () => {
 		await expect(alpha.getByText("+1", { exact: true })).toBeVisible();
 	});
 
-	test("the Link column stacks the contract and dashes what is unset", async ({ page }) => {
+	test("the Link column carries the contract beside the bandwidth", async ({ page }) => {
 		const response = await page.request.patch("/api/hosts/f0d3fd30/billing", {
 			data: {
 				cost_amount_cny: 3650,
@@ -348,15 +484,15 @@ test.describe("Hosts list page", () => {
 			const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
 			await expect(alpha.getByTestId("host-contract")).toBeVisible();
 
-			// One column, two lines: the bandwidth on top, the quota and the
-			// reset day together underneath.
+			// One line: the bandwidth as the value, the quota and the reset
+			// day as the qualifier beside it.
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
 			await expect(alpha.getByTestId("host-contract")).toContainText("500 GB · 1st");
 
 			// A host without contract data keeps its dashes in the same column.
 			await expect(beta.getByTestId("host-contract")).toContainText("—");
 
-			// At 1024 the cell shows the bandwidth only.
+			// At 1024 the qualifier gives way and the cell shows the bandwidth only.
 			await page.setViewportSize({ width: 1024, height: 900 });
 			await expect(alpha.getByTestId("host-contract")).toContainText("2.5 Gbps");
 			await expect(alpha.getByTestId("host-contract").getByText("500 GB · 1st")).toBeHidden();
@@ -443,23 +579,25 @@ test.describe("Hosts list page", () => {
 				const geometry = await table.evaluate((element) => {
 					const rows = Array.from(element.querySelectorAll("tbody tr"));
 					const first = rows[0] as HTMLElement;
-					// The row that carries a countdown — the gap between the expiry
-					// text and the cost cell is what must stay open.
-					const counted = (rows.find((row) => row.querySelector("td:nth-child(7) span")) ??
-						first) as HTMLElement;
+					// The row that carries a contract — the gap between the link
+					// line and the billing cell is what must stay open.
+					const counted = (rows.find((row) =>
+						row.querySelector('[data-testid="host-contract"] span'),
+					) ?? first) as HTMLElement;
 					const cells = Array.from(counted.querySelectorAll("td"));
-					const expiry = cells[6] as HTMLElement;
-					const cost = cells[7] as HTMLElement;
-					const expiryText = expiry.querySelector("span")?.getBoundingClientRect();
+					const link = counted.querySelector<HTMLElement>('[data-testid="host-contract"]');
+					const billing = counted.querySelector<HTMLElement>('[data-testid="host-billing"]');
+					const linkText = link?.querySelector("span")?.getBoundingClientRect();
 					return {
 						tableOverflow: element.scrollWidth - element.clientWidth,
 						rowHeight: Math.round(first.getBoundingClientRect().height),
 						identityWidth: Math.round((cells[0] as HTMLElement).getBoundingClientRect().width),
-						expiryWidth: Math.round(expiry.getBoundingClientRect().width),
-						costWidth: Math.round(cost.getBoundingClientRect().width),
-						expiryCostGap: expiryText
-							? Math.round(cost.getBoundingClientRect().left - expiryText.right)
-							: null,
+						linkWidth: link ? Math.round(link.getBoundingClientRect().width) : 0,
+						billingWidth: billing ? Math.round(billing.getBoundingClientRect().width) : 0,
+						linkBillingGap:
+							linkText && billing
+								? Math.round(billing.getBoundingClientRect().left - linkText.right)
+								: null,
 						cellOverflow: Math.max(
 							...cells.map(
 								(cell) => (cell as HTMLElement).scrollWidth - (cell as HTMLElement).clientWidth,
@@ -471,10 +609,10 @@ test.describe("Hosts list page", () => {
 				expect(geometry.cellOverflow).toBeLessThanOrEqual(0);
 				// The identity cell keeps a usable width at every viewport.
 				expect(geometry.identityWidth).toBeGreaterThanOrEqual(180);
-				// The expiry and the cost never touch.
-				expect(geometry.expiryCostGap ?? 0).toBeGreaterThanOrEqual(4);
-				// Two lines of contract keep the row compact.
-				expect(geometry.rowHeight).toBeLessThanOrEqual(60);
+				// The link line and the billing figures never touch.
+				expect(geometry.linkBillingGap ?? 0).toBeGreaterThanOrEqual(4);
+				// One 48px line per column keeps the row compact.
+				expect(geometry.rowHeight).toBeLessThanOrEqual(52);
 			}
 		} finally {
 			// The longer name must not leak into the specs that follow.

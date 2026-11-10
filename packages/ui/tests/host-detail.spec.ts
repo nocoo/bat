@@ -127,10 +127,13 @@ test.describe("Host detail page", () => {
 
 		const badge = page.getByTestId("status-badge");
 		await expect(badge).toBeVisible({ timeout: 15_000 });
+		// The badge carries the state icon before its label; the label
+		// itself must still render on one line.
+		await expect(badge.locator("svg")).toBeVisible();
 		expect(
 			await badge.evaluate((element) => {
 				const range = document.createRange();
-				range.selectNodeContents(element);
+				range.selectNodeContents(element.lastChild as Node);
 				return range.getClientRects().length;
 			}),
 		).toBe(1);

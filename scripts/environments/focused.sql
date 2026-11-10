@@ -21,6 +21,14 @@ VALUES
   ('pw-host-alpha', strftime('%s','now') - 30, 1.5, 0.9, 0.6, 42.1, 1.3, 0.1, 8, 8589934592, 5100000000, 40.6, 2147483648, 322122547, 15.0, '[{"mount":"/","total_bytes":53687091200,"avail_bytes":31000000000,"used_pct":42.3}]', '[{"iface":"eth0","rx_bytes_rate":200000,"tx_bytes_rate":100000,"rx_errors":0,"tx_errors":0}]', 86370),
   ('pw-host-beta', strftime('%s','now') - 45, 0.3, 0.2, 0.1, 12.4, 0.2, 0.0, 4, 4294967296, 3435973837, 20.0, 0, 0, 0.0, '[{"mount":"/","total_bytes":21474836480,"avail_bytes":16106127360,"used_pct":25.0}]', '[{"iface":"eth0","rx_bytes_rate":50000,"tx_bytes_rate":25000,"rx_errors":0,"tx_errors":0}]', 172755);
 
+-- Hourly rollups for alpha: the fleet table's 24h trend slots read
+-- metrics_hourly, not metrics_raw. Beta keeps none so the empty-slot
+-- branch stays covered in the same table.
+INSERT OR REPLACE INTO metrics_hourly (host_id, hour_ts, sample_count, cpu_usage_avg, mem_used_pct_avg, cpu_load1_avg, net_rx_bytes_avg, net_tx_bytes_avg)
+VALUES
+  ('pw-host-alpha', (strftime('%s','now') / 3600) * 3600 - 7200, 12, 33.4, 36.1, 1.1, 125000, 62500),
+  ('pw-host-alpha', (strftime('%s','now') / 3600) * 3600 - 3600, 30, 41.2, 38.9, 1.4, 160000, 88000);
+
 -- Tags
 INSERT OR REPLACE INTO tags (id, name, color) VALUES
   (1, 'production', 0),
