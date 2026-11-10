@@ -100,17 +100,18 @@ function processCommand(pid) {
  */
 export function heldStore(path) {
 	const lock = join(path, "running.lock");
-	if (!existsSync(lock)) return null;
-	const pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
-	if (Number.isInteger(pid)) {
-		let alive = false;
-		try {
-			process.kill(pid, 0);
-			alive = true;
-		} catch {}
-		const command = alive ? processCommand(pid) : "";
-		if (pid === process.pid || batProcessPattern.test(command))
-			return `pid ${pid} (${command || "this process"})`;
+	if (existsSync(lock)) {
+		const pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
+		if (Number.isInteger(pid)) {
+			let alive = false;
+			try {
+				process.kill(pid, 0);
+				alive = true;
+			} catch {}
+			const command = alive ? processCommand(pid) : "";
+			if (pid === process.pid || batProcessPattern.test(command))
+				return `pid ${pid} (${command || "this process"})`;
+		}
 	}
 	const state = join(path, "state");
 	if (existsSync(state)) {
@@ -254,7 +255,7 @@ export async function createRuntime({
 	const fresh = !existsSync(path);
 	mkdirSync(path, { recursive: true });
 	const lock = join(path, "running.lock");
-	const holder = existsSync(lock) ? heldStore(path) : null;
+	const holder = heldStore(path);
 	if (holder)
 		throw new Error(`Storage ${owner} is still in use by ${holder}; stop it before reuse`);
 	if (existsSync(lock)) rmSync(lock);
