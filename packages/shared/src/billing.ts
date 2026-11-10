@@ -318,6 +318,13 @@ export function formatResetDayCompact(day: number | null | undefined): string | 
 	return ordinalDayOfMonth(day);
 }
 
+/** The reset day as a sentence, for tooltips and detail rows:
+ *  `resets on the 1st`. */
+export function formatResetDayLong(day: number | null | undefined): string | null {
+	const ordinal = ordinalDayOfMonth(day);
+	return ordinal === null ? null : `resets on the ${ordinal}`;
+}
+
 /** The monthly traffic allowance with its period: `500 GB/mo`. */
 export function formatMonthlyTrafficGb(gb: number | null | undefined): string | null {
 	const quota = formatTrafficQuotaGb(gb);

@@ -8,12 +8,14 @@
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
+	billingPeriodDays,
 	dailyCostCny,
 	daysUntilRenewal,
 	formatBandwidthMbps,
-	formatResetDayCompact,
+	formatResetDayLong,
 	formatTrafficQuotaGb,
 	hashHostId,
+	type RenewalTone,
 	renewalBadgeLabel,
 	renewalTone,
 } from "@bat/shared";
@@ -56,11 +58,7 @@ import { formatPercent } from "@/lib/workstation-format";
  *  size and colour utilities apart and would drop one of them. */
 const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums";
 /** The qualifier beside it — 12px muted, wide-view only for machine specs. */
-const CELL_SPEC = "max-w-28 truncate text-basalt-xs tabular-nums text-basalt-muted-foreground";
-/** The Link qualifier: bandwidth plus traffic, whole words only — the
- *  reset day folds away below `2xl` and the full string lives in `title`. */
-const CELL_LINK_SPEC =
-	"hidden shrink-0 whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
+const CELL_SPEC = "whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground";
 const MAX_VISIBLE_TAGS = 3;
 
 /** One header cell: a small muted lucide anchor next to the 12px label.
@@ -89,7 +87,7 @@ function TrendSlot({
 	const ready = points !== null && points.length >= 2;
 	return (
 		<span
-			className="hidden h-3.5 w-10 shrink-0 items-center justify-center xl:flex"
+			className="hidden h-3.5 w-10 shrink-0 items-center justify-center 2xl:flex"
 			aria-hidden={ready ? undefined : true}
 		>
 			{ready ? (
@@ -193,19 +191,52 @@ function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	);
 }
 
-/** The Link cell always keeps its full contract in `title`: the visible
- *  line folds the quota below `xl` and the reset day below `2xl`. */
-function contractTitle(
-	bandwidthMbps: number | null,
-	quotaGb: number | null,
-	resetDay: number | null,
-): string {
-	const parts = [
-		formatBandwidthMbps(bandwidthMbps),
-		formatTrafficQuotaGb(quotaGb),
-		formatResetDayCompact(resetDay),
-	].filter((part): part is string => part !== null);
-	return parts.length > 0 ? parts.join(" · ") : "—";
+/** The empty cell: one muted dash, never a fabricated zero. */
+function Dash() {
+	return <span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>;
+}
+
+function bandwidthTitle(mbps: number | null): string {
+	const label = formatBandwidthMbps(mbps);
+	return label === null ? "No bandwidth recorded" : `${label} bandwidth`;
+}
+
+function trafficTitle(quotaGb: number | null, resetDay: number | null): string {
+	const label = formatTrafficQuotaGb(quotaGb);
+	if (label === null) return "No traffic quota recorded";
+	return resetDay === null
+		? `${label} per month`
+		: `${label} per month, ${formatResetDayLong(resetDay)}`;
+}
+
+function daysLeftTitle(days: number | null, period: number | null): string {
+	if (days === null) return "No renewal date recorded";
+	const base = days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `${days} days left`;
+	return period === null ? base : `${base} of ${period} days`;
+}
+
+/** Bandwidth bars are relative to the widest host on screen, so the column
+ *  reads as a comparison rather than seven unrelated numbers. */
+function bandwidthShare(mbps: number, max: number): string {
+	if (!(max > 0) || !(mbps > 0)) return "0%";
+	return `${Math.min(100, Math.max(4, (mbps / max) * 100)).toFixed(1)}%`;
+}
+
+/** The bar is the share of the period already spent, so a full track means
+ *  the renewal is due. Overdue stays full. */
+function renewalShare(days: number, period: number | null): string {
+	// An overdue renewal has no time left on the track, so the bar reads full
+	// and red rather than empty — a spent bar must never look calm.
+	if (days <= 0) return "100%";
+	if (period === null || period <= 0) return "100%";
+	const remaining = Math.max(0, Math.min(period, days));
+	return `${Math.max(0, Math.min(100, (remaining / period) * 100)).toFixed(1)}%`;
+}
+
+function renewalBarColor(tone: RenewalTone): string {
+	if (tone === "overdue") return "hsl(var(--basalt-destructive))";
+	if (tone === "warning") return "hsl(var(--basalt-warning))";
+	return chart.sky;
 }
 
 export function HostTable({
@@ -218,6 +249,7 @@ export function HostTable({
 	now: number;
 }) {
 	const today = todayCalendarDate(new Date(now * 1000));
+	const maxBandwidth = hosts.reduce((max, host) => Math.max(max, host.bandwidth_mbps ?? 0), 0);
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
 			<Table
@@ -229,23 +261,29 @@ export function HostTable({
 						<TableHead>
 							<HeadLabel icon={Server}>Server</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-24">
+						<TableHead className="hidden xl:table-cell xl:w-22">
 							<HeadLabel icon={Activity}>Status</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-28 xl:w-39" textAlign="end">
+						<TableHead className="lg:w-25 xl:w-32" textAlign="end">
 							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-24 xl:w-37" textAlign="end">
+						<TableHead className="lg:w-24 xl:w-32" textAlign="end">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-29 xl:w-26" textAlign="end">
+						<TableHead className="lg:w-26 xl:w-26" textAlign="end">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-39 2xl:w-44" textAlign="end">
-							<HeadLabel icon={Network}>Link</HeadLabel>
+						<TableHead className="hidden xl:table-cell xl:w-24" textAlign="end">
+							<HeadLabel icon={Network}>Bandwidth</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-39 2xl:w-44" textAlign="end">
-							<HeadLabel icon={Wallet}>Billing</HeadLabel>
+						<TableHead className="hidden xl:table-cell xl:w-22" textAlign="end">
+							<HeadLabel icon={HardDrive}>Traffic</HeadLabel>
+						</TableHead>
+						<TableHead className="lg:w-20 xl:w-26" textAlign="end">
+							<HeadLabel icon={Wallet}>Cost</HeadLabel>
+						</TableHead>
+						<TableHead className="lg:w-24 xl:w-32" textAlign="end">
+							<HeadLabel icon={Timer}>Days left</HeadLabel>
 						</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -253,6 +291,7 @@ export function HostTable({
 					{hosts.map((host) => {
 						const tags = tagsFor(host.host_id) ?? [];
 						const daysLeft = daysUntilRenewal(host.renews_at, today);
+						const periodDays = billingPeriodDays(host.paid_at, host.renews_at);
 						const countdown = renewalBadgeLabel(daysLeft);
 						const dailyCost = dailyCostCny(host.cost_amount_cny, host.paid_at, host.renews_at);
 						const quota = host.traffic_quota_gb;
@@ -337,49 +376,91 @@ export function HostTable({
 								<TableCell
 									textAlign="end"
 									className="hidden whitespace-nowrap xl:table-cell"
-									data-testid="host-contract"
-									title={contractTitle(host.bandwidth_mbps, quota, reset)}
+									data-testid="host-bandwidth"
+									title={bandwidthTitle(host.bandwidth_mbps)}
 								>
-									<div className="flex items-center justify-end gap-basalt-space-md">
-										<span className={CELL_VALUE}>
-											{formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}
-										</span>
-										{quota !== null && (
-											<span className={CELL_LINK_SPEC}>
-												· {formatTrafficQuotaGb(quota)}
-												{reset !== null && (
-													<span className="hidden 2xl:inline">
-														{" "}
-														· {formatResetDayCompact(reset)}
-													</span>
-												)}
-											</span>
-										)}
-									</div>
-								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-billing">
-									{countdown === null && dailyCost === null ? (
-										<span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>
+									{host.bandwidth_mbps === null ? (
+										<Dash />
 									) : (
-										<div className="flex items-center justify-end gap-basalt-space-lg">
-											{dailyCost !== null && (
-												<span className={CELL_VALUE} data-testid="host-daily-cost">
-													{`${formatCny(dailyCost)}/day`}
-												</span>
-											)}
-											{countdown !== null && (
+										<div className="flex items-center justify-end gap-basalt-space-md">
+											<span
+												aria-hidden="true"
+												className="h-1 w-7 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
+												data-testid="host-bandwidth-bar"
+											>
 												<span
-													className={`inline-flex items-center gap-basalt-space-xs whitespace-nowrap text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
-													data-testid="host-countdown"
-												>
-													<Timer
-														className="hidden size-3 shrink-0 2xl:block"
-														strokeWidth={1.5}
-														aria-hidden="true"
-													/>
-													{countdown}
+													className="block h-full rounded-basalt-full"
+													style={{
+														width: bandwidthShare(host.bandwidth_mbps, maxBandwidth),
+														backgroundColor: chart.sky,
+													}}
+												/>
+											</span>
+											<span className={CELL_SPEC}>{formatBandwidthMbps(host.bandwidth_mbps)}</span>
+										</div>
+									)}
+								</TableCell>
+								<TableCell
+									textAlign="end"
+									className="hidden whitespace-nowrap xl:table-cell"
+									data-testid="host-traffic"
+									title={trafficTitle(quota, reset)}
+								>
+									{quota === null ? (
+										<Dash />
+									) : (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<span className={`${CELL_VALUE} cursor-default`}>
+													{formatTrafficQuotaGb(quota)}
 												</span>
-											)}
+											</TooltipTrigger>
+											<TooltipContent side="top" sideOffset={6}>
+												{reset === null
+													? `${formatTrafficQuotaGb(quota)} per month`
+													: `${formatTrafficQuotaGb(quota)} per month, ${formatResetDayLong(reset)}`}
+											</TooltipContent>
+										</Tooltip>
+									)}
+								</TableCell>
+								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-cost">
+									{dailyCost === null ? (
+										<Dash />
+									) : (
+										<span className={CELL_VALUE} data-testid="host-daily-cost">
+											{`${formatCny(dailyCost)}/day`}
+										</span>
+									)}
+								</TableCell>
+								<TableCell
+									textAlign="end"
+									className="whitespace-nowrap"
+									data-testid="host-days-left"
+									title={daysLeftTitle(daysLeft, periodDays)}
+								>
+									{daysLeft === null ? (
+										<Dash />
+									) : (
+										<div className="flex items-center justify-end gap-basalt-space-md">
+											<span
+												aria-hidden="true"
+												className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
+												data-testid="host-days-bar"
+											>
+												<span
+													className="block h-full rounded-basalt-full"
+													style={{
+														width: renewalShare(daysLeft, periodDays),
+														backgroundColor: renewalBarColor(renewalTone(daysLeft)),
+													}}
+												/>
+											</span>
+											<span
+												data-testid="host-countdown"
+												className={`shrink-0 text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
+											>
+												{countdown}
+											</span>
 										</div>
 									)}
 								</TableCell>
