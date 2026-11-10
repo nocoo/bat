@@ -12,6 +12,32 @@ import {
 	workerRoot,
 } from "./runtime.mjs";
 
+/**
+ * A launcher restart loses the in-memory instance map, so an unknown
+ * `previous` id means "no previous instance", not an error: the requested
+ * mode is created and the open tab recovers without clearing its storage.
+ * A 410 is reserved for an id that still exists but is no longer active.
+ */
+export function switchDecision(instances, previous) {
+	const old = previous ? instances.get(previous) : undefined;
+	if (!old) return { previousInstance: null };
+	if (!old.active) return { expired: true };
+	return { previousInstance: old };
+}
+
+/**
+ * A proxy failure means the runtime is gone: deactivate the instance, wait
+ * for its in-flight requests and drop it from the map so later requests get
+ * an honest 410 instead of a permanent 503, then release the dead runtime so
+ * the next instance rebuilds on a clean store.
+ */
+export async function expireInstance(instance, instances, releaseRuntime) {
+	instance.active = false;
+	instances.delete(instance.id);
+	await Promise.allSettled([...instance.pending]);
+	if (instance.runtime) await releaseRuntime?.(instance);
+}
+
 export async function launch({
 	automated = false,
 	initial,
@@ -28,6 +54,15 @@ export async function launch({
 	const capability = randomBytes(32).toString("hex");
 	const instances = new Map();
 	let demo, demoStarting, vite;
+	const releaseRuntime = async (instance) => {
+		if (instance.mode === "demo") {
+			// The shared demo memo points at a dead runtime; reset it so the
+			// next create rebuilds a fresh worker on the retained store.
+			demo = undefined;
+			demoStarting = undefined;
+		}
+		await instance.runtime.close();
+	};
 	const create = async (mode) => {
 		if (!["demo", "e2e", "prod"].includes(mode) || (automated && mode !== "e2e"))
 			throw new Error("Environment locked or invalid");
@@ -116,8 +151,8 @@ export async function launch({
 						if (request.method !== "POST") return json({ error: "Method denied" }, 405);
 						const { mode, previous } = await request.json();
 						if (automated) return json({ error: "Automated environment is locked" }, 403);
-						const old = previous ? instances.get(previous) : null;
-						if (previous && !old?.active) return json({ error: "Instance expired" }, 410);
+						const { previousInstance: old, expired } = switchDecision(instances, previous);
+						if (expired) return json({ error: "Instance expired" }, 410);
 						if (old?.switching) return json({ error: "Switch already in progress" }, 409);
 						if (old?.mode === mode) return json(summary(old));
 						if (old) old.switching = true;
@@ -191,9 +226,14 @@ export async function launch({
 						})();
 						instance.pending.add(operation);
 						try {
-							return await operation;
-						} finally {
-							instance.pending.delete(operation);
+							try {
+								return await operation;
+							} finally {
+								instance.pending.delete(operation);
+							}
+						} catch {
+							await expireInstance(instance, instances, releaseRuntime);
+							return json({ error: "Instance expired. Reload to select an environment." }, 410);
 						}
 					}
 					if (url.pathname.startsWith("/__bat/")) return json({ error: "Not found" }, 404);

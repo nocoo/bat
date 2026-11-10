@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { launch } from "./launcher.mjs";
 import { readRecordedRecording, SERVER_ALIASES } from "./recorded-demo.mjs";
 import { createRuntime, productionConfig, removeOwned, storageRoot } from "./runtime.mjs";
@@ -278,6 +280,10 @@ try {
 		"migrations",
 	])
 		assert.deepEqual(local[key], prod[key]);
+	// The instance serves a private assets copy so `bun run build` rewriting
+	// packages/worker/static cannot kill a running worker.
+	assert.equal(local.assets.directory, join(runtime.path, "static"));
+	assert.equal(existsSync(join(runtime.path, "static", "index.html")), true);
 	const response = await fetch(`${prefix}/api/settings`, {
 		method: "PUT",
 		headers: { "Content-Type": "application/json" },
@@ -292,8 +298,30 @@ try {
 	assert.equal((await fetch(`${prefix}/api/hosts`)).status, 200);
 	const switched = await select("e2e", first.id);
 	assert.equal((await switched.json()).id, first.id);
+	// A launcher restart wipes the in-memory instance map: an unknown previous
+	// id must create the requested mode instead of bricking the open tab.
+	const restarted = await (await select("e2e", randomUUID())).json();
+	assert.equal(restarted.mode, "e2e");
+	assert.notEqual(restarted.id, first.id);
+	// A previous id that still exists but is inactive is a real expiry.
+	const dormant = app.instances.get(first.id);
+	dormant.active = false;
+	assert.equal((await select("e2e", first.id)).status, 410);
+	dormant.active = true;
+	// A dead worker expires its instance with an honest 410 instead of a
+	// permanent 503, drops the store, and the next switch rebuilds fresh.
+	const victim = restarted;
+	const victimRuntime = app.instances.get(victim.id).runtime;
+	process.kill(-victimRuntime.workerPid, "SIGKILL");
+	const dead = await fetch(`${app.base}/__bat/instances/${victim.id}/api/hosts`);
+	assert.equal(dead.status, 410);
+	assert.equal(app.instances.has(victim.id), false);
+	assert.equal(existsSync(victimRuntime.path), false);
+	const reborn = await (await select("e2e", victim.id)).json();
+	assert.notEqual(reborn.id, victim.id);
+	assert.equal((await fetch(`${app.base}/__bat/instances/${reborn.id}/api/hosts`)).status, 200);
 	console.log(
-		"PASS: real recorded catalog (8 aliases, one workstation), authentication, ownership guard, parallel E2E stores, config parity, real settings CRUD",
+		"PASS: real recorded catalog (8 aliases, one workstation), authentication, ownership guard, parallel E2E stores, config parity, instance assets isolation, real settings CRUD, environment recovery (unknown previous, inactive previous, dead worker)",
 	);
 } finally {
 	await app.close();
