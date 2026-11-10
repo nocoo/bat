@@ -113,6 +113,7 @@ Each proxy route:
 ### `/hosts` — Host Overview
 
 Grid of `HostCard` components. Each card shows:
+
 - Hostname + status badge (healthy / warning / critical / offline)
 - CPU usage % (current)
 - Memory usage % (current)
@@ -124,12 +125,14 @@ Data source: `GET /api/hosts` (Dashboard proxy) → `HostOverviewItem[]` via SWR
 ### `/hosts/[id]` — Host Detail
 
 Full detail view with:
+
 - System info panel (OS, kernel, arch, CPU model, boot time)
 - Time-series charts (CPU, Memory, Network) with time range picker
 - Disk usage horizontal bars (per-mount)
 - Active alerts for this host
 
 Time range picker options:
+
 - **Raw data ranges**: 1h, 6h, 24h → queries `GET /api/hosts/:id/metrics?from=&to=`
 - **Hourly data ranges**: 7d, 30d, 90d → same endpoint, Worker auto-selects hourly resolution
 
@@ -138,6 +141,7 @@ Data source: `GET /api/hosts/[id]/metrics` → `MetricsQueryResponse` via SWR ho
 ### `/alerts` — Alerts Overview
 
 Table of all active alerts across all hosts:
+
 - Host (link to detail page)
 - Rule ID + human-readable message
 - Severity badge (warning / critical)

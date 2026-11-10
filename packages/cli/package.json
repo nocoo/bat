@@ -1,6 +1,6 @@
 {
 	"name": "@nocoo/bat",
-	"version": "4.0.1",
+	"version": "4.0.2",
 	"description": "bat CLI — manage agents, assets and bindings for bat.hexly.ai",
 	"type": "module",
 	"bin": {
@@ -48,6 +48,6 @@
 		"@types/proper-lockfile": "4.1.4",
 		"proper-lockfile": "4.1.2",
 		"typescript": "^7.0.2",
-		"vitest": "5.0.5"
+		"vitest": "5.1.0"
 	}
 }

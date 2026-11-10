@@ -113,6 +113,7 @@ pub struct PsiMetrics {
 ```
 
 Fields (0-indexed after device name):
+
 - Field 0: reads completed
 - Field 2: sectors read (× 512 = bytes)
 - Field 4: writes completed

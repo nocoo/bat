@@ -3,6 +3,7 @@
 ## Context
 
 After expanding L3 from 9→36 tests and adding D1 check to pre-push, several smaller items need fixing:
+
 1. `docs/07-testing.md` has stale info (L3 "Not implemented", `pnpm-lock.yaml` reference)
 2. D1 isolation is shallow (1 layer) vs zhe's 4-layer chain
 3. Hooks need review for correctness and consistency
@@ -25,6 +26,7 @@ After expanding L3 from 9→36 tests and adding D1 check to pre-push, several sm
 Current: 1 layer (binding name `-test` suffix check via `verify-test-bindings.ts`)
 
 Add:
+
 - **Layer 2**: L2 E2E `beforeAll` — query `_test_marker` table to confirm test DB identity. Migration `0018_test_marker.sql` already exists and is applied. Add a check at L2 test startup.
 - **Layer 3**: L3 Playwright `globalSetup` — hit `/api/live` or a test endpoint to verify the Wrangler instance is using test DB (check _test_marker via a fetch).
 
@@ -37,11 +39,13 @@ For L3: the Playwright tests run against a local Wrangler that uses `--persist-t
 ### 3. Review & Fix Hooks
 
 **pre-commit** — looks correct:
+
 - 5 parallel stages: unit_cov, typecheck, lint, gitleaks, rust_lint (conditional)
 - gitleaks in pre-commit ✅ (matches zhe)
 - Comment says "L1 + G1" but gitleaks is G2 → fix comment to "L1 + G1 + G2-secrets"
 
 **pre-push** — looks correct:
+
 - D1 check (synchronous) → l2_e2e + osv_js + osv_rust (parallel)
 - Comment already updated to "L2 + G2 + D1" ✅
 

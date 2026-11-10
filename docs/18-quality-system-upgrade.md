@@ -107,6 +107,7 @@ git checkout -- packages/shared/src/version.ts
 ### Current state
 
 `scripts/check-coverage.sh:18-21`:
+
 ```bash
 if [ -z "$coverage" ]; then
     echo "⚠ ${pkg}: no coverage data found (skipping)"
@@ -295,6 +296,7 @@ cat .husky/pre-push
 
 Bat's Worker E2E already achieves **physical isolation via local D1** (`.wrangler/e2e/` SQLite).
 This is D1-compliant because:
+
 - Tests never touch remote D1
 - Fresh migrations applied per run
 - Cleanup on teardown

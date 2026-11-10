@@ -100,6 +100,7 @@ Tag CRUD is handled by Worker routes (`packages/worker/src/routes/tags.ts`). The
 ### Implementation pattern
 
 Each Worker route handler:
+
 1. Validate input (name format, tag exists, host exists, limit not exceeded)
 2. Execute D1 query via `c.env.DB` native binding
 3. Return JSON response
@@ -134,10 +135,12 @@ export interface HostTag {
 The hosts page currently fetches host data from Worker via `GET /api/hosts` (proxied through Dashboard). Tags are NOT part of that response — they live in a separate data path.
 
 **Approach**: The hosts page makes two parallel requests:
+
 1. `GET /api/hosts` → Worker (via existing proxy) → host list with metrics
 2. `GET /api/tags/by-hosts` → Worker (via proxy) → `{ [host_id]: HostTag[] }`
 
 New Dashboard route `/api/tags/by-hosts/route.ts`:
+
 ```sql
 SELECT ht.host_id, t.id, t.name, t.color
 FROM host_tags ht JOIN tags t ON t.id = ht.tag_id

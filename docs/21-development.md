@@ -103,7 +103,6 @@ Playwright runs conflicting mutations serially. Settings tests use the real API.
 
 版本发布入口是 `bun run release`，会同步版本并创建 tag；只有 tag push 才构建并上传探针到 R2。普通 main 文档提交会走 Worker CD，不会更新探针二进制或 VPS。R2 分发和主机上的探针升级是两个步骤，后者仍需维护者执行。
 
-
 ## Dashboard controls
 
 The dashboard uses the installed Basalt 3.2.1 control and surface contract.

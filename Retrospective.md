@@ -225,7 +225,6 @@ caught the regression. The shared status badge now preserves its intrinsic width
 and single-line label; a browser regression measures the rendered text lines.
 Check inline labels as well as outer geometry when adding navigation gutters.
 
-
 ## 2026-10-22 - Migrate control contracts, not only element names
 
 The first Select migration tests still matched the library's hidden native
@@ -240,7 +239,6 @@ glob, corrupting the stylesheet header. Formatting caught it before commit.
 Keep import/source directives intact, use anchored sections for scripted edits,
 and scan direct CSS-variable references as well as utility classes when removing
 a token system. Typecheck, full browser tests and theme captures follow the rewrite.
-
 
 ## 2026-10-22 - Wait for populated details before visual acceptance
 

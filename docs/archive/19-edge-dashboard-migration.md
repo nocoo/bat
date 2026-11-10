@@ -232,6 +232,7 @@ app.post("/api/ingest", ingestHandler);
 ### API Key 认证（机器路由）
 
 机器路由继续使用现有的 `apiKeyAuth` 中间件：
+
 - Probe 写路由：`BAT_WRITE_KEY`
 - Monitoring 读路由：`BAT_READ_KEY`（Uptime Kuma 用）
 - `/api/events`：自带 webhook token 校验
@@ -245,6 +246,7 @@ app.post("/api/ingest", ingestHandler);
 ## 3. 操作员写权限
 
 现有写操作（tags, webhooks, allowed-ports）：
+
 - 原方案：Dashboard 代理，用 `BAT_WRITE_KEY`
 - 新方案：浏览器直接调用，用 Access JWT
 
@@ -257,6 +259,7 @@ app.post("/api/ingest", ingestHandler);
 **迁移方案：手动填入**
 
 Setup 页面只显示安装命令模板（带 `YOUR_WRITE_KEY` 占位符），用户需要：
+
 1. 从 Cloudflare 控制台 Workers → Settings → Variables 获取 `BAT_WRITE_KEY`
 2. 手动替换占位符
 
@@ -306,6 +309,7 @@ custom_domain = true
 ### 路由优先级
 
 `run_worker_first = true` 确保：
+
 1. 所有请求先到 Worker 代码
 2. `/api/*` 由 Hono 路由处理
 3. 非匹配请求 fallback 到 `static/` 目录
@@ -405,10 +409,12 @@ export default defineConfig({
 现有 L3 是 Playwright 浏览器测试，定义在 [07-testing.md § L3](./07-testing.md)。
 
 **本次迁移暂时移除 L3**，原因：
+
 - Dashboard → UI 重写，原 E2E 测试不可复用
 - 优先保证功能上线
 
 **质量体系调整**：
+
 - 迁移期间质量等级从 **Tier A** 降至 **Tier B**（L1 + G1）
 - Phase 5 完成后，需更新 [07-testing.md](./07-testing.md)：
   - 移除 `@bat/dashboard` 相关 L3 描述
@@ -420,6 +426,7 @@ export default defineConfig({
 ### Husky hooks 更新
 
 确保 pre-commit/pre-push 运行新的包结构：
+
 - `@bat/ui` 替代 `@bat/dashboard`
 - 路径更新
 
@@ -445,6 +452,7 @@ export default defineConfig({
 ### 获取配置值
 
 Application 创建后，记录：
+
 - **Team domain**: `<team>.cloudflareaccess.com`（用于 JWKS URL）
 - **Application Audience (AUD)**: 用于 JWT 验证
 

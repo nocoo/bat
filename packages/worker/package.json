@@ -1,6 +1,6 @@
 {
 	"name": "@bat/worker",
-	"version": "4.0.1",
+	"version": "4.0.2",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -16,8 +16,8 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"@cfworker/json-schema": "4.1.4",
-		"hono": "4.13.13",
+		"@cfworker/json-schema": "4.1.6",
+		"hono": "4.13.17",
 		"jose": "^6.2.14"
 	},
 	"devDependencies": {

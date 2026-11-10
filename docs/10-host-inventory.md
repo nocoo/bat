@@ -5,6 +5,7 @@
 The probe's identity payload currently carries 7 fields (hostname, os, kernel, arch, cpu_model, uptime, boot_time). This is far too thin for fleet management — the host list page shows only hostname + CPU% + MEM% + uptime, offering almost zero context for triage or capacity planning.
 
 A server monitoring product should let the operator answer questions like:
+
 - "Which box has 10.0.1.42?"
 - "How many servers still run on spinning disks?"
 - "Is that a VM or bare metal?"
@@ -43,6 +44,7 @@ These fields do not change without hardware replacement, re-provisioning, or reb
 The existing `cpu::parse_cpu_count()` counts `^processor` lines and is labeled "CPU cores" in the codebase — this is wrong. `^processor` lines represent **logical CPUs** (hardware threads), not physical cores. On a 4-core/8-thread system, there are 8 `processor` entries.
 
 Correct definitions:
+
 - **`cpu_logical`** = total logical CPUs visible to the OS = count of `^processor` lines. This is what the kernel scheduler sees. Rename existing `parse_cpu_count()` comment to "logical CPUs".
 - **`cpu_physical`** = physical cores (excluding HT siblings). Parse from `/proc/cpuinfo`:
   1. **Best method**: collect all (`physical id`, `core id`) pairs across all processor blocks, count unique pairs. This handles multi-socket correctly.
@@ -139,6 +141,7 @@ All new fields use **2-state wire semantics** that match the existing `#[serde(s
 | **Key absent** from JSON                                              | Probe doesn't support this field (old version), or collection failed on this run | **No-op** — retain existing value in D1        |
 
 There is no third "explicit null" state. If the probe finds nothing (e.g., no `/etc/timezone` and no `/etc/localtime` symlink), it sends a concrete sentinel value:
+
 - String fields: `""` (empty string)
 - Array fields: `[]` (empty array)
 
@@ -208,6 +211,7 @@ Enhanced card adds a secondary info line below the title:
 Subtitle format: `{os_short} · {arch} · {physical}C/{logical}T · {mem_total_formatted}`
 
 Where:
+
 - `os_short`: truncate PRETTY_NAME — e.g., `"Ubuntu 22.04.3 LTS"` → `"Ubuntu 22.04"`
 - `physical`/`logical`: from `cpu_physical`/`cpu_logical`
 - `mem_total_formatted`: humanize bytes — `"512 MB"`, `"8 GB"`, `"64 GB"`

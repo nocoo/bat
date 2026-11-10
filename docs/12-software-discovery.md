@@ -64,6 +64,7 @@ struct DetectRules {
 ### Initial Software List (~40 items)
 
 **Web servers & reverse proxies:**
+
 - Nginx (`nginx`, port 80/443, unit `nginx.service`)
 - Apache (`apache2`/`httpd`, port 80/443)
 - Caddy (`caddy`, unit `caddy.service`)
@@ -71,6 +72,7 @@ struct DetectRules {
 - HAProxy (`haproxy`, port 80/443)
 
 **Databases:**
+
 - PostgreSQL (`postgres`, port 5432)
 - MySQL/MariaDB (`mysqld`/`mariadbd`, port 3306)
 - MongoDB (`mongod`, port 27017)
@@ -78,6 +80,7 @@ struct DetectRules {
 - ClickHouse (`clickhouse-server`, port 8123/9000)
 
 **Caches & message queues:**
+
 - Redis (`redis-server`, port 6379)
 - Memcached (`memcached`, port 11211)
 - RabbitMQ (`rabbitmq-server`, port 5672)
@@ -85,6 +88,7 @@ struct DetectRules {
 - NATS (`nats-server`, port 4222)
 
 **Runtimes & languages:**
+
 - Node.js (`node`, binary)
 - Python 3 (`python3`, binary)
 - Go (`go`, binary)
@@ -96,24 +100,28 @@ struct DetectRules {
 - Deno (`deno`, binary)
 
 **Container & orchestration:**
+
 - Docker (already detected via tier2::docker, reference only)
 - Podman (`podman`, binary/socket)
 - containerd (`containerd`, process)
 - k3s (`k3s`, process/unit)
 
 **Monitoring & observability:**
+
 - Prometheus (`prometheus`, port 9090)
 - Grafana (`grafana-server`, port 3000)
 - node_exporter (`node_exporter`, port 9100)
 - Zabbix agent (`zabbix_agentd`, port 10050)
 
 **Security:**
+
 - fail2ban (already in security collector, reference only)
 - CrowdSec (`crowdsec`, process/unit)
 - WireGuard (`wg`, interface/unit)
 - OpenVPN (`openvpn`, process/unit)
 
 **Infrastructure:**
+
 - OpenSSH server (`sshd`, port 22)
 - Cron (`cron`/`crond`, process)
 - systemd-resolved (`systemd-resolved`, process)
@@ -146,22 +154,26 @@ pub struct SoftwareDiscoveryData {
 ```
 
 **Version detection** is best-effort:
+
 - For binaries: run `<binary> --version` with 2s timeout, parse first line
 - For packages: `dpkg-query -W -f '${Version}' <pkg>` with 2s timeout
 - If both fail: `version = None`
 
 **Process scan** is a single `/proc` traversal:
+
 - Read all `/proc/[pid]/comm` files (similar to existing `build_inode_pid_map`)
 - Collect unique process names into a `HashSet<String>`
 - Match against registry entries
 
 **Systemd scan**:
+
 - `systemctl list-unit-files --type=service --no-legend --plain` → parse unit names
 - Match `unit_name.strip_suffix(".service")` against registry
 
 ### Integration into Tier 2 flow
 
 In `main.rs::collect_tier2()`:
+
 ```rust
 // After existing collectors, add:
 let software = collectors::tier2::software::collect_software_discovery(
@@ -174,6 +186,7 @@ The software collector receives the already-collected `ServicePortsData` to avoi
 ### Performance budget
 
 **Core detection** (signals 1–5, excluding version probing):
+
 - Target: **< 500ms** total scan time (no network I/O, all local).
 - `/proc/*/comm` scan: ~10ms (same as ports inode scan)
 - `systemctl list-unit-files`: ~50ms
@@ -182,6 +195,7 @@ The software collector receives the already-collected `ServicePortsData` to avoi
 - Total typical: ~200ms.
 
 **Version probing** (separate, runs after core detection completes):
+
 - Runs **sequentially** for all detected software, under a **global 3s timeout** via `tokio::time::timeout`. Sequential execution avoids adding the `futures` crate dependency while keeping code simple; typical fleet hosts have <10 detected items, so serial probing completes well within the timeout.
 - Each `<binary> --version` subprocess has an individual 2s timeout.
 - Version results are best-effort: if the global timeout fires, any remaining software keeps `version: None`.
@@ -233,11 +247,13 @@ export interface SoftwareDiscoveryData {
 ```
 
 Extend `Tier2Payload`:
+
 ```typescript
 software?: SoftwareDiscoveryData;
 ```
 
 Extend `Tier2Snapshot`:
+
 ```typescript
 software: SoftwareDiscoveryData | null;
 ```
@@ -287,6 +303,7 @@ Add `software_summary` to `HostOverviewItem` — array of software IDs from late
 ### Host detail page — Tier 2 section
 
 New card: **"Installed Software"**
+
 - Grid of software items, grouped by category
 - Each item: icon (emoji or simple SVG) + name + version + status dot (running/installed)
 - Category headers: Web, Database, Cache, Runtime, etc.

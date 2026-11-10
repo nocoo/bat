@@ -33,6 +33,7 @@ exclude_interfaces = ["lo", "docker0"]
 ### Config path convention
 
 The binary looks for config in this order:
+
 1. `--config <path>` CLI argument (explicit override)
 2. `/etc/bat/config.toml` (hardcoded default)
 
@@ -95,6 +96,7 @@ Output: array of `{ mount, total_bytes, avail_bytes, used_pct }`.
 Read `/sys/class/net/{iface}/statistics/{rx,tx}_{bytes,errors}` for each non-excluded interface. Packet counters (`rx_packets`, `tx_packets`) are defined in [01-metrics-catalogue.md](./01-metrics-catalogue.md) but excluded from MVP payload — bytes + errors are sufficient for alerting.
 
 **Rate calculation** (`rate.rs`):
+
 - **Bytes**: `rate = (current - previous) / interval_seconds` → bytes/sec (gauge)
 - **Errors**: `delta = current - previous` → error count in the interval (not per-second rate, just the increment). This ensures each `metrics_raw` row records errors _during that interval_, not a cumulative counter. Hourly aggregation can safely sum these deltas.
 
@@ -251,6 +253,7 @@ WantedBy=multi-user.target
 ### L3 — Integration Test
 
 Manual: build release binary, run against local Wrangler Worker (`pnpm --filter @bat/worker dev`), verify:
+
 - Identity appears in D1 `hosts` table
 - Metrics appear in `metrics_raw`
 - Health endpoint reflects data

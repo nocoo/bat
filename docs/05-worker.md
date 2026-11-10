@@ -40,6 +40,7 @@ One middleware handles both keys, scoped by route:
 - **Public routes** (`GET /api/health`, `GET /api/live`): no auth required
 
 **Rejection semantics**:
+
 - Missing `Authorization` header → `401 Unauthorized`
 - Wrong key (e.g. read key on write route, or invalid key) → `403 Forbidden`
 
@@ -101,6 +102,7 @@ ON CONFLICT(host_id) DO UPDATE SET
 4. Return `204 No Content`
 
 **Design choices**:
+
 - **Full overwrite**: Every field is replaced on each identity POST. The Probe always sends a complete identity payload, so partial updates add complexity without benefit.
 - **No auto-reactivation**: Identity updates do NOT change `is_active`. See [03-data-structures.md § Host lifecycle](./03-data-structures.md).
 - **Detecting changes**: Compare `boot_time` to detect reboots. Compare `kernel`/`os` to detect upgrades. `identity_updated_at` tracks when metadata was last refreshed.
@@ -256,6 +258,7 @@ The health endpoint returns only aggregate counts — no host IDs, no alert deta
 **Note**: The per-host status derivation logic (steps 2-4) is shared with `GET /api/hosts` — both endpoints compute status the same way. Extract into `services/status.ts` to avoid duplication.
 
 **HTTP status code logic** (three-level):
+
 - `200` — all hosts healthy, OR only `warning` alerts active → `"status": "healthy"` or `"degraded"`
 - `503` — any `critical` alert active → `"status": "critical"`
 
