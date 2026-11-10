@@ -50,6 +50,7 @@ ALTER TABLE hosts ADD COLUMN renews_at TEXT;        -- next payment / expiry dat
 ```
 
 **Key semantics**:
+
 - The three columns are **all-or-nothing**: either every one of them carries a value or every one of them is null. The write path (`PATCH /api/hosts/:id/billing`) enforces it and rejects a mixed triple with 400.
 - Dates are **calendar dates**, not instants. They are parsed as UTC midnight, so a countdown never shifts with the reader's time zone and a period is always a whole number of days.
 - Nothing else is stored. The period length, the daily cost and the renewal countdown are derived from the three columns by `packages/shared/src/billing.ts`, so the Worker and the dashboard can never disagree.
