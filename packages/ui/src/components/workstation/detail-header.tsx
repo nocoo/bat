@@ -5,6 +5,7 @@
 import type { WorkstationRecord, WorkstationStatus } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
+import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
@@ -109,38 +110,36 @@ export function DetailHeader({
 
 	return (
 		<LayerCard padding="none">
-			<div className="flex flex-wrap items-center justify-between gap-x-basalt-layout gap-y-basalt-space-card-sm px-basalt-card py-basalt-layout">
-				<div className="flex min-w-0 items-center gap-basalt-space-md">
-					<Button
-						asChild={true}
-						variant="ghost"
-						size="icon"
-						className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
-					>
-						<Link to="/workstations" aria-label="Back to workstations">
-							<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
-						</Link>
-					</Button>
-					<div className="min-w-0 space-y-basalt-space-md">
-						<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-lg">
-							<h1 className="text-basalt-3xl font-semibold text-basalt-foreground">
-								{record.name}
-							</h1>
-							<WorkstationStatusBadge status={status} size="md" />
-							<WorkstationRenameDialog workstation={record} />
-						</div>
-						<p className="line-clamp-1 text-basalt-sm text-basalt-muted-foreground">{system}</p>
-					</div>
-				</div>
-				<div className="flex flex-wrap items-center gap-basalt-space-lg">
-					<SegmentControl
-						legend="History window"
-						className={INLINE_SEGMENT}
-						value={String(rangeSeconds)}
-						onValueChange={(value) => onRangeChange(Number(value))}
-						options={RANGES.map(({ label, seconds }) => ({ label, value: String(seconds) }))}
+			<div className="flex items-start gap-basalt-space-md px-basalt-card py-basalt-layout">
+				<Button
+					asChild={true}
+					variant="ghost"
+					size="icon"
+					className="h-basalt-control-sm min-h-0 w-basalt-control-sm min-w-0"
+				>
+					<Link to="/workstations" aria-label="Back to workstations">
+						<ArrowLeft aria-hidden="true" strokeWidth={1.5} />
+					</Link>
+				</Button>
+				<div className="min-w-0 flex-1">
+					<PageHeader
+						title={record.name}
+						description={system}
+						actions={
+							<>
+								<WorkstationStatusBadge status={status} size="md" />
+								<WorkstationRenameDialog workstation={record} />
+								<SegmentControl
+									legend="History window"
+									className={INLINE_SEGMENT}
+									value={String(rangeSeconds)}
+									onValueChange={(value) => onRangeChange(Number(value))}
+									options={RANGES.map(({ label, seconds }) => ({ label, value: String(seconds) }))}
+								/>
+								{actions}
+							</>
+						}
 					/>
-					{actions}
 				</div>
 			</div>
 
