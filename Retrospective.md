@@ -358,3 +358,32 @@ the classification into SQL shape filters and still promoted junk such as
 address parsers on the read path instead of re-implementing address grammar in
 SQL, and test the migration and the read path against pre-existing rows, not only
 against rows written by the new probe.
+
+## 2026-11-10 - Three separate reasons the daily Demo answered 503
+
+The owner hit the same failure three times in one day; it was not one bug.
+
+1. `bun run build` rewrote `packages/worker/static` under the running worker, which
+   exited and left the launcher proxying to a dead runtime. The instance now copies
+   the built assets into its own directory, so a rebuild cannot touch a live instance.
+2. Restarting the launcher emptied the in-memory instance map, so the open tab's
+   `POST /__bat/environment` with its old `previous` id answered 410 forever. An
+   unknown `previous` now means "no previous instance" and creates one; only an id
+   that exists but is inactive answers 410. The UI clears the stored id and retries
+   once, so a reload recovers without clearing storage.
+3. A dead worker made the proxy answer 503 while the instance stayed `active`, so
+   every later request failed the same way. A proxy failure now marks the instance
+   inactive and answers 410, which the same retry path turns into a fresh instance.
+
+Two follow-ups from the same investigation: the store-holder check treated the
+launcher's own pid, and then its own worker children, as foreign holders, so a
+healthy launch refused to reuse its own store; it now excludes the caller's whole
+process tree. And `bun run build`/`kill` leave orphan `workerd` children whose
+`+`-containing paths defeat a plain `pkill -f` pattern — kill them by an unescaped
+substring or by pid, and prefer restarting the whole launcher over restarting only
+the worker, since only the launcher owns the instance map.
+
+The launcher's SIGTERM handler still does not reliably tear down the worker group
+under Bun; the local restart script kills the worker tree explicitly before
+relaunching. Treat "no orphan workerd after stop" as unproven until that handler is
+verified.
