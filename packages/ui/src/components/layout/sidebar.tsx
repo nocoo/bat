@@ -74,9 +74,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 		</span>
 	);
 	const userAvatar = (
-		<Avatar>
+		<Avatar className="h-9 w-9 shrink-0">
 			{avatar && <AvatarImage src={avatar} alt={name} />}
-			<AvatarFallback>{initial}</AvatarFallback>
+			<AvatarFallback className="text-basalt-sm">{initial}</AvatarFallback>
 		</Avatar>
 	);
 
@@ -179,13 +179,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 			<SidebarFooter>
 				{compact ? (
 					<>
-						<Tooltip>
-							<TooltipTrigger asChild={true}>
-								<span role="img" aria-label={name}>
-									{userAvatar}
-								</span>
-							</TooltipTrigger>
-							<TooltipContent side="right">{name}</TooltipContent>
+						<Tooltip delayDuration={0}>
+							<TooltipTrigger asChild={true}>{userAvatar}</TooltipTrigger>
+							<TooltipContent side="right" sideOffset={8}>
+								{name}
+							</TooltipContent>
 						</Tooltip>
 						{version}
 					</>
