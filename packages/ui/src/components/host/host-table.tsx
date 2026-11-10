@@ -1,7 +1,9 @@
-// Fleet table for the hosts page: one fixed rhythm per row — a 14px/500
-// primary reading with a 12px muted qualifier under it, 8px cell padding and
-// a hairline between rows. Sparklines ride the primary line in a fixed
-// 40×14 slot so every numeral keeps one right edge.
+// Fleet table for the hosts page: one clean line per column in the UI font
+// (tabular numerals keep the columns honest), a lucide anchor on each
+// header, and a fixed 40×14 trend slot right of the value so the numbers
+// never move. Spec qualifiers and trend slots give way below `xl`; the
+// state stays readable from the coloured badge icon and tone-coded
+// countdown at every width.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
@@ -26,32 +28,53 @@ import {
 	TableRow,
 } from "@nocoo/basalt/components/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@nocoo/basalt/components/tooltip";
-import { Info } from "lucide-react";
+import {
+	Activity,
+	Cpu,
+	HardDrive,
+	Info,
+	type LucideIcon,
+	MemoryStick,
+	Network,
+	Server,
+	Timer,
+	Wallet,
+} from "lucide-react";
+import { Fragment } from "react";
 import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
-import { getValueColor, statusDotColor } from "@/lib/host-card-format";
+import { getValueColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { formatPercent } from "@/lib/workstation-format";
 
-/** The primary reading of a cell — 14px/500, monospaced numerals. Plain
+/** The value of a cell — 14px/500 in the UI font, tabular numerals. Plain
  *  strings, because tailwind-merge cannot tell the custom `text-basalt-*`
  *  size and colour utilities apart and would drop one of them. */
-const PRIMARY_VALUE = "whitespace-nowrap font-mono text-basalt-base font-medium tabular-nums";
-/** The qualifier under it — 12px, muted unless a tone overrides the colour. */
-const SECONDARY_VALUE = "whitespace-nowrap font-mono text-basalt-xs tabular-nums";
-const SECONDARY_MUTED = `${SECONDARY_VALUE} text-basalt-muted-foreground`;
-/** The two-line stack every metric cell shares: one 2px gap between lines. */
-const VALUE_STACK = "flex flex-col items-end gap-basalt-space-xs";
-/** The primary line when it carries a sparkline: chart first, value last. */
-const VALUE_LINE = "flex items-center justify-end gap-basalt-space-md";
+const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums";
+/** The qualifier beside it — 12px muted, wide-view only for machine specs. */
+const CELL_SPEC =
+	"hidden max-w-28 truncate text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
 const MAX_VISIBLE_TAGS = 3;
-const TAG_NAME_MAX_WIDTH = "max-w-40";
 
-function MiniTrend({
+/** One header cell: a small muted lucide anchor next to the 12px label.
+ *  Decorative only — the text label carries the meaning. */
+function HeadLabel({ icon: Icon, children }: { icon: LucideIcon; children: React.ReactNode }) {
+	return (
+		<span className="inline-flex items-center gap-basalt-space-sm">
+			<Icon className="size-3.5 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+			{children}
+		</span>
+	);
+}
+
+/** The fixed 40×14 trend slot right of the value. The slot is reserved for
+ *  every row (empty when the host has no history) so the numerals keep one
+ *  right edge, and the whole slot gives way below `xl`. */
+function TrendSlot({
 	points,
 	color,
 	label,
@@ -60,19 +83,24 @@ function MiniTrend({
 	color: string;
 	label: string;
 }) {
-	if (!points || points.length < 2) {
-		return null;
-	}
+	const ready = points !== null && points.length >= 2;
 	return (
-		<LineChart
-			data={points.map((point) => ({ x: point.ts, value: point.v }))}
-			series={[{ key: "value", color }]}
-			ariaLabel={label}
-			className="hidden h-3.5 w-10 shrink-0 xl:block"
-			showAxes={false}
-			showLegend={false}
-			accessibilityLayer={false}
-		/>
+		<span
+			className="hidden h-3.5 w-10 shrink-0 items-center justify-center xl:flex"
+			aria-hidden={ready ? undefined : true}
+		>
+			{ready ? (
+				<LineChart
+					data={points.map((point) => ({ x: point.ts, value: point.v }))}
+					series={[{ key: "value", color }]}
+					ariaLabel={label}
+					className="h-3.5 w-10"
+					showAxes={false}
+					showLegend={false}
+					accessibilityLayer={false}
+				/>
+			) : null}
+		</span>
 	);
 }
 
@@ -83,14 +111,9 @@ function pressureClass(value: number): string {
 
 function Pct({ value }: { value: number | null }) {
 	if (value === null) {
-		return <span className={`${PRIMARY_VALUE} text-basalt-muted-foreground`}>—</span>;
+		return <span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>;
 	}
-	return <span className={`${PRIMARY_VALUE} ${pressureClass(value)}`}>{formatPercent(value)}</span>;
-}
-
-/** The machine's own size, shown under the utilisation it belongs to. */
-function Spec({ value }: { value: string }) {
-	return <span className={SECONDARY_MUTED}>{value}</span>;
+	return <span className={`${CELL_VALUE} ${pressureClass(value)}`}>{formatPercent(value)}</span>;
 }
 
 /** Description affordance — a circled `i` that reveals the host description. */
@@ -120,39 +143,40 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 }
 
 /**
- * Tags stay on the subtitle row: capped, dotted and never pushing the name.
- * The names run one step quieter than the architecture text so the subtitle
- * reads as one line with a foreground head and a muted tail. Wide viewports
- * show three tags; below `xl` the trail narrows to two so every visible name
- * stays readable instead of collapsing to a letter.
+ * Tags share the identity line: colour dots always, names from `xl` up so
+ * the hostname stays complete on narrow viewports. Capped at three with a
+ * `+N` counter, never pushing the name around.
  */
 function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	const visible = tags.slice(0, MAX_VISIBLE_TAGS);
 	return (
-		<span className="flex shrink-0 items-center gap-basalt-space-md">
+		<span className="[flex-shrink:100] flex min-w-0 items-center gap-basalt-space-sm overflow-hidden">
 			{visible.map((tag, index) => (
-				<span
-					key={tag.id}
-					className={cn(
-						"items-center gap-basalt-space-xs",
-						index === MAX_VISIBLE_TAGS - 1 ? "hidden xl:flex" : "flex",
-					)}
-				>
+				<Fragment key={tag.id}>
 					<span
 						aria-hidden="true"
-						className="size-1.5 shrink-0 rounded-basalt-full"
+						className={cn(
+							"size-1.5 shrink-0 rounded-basalt-full",
+							index === MAX_VISIBLE_TAGS - 1 && "hidden xl:block",
+						)}
 						style={{ backgroundColor: getSwatchColor(tag.color) }}
 					/>
-					<span className={cn("truncate text-basalt-muted-foreground", TAG_NAME_MAX_WIDTH)}>
+					<span
+						className={cn(
+							"hidden min-w-8 max-w-24 truncate text-basalt-xs text-basalt-muted-foreground xl:inline",
+						)}
+					>
 						{tag.name}
 					</span>
-				</span>
+				</Fragment>
 			))}
 			{tags.length > 2 && (
-				<span className="shrink-0 text-basalt-muted-foreground xl:hidden">+{tags.length - 2}</span>
+				<span className="shrink-0 text-basalt-xs text-basalt-muted-foreground xl:hidden">
+					+{tags.length - 2}
+				</span>
 			)}
 			{tags.length > MAX_VISIBLE_TAGS && (
-				<span className="hidden shrink-0 text-basalt-muted-foreground xl:inline">
+				<span className="hidden shrink-0 text-basalt-xs text-basalt-muted-foreground xl:inline">
 					+{tags.length - MAX_VISIBLE_TAGS}
 				</span>
 			)}
@@ -160,7 +184,7 @@ function TagTrail({ tags }: { tags: readonly HostTag[] }) {
 	);
 }
 
-/** The second line of the Link column: quota and reset day in one string,
+/** The qualifier of the Link column: quota and reset day in one string,
  *  or a dash when the host carries neither. */
 function contractLine(quotaGb: number | null, resetDay: number | null): string {
 	const quota = formatTrafficQuotaGb(quotaGb);
@@ -183,29 +207,31 @@ export function HostTable({
 		<div data-basalt-table-container="" data-edge="attached">
 			<Table
 				aria-label="Servers"
-				className="lg:table-fixed lg:[&_th]:px-basalt-space-lg lg:[&_td]:px-basalt-space-lg"
+				className="lg:table-fixed lg:[&_th]:px-basalt-space-lg lg:[&_td]:px-basalt-space-lg lg:[&_td]:h-basalt-12"
 			>
 				<TableHeader>
 					<TableRow>
-						<TableHead>Server</TableHead>
-						<TableHead className="lg:w-21">Status</TableHead>
-						<TableHead className="lg:w-17 xl:w-26" textAlign="end">
-							CPU
+						<TableHead>
+							<HeadLabel icon={Server}>Server</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-17 xl:w-26" textAlign="end">
-							Memory
+						<TableHead className="lg:w-12 xl:w-24">Status</TableHead>
+						<TableHead className="lg:w-17 xl:w-39" textAlign="end">
+							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-16" textAlign="end">
-							Disk
+						<TableHead className="lg:w-17 xl:w-37" textAlign="end">
+							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden 2xl:table-cell 2xl:w-24" textAlign="end">
-							Load 1m
+						<TableHead className="lg:w-15 xl:w-26" textAlign="end">
+							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-21 xl:w-26" textAlign="end">
-							Link
+						<TableHead className="hidden 2xl:table-cell 2xl:w-26" textAlign="end">
+							<HeadLabel icon={Activity}>Load 1m</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-26" textAlign="end">
-							Billing
+						<TableHead className="lg:w-18 xl:w-37" textAlign="end">
+							<HeadLabel icon={Network}>Link</HeadLabel>
+						</TableHead>
+						<TableHead className="lg:w-35 2xl:w-41" textAlign="end">
+							<HeadLabel icon={Wallet}>Billing</HeadLabel>
 						</TableHead>
 					</TableRow>
 				</TableHeader>
@@ -215,77 +241,61 @@ export function HostTable({
 						const daysLeft = daysUntilRenewal(host.renews_at, today);
 						const countdown = renewalBadgeLabel(daysLeft);
 						const dailyCost = dailyCostCny(host.cost_amount_cny, host.paid_at, host.renews_at);
+						const contract = contractLine(host.traffic_quota_gb, host.traffic_reset_day);
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
-									<div className="flex min-w-0 items-start gap-basalt-space-xs">
+									<div className="flex min-w-0 items-center gap-basalt-space-sm">
+										<Link
+											to={`/hosts/${hashHostId(host.host_id)}`}
+											className="[flex-shrink:0.001] min-w-0 truncate font-medium underline-offset-4 hover:underline"
+											title={host.hostname}
+										>
+											{host.hostname}
+										</Link>
+										{host.description && (
+											<DescriptionHint hostname={host.hostname} description={host.description} />
+										)}
 										<span
-											aria-hidden="true"
-											className={`mt-basalt-space-md size-2 shrink-0 rounded-basalt-full ${statusDotColor(host.status)}`}
-										/>
-										<div className="min-w-0 flex-1">
-											<div className="flex min-w-0 items-center gap-basalt-space-xs">
-												<Link
-													to={`/hosts/${hashHostId(host.host_id)}`}
-													className="min-w-0 truncate font-medium underline-offset-4 hover:underline"
-													title={host.hostname}
-												>
-													{host.hostname}
-												</Link>
-												{host.description && (
-													<DescriptionHint
-														hostname={host.hostname}
-														description={host.description}
-													/>
-												)}
-											</div>
-											<div className="flex min-w-0 items-center gap-basalt-space-xs overflow-hidden text-basalt-xs">
-												<span
-													className={cn(
-														"min-w-0 truncate text-basalt-foreground",
-														tags.length > 0 && "hidden xl:inline",
-													)}
-												>
-													{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
-												</span>
-												<TagTrail tags={tags} />
-											</div>
-										</div>
+											className={cn(
+												"[flex-shrink:100] min-w-0 truncate text-basalt-xs text-basalt-muted-foreground",
+												tags.length > 0 && "hidden xl:inline",
+											)}
+										>
+											{[host.os, host.arch].filter(Boolean).join(" · ") || host.host_id}
+										</span>
+										<TagTrail tags={tags} />
 									</div>
 								</TableCell>
 								<TableCell>
-									<StatusBadge status={host.status} />
+									<StatusBadge status={host.status} responsiveLabel={true} />
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-cpu">
-									<div className={VALUE_STACK}>
-										<div className={VALUE_LINE}>
-											<MiniTrend
-												points={host.cpu_sparkline}
-												color={chart.pink}
-												label={`${host.hostname} 24 hour CPU`}
-											/>
-											<Pct value={host.cpu_usage_pct} />
-										</div>
-										<Spec value={formatCoreCount(host.cpu_logical)} />
+									<div className="flex items-center justify-end gap-basalt-space-md">
+										<Pct value={host.cpu_usage_pct} />
+										<span className={CELL_SPEC}>{formatCoreCount(host.cpu_logical)}</span>
+										<TrendSlot
+											points={host.cpu_sparkline}
+											color={chart.pink}
+											label={`${host.hostname} 24 hour CPU`}
+										/>
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-memory">
-									<div className={VALUE_STACK}>
-										<div className={VALUE_LINE}>
-											<MiniTrend
-												points={host.mem_sparkline}
-												color={chart.sky}
-												label={`${host.hostname} 24 hour memory`}
-											/>
-											<Pct value={host.mem_used_pct} />
-										</div>
-										<Spec value={formatSpecSize(host.mem_total_bytes)} />
+									<div className="flex items-center justify-end gap-basalt-space-md">
+										<Pct value={host.mem_used_pct} />
+										<span className={CELL_SPEC}>{formatSpecSize(host.mem_total_bytes)}</span>
+										<TrendSlot
+											points={host.mem_sparkline}
+											color={chart.sky}
+											label={`${host.hostname} 24 hour memory`}
+										/>
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-disk">
-									<div className={VALUE_STACK}>
+									<div className="flex items-center justify-end gap-basalt-space-md">
 										<Pct value={host.disk_root_used_pct} />
-										<Spec value={formatSpecSize(host.disk_root_total_bytes)} />
+										<span className={CELL_SPEC}>{formatSpecSize(host.disk_root_total_bytes)}</span>
 									</div>
 								</TableCell>
 								<TableCell
@@ -293,17 +303,17 @@ export function HostTable({
 									className="hidden 2xl:table-cell"
 									data-testid="host-load"
 								>
-									<div className={VALUE_LINE}>
-										<MiniTrend
+									<div className="flex items-center justify-end gap-basalt-space-md">
+										{host.cpu_load1 === null ? (
+											<span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>
+										) : (
+											<span className={CELL_VALUE}>{host.cpu_load1.toFixed(2)}</span>
+										)}
+										<TrendSlot
 											points={host.load_sparkline}
 											color={chart.teal}
 											label={`${host.hostname} 24 hour load`}
 										/>
-										{host.cpu_load1 === null ? (
-											<span className={`${PRIMARY_VALUE} text-basalt-muted-foreground`}>—</span>
-										) : (
-											<span className={PRIMARY_VALUE}>{host.cpu_load1.toFixed(2)}</span>
-										)}
 									</div>
 								</TableCell>
 								<TableCell
@@ -311,32 +321,33 @@ export function HostTable({
 									className="whitespace-nowrap"
 									data-testid="host-contract"
 								>
-									<div className={VALUE_STACK}>
-										<span className={PRIMARY_VALUE}>
+									<div className="flex items-center justify-end gap-basalt-space-md">
+										<span className={CELL_VALUE}>
 											{formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}
 										</span>
-										{contractLine(host.traffic_quota_gb, host.traffic_reset_day) !== "—" && (
-											<span className={`${SECONDARY_MUTED} hidden xl:inline`}>
-												{contractLine(host.traffic_quota_gb, host.traffic_reset_day)}
-											</span>
-										)}
+										{contract !== "—" && <span className={CELL_SPEC}>{contract}</span>}
 									</div>
 								</TableCell>
 								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-billing">
 									{countdown === null && dailyCost === null ? (
-										<span className={`${PRIMARY_VALUE} text-basalt-muted-foreground`}>—</span>
+										<span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>
 									) : (
-										<div className={VALUE_STACK}>
+										<div className="flex items-center justify-end gap-basalt-space-md">
 											{dailyCost !== null && (
-												<span className={PRIMARY_VALUE} data-testid="host-daily-cost">
+												<span className={CELL_VALUE} data-testid="host-daily-cost">
 													{`${formatCny(dailyCost)}/day`}
 												</span>
 											)}
 											{countdown !== null && (
 												<span
-													className={`${SECONDARY_VALUE} ${renewalToneClass(renewalTone(daysLeft))}`}
+													className={`inline-flex items-center gap-basalt-space-xs whitespace-nowrap text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
 													data-testid="host-countdown"
 												>
+													<Timer
+														className="hidden size-3 shrink-0 2xl:block"
+														strokeWidth={1.5}
+														aria-hidden="true"
+													/>
 													{countdown}
 												</span>
 											)}
