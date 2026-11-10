@@ -119,13 +119,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 				</div>
 			</SidebarHeader>
 			{compact ? (
-				<Button
-					variant="ghost"
-					size="icon"
-					onClick={toggle}
-					aria-label="Expand sidebar"
-					className="mb-basalt-space-sm self-center"
-				>
+				<Button variant="ghost" size="icon" onClick={toggle} aria-label="Expand sidebar">
 					<PanelLeft aria-hidden="true" strokeWidth={1.5} />
 				</Button>
 			) : null}

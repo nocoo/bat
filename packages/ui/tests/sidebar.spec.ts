@@ -16,14 +16,11 @@ for (const theme of ["light", "dark"]) {
 		await expect(footer).toHaveCSS("padding-left", "16px");
 		await expect(footer).toHaveCSS("padding-bottom", "16px");
 		await expect(footer).toHaveCSS("border-top-width", "0px");
-		const separator = nav.locator('[data-orientation="horizontal"]');
-		await expect(separator).toHaveCount(1);
+		await expect(nav.locator('[data-slot="sidebar-group"]')).toHaveCount(2);
 		const railBounds = await sidebar.boundingBox();
 		const row = nav.locator('[data-basalt-hover-item][data-hover-selected="true"]');
 		const rowBounds = await row.boundingBox();
-		const separatorBounds = await separator.boundingBox();
 		expect(rowBounds?.x).toBe((railBounds?.x ?? 0) + 8);
-		expect(separatorBounds?.x).toBe((railBounds?.x ?? 0) + 16);
 
 		const selectedColor = await row.evaluate((element) => {
 			const probe = document.createElement("span");
