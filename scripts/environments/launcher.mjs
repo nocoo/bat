@@ -144,9 +144,22 @@ export async function launch({
 							return json({ error: "Local capability required" }, 403);
 						if (request.method === "GET") {
 							const instance = instances.get(url.searchParams.get("id"));
-							return instance?.active
-								? json(summary(instance))
-								: json({ error: "Instance expired" }, 410);
+							if (!instance?.active) return json({ error: "Instance expired" }, 410);
+							if (instance.runtime) {
+								// A reloaded tab revalidates its instance on boot: probe the
+								// runtime so a dead worker expires here and the UI rebuilds
+								// instead of loading into an immediate 410.
+								try {
+									const live = await fetch(new URL("/api/live", instance.runtime.base), {
+										signal: AbortSignal.timeout(2000),
+									});
+									if (!live.ok) throw new Error("runtime unhealthy");
+								} catch {
+									await expireInstance(instance, instances, releaseRuntime);
+									return json({ error: "Instance expired" }, 410);
+								}
+							}
+							return json(summary(instance));
 						}
 						if (request.method !== "POST") return json({ error: "Method denied" }, 405);
 						const { mode, previous } = await request.json();

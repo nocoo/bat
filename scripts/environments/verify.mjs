@@ -315,6 +315,10 @@ try {
 	process.kill(-victimRuntime.workerPid, "SIGKILL");
 	const dead = await fetch(`${app.base}/__bat/instances/${victim.id}/api/hosts`);
 	assert.equal(dead.status, 410);
+	const revalidated = await fetch(`${app.base}/__bat/environment?id=${victim.id}`, {
+		headers: { "X-Bat-Local": config.capability },
+	});
+	assert.equal(revalidated.status, 410);
 	assert.equal(app.instances.has(victim.id), false);
 	assert.equal(existsSync(victimRuntime.path), false);
 	const reborn = await (await select("e2e", victim.id)).json();
