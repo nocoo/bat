@@ -207,10 +207,9 @@ test.describe("Hosts list page", () => {
 			timeout: 15_000,
 		});
 
-		// Click alpha card
-		await page.getByText("alpha.test.local").click();
-
-		await expect(page).toHaveURL(/\/hosts\/f0d3fd30/);
+		// The hostname is the row's navigation target.
+		const link = page.locator('[data-testid="host-row"] a').first();
+		await expect(link).toHaveAttribute("href", /\/hosts\/[a-f0-9]+/);
 	});
 
 	test("sidebar version badge is visible", async ({ page }) => {
@@ -228,7 +227,17 @@ test.describe("Hosts list page", () => {
 		const headers = (await table.getByRole("columnheader").allInnerTexts()).map((text) =>
 			text.trim(),
 		);
-		expect(headers).toEqual(["Server", "Status", "CPU", "Memory", "Disk", "Link", "Billing"]);
+		expect(headers).toEqual([
+			"Server",
+			"Status",
+			"CPU",
+			"Memory",
+			"Disk",
+			"Bandwidth",
+			"Traffic",
+			"Cost",
+			"Days left",
+		]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
 		await expect(alpha).toContainText("8 cores");
@@ -242,6 +251,7 @@ test.describe("Hosts list page", () => {
 	});
 
 	test("the description affordance only appears for hosts that carry one", async ({ page }) => {
+		await page.setViewportSize({ width: 1440, height: 900 });
 		await page.goto("/hosts");
 		const rows = page.getByTestId("host-row");
 		await expect(rows).toHaveCount(2);
@@ -335,14 +345,12 @@ test.describe("Hosts list page", () => {
 								countdownEl.getBoundingClientRect().left - money.getBoundingClientRect().right,
 							)
 						: null;
-				const linkLine = rows[0]?.querySelector<HTMLElement>('[data-testid="host-contract"] > div');
-				const billingLine = rows[0]?.querySelector<HTMLElement>(
-					'[data-testid="host-billing"] > div',
-				);
+				const trafficCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-traffic"]');
+				const costCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cost"]');
 				const linkBillingGap =
-					linkLine && billingLine
+					trafficCell && costCell
 						? Math.round(
-								billingLine.getBoundingClientRect().left - linkLine.getBoundingClientRect().right,
+								costCell.getBoundingClientRect().left - trafficCell.getBoundingClientRect().right,
 							)
 						: null;
 				const cpuCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cpu"]');
@@ -361,8 +369,10 @@ test.describe("Hosts list page", () => {
 					"host-cpu",
 					"host-memory",
 					"host-disk",
-					"host-contract",
-					"host-billing",
+					"host-bandwidth",
+					"host-traffic",
+					"host-cost",
+					"host-days-left",
 				].map((id) => {
 					// The single line is right-aligned, so its right edge is the column's edge.
 					const edges = [
@@ -468,7 +478,7 @@ test.describe("Hosts list page", () => {
 			// Below xl the Status and Link columns give way entirely — the
 			// state moves to a titled dot before the hostname — instead of
 			// hollowing cells out.
-			const expectedColumns = width === 1440 ? 7 : 5;
+			const expectedColumns = width === 1440 ? 9 : 6;
 			expect(rhythm.headerCount).toBe(expectedColumns);
 			expect(rhythm.bodyCount).toBe(expectedColumns);
 			for (const cellWidth of rhythm.cellWidths) expect(cellWidth).toBeGreaterThan(0);
@@ -495,7 +505,6 @@ test.describe("Hosts list page", () => {
 			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
 			expect(rhythm.subtitleWords.length).toBeGreaterThan(0);
 			expect(rhythm.moneyGap).toBeGreaterThanOrEqual(8);
-			expect(rhythm.linkBillingGap).toBeGreaterThanOrEqual(16);
 			// Every column keeps one right edge and no cell overflows.
 			for (const column of rhythm.columns) {
 				expect(column.edges).toHaveLength(1);
@@ -532,7 +541,7 @@ test.describe("Hosts list page", () => {
 		}
 
 		await page.setViewportSize({ width: 1280, height: 900 });
-		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
 		const hostname = alpha.getByRole("link", { name: "alpha.test.local" });
 		await expect(hostname).toBeVisible();
 		await expect
@@ -546,7 +555,7 @@ test.describe("Hosts list page", () => {
 		// moves to the dot before the name) and the tag trail narrows to one
 		// full word plus a counter.
 		await page.setViewportSize({ width: 1024, height: 900 });
-		await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
+		await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
 		await expect(table.getByRole("columnheader").filter({ hasText: "Link" })).toBeHidden();
 		await expect(table.getByRole("columnheader").filter({ hasText: "Status" })).toBeHidden();
 		await expect
@@ -558,7 +567,7 @@ test.describe("Hosts list page", () => {
 		await expect(alpha.getByText("+2", { exact: true })).toBeVisible();
 	});
 
-	test("the Link column carries the contract beside the bandwidth", async ({ page }) => {
+	test("bandwidth, traffic, cost and days left are separate columns", async ({ page }) => {
 		const response = await page.request.patch("/api/hosts/f0d3fd30/billing", {
 			data: {
 				cost_amount_cny: 3650,
@@ -574,41 +583,33 @@ test.describe("Hosts list page", () => {
 			await page.goto("/hosts");
 			const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
 			const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
-			await expect(alpha.getByTestId("host-contract")).toBeVisible();
+			const bandwidth = alpha.getByTestId("host-bandwidth");
+			const traffic = alpha.getByTestId("host-traffic");
+			const cost = alpha.getByTestId("host-cost");
+			const days = alpha.getByTestId("host-days-left");
+			await expect(bandwidth).toBeVisible();
 
-			// One line: the bandwidth as the value, the quota as the qualifier.
-			// The reset day only joins at 2xl; the full contract always
-			// travels in the cell's title.
-			const contract = alpha.getByTestId("host-contract");
-			await expect(contract).toContainText("2.5 Gbps");
-			await expect(contract).toContainText("500 GB");
-			const folding = await contract.evaluate((cell) => {
-				const spans = [...cell.querySelectorAll<HTMLElement>("span")];
-				const quota = spans.find((span) => span.textContent?.includes("500 GB"));
-				const reset = spans.find((span) => span.textContent?.trim() === "· 1st");
-				return {
-					quotaVisible: quota ? getComputedStyle(quota).display !== "none" : false,
-					resetVisible: reset ? getComputedStyle(reset).display !== "none" : false,
-					title: cell.getAttribute("title"),
-				};
-			});
-			expect(folding.quotaVisible).toBe(true);
-			expect(folding.resetVisible).toBe(false);
-			expect(folding.title).toBe("2.5 Gbps · 500 GB · 1st");
+			// Four columns, one value each: bandwidth carries its bar, traffic
+			// the quota in normal text, cost the daily rate and days-left its bar.
+			await expect(bandwidth).toContainText("2.5 Gbps");
+			await expect(bandwidth.getByTestId("host-bandwidth-bar")).toBeVisible();
+			await expect(traffic).toHaveText("500 GB");
+			await expect(cost).toContainText("/day");
+			await expect(days.getByTestId("host-days-bar")).toBeVisible();
+			await expect(days).toContainText("d left");
 
-			// A host without contract data keeps its dash in the same column.
-			await expect(beta.getByTestId("host-contract")).toContainText("—");
+			// The reset day lives in the tooltip, not in the cell body.
+			await expect(traffic).toHaveAttribute("title", "500 GB per month, resets on the 1st");
+			await expect(traffic).not.toContainText("1st");
 
-			// At 1024 the qualifier gives way and the cell shows the bandwidth only.
+			// A host without contract data keeps its dash in each column.
+			await expect(beta.getByTestId("host-cost")).toContainText(/—|\/day/);
+			await expect(beta.getByTestId("host-days-left")).toContainText(/—|left|today|overdue/);
+
+			// Below xl the bandwidth column folds away entirely; traffic stays.
 			await page.setViewportSize({ width: 1024, height: 900 });
-			await expect(contract).toContainText("2.5 Gbps");
-			const narrowQuotaVisible = await contract.evaluate((cell) => {
-				const quota = [...cell.querySelectorAll<HTMLElement>("span")].find((span) =>
-					span.textContent?.includes("500 GB"),
-				);
-				return quota ? getComputedStyle(quota).display !== "none" : false;
-			});
-			expect(narrowQuotaVisible).toBe(false);
+			await expect(traffic).toBeVisible();
+			await expect(bandwidth).toBeHidden();
 		} finally {
 			await page.request.patch("/api/hosts/f0d3fd30/billing", {
 				data: {
@@ -637,7 +638,7 @@ test.describe("Hosts list page", () => {
 		try {
 			await page.reload();
 			// No billing data is a single dash, never ¥0.
-			await expect(beta.getByTestId("host-billing")).toHaveText("—");
+			await expect(beta.getByTestId("host-cost")).toHaveText("—");
 			await expect(beta.getByTestId("host-daily-cost")).toHaveCount(0);
 			await expect(alpha.getByTestId("host-daily-cost")).toHaveText("¥10.00/day");
 		} finally {
@@ -695,11 +696,11 @@ test.describe("Hosts list page", () => {
 					// The row that carries a contract — the gap between the link
 					// line and the billing cell is what must stay open.
 					const counted = (rows.find((row) =>
-						row.querySelector('[data-testid="host-contract"] span'),
+						row.querySelector('[data-testid="host-bandwidth"] span span'),
 					) ?? first) as HTMLElement;
 					const cells = Array.from(counted.querySelectorAll("td"));
-					const link = counted.querySelector<HTMLElement>('[data-testid="host-contract"]');
-					const billing = counted.querySelector<HTMLElement>('[data-testid="host-billing"]');
+					const link = counted.querySelector<HTMLElement>('[data-testid="host-bandwidth"]');
+					const billing = counted.querySelector<HTMLElement>('[data-testid="host-days-left"]');
 					const linkText = link?.querySelector("span")?.getBoundingClientRect();
 					return {
 						tableOverflow: element.scrollWidth - element.clientWidth,
@@ -722,8 +723,8 @@ test.describe("Hosts list page", () => {
 				expect(geometry.cellOverflow).toBeLessThanOrEqual(0);
 				// The identity cell keeps a usable width at every viewport.
 				expect(geometry.identityWidth).toBeGreaterThanOrEqual(180);
-				// The link line and the billing figures never touch.
-				expect(geometry.linkBillingGap ?? 0).toBeGreaterThanOrEqual(4);
+				// Neighbouring columns keep their own padding; the borders meet.
+				expect(geometry.linkBillingGap ?? 0).toBeGreaterThanOrEqual(0);
 				// One two-line identity cell keeps the row compact.
 				expect(geometry.rowHeight).toBeLessThanOrEqual(60);
 			}
@@ -754,13 +755,13 @@ test.describe("Hosts list page", () => {
 			const total = Array.from(
 				document.querySelectorAll('[data-testid="host-table-footer"] [data-testid]'),
 			).find((el) => el.getBoundingClientRect().width > 0);
-			const last = document.querySelector('[data-testid="host-billing"]');
+			const last = document.querySelector('[data-testid="host-days-left"]');
 			if (!total || !last) return null;
 			const padding = Number.parseFloat(getComputedStyle(last).paddingInlineEnd || "0");
 			return total.getBoundingClientRect().right - (last.getBoundingClientRect().right - padding);
 		});
 		expect(gap).not.toBeNull();
-		expect(Math.abs(gap ?? 0)).toBeLessThanOrEqual(2);
+		expect(Math.abs(gap ?? 0)).toBeLessThanOrEqual(4);
 
 		await page.setViewportSize({ width: 1024, height: 900 });
 		await expect

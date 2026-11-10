@@ -216,7 +216,8 @@ test.describe("Host billing", () => {
 			});
 			await page.reload();
 			// Without billing the merged column shows one dash, not an empty cell.
-			await expect(betaRow.getByTestId("host-billing")).toHaveText("—");
+			await expect(betaRow.getByTestId("host-cost")).toHaveText("—");
+			await expect(betaRow.getByTestId("host-days-left")).toHaveText("—");
 			await expect(betaRow.getByTestId("host-countdown")).toHaveCount(0);
 			await betaRow.screenshot({ path: testInfo.outputPath(`host-list-no-billing-${width}.png`) });
 		}
@@ -246,7 +247,7 @@ test.describe("Host billing", () => {
 
 			// The total sits under the billing column, which stays visible at every width.
 			const table = page.getByRole("table", { name: "Servers" });
-			await expect(table.getByRole("columnheader").filter({ hasText: "Billing" })).toBeVisible();
+			await expect(table.getByRole("columnheader").filter({ hasText: "Cost" })).toBeVisible();
 			await footer.screenshot({ path: testInfo.outputPath(`fleet-cost-${width}.png`) });
 		}
 	});

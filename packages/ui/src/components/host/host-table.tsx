@@ -209,6 +209,26 @@ function trafficTitle(quotaGb: number | null, resetDay: number | null): string {
 		: `${label} per month, ${formatResetDayLong(resetDay)}`;
 }
 
+function diskTitle(usedPct: number | null, totalBytes: number | null): string {
+	if (usedPct === null) return "No disk reading";
+	const total = formatSpecSize(totalBytes);
+	if (total === null) return `${usedPct.toFixed(1)}% used`;
+	const used = formatSpecSize(((totalBytes ?? 0) * usedPct) / 100);
+	return `${used} of ${total} used · ${usedPct.toFixed(1)}%`;
+}
+
+function diskBarColor(usedPct: number): string {
+	if (usedPct >= 80) return "hsl(var(--basalt-destructive))";
+	if (usedPct >= 60) return "hsl(var(--basalt-warning))";
+	return chart.sky;
+}
+
+function costTitle(renewsAt: string | null, amount: number | null): string {
+	const next = renewsAt === null ? "no renewal date recorded" : `next payment ${renewsAt}`;
+	const paid = amount === null ? "amount not recorded" : `${formatCny(amount)} for this period`;
+	return `${next} · ${paid}`;
+}
+
 function daysLeftTitle(days: number | null, period: number | null): string {
 	if (days === null) return "No renewal date recorded";
 	const base = days < 0 ? `${-days} days overdue` : days === 0 ? "Due today" : `${days} days left`;
@@ -279,7 +299,7 @@ export function HostTable({
 						<TableHead className="hidden xl:table-cell xl:w-22" textAlign="end">
 							<HeadLabel icon={HardDrive}>Traffic</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-20 xl:w-26" textAlign="end">
+						<TableHead className="lg:w-22 xl:w-26" textAlign="end">
 							<HeadLabel icon={Wallet}>Cost</HeadLabel>
 						</TableHead>
 						<TableHead className="lg:w-24 xl:w-32" textAlign="end">
@@ -367,11 +387,44 @@ export function HostTable({
 										/>
 									</div>
 								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-disk">
-									<div className="flex items-center justify-end gap-basalt-space-md">
-										<Pct value={host.disk_root_used_pct} />
-										<span className={CELL_SPEC}>{formatSpecSize(host.disk_root_total_bytes)}</span>
-									</div>
+								<TableCell
+									textAlign="end"
+									className="whitespace-nowrap"
+									data-testid="host-disk"
+									title={diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
+								>
+									{host.disk_root_used_pct === null ? (
+										<Dash />
+									) : (
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<div className="flex cursor-default items-center justify-end gap-basalt-space-md">
+													<span
+														aria-hidden="true"
+														className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
+														data-testid="host-disk-bar"
+													>
+														<span
+															className="block h-full rounded-basalt-full"
+															style={{
+																width: `${Math.min(100, Math.max(0, host.disk_root_used_pct)).toFixed(1)}%`,
+																backgroundColor: diskBarColor(host.disk_root_used_pct),
+															}}
+														/>
+													</span>
+													<span
+														data-testid="host-disk-pct"
+														className={`${CELL_VALUE} ${pressureClass(host.disk_root_used_pct)}`}
+													>
+														{formatPercent(host.disk_root_used_pct)}
+													</span>
+												</div>
+											</TooltipTrigger>
+											<TooltipContent side="top" sideOffset={6}>
+												{diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
+											</TooltipContent>
+										</Tooltip>
+									)}
 								</TableCell>
 								<TableCell
 									textAlign="end"
@@ -423,13 +476,28 @@ export function HostTable({
 										</Tooltip>
 									)}
 								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-cost">
+								<TableCell
+									textAlign="end"
+									className="whitespace-nowrap"
+									data-testid="host-cost"
+									title={costTitle(host.renews_at, host.cost_amount_cny)}
+								>
 									{dailyCost === null ? (
 										<Dash />
 									) : (
-										<span className={CELL_VALUE} data-testid="host-daily-cost">
-											{`${formatCny(dailyCost)}/day`}
-										</span>
+										<Tooltip>
+											<TooltipTrigger asChild>
+												<span
+													className={`${CELL_VALUE} cursor-default`}
+													data-testid="host-daily-cost"
+												>
+													{`${formatCny(dailyCost)}/day`}
+												</span>
+											</TooltipTrigger>
+											<TooltipContent side="top" sideOffset={6}>
+												{costTitle(host.renews_at, host.cost_amount_cny)}
+											</TooltipContent>
+										</Tooltip>
 									)}
 								</TableCell>
 								<TableCell
@@ -457,7 +525,7 @@ export function HostTable({
 											</span>
 											<span
 												data-testid="host-countdown"
-												className={`shrink-0 text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
+												className={`w-18 shrink-0 text-right text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
 											>
 												{countdown}
 											</span>
