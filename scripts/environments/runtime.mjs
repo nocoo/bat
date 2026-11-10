@@ -1,8 +1,9 @@
 import { Database } from "bun:sqlite";
-import { spawn } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { randomBytes, randomUUID } from "node:crypto";
 import {
 	closeSync,
+	cpSync,
 	existsSync,
 	mkdirSync,
 	openSync,
@@ -81,6 +82,44 @@ export function removeOwned(path, owner) {
 	verifyOwnership(path, owner);
 	rmSync(path, { recursive: true });
 }
+const batProcessPattern = /launcher\.mjs|wrangler|workerd/;
+function processCommand(pid) {
+	try {
+		return execFileSync("ps", ["-p", String(pid), "-o", "command="], {
+			encoding: "utf8",
+		}).trim();
+	} catch {
+		return "";
+	}
+}
+/**
+ * A running.lock survives a hard launcher kill. Reusing a store whose
+ * launcher or wrangler/workerd children still live would put two workers on
+ * one D1 file, so the lock is stale only when its holder is gone and nothing
+ * keeps the state directory open.
+ */
+export function heldStore(path) {
+	const lock = join(path, "running.lock");
+	if (!existsSync(lock)) return null;
+	const pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
+	if (Number.isInteger(pid)) {
+		let alive = false;
+		try {
+			process.kill(pid, 0);
+			alive = true;
+		} catch {}
+		const command = alive ? processCommand(pid) : "";
+		if (pid === process.pid || batProcessPattern.test(command))
+			return `pid ${pid} (${command || "this process"})`;
+	}
+	const state = join(path, "state");
+	if (existsSync(state)) {
+		// lsof exits 1 on macOS even with matches, so read stdout, not the code.
+		const holders = spawnSync("lsof", ["-t", "+D", state], { encoding: "utf8" })?.stdout.trim();
+		if (holders) return `processes ${holders.replace(/\n/g, ", ")} holding ${state}`;
+	}
+	return null;
+}
 export function productionConfig() {
 	const base = Bun.TOML.parse(readFileSync(join(workerRoot, "wrangler.toml"), "utf8"));
 	const { env, ...common } = base;
@@ -88,6 +127,16 @@ export function productionConfig() {
 }
 export function localConfig(path, identity, owner) {
 	const prod = productionConfig();
+	// The instance owns a private copy of the built assets: `bun run build`
+	// rewrites packages/worker/static, which kills a running worker that
+	// serves it. The copy is refreshed on every instance creation so a new
+	// version never reuses stale files.
+	const assetsDirectory = join(path, "static");
+	const sourceAssets = join(workerRoot, "static");
+	if (!existsSync(sourceAssets))
+		throw new Error("Built dashboard assets are missing; run `bun run build` first");
+	rmSync(assetsDirectory, { recursive: true, force: true });
+	cpSync(sourceAssets, assetsDirectory, { recursive: true });
 	const config = {
 		...prod,
 		name: "bat-local",
@@ -95,7 +144,7 @@ export function localConfig(path, identity, owner) {
 		routes: [],
 		workers_dev: false,
 		preview_urls: false,
-		assets: { ...prod.assets, directory: join(workerRoot, "static") },
+		assets: { ...prod.assets, directory: assetsDirectory },
 		d1_databases: [
 			{
 				binding: "DB",
@@ -153,9 +202,23 @@ async function execute(path, args) {
 }
 async function stopWorker(child) {
 	if (!child || child.exitCode !== null || child.signalCode !== null) return;
+	// The worker runs in its own process group so one signal reaches the
+	// wrangler process and its workerd children; killing only the node
+	// process leaves orphaned workerd holders on the store and its ports.
+	const signal = (name) => {
+		try {
+			process.kill(-child.pid, name);
+		} catch {
+			child.kill(name);
+		}
+	};
 	const exited = new Promise((resolve) => child.once("exit", resolve));
-	child.kill();
+	signal("SIGTERM");
 	await Promise.race([exited, Bun.sleep(5000)]);
+	if (child.exitCode === null && child.signalCode === null) {
+		signal("SIGKILL");
+		await Promise.race([exited, Bun.sleep(5000)]);
+	}
 	if (child.exitCode === null && child.signalCode === null)
 		throw new Error("Worker did not stop; owned storage retained");
 }
@@ -191,8 +254,11 @@ export async function createRuntime({
 	const fresh = !existsSync(path);
 	mkdirSync(path, { recursive: true });
 	const lock = join(path, "running.lock");
-	const lockFd = openSync(lock, "wx", 0o600);
-	closeSync(lockFd);
+	const holder = existsSync(lock) ? heldStore(path) : null;
+	if (holder)
+		throw new Error(`Storage ${owner} is still in use by ${holder}; stop it before reuse`);
+	if (existsSync(lock)) rmSync(lock);
+	closeSync(openSync(lock, "wx", 0o600));
 	writeFileSync(lock, String(process.pid));
 	let provider, child;
 	try {
@@ -298,7 +364,7 @@ export async function createRuntime({
 				"--inspector-port",
 				"0",
 			],
-			{ cwd: workerRoot, env: isolatedEnvironment(), stdio: ["ignore", fd, fd] },
+			{ cwd: workerRoot, env: isolatedEnvironment(), stdio: ["ignore", fd, fd], detached: true },
 		);
 		closeSync(fd);
 		let base,
@@ -352,6 +418,7 @@ export async function createRuntime({
 			owner,
 			base,
 			anchor,
+			workerPid: child.pid,
 			identity,
 			token,
 			sql,
