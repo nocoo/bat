@@ -92,32 +92,57 @@ function processCommand(pid) {
 		return "";
 	}
 }
+/** The caller and everything it spawned: its own worker tree is never foreign. */
+function processTree(rootPid) {
+	const listing = spawnSync("ps", ["-A", "-o", "pid=,ppid="], { encoding: "utf8" })?.stdout ?? "";
+	const parents = new Map();
+	for (const line of listing.split("\n")) {
+		const [pid, ppid] = line.trim().split(/\s+/).map(Number);
+		if (Number.isInteger(pid) && Number.isInteger(ppid)) parents.set(pid, ppid);
+	}
+	const tree = new Set([rootPid]);
+	let grew = true;
+	while (grew) {
+		grew = false;
+		for (const [pid, ppid] of parents) {
+			if (!tree.has(pid) && tree.has(ppid)) {
+				tree.add(pid);
+				grew = true;
+			}
+		}
+	}
+	return tree;
+}
 /**
  * A running.lock survives a hard launcher kill. Reusing a store whose
  * launcher or wrangler/workerd children still live would put two workers on
  * one D1 file, so the lock is stale only when its holder is gone and nothing
- * keeps the state directory open.
+ * keeps the state directory open. The calling launcher owns the lock it wrote
+ * itself, so its own pid is never a foreign holder.
  */
-export function heldStore(path) {
+export function heldStore(path, selfPid = process.pid) {
+	const ownTree = processTree(selfPid);
 	const lock = join(path, "running.lock");
 	if (existsSync(lock)) {
 		const pid = Number.parseInt(readFileSync(lock, "utf8"), 10);
-		if (Number.isInteger(pid)) {
+		if (Number.isInteger(pid) && !ownTree.has(pid)) {
 			let alive = false;
 			try {
 				process.kill(pid, 0);
 				alive = true;
 			} catch {}
 			const command = alive ? processCommand(pid) : "";
-			if (pid === process.pid || batProcessPattern.test(command))
-				return `pid ${pid} (${command || "this process"})`;
+			if (batProcessPattern.test(command)) return `pid ${pid} (${command})`;
 		}
 	}
 	const state = join(path, "state");
 	if (existsSync(state)) {
 		// lsof exits 1 on macOS even with matches, so read stdout, not the code.
-		const holders = spawnSync("lsof", ["-t", "+D", state], { encoding: "utf8" })?.stdout.trim();
-		if (holders) return `processes ${holders.replace(/\n/g, ", ")} holding ${state}`;
+		const holders = (spawnSync("lsof", ["-t", "+D", state], { encoding: "utf8" })?.stdout ?? "")
+			.split("\n")
+			.map((value) => Number.parseInt(value, 10))
+			.filter((value) => Number.isInteger(value) && !ownTree.has(value));
+		if (holders.length > 0) return `processes ${holders.join(", ")} holding ${state}`;
 	}
 	return null;
 }
@@ -423,6 +448,24 @@ export async function createRuntime({
 			identity,
 			token,
 			sql,
+			/** Synchronous teardown for signal handlers: Bun does not await async handlers. */
+			killNow() {
+				if (closed) return;
+				closed = true;
+				try {
+					provider.stop(true);
+				} catch {}
+				for (const name of ["SIGTERM", "SIGKILL"]) {
+					try {
+						process.kill(-child.pid, name);
+					} catch {
+						try {
+							child.kill(name);
+						} catch {}
+					}
+				}
+				rmSync(lock, { force: true });
+			},
 			async close({ remove = mode === "e2e" } = {}) {
 				if (closed) return;
 				closed = true;

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
 	closeSync,
 	existsSync,
@@ -36,12 +36,29 @@ describe("heldStore", () => {
 		rmSync(path, { recursive: true });
 	});
 
-	test("a lock held by a live bat process refuses reuse", () => {
+	test("the launcher's own lock is not a foreign holder", () => {
 		const path = mkdtempSync(join(tmpdir(), "bat-held-"));
 		writeFileSync(join(path, "running.lock"), String(process.pid));
-		const holder = heldStore(path);
-		expect(holder).toContain(String(process.pid));
+		expect(heldStore(path)).toBeNull();
 		rmSync(path, { recursive: true });
+	});
+
+	test("a lock held by another live bat process refuses reuse", async () => {
+		const path = mkdtempSync(join(tmpdir(), "bat-held-"));
+		const child = spawn("node", ["-e", "setTimeout(() => {}, 5000)", "launcher.mjs"], {
+			stdio: "ignore",
+		});
+		try {
+			await new Promise((resolve) => setTimeout(resolve, 300));
+			writeFileSync(join(path, "running.lock"), String(child.pid));
+			// Ask from another process's point of view: the child belongs to this
+			// test's own tree, so a real launcher would only see it as foreign.
+			const holder = heldStore(path, -1);
+			expect(holder).toContain(String(child.pid));
+		} finally {
+			child.kill("SIGKILL");
+			rmSync(path, { recursive: true });
+		}
 	});
 
 	test("an orphan holding the state directory refuses reuse", () => {
@@ -51,7 +68,8 @@ describe("heldStore", () => {
 		writeFileSync(join(path, "running.lock"), "1"); // launcher is gone
 		const handle = openSync(join(path, "state", "keeper"), "r");
 		try {
-			const holder = heldStore(path);
+			// This process holds the file; pretend the caller is a different one.
+			const holder = heldStore(path, -1);
 			// lsof is expected on dev machines and CI runners; without it the
 			// check degrades to trusting the dead-pid lock.
 			if (spawnSync("which", ["lsof"]).status === 0) expect(holder).toContain("holding");

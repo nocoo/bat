@@ -386,10 +386,12 @@ if (import.meta.main) {
 	}
 	let closing = false;
 	for (const signal of ["SIGINT", "SIGTERM"])
-		process.on(signal, async () => {
+		process.on(signal, () => {
 			if (closing) return;
 			closing = true;
-			await runtime.close();
+			// Bun does not await an async signal handler, so the teardown that
+			// matters for the next launch has to be synchronous.
+			for (const instance of instances.values()) instance.runtime?.killNow?.();
 			process.exit(0);
 		});
 }
