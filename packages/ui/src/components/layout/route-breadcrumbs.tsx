@@ -16,6 +16,13 @@ const routes: Record<string, BreadcrumbItem[]> = {
 	"/connect": [{ label: "Connect" }],
 };
 
+export function useAppHeaderBreadcrumbs(
+	isMobile: boolean | undefined,
+): BreadcrumbItem[] | undefined {
+	const items = useRouteBreadcrumbs();
+	return isMobile === true ? undefined : items;
+}
+
 export function useRouteBreadcrumbs(): BreadcrumbItem[] {
 	const { pathname } = useLocation();
 	const hostMatch = useMatch("/hosts/:id");

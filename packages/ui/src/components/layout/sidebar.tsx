@@ -15,6 +15,7 @@ import {
 	TooltipTrigger,
 } from "@nocoo/basalt";
 import { EditableNavItem } from "@nocoo/basalt/components/editable-nav-item";
+import { Link } from "@nocoo/basalt/components/link";
 import {
 	Bell,
 	Database,
@@ -28,7 +29,7 @@ import {
 	Webhook,
 } from "lucide-react";
 import { Fragment } from "react";
-import { Link, useLocation } from "react-router";
+import { Link as RouterLink, useLocation } from "react-router";
 import { useMe } from "@/hooks";
 import { getDisplayName } from "@/lib/avatar-color";
 import { cn } from "@/lib/utils";
@@ -57,6 +58,8 @@ const NAV_GROUPS = [
 	},
 ];
 
+const SIDEBAR_MARK_SLOT_CLASS = "flex w-full items-center";
+
 export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 	const { pathname } = useLocation();
 	const { collapsed, toggle, setMobileOpen } = useSidebar();
@@ -71,9 +74,9 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 		</span>
 	);
 	const userAvatar = (
-		<Avatar>
+		<Avatar className="h-9 w-9 shrink-0">
 			{avatar && <AvatarImage src={avatar} alt={name} />}
-			<AvatarFallback>{initial}</AvatarFallback>
+			<AvatarFallback className="text-basalt-sm">{initial}</AvatarFallback>
 		</Avatar>
 	);
 
@@ -85,25 +88,25 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 			<SidebarHeader>
 				<div
 					className={cn(
-						"flex w-full items-center",
+						SIDEBAR_MARK_SLOT_CLASS,
 						compact ? "justify-center" : "justify-between pl-basalt-layout-sm",
 					)}
 				>
 					<Link
-						to="/"
+						href="/"
 						aria-label="Bat home"
 						onClick={closeMobile}
-						className="flex min-w-0 items-center gap-basalt-space-lg text-basalt-foreground"
+						className="flex items-center gap-basalt-space-lg text-basalt-foreground no-underline hover:no-underline"
 					>
-						<img src="/logo-80.png" alt="bat" width={28} height={28} className="shrink-0" />
-						{!compact && (
+						<img src="/logo-80.png" alt="bat" className="h-7 w-7 shrink-0 object-contain" />
+						{compact ? null : (
 							<>
-								<span className="text-basalt-xl font-semibold">bat</span>
+								<span className="text-basalt-xl font-semibold text-basalt-foreground">bat</span>
 								{version}
 							</>
 						)}
 					</Link>
-					{!compact && (
+					{compact ? null : (
 						<Button
 							variant="ghost"
 							size="icon"
@@ -115,22 +118,17 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 					)}
 				</div>
 			</SidebarHeader>
-			{compact && (
-				<Tooltip>
-					<TooltipTrigger asChild={true}>
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={toggle}
-							aria-label="Expand sidebar"
-							className="mb-basalt-space-sm self-center"
-						>
-							<PanelLeft aria-hidden="true" strokeWidth={1.5} />
-						</Button>
-					</TooltipTrigger>
-					<TooltipContent side="right">Expand sidebar</TooltipContent>
-				</Tooltip>
-			)}
+			{compact ? (
+				<Button
+					variant="ghost"
+					size="icon"
+					onClick={toggle}
+					aria-label="Expand sidebar"
+					className="mb-basalt-space-sm self-center"
+				>
+					<PanelLeft aria-hidden="true" strokeWidth={1.5} />
+				</Button>
+			) : null}
 			<SidebarNav>
 				{NAV_GROUPS.map((group, index) => (
 					<Fragment key={group.label}>
@@ -147,7 +145,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 											data-basalt-hover-item=""
 											data-hover-selected={active(item.href)}
 										>
-											<Link
+											<RouterLink
 												to={item.href}
 												onClick={closeMobile}
 												aria-label={item.label}
@@ -155,7 +153,7 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 											>
 												<item.icon aria-hidden="true" strokeWidth={1.5} />
 												<span className="sr-only">{item.label}</span>
-											</Link>
+											</RouterLink>
 										</Button>
 									</TooltipTrigger>
 									<TooltipContent side="right">{item.label}</TooltipContent>
@@ -181,13 +179,11 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 			<SidebarFooter>
 				{compact ? (
 					<>
-						<Tooltip>
-							<TooltipTrigger asChild={true}>
-								<span role="img" aria-label={name}>
-									{userAvatar}
-								</span>
-							</TooltipTrigger>
-							<TooltipContent side="right">{name}</TooltipContent>
+						<Tooltip delayDuration={0}>
+							<TooltipTrigger asChild={true}>{userAvatar}</TooltipTrigger>
+							<TooltipContent side="right" sideOffset={8}>
+								{name}
+							</TooltipContent>
 						</Tooltip>
 						{version}
 					</>
