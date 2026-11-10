@@ -20,7 +20,7 @@ import { Github } from "@/components/icons/github";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { EnvironmentSwitch } from "./environment-switch";
 import { HeaderTooltip, HexlyLink } from "./header-links";
-import { useRouteBreadcrumbs } from "./route-breadcrumbs";
+import { useAppHeaderBreadcrumbs } from "./route-breadcrumbs";
 import { Sidebar } from "./sidebar";
 import { SidebarProvider, useSidebar } from "./sidebar-context";
 import { ThemeToggle } from "./theme-toggle";
@@ -31,7 +31,7 @@ interface AppShellProps {
 
 function AppShellInner({ children }: AppShellProps) {
 	const isMobile = useIsMobile();
-	const breadcrumbs = useRouteBreadcrumbs();
+	const breadcrumbs = useAppHeaderBreadcrumbs(isMobile);
 	const menuTrigger = useRef<HTMLButtonElement>(null);
 	const { mobileOpen, setMobileOpen } = useSidebar();
 	const { pathname } = useLocation();
@@ -84,9 +84,7 @@ function AppShellInner({ children }: AppShellProps) {
 			<AppMain>
 				<AppHeader
 					density="compact"
-					// Below md the trail cannot shrink and would paint over the actions;
-					// the page title in the content identifies the route instead.
-					breadcrumbs={isMobile === true ? undefined : breadcrumbs}
+					breadcrumbs={breadcrumbs}
 					leading={
 						showHamburger ? (
 							<HeaderTooltip label="Open navigation menu">
