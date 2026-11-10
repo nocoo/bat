@@ -68,6 +68,7 @@ But the acceptance is not "directory removal"; that's just the natural consequen
 Files in `packages/worker/src/domain/` are **pure functions** — no I/O, no `c.env`, no `D1Database`. They take typed inputs and return typed outputs. They're trivially testable.
 
 Today's pure logic that ends up in `domain/`:
+
 - `domain/status.ts` (host status derivation)
 - `domain/alerts/evaluate.ts` (tier-1 / signal-expansion / tier-3 rules)
 - `domain/alerts/tier2.ts`

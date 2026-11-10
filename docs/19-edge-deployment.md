@@ -94,6 +94,7 @@ Any request to `bat-ingest.*` not matching this whitelist returns 403 immediatel
 Cloudflare Access JWT verification for the browser endpoint. Only runs on `/api/*` routes.
 
 **Skip conditions** (calls `next()` immediately):
+
 - Localhost (local dev)
 - Machine endpoint (`bat-ingest.*`)
 - Public route (`/api/live`)
@@ -126,6 +127,7 @@ Cloudflare Access JWT verification for the browser endpoint. Only runs on `/api/
 Final auth layer. Enforces API key on machine routes, skips for browser users who already passed Access JWT.
 
 **No-auth fast paths**:
+
 - Public routes: `/api/live`, `/api/me`
 - `POST /api/events` (webhook — uses its own per-host token validation)
 - Localhost (development)
@@ -300,6 +302,7 @@ localhost:37025 (Wrangler dev, serving static from packages/worker/static/)
 ### Prerequisites
 
 Worker secrets must be set (one-time):
+
 ```bash
 npx wrangler secret put BAT_WRITE_KEY --env production
 npx wrangler secret put BAT_READ_KEY --env production

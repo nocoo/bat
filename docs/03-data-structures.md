@@ -33,6 +33,7 @@ CREATE TABLE hosts (
 ```
 
 **Key semantics**:
+
 - `host_id` is immutable — it's the primary key. If a machine's `host_id` changes (new config), it appears as a new host.
 - `last_seen` uses **Worker time** (`Date.now()` at request time), NOT Probe time. See [Time source policy](#time-source-policy).
 - `is_active` controls visibility. See [Host lifecycle and retirement](#host-lifecycle-and-retirement).
@@ -148,6 +149,7 @@ CREATE TABLE metrics_hourly (
 ```
 
 **Design rationale for hourly network fields**:
+
 - `net_json` (last sample) was misleading for long-range charts — it represents one instant, not the hour's traffic pattern
 - Scalar avg/max fields give Dashboard meaningful data for 7d/30d/90d network charts
 - Per-interface breakdown is lost in hourly aggregation — this is acceptable for MVP (6 hosts, typically 1 primary interface). Post-MVP can add per-interface hourly if needed
@@ -212,6 +214,7 @@ packages/worker/migrations/
 ```
 
 **Rules**:
+
 - Each migration file is **idempotent** where possible (`CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`). `ALTER TABLE ADD COLUMN` is not idempotent in SQLite — guard with a comment noting manual check.
 - Files are applied in numeric order. The `_migrations` meta-table tracks which have been applied (for human reference, not auto-executed).
 - **Execution**: All migrations are applied manually via `wrangler d1 execute bat-db --file=migrations/NNNN_*.sql` during deploy. There is no auto-runner — the operator checks `_migrations` and runs unapplied files in order. This is sufficient for a 6-host system with infrequent schema changes.

@@ -69,8 +69,6 @@ the machine; the headless path keeps it on any other device.
 `PATCH /api/workstations/{id}` renames a workstation for its owner or a global
 manager. It changes the display name only, never the enrollment, key or history.
 
-
-
 `POST /api/workstation-auth/authorize` requires a verified Access session whose principal is
 `email:<address>`; service principals are refused. It also requires `Origin` equal to the request
 origin and `X-Bat-Management: 1`. The body is `WorkstationAuthorizeInput`:

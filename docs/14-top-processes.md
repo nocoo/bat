@@ -21,6 +21,7 @@
 ## 2. Data Source: `/proc/[pid]/*`
 
 **不使用 `top` 命令**。直接读 procfs，原因：
+
 - `top` 本身有 fork/exec 开销，输出格式因版本而异
 - procfs 是零开销内存文件 I/O，和现有所有 collector 一致
 - CPU% 需要两次采样 delta，在 probe 内部管理状态更可靠
@@ -180,6 +181,7 @@ struct PrevProcStat {
 ```
 
 **进程生命周期处理**：
+
 - 新进程（prev 中无 PID）：`cpu_pct = 0`（首次无 delta），其余字段正常采集
 - 消失进程（curr 中无 PID）：从 prev map 中移除，不出现在结果中
 - PID 复用检测：对比 `starttime`，若不同说明是新进程，重置 delta 基线
@@ -200,6 +202,7 @@ struct PrevProcStat {
 | **Total**                  | —               | **< 1ms per 30s cycle** |
 
 **对比**：
+
 - Netdata `apps.plugin`：~10ms/cycle + 120MB RSS (per-process tracking for ALL processes, all metrics)
 - bat top_processes：< 1ms/cycle + < 100KB RSS delta (fixed 50-entry output)
 
@@ -208,16 +211,19 @@ struct PrevProcStat {
 为了最小化文件 I/O，使用两阶段策略：
 
 **Phase 1 — Scan (read ALL /proc/[pid]/stat)**：
+
 - 遍历 `/proc/` 目录，过滤纯数字目录名（即 PID）
 - 每个 PID 只读 `/proc/[pid]/stat`（单次 read，按 comm-aware 规则解析单行，见 §2.2）
 - 计算 CPU% delta 和 RSS
 - **按 CPU% 降序排序，取 Top 50**
 
 **Phase 2 — Enrich (read cmdline + io for Top 50 only)**：
+
 - 仅对 Top 50 进程读取 `/proc/[pid]/cmdline` 和 `/proc/[pid]/io`
 - 将 50 × 2 = 100 次额外 read 控制在最小范围
 
 **为什么是 Top 50**：
+
 - Phase 1 必须扫描全部进程（~200 个），但每个只读 1 个文件 × 1 行 = 极低开销
 - Phase 2 的 cmdline + io 开销更大（cmdline 可能数 KB），限制在 Top 50 控制总量
 - 50 个进程覆盖绝大多数问题场景（CPU hog、内存泄漏、I/O storm）
@@ -234,6 +240,7 @@ struct PrevProcStat {
 ### 4.4 Payload Size
 
 每个进程 JSON ~250 bytes：
+
 ```json
 {
 	"pid": 1234,
@@ -402,6 +409,7 @@ export interface MetricsDataPoint {
 | Uptime  | 80px  | human-readable (2d 3h, 15m, etc.)              | —                  |
 
 **隐藏列（默认不展示，空间不够时省略）**：
+
 - `mem_virt` — Virtual memory
 - `ppid` — Parent PID
 - `majflt_rate` — Major faults/sec
@@ -410,11 +418,13 @@ export interface MetricsDataPoint {
 ### 6.3 Sorting & Filtering
 
 **排序**：
+
 - 点击列头切换排序（asc/desc toggle）
 - 默认按 CPU% 降序
 - 支持所有数值列排序：CPU%, Mem%, Memory, Threads, I/O R, I/O W, Uptime
 
 **过滤**：
+
 - **搜索框**（表格上方）：按 name / cmd / user 文本过滤
 - **State 过滤**：多选 chip（All / R / S / D / Z），默认 All
 - **User 过滤**：dropdown，从当前数据中提取 unique users
@@ -482,6 +492,7 @@ export interface MetricsDataPoint {
 ### 7.1 不添加系统级 alert rules
 
 Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
+
 - 系统级 CPU/Memory 告警已由 `cpu_usage_pct`、`mem_used_pct` 等 T1 指标覆盖
 - 进程级告警的 false positive 率高（短暂编译任务、备份任务正常占高 CPU）
 - 正确的使用方式：系统级告警触发 → 查看 Top Processes 表格定位根因

@@ -1404,6 +1404,7 @@
 ## v0.2.0 (2026-03-15)
 
 Initial release with full monitoring stack:
+
 - Rust probe with CPU, memory, disk, network collectors
 - Cloudflare Worker with D1 storage, alert evaluation, hourly aggregation
 - Next.js 16 dashboard with host overview, detail charts, alert table

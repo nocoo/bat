@@ -70,12 +70,14 @@ umami-software/umami*      → umami
 ```
 
 This layer would:
+
 - Only run if Docker is already detected as installed
 - Reuse the Docker container list already collected by `tier2/docker.rs`
 - Set `source: "docker"` and `running: true` (if container state is "running")
 - Extract version from image tag when available (e.g., `n8nio/n8n:1.76.1` → version `1.76.1`)
 
 **Files to modify**:
+
 - `probe/src/collectors/tier2/software.rs` — add `match_by_docker_images()` and image registry
 - `probe/src/collectors/tier2/docker.rs` — export the container list so software.rs can consume it
 - `packages/shared/src/tier2.ts` — add `"docker"` to `source` union type
@@ -120,6 +122,7 @@ This is a **best-effort parser**, not a full config syntax analyzer. Nginx and A
 ```
 
 **Limitations** (documented, accepted):
+
 - Does not follow `include` directives — sites defined in non-standard paths will be missed
 - Cannot parse Lua-generated or dynamically-templated configs
 - SSL detection is heuristic: `listen 443`, `listen ... ssl`, `SSLEngine on`
@@ -277,6 +280,7 @@ Renders below the Installed Software card in the right column of the host detail
 ```
 
 Design:
+
 - Card with `Globe` icon from lucide-react
 - Each row: lock icon (🔒 SSL / 🔓 no SSL) + domain name + web server badge
 - Domain names are plain text (not links — we don't know the full URL path)
@@ -295,6 +299,7 @@ All detected software has `source: "process"` and `listening_ports: []`. Port-ba
 ### 4.2 Root Cause Hypothesis
 
 The probe now runs as `bat` user (not root). Port detection in `tier2/ports.rs` uses:
+
 1. `/proc/net/tcp` — world-readable, lists all sockets with inode numbers ✅
 2. `/proc/[pid]/fd/` — maps socket inodes to PIDs, but **requires root or `CAP_DAC_READ_SEARCH`** to read other processes' fd directories ❌
 
@@ -346,6 +351,7 @@ export type SoftwareCategory =
 ```
 
 Update dashboard `CATEGORY_LABELS` and `CATEGORY_ORDER`:
+
 ```typescript
 // packages/dashboard/src/app/hosts/[id]/page.tsx
 const CATEGORY_LABELS: Record<SoftwareCategory, string> = {

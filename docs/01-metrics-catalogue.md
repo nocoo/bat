@@ -109,6 +109,7 @@ One file read (~50 lines). Currently extracting 4 fields out of ~50 — expand t
 | `swap.used_pct`                | gauge | %     | used / total × 100                | ✅     |
 
 **Rationale for new fields**:
+
 - `cached` — page cache shrinking toward 0 means memory pressure, even before OOM. tongji had committed 3175 MB on 1.9 GB RAM.
 - `dirty` + `writeback` — write pressure; dirty pages spiking precedes iowait spikes.
 - `slab_unreclaim` — growth here = kernel memory leak (dentry/inode cache).

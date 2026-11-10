@@ -151,6 +151,7 @@ Connect extends this model with a separate server-bound Bearer surface at `https
 | **Public**       | None                           | Anyone          | `GET /api/live`, `GET /api/me`                              |
 
 Worker middleware (`entry-control.ts`) routes requests based on hostname:
+
 - Requests from `bat.hexly.ai` → Access JWT verification
 - Requests from `bat-ingest.worker.hexly.ai` → API key whitelist matching
 
