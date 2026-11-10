@@ -4,7 +4,6 @@ import {
 	AvatarImage,
 	Sidebar as BasaltSidebar,
 	Button,
-	Separator,
 	SidebarFooter,
 	SidebarGroup,
 	SidebarHeader,
@@ -28,7 +27,6 @@ import {
 	Tag,
 	Webhook,
 } from "lucide-react";
-import { Fragment } from "react";
 import { Link as RouterLink, useLocation } from "react-router";
 import { useMe } from "@/hooks";
 import { getDisplayName } from "@/lib/avatar-color";
@@ -130,51 +128,48 @@ export function Sidebar({ mobile = false }: { mobile?: boolean }) {
 				</Button>
 			) : null}
 			<SidebarNav>
-				{NAV_GROUPS.map((group, index) => (
-					<Fragment key={group.label}>
-						{index > 0 && <Separator className="mx-basalt-row-x my-basalt-content-gap w-auto" />}
-						{compact ? (
-							group.items.map((item) => (
-								<Tooltip key={item.href}>
-									<TooltipTrigger asChild={true}>
-										<Button
-											asChild={true}
-											variant="ghost"
-											size="icon"
-											className="basalt-nav-item"
-											data-basalt-hover-item=""
-											data-hover-selected={active(item.href)}
+				{NAV_GROUPS.map((group) =>
+					compact ? (
+						group.items.map((item) => (
+							<Tooltip key={item.href}>
+								<TooltipTrigger asChild={true}>
+									<Button
+										asChild={true}
+										variant="ghost"
+										size="icon"
+										className="basalt-nav-item"
+										data-basalt-hover-item=""
+										data-hover-selected={active(item.href)}
+									>
+										<RouterLink
+											to={item.href}
+											onClick={closeMobile}
+											aria-label={item.label}
+											aria-current={active(item.href) ? "page" : undefined}
 										>
-											<RouterLink
-												to={item.href}
-												onClick={closeMobile}
-												aria-label={item.label}
-												aria-current={active(item.href) ? "page" : undefined}
-											>
-												<item.icon aria-hidden="true" strokeWidth={1.5} />
-												<span className="sr-only">{item.label}</span>
-											</RouterLink>
-										</Button>
-									</TooltipTrigger>
-									<TooltipContent side="right">{item.label}</TooltipContent>
-								</Tooltip>
-							))
-						) : (
-							<SidebarGroup label={group.label}>
-								{group.items.map((item) => (
-									<EditableNavItem
-										key={item.href}
-										label={item.label}
-										href={item.href}
-										selected={active(item.href)}
-										onSelect={closeMobile}
-										icon={<item.icon strokeWidth={1.5} />}
-									/>
-								))}
-							</SidebarGroup>
-						)}
-					</Fragment>
-				))}
+											<item.icon aria-hidden="true" strokeWidth={1.5} />
+											<span className="sr-only">{item.label}</span>
+										</RouterLink>
+									</Button>
+								</TooltipTrigger>
+								<TooltipContent side="right">{item.label}</TooltipContent>
+							</Tooltip>
+						))
+					) : (
+						<SidebarGroup key={group.label} label={group.label}>
+							{group.items.map((item) => (
+								<EditableNavItem
+									key={item.href}
+									label={item.label}
+									href={item.href}
+									selected={active(item.href)}
+									onSelect={closeMobile}
+									icon={<item.icon strokeWidth={1.5} />}
+								/>
+							))}
+						</SidebarGroup>
+					),
+				)}
 			</SidebarNav>
 			<SidebarFooter>
 				{compact ? (
