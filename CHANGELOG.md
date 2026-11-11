@@ -1,5 +1,30 @@
 # Changelog
 
+## v4.1.2
+
+### Added
+
+- Centre host metrics with their readings
+- Move host table readings into hover
+- Seed a varied demo fleet on a rebased clock
+
+### Changed
+
+- Align collapsed SidebarBrand assertions with basalt 3.3
+- Update shell e2e for basalt 3.3 layout
+- Align app shell with basalt 3.3 sidebar and header
+- Upgrade @nocoo/basalt to 3.3.1
+- Pin release workflows to base-ci v2026.12
+- Migrate to base-ci v2026.12 quality.yml strict slots
+
+### Fixed
+
+- Bump rustix past RUSTSEC-2026-0486
+- Size host table columns by content
+- Use returned instances in launcher signal handler
+- Keep sidebar nav groups open by default for / redirect
+- Use className padding on mobile nav sheet like surety
+
 ## v4.1.1
 
 ### Added

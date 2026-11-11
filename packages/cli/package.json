@@ -1,6 +1,6 @@
 {
 	"name": "@nocoo/bat",
-	"version": "4.1.1",
+	"version": "4.1.2",
 	"description": "bat CLI — manage agents, assets and bindings for bat.hexly.ai",
 	"type": "module",
 	"bin": {
