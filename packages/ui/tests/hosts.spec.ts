@@ -218,7 +218,7 @@ test.describe("Hosts list page", () => {
 		await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("the list shows machine specs and drops the traffic columns", async ({ page }) => {
+	test("metric cells keep their reading behind the hover", async ({ page }) => {
 		await page.setViewportSize({ width: 1536, height: 900 });
 		await page.goto("/hosts");
 		const table = page.getByRole("table", { name: "Servers" });
@@ -233,22 +233,51 @@ test.describe("Hosts list page", () => {
 			"CPU",
 			"Memory",
 			"Disk",
-			"Bandwidth",
-			"Traffic",
+			"Traffic / Link",
 			"Cost",
 			"Days left",
 		]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
-		await expect(alpha).toContainText("8 cores");
-		await expect(alpha).toContainText("8 GB");
-		await expect(alpha.getByTestId("host-disk")).toContainText("%");
-		await expect(alpha.getByTestId("host-disk")).toHaveAttribute("title", /of 50 GB used/);
+		// The row is for scanning: no metric cell prints a reading or a size.
+		for (const id of ["host-cpu", "host-memory", "host-disk"]) {
+			await expect(alpha.getByTestId(id)).not.toContainText("%");
+		}
+		await expect(alpha.getByTestId("host-cpu").locator("svg")).toBeVisible();
+		await expect(alpha.getByTestId("host-memory").locator("svg")).toBeVisible();
+		await expect(alpha.getByTestId("host-disk-bar")).toBeVisible();
+		await expect(alpha.getByTestId("host-disk")).not.toContainText("GB");
 
-		const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
-		await expect(beta).toContainText("4 cores");
-		await expect(beta).toContainText("4 GB");
-		await expect(beta.getByTestId("host-disk")).toHaveAttribute("title", /of 20 GB used/);
+		// Hovering a trend opens the chart tooltip: local timestamp first, then
+		// the reading and the machine's own size.
+		const cpuChart = alpha.getByTestId("host-cpu").locator(".basalt-chart");
+		const cpuBox = await cpuChart.boundingBox();
+		if (!cpuBox) throw new Error("CPU trend has no box");
+		await page.mouse.move(cpuBox.x + cpuBox.width * 0.6, cpuBox.y + cpuBox.height / 2);
+		const chartTooltip = page.getByTestId("chart-tooltip").first();
+		await expect(chartTooltip).toBeVisible();
+		// The hover's first line is the point's local clock time, never an epoch.
+		await expect(chartTooltip.locator("p").first()).toHaveText(
+			/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+		);
+		await expect(chartTooltip).toContainText("%");
+		await expect(chartTooltip).toContainText("8 cores");
+
+		const memoryChart = alpha.getByTestId("host-memory").locator(".basalt-chart");
+		const memoryBox = await memoryChart.boundingBox();
+		if (!memoryBox) throw new Error("memory trend has no box");
+		await page.mouse.move(memoryBox.x + memoryBox.width * 0.5, memoryBox.y + memoryBox.height / 2);
+		await expect(chartTooltip).toContainText("Total");
+		await expect(chartTooltip).toContainText("8 GB");
+
+		// The disk bar carries its reading and size in the hover only.
+		await alpha.getByTestId("host-disk-bar").hover();
+		const diskTooltip = page.getByRole("tooltip").first();
+		await expect(diskTooltip.locator("span").first()).toHaveText(
+			/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
+		);
+		await expect(diskTooltip).toContainText("% used");
+		await expect(diskTooltip).toContainText("of 50 GB");
 	});
 
 	test("the description affordance only appears for hosts that carry one", async ({ page }) => {
@@ -308,98 +337,29 @@ test.describe("Hosts list page", () => {
 				const rows = Array.from(
 					element.querySelectorAll<HTMLElement>('tbody tr[data-testid="host-row"]'),
 				);
-				const headerCount = Array.from(element.querySelectorAll("thead th")).filter(
-					(th) => th.getBoundingClientRect().width > 0,
-				).length;
-				const cellText = (id: string) =>
-					Array.from(rows[0]?.querySelectorAll<HTMLElement>(`[data-testid="${id}"] span`) ?? [])
-						.filter((span) => span.getBoundingClientRect().width > 0)
-						.map((span) => span.textContent.trim())
-						.filter(Boolean)
-						.join(" ");
+				const visible = (node: Element) => node.getBoundingClientRect().width > 0;
+				const cells = rows[0]
+					? Array.from(rows[0].querySelectorAll<HTMLElement>("td")).filter(visible)
+					: [];
+				const cpuCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cpu"]');
+				const header = element.querySelector<HTMLElement>("th:nth-child(3)");
+				const subtitleEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-subtitle"]');
 				const statusDotEl = rows[0]?.querySelector<HTMLElement>('td span[role="img"]');
 				const badgeEl = rows[0]?.querySelector<HTMLElement>('[data-testid="status-badge"]');
-				const bodyCount = rows[0]
-					? Array.from(rows[0].querySelectorAll("td")).filter(
-							(td) => td.getBoundingClientRect().width > 0,
-						).length
-					: 0;
-				const cellWidths = rows[0]
-					? Array.from(rows[0].querySelectorAll("td"))
-							.filter((cell) => cell.getBoundingClientRect().width > 0)
-							.map((cell) => Math.round(cell.getBoundingClientRect().width))
-					: [];
-				const subtitleEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-subtitle"]');
-				const subtitleWords = subtitleEl
-					? Array.from(subtitleEl.querySelectorAll<HTMLElement>("span"))
-							.filter(
-								(span) =>
-									getComputedStyle(span).display !== "none" && span.textContent.trim().length > 0,
-							)
-							.map((span) => span.textContent.trim())
-					: [];
-				const money = rows[0]?.querySelector<HTMLElement>('[data-testid="host-daily-cost"]');
-				const countdownEl = rows[0]?.querySelector<HTMLElement>('[data-testid="host-countdown"]');
-				const moneyGap =
-					money && countdownEl
-						? Math.round(
-								countdownEl.getBoundingClientRect().left - money.getBoundingClientRect().right,
-							)
-						: null;
-				const trafficCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-traffic"]');
-				const costCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cost"]');
-				const linkBillingGap =
-					trafficCell && costCell
-						? Math.round(
-								costCell.getBoundingClientRect().left - trafficCell.getBoundingClientRect().right,
-							)
-						: null;
-				const cpuCell = rows[0]?.querySelector<HTMLElement>('[data-testid="host-cpu"]');
-				const serverCell = rows[0]?.querySelector<HTMLElement>("td");
-				const value = rows[0]?.querySelector<HTMLElement>(
-					'[data-testid="host-cpu"] span.font-medium',
-				);
-				const qualifier = rows[0]?.querySelector<HTMLElement>(
-					'[data-testid="host-cpu"] span.text-basalt-xs',
-				);
-				const header = element.querySelector<HTMLElement>("th:nth-child(3)");
 				const hostname = rows[0]?.querySelector<HTMLAnchorElement>("a");
-				const badge = rows[0]?.querySelector<HTMLElement>('[data-testid="status-badge"]');
-				const badgeLabel = badge?.querySelector<HTMLElement>("span") ?? null;
-				// The days-left cell holds a bar plus a number on purpose, so it is
-				// excluded from the single-right-edge check.
-				const columns = [
-					"host-cpu",
-					"host-memory",
-					"host-disk",
-					"host-bandwidth",
-					"host-traffic",
-					"host-cost",
-				].map((id) => {
-					// The single line is right-aligned, so its right edge is the column's edge.
-					const edges = [
-						...new Set(
-							Array.from(element.querySelectorAll<HTMLElement>(`[data-testid="${id}"] > *`)).map(
-								(line) => Math.round(line.getBoundingClientRect().right),
-							),
-						),
-					];
-					const overflow = Array.from(
-						element.querySelectorAll<HTMLElement>(`[data-testid="${id}"]`),
-					).some((cell) => cell.scrollWidth > cell.clientWidth);
-					return { id, edges, overflow };
+				const visuals = ["host-cpu", "host-memory", "host-disk", "host-days-left"].map((id) => {
+					const cell = rows[0]?.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+					const visual = cell?.querySelector<HTMLElement>("svg, [data-testid$='-bar']");
+					if (!cell || !visual) return { id, gap: null };
+					const contentRight =
+						cell.getBoundingClientRect().right -
+						Number.parseFloat(getComputedStyle(cell).paddingRight);
+					return { id, gap: Math.round(contentRight - visual.getBoundingClientRect().right) };
 				});
-				const trendSlots = rows.map((row) => {
-					const slot = row.querySelector<HTMLElement>('[data-testid="host-cpu"] span.w-10');
-					if (!slot) return null;
-					const box = slot.getBoundingClientRect();
-					return {
-						display: getComputedStyle(slot).display,
-						width: Math.round(box.width),
-						height: Math.round(box.height),
-						chart: Boolean(slot.querySelector(".basalt-chart")),
-					};
-				});
+				const readings = ["host-cpu", "host-memory", "host-disk"].map(
+					(id) =>
+						rows[0]?.querySelector<HTMLElement>(`[data-testid="${id}"]`)?.textContent?.trim() ?? "",
+				);
 				return {
 					rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
 					padding: cpuCell
@@ -408,27 +368,12 @@ test.describe("Hosts list page", () => {
 								inline: getComputedStyle(cpuCell).paddingInline,
 							}
 						: null,
-					serverInlineStart: serverCell ? getComputedStyle(serverCell).paddingInlineStart : null,
-					value: value
-						? {
-								size: getComputedStyle(value).fontSize,
-								weight: getComputedStyle(value).fontWeight,
-								family: getComputedStyle(value).fontFamily,
-							}
-						: null,
-					qualifier: qualifier
-						? {
-								size: getComputedStyle(qualifier).fontSize,
-								weight: getComputedStyle(qualifier).fontWeight,
-								family: getComputedStyle(qualifier).fontFamily,
-							}
-						: null,
+					serverInlineStart: cells[0] ? getComputedStyle(cells[0]).paddingInlineStart : null,
 					headerSize: header ? getComputedStyle(header).fontSize : null,
 					headerIcon: Boolean(header?.querySelector("svg[aria-hidden='true']")),
-					badgeIcon: Boolean(badge?.querySelector("svg")),
-					badgeLabelDisplay: badgeLabel ? getComputedStyle(badgeLabel).display : null,
-					hostnameComplete: hostname ? hostname.scrollWidth <= hostname.clientWidth : false,
+					badgeIcon: Boolean(badgeEl?.querySelector("svg")),
 					hostnameFamily: hostname ? getComputedStyle(hostname).fontFamily : null,
+					hostnameComplete: hostname ? hostname.scrollWidth <= hostname.clientWidth : false,
 					separators: rows.map((row) =>
 						getComputedStyle(row.querySelector("td") as HTMLElement).borderBottomWidth === "1px"
 							? 1
@@ -438,18 +383,23 @@ test.describe("Hosts list page", () => {
 					statusDotLabel: statusDotEl?.getAttribute("aria-label") ?? null,
 					badgeLabel: badgeEl?.getAttribute("aria-label") ?? null,
 					badgeVisible: badgeEl ? badgeEl.getBoundingClientRect().width > 0 : false,
-					cpuText: cellText("host-cpu"),
-					memoryText: cellText("host-memory"),
-					diskText: cellText("host-disk"),
-					headerCount,
-					bodyCount,
-					cellWidths,
-					subtitleWords,
-					moneyGap,
-					linkBillingGap,
+					headerCount: Array.from(element.querySelectorAll("thead th")).filter(visible).length,
+					bodyCount: cells.length,
+					cellWidths: cells.map((cell) => Math.round(cell.getBoundingClientRect().width)),
+					subtitleWords: subtitleEl
+						? Array.from(subtitleEl.querySelectorAll<HTMLElement>("span"))
+								.filter(
+									(span) =>
+										getComputedStyle(span).display !== "none" && span.textContent.trim().length > 0,
+								)
+								.map((span) => span.textContent.trim())
+						: [],
+					visuals,
+					readings,
 					tableOverflow: element.scrollWidth - element.clientWidth,
-					columns,
-					trendSlots,
+					cellOverflow: Array.from(element.querySelectorAll<HTMLElement>("td")).filter(
+						(cell) => cell.scrollWidth > cell.clientWidth + 1,
+					).length,
 				};
 			});
 
@@ -465,12 +415,6 @@ test.describe("Hosts list page", () => {
 			// step wider on the panel edge.
 			expect(rhythm.padding).toEqual({ block: "8px", inline: "12px" });
 			expect(rhythm.serverInlineStart).toBe("16px");
-			// One font family for values, qualifiers and names; 14px/500 over 12px/400.
-			expect(rhythm.value?.family).not.toMatch(/mono/i);
-			expect(rhythm.value?.family).toBe(rhythm.qualifier?.family);
-			expect(rhythm.value?.family).toBe(rhythm.hostnameFamily);
-			expect(rhythm.value).toMatchObject({ size: "14px", weight: "500" });
-			expect(rhythm.qualifier).toMatchObject({ size: "12px", weight: "400" });
 			expect(rhythm.headerSize).toBe("12px");
 			// Every column carries a lucide anchor, the badge its state icon.
 			expect(rhythm.headerIcon).toBe(true);
@@ -478,10 +422,7 @@ test.describe("Hosts list page", () => {
 			// Hairline between rows, none after the last.
 			expect(rhythm.separators).toEqual([1, 0]);
 			// Header and body agree on the column count, with no phantom cell.
-			// Below xl the Status and Link columns give way entirely — the
-			// state moves to a titled dot before the hostname — instead of
-			// hollowing cells out.
-			const expectedColumns = width === 1440 ? 9 : 6;
+			const expectedColumns = width === 1440 ? 8 : 6;
 			expect(rhythm.headerCount).toBe(expectedColumns);
 			expect(rhythm.bodyCount).toBe(expectedColumns);
 			for (const cellWidth of rhythm.cellWidths) expect(cellWidth).toBeGreaterThan(0);
@@ -495,31 +436,18 @@ test.describe("Hosts list page", () => {
 				expect(rhythm.statusDotLabel).toBe(badgeLabel);
 				expect(rhythm.badgeVisible).toBe(false);
 			}
-			// The spec qualifier leads and the reading keeps the right edge, so a
-			// column of numbers lines up under its own header; below `xl` the
-			// qualifier gives way and the reading owns the cell alone.
-			expect(rhythm.cpuText).toBe(width === 1440 ? "8 cores 42.1%" : "42.1%");
-			expect(rhythm.memoryText).toBe(width === 1440 ? "8 GB 40.6%" : "40.6%");
-			expect(rhythm.diskText).toBe("42.3%");
-			expect(rhythm.subtitleWords.join(" ")).toContain("production");
-			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
-			// The subtitle keeps whole words; the money and its countdown
-			// never touch, and neither do the Link and Billing figures.
-			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
+			// The table is for scanning: no metric cell prints a reading, and each
+			// visual sits flush with its column's content edge.
+			for (const reading of rhythm.readings) expect(reading).toBe("");
+			for (const visual of rhythm.visuals) expect(visual.gap).toBe(0);
+			// The subtitle keeps whole words — a colour dot alone is never acceptable.
 			expect(rhythm.subtitleWords.length).toBeGreaterThan(0);
-			expect(rhythm.moneyGap).toBeGreaterThanOrEqual(8);
-			// Every column keeps one right edge and no cell overflows.
-			for (const column of rhythm.columns) {
-				expect(column.edges.length).toBeGreaterThanOrEqual(1);
-				expect(column.overflow).toBe(false);
-			}
+			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
+			expect(rhythm.subtitleWords.join(" ")).toContain("production");
+			expect(rhythm.hostnameFamily).not.toMatch(/mono/i);
 			expect(rhythm.hostnameComplete).toBe(true);
 			expect(rhythm.tableOverflow).toBeLessThanOrEqual(0);
-			// The trend slot is a reserved 40×14 box right of the value once the
-			// viewport is wide enough for it (2xl); below that the spec text wins.
-			for (const slot of rhythm.trendSlots) {
-				expect(slot?.display).toBe("none");
-			}
+			expect(rhythm.cellOverflow).toBe(0);
 		}
 	});
 	test("the metric columns spread on a wide viewport instead of squeezing", async ({ page }) => {
@@ -602,49 +530,50 @@ test.describe("Hosts list page", () => {
 		await expect(alpha.getByText("+2", { exact: true })).toBeVisible();
 	});
 
-	test("bandwidth, traffic, cost and days left are separate columns", async ({ page }) => {
-		const response = await page.request.patch("/api/hosts/f0d3fd30/billing", {
-			data: {
-				cost_amount_cny: 3650,
-				paid_at: billingDate(-253),
-				renews_at: billingDate(112),
-				bandwidth_mbps: 2500,
-				traffic_quota_gb: 500,
-				traffic_reset_day: 1,
-			},
-		});
-		expect(response.ok()).toBe(true);
+	test("traffic and link speed share one column", async ({ page }) => {
+		const contract = {
+			cost_amount_cny: 3650,
+			paid_at: billingDate(-253),
+			renews_at: billingDate(112),
+			bandwidth_mbps: 2500,
+			traffic_quota_gb: 500,
+			traffic_reset_day: 1,
+		};
+		const patch = (data: object) =>
+			page.request.patch("/api/hosts/f0d3fd30/billing", { data: { ...contract, ...data } });
+		expect((await patch(contract)).ok()).toBe(true);
 		try {
 			await page.goto("/hosts");
 			const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
-			const beta = page.getByTestId("host-row").filter({ hasText: "beta.test.local" });
-			const bandwidth = alpha.getByTestId("host-bandwidth");
 			const traffic = alpha.getByTestId("host-traffic");
 			const cost = alpha.getByTestId("host-cost");
 			const days = alpha.getByTestId("host-days-left");
-			await expect(bandwidth).toBeVisible();
 
-			// Four columns, one value each: bandwidth carries its bar, traffic
-			// the quota in normal text, cost the daily rate and days-left its bar.
-			await expect(bandwidth).toContainText("2.5 Gbps");
-			await expect(bandwidth.getByTestId("host-bandwidth-bar")).toBeVisible();
+			// One column, quota then link speed.
+			await expect(traffic).toHaveText("500 GB @ 2.5 Gbps");
+			await traffic.locator("span").first().hover();
+			await expect(page.getByRole("tooltip").first()).toHaveText(
+				"500 GB per month, resets on the 1st · 2.5 Gbps bandwidth",
+			);
+
+			// A missing side still reads sensibly instead of inventing one.
+			await patch({ traffic_quota_gb: null, traffic_reset_day: null });
+			await page.reload();
+			await expect(traffic).toHaveText("2.5 Gbps");
+			await patch({ bandwidth_mbps: null, traffic_quota_gb: 500, traffic_reset_day: 15 });
+			await page.reload();
 			await expect(traffic).toHaveText("500 GB");
+			await patch({ bandwidth_mbps: null, traffic_quota_gb: null, traffic_reset_day: null });
+			await page.reload();
+			await expect(traffic).toHaveText("—");
+
+			// The cost and the countdown stay, because they are fleet-level facts.
 			await expect(cost).toContainText("/day");
 			await expect(days.getByTestId("host-days-bar")).toBeVisible();
 			await expect(days).toContainText("d left");
 
-			// The reset day lives in the tooltip, not in the cell body.
-			await expect(traffic).toHaveAttribute("title", "500 GB per month, resets on the 1st");
-			await expect(traffic).not.toContainText("1st");
-
-			// A host without contract data keeps its dash in each column.
-			await expect(beta.getByTestId("host-cost")).toContainText(/—|\/day/);
-			await expect(beta.getByTestId("host-days-left")).toContainText(/—|left|today|overdue/);
-
-			// Below xl the bandwidth and traffic columns fold away; the cost and
-			// the countdown stay, because they are the fleet-level facts.
+			// Below xl the merged column folds away.
 			await page.setViewportSize({ width: 1024, height: 900 });
-			await expect(bandwidth).toBeHidden();
 			await expect(traffic).toBeHidden();
 			await expect(cost).toBeVisible();
 			await expect(days).toBeVisible();
@@ -654,6 +583,9 @@ test.describe("Hosts list page", () => {
 					cost_amount_cny: 3650,
 					paid_at: billingDate(-253),
 					renews_at: billingDate(112),
+					bandwidth_mbps: null,
+					traffic_quota_gb: null,
+					traffic_reset_day: null,
 				},
 			});
 		}
@@ -734,10 +666,10 @@ test.describe("Hosts list page", () => {
 					// The row that carries a contract — the gap between the link
 					// line and the billing cell is what must stay open.
 					const counted = (rows.find((row) =>
-						row.querySelector('[data-testid="host-bandwidth"] span span'),
+						row.querySelector('[data-testid="host-traffic"] span'),
 					) ?? first) as HTMLElement;
 					const cells = Array.from(counted.querySelectorAll("td"));
-					const link = counted.querySelector<HTMLElement>('[data-testid="host-bandwidth"]');
+					const link = counted.querySelector<HTMLElement>('[data-testid="host-traffic"]');
 					const billing = counted.querySelector<HTMLElement>('[data-testid="host-days-left"]');
 					const linkText = link?.querySelector("span")?.getBoundingClientRect();
 					return {

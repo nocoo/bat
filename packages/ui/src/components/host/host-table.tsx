@@ -1,11 +1,11 @@
-// Fleet table for the hosts page. One column per metric, each cell one
-// right-aligned reading with its micro-graph on the left: the numbers of a
-// column share a single right edge, the graphs share a single left edge, and
-// the quantifier between them stays muted. Columns size to their content —
-// the identity column takes whatever is left — so a wide viewport widens the
-// gutters instead of squeezing numbers against their neighbours. The trend
-// slot and the spec qualifier give way below `xl`/`2xl`; the state stays
-// readable from the coloured badge icon and tone-coded countdown at every width.
+// Fleet table for the hosts page. The table is for scanning, not for reading
+// numbers: each metric column carries one visual — a 24 hour trend for CPU and
+// memory, a usage bar for disk — and the reading plus the machine's own size
+// live in that visual's hover. Traffic and link speed share one column as
+// `500 GB @ 100 Mbps`. Columns size to their content and the identity column
+// takes whatever is left, so a wide viewport widens the gutters instead of
+// squeezing cells against their neighbours. Hover times are the local browser
+// clock, `YYYY-MM-DD HH:mm:ss`.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
@@ -21,6 +21,7 @@ import {
 	renewalTone,
 } from "@bat/shared";
 import { LineChart } from "@nocoo/basalt/charts/line";
+import { ChartTooltipContent, type ChartTooltipItem } from "@nocoo/basalt/charts/tooltip";
 import { Button } from "@nocoo/basalt/components/button";
 import {
 	Table,
@@ -48,7 +49,7 @@ import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { hostStatusLabel, StatusBadge } from "@/components/status-badge";
 import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
-import { getValueColor, statusDotColor } from "@/lib/host-card-format";
+import { statusDotColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { cn } from "@/lib/utils";
@@ -58,11 +59,22 @@ import { formatPercent } from "@/lib/workstation-format";
  *  column. Plain strings, because tailwind-merge cannot tell the custom
  *  `text-basalt-*` size and colour utilities apart and would drop one of them. */
 const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums";
-/** The qualifier beside it — 12px muted, and the first thing to give way
- *  below `xl`: at tablet widths the reading itself owns the cell. */
-const CELL_SPEC =
-	"hidden whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
 const MAX_VISIBLE_TAGS = 3;
+/** Hover rows reuse the chart tooltip's type: a label and an already
+ *  formatted value, so a size never gets run through the numeric formatter. */
+const SPARK_SLOT = "ms-auto h-5 w-16 2xl:h-6 2xl:w-24";
+
+/** Local browser clock, the one reference every hover time uses. */
+export function localDateTime(seconds: number): string {
+	const date = new Date(seconds * 1000);
+	const pad = (value: number) => String(value).padStart(2, "0");
+	return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function tooltipLabel(label: string | number | undefined): string | undefined {
+	if (typeof label === "number") return localDateTime(label);
+	return label;
+}
 
 /** One header cell: a small muted lucide anchor next to the 12px label.
  *  Decorative only — the text label carries the meaning. */
@@ -75,30 +87,100 @@ function HeadLabel({ icon: Icon, children }: { icon: LucideIcon; children: React
 	);
 }
 
-/** Every metric cell is the same single line, right-aligned: micro-graph,
- *  muted qualifier, then the reading flush to the column's right edge. */
-function MetricLine({ children }: { children: React.ReactNode }) {
-	return <div className="flex items-center justify-end gap-basalt-space-md">{children}</div>;
+/** The chart hover: local time on the first line, the point's reading below
+ *  it, then whatever the machine's own size is. */
+function MetricTooltip({
+	active,
+	payload,
+	label,
+	extras,
+	formatter,
+}: {
+	active?: boolean;
+	payload?: readonly ChartTooltipItem[];
+	label?: string | number;
+	extras: readonly { name: string; value: string }[];
+	formatter: (value: number) => string;
+}) {
+	return (
+		<ChartTooltipContent
+			active={active}
+			payload={[...(payload ?? []), ...extras]}
+			label={tooltipLabel(label)}
+			formatter={formatter}
+		/>
+	);
 }
 
-/** A usage bar, 32×4, muted rail. It leads the cell so the bar of every row
- *  starts on one left edge while the readings stay on the right one. */
-function MicroBar({
-	share,
+/** CPU and memory carry their history; the reading only appears on hover. */
+function TrendChart({
+	points,
 	color,
 	label,
-	testId,
+	extras,
+	formatter,
 }: {
-	share: string;
+	points: { ts: number; v: number }[] | null;
 	color: string;
 	label: string;
-	testId: string;
+	extras: readonly { name: string; value: string }[];
+	formatter: (value: number) => string;
 }) {
+	if (points === null || points.length < 2) {
+		return <Dash />;
+	}
+	return (
+		<LineChart
+			data={points.map((point) => ({ x: point.ts, value: point.v }))}
+			series={[{ key: "value", color }]}
+			ariaLabel={label}
+			className={SPARK_SLOT}
+			showAxes={false}
+			showLegend={false}
+			accessibilityLayer={false}
+			valueFormatter={formatter}
+			customTooltip={({ active, payload, label: x }) => (
+				<MetricTooltip
+					active={active}
+					payload={payload}
+					label={x}
+					extras={extras}
+					formatter={formatter}
+				/>
+			)}
+		/>
+	);
+}
+
+/** A hover panel for the measurements that have no series: local time, the
+ *  reading, then the size it was measured against. */
+function SnapshotTooltip({
+	at,
+	headline,
+	detail,
+}: {
+	at: number;
+	headline: string;
+	detail: string;
+}) {
+	return (
+		<TooltipContent side="top" sideOffset={6} className="text-basalt-sm">
+			<div className="flex flex-col gap-basalt-space-xs tabular-nums">
+				<span>{localDateTime(at)}</span>
+				<span className="text-basalt-muted-foreground">{headline}</span>
+				<span className="text-basalt-muted-foreground">{detail}</span>
+			</div>
+		</TooltipContent>
+	);
+}
+
+/** A usage bar, 56×4, muted rail. It is the cell's whole visible content, so
+ *  the reading lives in the hover rather than beside it. */
+function UsageBar({ share, color, testId }: { share: string; color: string; testId: string }) {
 	return (
 		<span
 			aria-hidden="true"
-			title={label}
-			className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
+			className="h-1 w-14 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted 2xl:w-20"
 			data-testid={testId}
 		>
 			<span
@@ -107,50 +189,6 @@ function MicroBar({
 			/>
 		</span>
 	);
-}
-
-/** The trend slot: 40×14, reserved for every row so the readings keep one
- *  right edge even when a host has no history. */
-function TrendSlot({
-	points,
-	color,
-	label,
-}: {
-	points: { ts: number; v: number }[] | null;
-	color: string;
-	label: string;
-}) {
-	const ready = points !== null && points.length >= 2;
-	return (
-		<span
-			className="hidden h-3.5 w-10 shrink-0 items-center justify-center 2xl:flex"
-			aria-hidden={ready ? undefined : true}
-		>
-			{ready ? (
-				<LineChart
-					data={points.map((point) => ({ x: point.ts, value: point.v }))}
-					series={[{ key: "value", color }]}
-					ariaLabel={label}
-					className="h-3.5 w-10"
-					showAxes={false}
-					showLegend={false}
-					accessibilityLayer={false}
-				/>
-			) : null}
-		</span>
-	);
-}
-
-/** Only pressure is coloured; a healthy reading stays on the neutral rail. */
-function pressureClass(value: number): string {
-	return value >= 60 ? getValueColor(value) : "";
-}
-
-function Pct({ value }: { value: number | null }) {
-	if (value === null) {
-		return <span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>;
-	}
-	return <span className={`${CELL_VALUE} ${pressureClass(value)}`}>{formatPercent(value)}</span>;
 }
 
 /** Description affordance — a circled `i` that reveals the host description. */
@@ -227,25 +265,21 @@ function Dash() {
 	return <span className={`${CELL_VALUE} text-basalt-muted-foreground`}>—</span>;
 }
 
-function bandwidthTitle(mbps: number | null): string {
-	const label = formatBandwidthMbps(mbps);
-	return label === null ? "No bandwidth recorded" : `${label} bandwidth`;
-}
-
-function trafficTitle(quotaGb: number | null, resetDay: number | null): string {
-	const label = formatTrafficQuotaGb(quotaGb);
-	if (label === null) return "No traffic quota recorded";
-	return resetDay === null
-		? `${label} per month`
-		: `${label} per month, ${formatResetDayLong(resetDay)}`;
-}
-
-function diskTitle(usedPct: number | null, totalBytes: number | null): string {
-	if (usedPct === null) return "No disk reading";
-	const total = formatSpecSize(totalBytes);
-	if (total === null) return `${usedPct.toFixed(1)}% used`;
-	const used = formatSpecSize(((totalBytes ?? 0) * usedPct) / 100);
-	return `${used} of ${total} used · ${usedPct.toFixed(1)}%`;
+function trafficTitle(
+	quotaGb: number | null,
+	resetDay: number | null,
+	bandwidthMbps: number | null,
+): string {
+	const traffic = formatTrafficQuotaGb(quotaGb);
+	const link = formatBandwidthMbps(bandwidthMbps);
+	const trafficLine =
+		traffic === null
+			? "No traffic quota recorded"
+			: resetDay === null
+				? `${traffic} per month`
+				: `${traffic} per month, ${formatResetDayLong(resetDay)}`;
+	const linkLine = link === null ? "no link speed recorded" : `${link} bandwidth`;
+	return `${trafficLine} · ${linkLine}`;
 }
 
 function diskBarColor(usedPct: number): string {
@@ -266,13 +300,6 @@ function daysLeftTitle(days: number | null, period: number | null): string {
 	return period === null ? base : `${base} of ${period} days`;
 }
 
-/** Bandwidth bars are relative to the widest host on screen, so the column
- *  reads as a comparison rather than seven unrelated numbers. */
-function bandwidthShare(mbps: number, max: number): string {
-	if (!(max > 0) || !(mbps > 0)) return "0%";
-	return `${Math.min(100, Math.max(4, (mbps / max) * 100)).toFixed(1)}%`;
-}
-
 /** The bar is the share of the period already spent, so a full track means
  *  the renewal is due. Overdue stays full. */
 function renewalShare(days: number, period: number | null): string {
@@ -290,6 +317,17 @@ function renewalBarColor(tone: RenewalTone): string {
 	return chart.sky;
 }
 
+/** `500 GB @ 100 Mbps`, and a sensible reading when one side is missing:
+ *  the quota alone, the link speed alone, or one dash for neither. */
+function trafficLabel(quotaGb: number | null, bandwidthMbps: number | null): string | null {
+	const traffic = formatTrafficQuotaGb(quotaGb);
+	const link = formatBandwidthMbps(bandwidthMbps);
+	if (traffic === null && link === null) return null;
+	if (traffic === null) return link;
+	if (link === null) return traffic;
+	return `${traffic} @ ${link}`;
+}
+
 export function HostTable({
 	hosts,
 	tagsFor,
@@ -300,7 +338,6 @@ export function HostTable({
 	now: number;
 }) {
 	const today = todayCalendarDate(new Date(now * 1000));
-	const maxBandwidth = hosts.reduce((max, host) => Math.max(max, host.bandwidth_mbps ?? 0), 0);
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
 			<Table aria-label="Servers">
@@ -324,10 +361,7 @@ export function HostTable({
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
 						<TableHead className="hidden xl:table-cell" textAlign="end">
-							<HeadLabel icon={Network}>Bandwidth</HeadLabel>
-						</TableHead>
-						<TableHead className="hidden xl:table-cell" textAlign="end">
-							<HeadLabel icon={HardDrive}>Traffic</HeadLabel>
+							<HeadLabel icon={Network}>Traffic / Link</HeadLabel>
 						</TableHead>
 						<TableHead textAlign="end">
 							<HeadLabel icon={Wallet}>Cost</HeadLabel>
@@ -344,8 +378,19 @@ export function HostTable({
 						const periodDays = billingPeriodDays(host.paid_at, host.renews_at);
 						const countdown = renewalBadgeLabel(daysLeft);
 						const dailyCost = dailyCostCny(host.cost_amount_cny, host.paid_at, host.renews_at);
-						const quota = host.traffic_quota_gb;
-						const reset = host.traffic_reset_day;
+						const mergedTraffic = trafficLabel(host.traffic_quota_gb, host.bandwidth_mbps);
+						const memoryTotal = formatSpecSize(host.mem_total_bytes);
+						const memoryUsed =
+							host.mem_used_pct === null
+								? null
+								: formatSpecSize(((host.mem_total_bytes ?? 0) * host.mem_used_pct) / 100);
+						const diskTotal = formatSpecSize(host.disk_root_total_bytes);
+						const diskUsed =
+							host.disk_root_used_pct === null
+								? null
+								: formatSpecSize(
+										((host.disk_root_total_bytes ?? 0) * host.disk_root_used_pct) / 100,
+									);
 						return (
 							<TableRow key={host.host_id} data-testid="host-row">
 								<TableCell>
@@ -396,97 +441,78 @@ export function HostTable({
 									<StatusBadge status={host.status} />
 								</TableCell>
 								<TableCell textAlign="end" data-testid="host-cpu">
-									<MetricLine>
-										<span className={CELL_SPEC}>{formatCoreCount(host.cpu_logical)}</span>
-										<Pct value={host.cpu_usage_pct} />
-										<TrendSlot
-											points={host.cpu_sparkline}
-											color={chart.pink}
-											label={`${host.hostname} 24 hour CPU`}
-										/>
-									</MetricLine>
+									<TrendChart
+										points={host.cpu_sparkline}
+										color={chart.pink}
+										label={
+											host.cpu_usage_pct === null
+												? `${host.hostname} CPU usage, no reading`
+												: `${host.hostname} CPU usage ${formatPercent(host.cpu_usage_pct)}, last 24 hours`
+										}
+										extras={[{ name: "Cores", value: formatCoreCount(host.cpu_logical) ?? "—" }]}
+										formatter={formatPercent}
+									/>
 								</TableCell>
 								<TableCell textAlign="end" data-testid="host-memory">
-									<MetricLine>
-										<span className={CELL_SPEC}>{formatSpecSize(host.mem_total_bytes)}</span>
-										<Pct value={host.mem_used_pct} />
-										<TrendSlot
-											points={host.mem_sparkline}
-											color={chart.sky}
-											label={`${host.hostname} 24 hour memory`}
-										/>
-									</MetricLine>
+									<TrendChart
+										points={host.mem_sparkline}
+										color={chart.sky}
+										label={
+											host.mem_used_pct === null
+												? `${host.hostname} memory usage, no reading`
+												: `${host.hostname} memory usage ${formatPercent(host.mem_used_pct)}, last 24 hours`
+										}
+										extras={[
+											{ name: "Used", value: memoryUsed ?? "—" },
+											{ name: "Total", value: memoryTotal ?? "—" },
+										]}
+										formatter={formatPercent}
+									/>
 								</TableCell>
-								<TableCell
-									textAlign="end"
-									data-testid="host-disk"
-									title={diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
-								>
+								<TableCell textAlign="end" data-testid="host-disk">
 									{host.disk_root_used_pct === null ? (
 										<Dash />
 									) : (
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<MetricLine>
-													<span
-														data-testid="host-disk-pct"
-														className={`${CELL_VALUE} ${pressureClass(host.disk_root_used_pct)}`}
-													>
-														{formatPercent(host.disk_root_used_pct)}
-													</span>
-													<MicroBar
+												<span className="inline-flex cursor-default">
+													<UsageBar
 														testId="host-disk-bar"
 														share={`${Math.min(100, Math.max(0, host.disk_root_used_pct)).toFixed(1)}%`}
 														color={diskBarColor(host.disk_root_used_pct)}
-														label={diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
 													/>
-												</MetricLine>
+												</span>
 											</TooltipTrigger>
-											<TooltipContent side="top" sideOffset={6}>
-												{diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
-											</TooltipContent>
+											<SnapshotTooltip
+												at={host.last_seen}
+												headline={`${formatPercent(host.disk_root_used_pct)} used`}
+												detail={
+													diskUsed !== null && diskTotal !== null
+														? `${diskUsed} of ${diskTotal}`
+														: (diskTotal ?? "size unknown")
+												}
+											/>
 										</Tooltip>
 									)}
 								</TableCell>
 								<TableCell
 									textAlign="end"
 									className="hidden xl:table-cell"
-									data-testid="host-bandwidth"
-									title={bandwidthTitle(host.bandwidth_mbps)}
-								>
-									{host.bandwidth_mbps === null ? (
-										<Dash />
-									) : (
-										<MetricLine>
-											<span className={CELL_VALUE}>{formatBandwidthMbps(host.bandwidth_mbps)}</span>
-											<MicroBar
-												testId="host-bandwidth-bar"
-												share={bandwidthShare(host.bandwidth_mbps, maxBandwidth)}
-												color={chart.sky}
-												label={bandwidthTitle(host.bandwidth_mbps)}
-											/>
-										</MetricLine>
-									)}
-								</TableCell>
-								<TableCell
-									textAlign="end"
-									className="hidden xl:table-cell"
 									data-testid="host-traffic"
-									title={trafficTitle(quota, reset)}
 								>
-									{quota === null ? (
+									{mergedTraffic === null ? (
 										<Dash />
 									) : (
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<span className={`${CELL_VALUE} cursor-default`}>
-													{formatTrafficQuotaGb(quota)}
-												</span>
+												<span className={CELL_VALUE}>{mergedTraffic}</span>
 											</TooltipTrigger>
-											<TooltipContent side="top" sideOffset={6}>
-												{reset === null
-													? `${formatTrafficQuotaGb(quota)} per month`
-													: `${formatTrafficQuotaGb(quota)} per month, ${formatResetDayLong(reset)}`}
+											<TooltipContent side="top" sideOffset={6} className="text-basalt-sm">
+												{trafficTitle(
+													host.traffic_quota_gb,
+													host.traffic_reset_day,
+													host.bandwidth_mbps,
+												)}
 											</TooltipContent>
 										</Tooltip>
 									)}
@@ -522,20 +548,19 @@ export function HostTable({
 									{daysLeft === null ? (
 										<Dash />
 									) : (
-										<MetricLine>
+										<div className="flex items-center justify-end gap-basalt-space-md">
 											<span
 												data-testid="host-countdown"
 												className={`whitespace-nowrap text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
 											>
 												{countdown}
 											</span>
-											<MicroBar
+											<UsageBar
 												testId="host-days-bar"
 												share={renewalShare(daysLeft, periodDays)}
 												color={renewalBarColor(renewalTone(daysLeft))}
-												label={daysLeftTitle(daysLeft, periodDays)}
 											/>
-										</MetricLine>
+										</div>
 									)}
 								</TableCell>
 							</TableRow>
@@ -543,7 +568,7 @@ export function HostTable({
 					})}
 				</TableBody>
 				<TableFooter data-testid="host-table-footer">
-					{/* Status and the traffic columns only join from `xl`, so the
+					{/* Status and the traffic column only join from `xl`, so the
 					    total needs one row per column count to span them all. */}
 					<TableRow className="xl:hidden">
 						<TableCell
@@ -556,7 +581,7 @@ export function HostTable({
 					</TableRow>
 					<TableRow className="hidden xl:table-row">
 						<TableCell
-							colSpan={9}
+							colSpan={8}
 							textAlign="end"
 							className="border-t border-basalt-border py-basalt-space-lg"
 						>
