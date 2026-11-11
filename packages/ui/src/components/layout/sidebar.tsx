@@ -3,24 +3,29 @@ import {
 	AvatarFallback,
 	AvatarImage,
 	Sidebar as BasaltSidebar,
-	Button,
+	SidebarBrand,
 	SidebarFooter,
 	SidebarGroup,
 	SidebarHeader,
+	SidebarIconItem,
+	SidebarItem,
 	SidebarNav,
+	SidebarProvider,
+	SidebarToggle,
 	SidebarUser,
+} from "@nocoo/basalt";
+import { useSidebar } from "@nocoo/basalt/components/sidebar";
+import {
 	Tooltip,
 	TooltipContent,
+	TooltipProvider,
 	TooltipTrigger,
-} from "@nocoo/basalt";
-import { EditableNavItem } from "@nocoo/basalt/components/editable-nav-item";
-import { Link } from "@nocoo/basalt/components/link";
+} from "@nocoo/basalt/components/tooltip";
 import {
 	Bell,
 	Database,
 	Download,
 	Laptop,
-	PanelLeft,
 	Plug,
 	ScrollText,
 	Server,
@@ -29,10 +34,9 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router";
 import { useMe } from "@/hooks";
+import { ACCESS_LOGOUT_URL } from "@/lib/access";
 import { getDisplayName } from "@/lib/avatar-color";
-import { cn } from "@/lib/utils";
 import { APP_VERSION } from "@/lib/version";
-import { useSidebar } from "./sidebar-context";
 
 const NAV_GROUPS = [
 	{
@@ -56,132 +60,153 @@ const NAV_GROUPS = [
 	},
 ];
 
-const NAV_ITEMS = NAV_GROUPS.flatMap((group) => group.items);
+type NavItem = { href: string; label: string; icon: typeof Server };
 
-const SIDEBAR_MARK_SLOT_CLASS = "flex w-full items-center";
+const ALL_NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 
-export function Sidebar({ mobile = false }: { mobile?: boolean }) {
+function isItemActive(href: string, pathname: string) {
+	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function shouldGroupBeOpenOnMount(group: { items: NavItem[] }, pathname: string): boolean {
+	return group.items.some((item) => isItemActive(item.href, pathname));
+}
+
+interface SidebarBodyProps {
+	variant?: "desktop" | "mobile";
+	onNavigate?: () => void;
+	onDismiss?: () => void;
+}
+
+function SidebarBody({ variant = "desktop", onNavigate, onDismiss }: SidebarBodyProps) {
 	const { pathname } = useLocation();
-	const { collapsed, toggle, setMobileOpen } = useSidebar();
+	const { collapsed, peek, peeking } = useSidebar();
+	const railCollapsed = collapsed && !(peek && peeking);
 	const { data: user } = useMe();
-	const compact = !mobile && collapsed;
 	const { name, initial, email, avatar } = getDisplayName(user);
-	const closeMobile = () => setMobileOpen(false);
-	const active = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-	const version = (
-		<span className="shrink-0 rounded-basalt-md bg-basalt-secondary px-basalt-space-md py-basalt-space-xs text-basalt-sm leading-basalt-tight font-medium text-basalt-muted-foreground">
-			v{APP_VERSION}
-		</span>
-	);
+
 	const userAvatar = (
 		<Avatar className="h-9 w-9 shrink-0">
-			{avatar && <AvatarImage src={avatar} alt={name} />}
+			{avatar ? <AvatarImage src={avatar} alt={name} /> : null}
 			<AvatarFallback className="text-basalt-sm">{initial}</AvatarFallback>
 		</Avatar>
 	);
 
 	return (
-		<BasaltSidebar
-			aria-label={mobile ? "Main navigation drawer" : "Main navigation"}
-			collapsed={compact}
-		>
+		<>
 			<SidebarHeader>
-				<div
-					className={cn(
-						SIDEBAR_MARK_SLOT_CLASS,
-						compact ? "justify-center" : "justify-between pl-basalt-layout-sm",
-					)}
-				>
-					<Link
-						href="/"
-						aria-label="Bat home"
-						onClick={closeMobile}
-						className="flex items-center gap-basalt-space-lg text-basalt-foreground no-underline hover:no-underline"
-					>
-						<img src="/logo-80.png" alt="bat" className="h-7 w-7 shrink-0 object-contain" />
-						{compact ? null : (
-							<>
-								<span className="text-basalt-xl font-semibold text-basalt-foreground">bat</span>
-								{version}
-							</>
-						)}
-					</Link>
-					{compact ? null : (
-						<Button
-							variant="ghost"
-							size="icon"
-							onClick={mobile ? closeMobile : toggle}
-							aria-label={mobile ? "Close navigation menu" : "Collapse sidebar"}
-						>
-							<PanelLeft aria-hidden="true" strokeWidth={1.5} />
-						</Button>
-					)}
-				</div>
+				<SidebarBrand
+					logo={<img src="/logo-24.png" alt="bat" width={24} height={24} />}
+					name="bat"
+					version={`v${APP_VERSION}`}
+					action={
+						variant === "mobile" ? (
+							<SidebarToggle
+								mode="dismiss"
+								dismissLabel="Close navigation menu"
+								{...(onDismiss ? { onDismiss } : {})}
+							/>
+						) : (
+							<SidebarToggle expandLabel="Expand sidebar" collapseLabel="Collapse sidebar" />
+						)
+					}
+				/>
 			</SidebarHeader>
-			{compact ? (
-				<Button variant="ghost" size="icon" onClick={toggle} aria-label="Expand sidebar">
-					<PanelLeft aria-hidden="true" strokeWidth={1.5} />
-				</Button>
-			) : null}
 			<SidebarNav>
-				{compact
-					? NAV_ITEMS.map((item) => (
-							<Tooltip key={item.href} delayDuration={0}>
-								<TooltipTrigger asChild>
-									<Button
-										asChild
-										variant="ghost"
-										size="icon"
-										className="basalt-nav-item"
-										data-basalt-hover-item=""
-										data-hover-selected={active(item.href)}
-									>
-										<Link
+				{railCollapsed
+					? ALL_NAV_ITEMS.map((item) => {
+							const Icon = item.icon;
+							const active = isItemActive(item.href, pathname);
+							return (
+								<Tooltip key={item.href} delayDuration={0}>
+									<TooltipTrigger asChild>
+										<SidebarIconItem
 											href={item.href}
-											onClick={closeMobile}
+											active={active}
 											aria-label={item.label}
-											aria-current={active(item.href) ? "page" : undefined}
+											onClick={onNavigate}
 										>
-											<item.icon aria-hidden="true" strokeWidth={1.5} />
-											<span className="sr-only">{item.label}</span>
-										</Link>
-									</Button>
-								</TooltipTrigger>
-								<TooltipContent side="right" sideOffset={8}>
-									{item.label}
-								</TooltipContent>
-							</Tooltip>
-						))
+											<Icon className="h-4 w-4" strokeWidth={1.5} aria-hidden="true" />
+										</SidebarIconItem>
+									</TooltipTrigger>
+									<TooltipContent side="right" sideOffset={8}>
+										{item.label}
+									</TooltipContent>
+								</Tooltip>
+							);
+						})
 					: NAV_GROUPS.map((group) => (
-							<SidebarGroup key={group.label} label={group.label}>
-								{group.items.map((item) => (
-									<EditableNavItem
-										key={item.href}
-										label={item.label}
-										href={item.href}
-										selected={active(item.href)}
-										onSelect={closeMobile}
-										icon={<item.icon strokeWidth={1.5} aria-hidden="true" />}
-									/>
-								))}
+							<SidebarGroup
+								key={group.label}
+								label={group.label}
+								defaultOpen={shouldGroupBeOpenOnMount(group, pathname)}
+							>
+								{group.items.map((item) => {
+									const Icon = item.icon;
+									const active = isItemActive(item.href, pathname);
+									return (
+										<SidebarItem
+											key={item.href}
+											href={item.href}
+											active={active}
+											onClick={onNavigate}
+										>
+											<Icon className="h-4 w-4 shrink-0" strokeWidth={1.5} aria-hidden="true" />
+											<span className="flex-1 truncate text-left">{item.label}</span>
+										</SidebarItem>
+									);
+								})}
 							</SidebarGroup>
 						))}
 			</SidebarNav>
 			<SidebarFooter>
-				{compact ? (
-					<>
-						<Tooltip delayDuration={0}>
-							<TooltipTrigger asChild>{userAvatar}</TooltipTrigger>
-							<TooltipContent side="right" sideOffset={8}>
-								{name}
-							</TooltipContent>
-						</Tooltip>
-						{version}
-					</>
-				) : (
-					<SidebarUser name={name} email={email} avatar={userAvatar} />
-				)}
+				<SidebarUser
+					name={name}
+					email={email ?? undefined}
+					avatar={userAvatar}
+					tooltip={name}
+					signOutHref={ACCESS_LOGOUT_URL}
+					signOutLabel="Sign out"
+				/>
 			</SidebarFooter>
-		</BasaltSidebar>
+		</>
+	);
+}
+
+export interface SidebarProps {
+	/** Accessible name for the complementary landmark. */
+	ariaLabel: string;
+	variant?: "desktop" | "mobile";
+	onNavigate?: () => void;
+	onDismiss?: () => void;
+}
+
+export function Sidebar({ ariaLabel, variant = "desktop", onNavigate, onDismiss }: SidebarProps) {
+	return (
+		<TooltipProvider delayDuration={0}>
+			<BasaltSidebar aria-label={ariaLabel} resizable={variant === "mobile" ? false : undefined}>
+				<SidebarBody
+					variant={variant}
+					{...(onNavigate ? { onNavigate } : {})}
+					{...(onDismiss ? { onDismiss } : {})}
+				/>
+			</BasaltSidebar>
+		</TooltipProvider>
+	);
+}
+
+export function DesktopSidebarProvider({
+	collapsed,
+	onCollapsedChange,
+	children,
+}: {
+	collapsed: boolean;
+	onCollapsedChange: (collapsed: boolean) => void;
+	children: React.ReactNode;
+}) {
+	return (
+		<SidebarProvider collapsed={collapsed} onCollapsedChange={onCollapsedChange} defaultWidth={260}>
+			{children}
+		</SidebarProvider>
 	);
 }
