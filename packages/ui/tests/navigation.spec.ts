@@ -13,27 +13,27 @@ test("navigation preserves shell nodes and collapsed state", async ({ page }) =>
 	});
 	for (const label of ["Events", "Tags", "Setup", "Hosts"]) {
 		await page.locator(`aside a[href="/${label.toLowerCase()}"]`).click();
-		await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-			label,
-		);
+		await expect(
+			page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+		).toContainText(label);
 		await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 		for (const node of [shell, header, sidebar]) {
 			expect(await node?.evaluate((element) => element.isConnected)).toBe(true);
 		}
 	}
 	await page.getByText("alpha.test.local").click();
-	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-		"alpha.test.local",
-	);
+	await expect(
+		page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+	).toContainText("alpha.test.local");
 	await page
-		.getByRole("navigation", { name: "Breadcrumb", exact: true })
+		.getByRole("navigation", { name: "Breadcrumb navigation", exact: true })
 		.getByRole("link", { name: "Hosts", exact: true })
 		.click();
 	await expect(page).toHaveURL("/hosts");
 	await page.goBack();
-	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-		"alpha.test.local",
-	);
+	await expect(
+		page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+	).toContainText("alpha.test.local");
 	await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 	for (const node of [shell, header, sidebar]) {
 		expect(await node?.evaluate((element) => element.isConnected)).toBe(true);
@@ -78,22 +78,30 @@ test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) =
 
 test("collapsed sidebar keeps its version badge compact and centered", async ({ page }) => {
 	await page.goto("/hosts");
-	await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-	const sidebar = page.locator("aside");
+	const sidebar = page.getByRole("complementary", { name: "Main navigation", exact: true });
+	await sidebar.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+	await expect(sidebar).toHaveAttribute("data-collapsed", "");
 	await expect(sidebar).toHaveCSS("width", "68px");
-	const badge = sidebar.getByText(/^v\d+\.\d+\.\d+$/);
-	await expect(badge).toBeVisible();
+
+	const logo = sidebar.locator('[data-slot="sidebar-brand-logo"] img[alt="bat"]');
+	await expect(logo).toBeVisible();
 	await expect
-		.poll(() =>
-			badge.evaluate((element) => {
-				const badgeBounds = element.getBoundingClientRect();
-				const sidebar = element.closest("aside")?.getBoundingClientRect();
-				return (
-					sidebar &&
-					badgeBounds.width < sidebar.width * 0.8 &&
-					Math.abs(badgeBounds.left + badgeBounds.width / 2 - sidebar.left - sidebar.width / 2) < 1
-				);
-			}),
-		)
+		.poll(async () => {
+			const rail = await sidebar.evaluate((element) => {
+				const bounds = element.getBoundingClientRect();
+				return { left: bounds.left, width: bounds.width, center: bounds.left + bounds.width / 2 };
+			});
+			const logoCenter = await logo.evaluate((element) => {
+				const bounds = element.getBoundingClientRect();
+				return bounds.left + bounds.width / 2;
+			});
+			return Math.abs(logoCenter - rail.center) < 1;
+		})
 		.toBe(true);
+
+	// SidebarBrand keeps name/version in the header; collapsed overflow clips them off the rail.
+	await expect(sidebar.locator('[data-slot="sidebar-brand-name"]')).toBeHidden();
+	const version = sidebar.locator('[data-slot="sidebar-brand-version"]');
+	await expect(version).toBeAttached();
+	await expect(version).not.toBeInViewport();
 });

@@ -1,4 +1,3 @@
 export { AppShell } from "./app-shell";
-export { Sidebar } from "./sidebar";
-export { SidebarProvider, useSidebar } from "./sidebar-context";
-export { ThemeToggle } from "./theme-toggle";
+export { MobileNavProvider, useMobileNav } from "./mobile-nav-context";
+export { DesktopSidebarProvider, Sidebar } from "./sidebar";
