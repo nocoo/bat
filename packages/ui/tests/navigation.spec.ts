@@ -78,18 +78,30 @@ test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) =
 
 test("collapsed sidebar keeps its version badge compact and centered", async ({ page }) => {
 	await page.goto("/hosts");
-	await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
-	const sidebar = page.locator("aside");
+	const sidebar = page.getByRole("complementary", { name: "Main navigation", exact: true });
+	await sidebar.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+	await expect(sidebar).toHaveAttribute("data-collapsed", "");
 	await expect(sidebar).toHaveCSS("width", "68px");
-	const badge = sidebar.getByText(/^v\d+\.\d+\.\d+$/);
-	await expect(badge).toBeVisible();
+
+	const logo = sidebar.locator('[data-slot="sidebar-brand-logo"] img[alt="bat"]');
+	await expect(logo).toBeVisible();
 	await expect
-		.poll(() =>
-			badge.evaluate((element) => {
-				const badgeBounds = element.getBoundingClientRect();
-				const aside = element.closest("aside")?.getBoundingClientRect();
-				return aside !== undefined && badgeBounds.width < aside.width * 0.8;
-			}),
-		)
+		.poll(async () => {
+			const rail = await sidebar.evaluate((element) => {
+				const bounds = element.getBoundingClientRect();
+				return { left: bounds.left, width: bounds.width, center: bounds.left + bounds.width / 2 };
+			});
+			const logoCenter = await logo.evaluate((element) => {
+				const bounds = element.getBoundingClientRect();
+				return bounds.left + bounds.width / 2;
+			});
+			return Math.abs(logoCenter - rail.center) < 1;
+		})
 		.toBe(true);
+
+	// SidebarBrand keeps name/version in the header; collapsed overflow clips them off the rail.
+	await expect(sidebar.locator('[data-slot="sidebar-brand-name"]')).toBeHidden();
+	const version = sidebar.locator('[data-slot="sidebar-brand-version"]');
+	await expect(version).toBeAttached();
+	await expect(version).not.toBeInViewport();
 });
