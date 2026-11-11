@@ -461,8 +461,9 @@ test.describe("Hosts list page", () => {
 				expect(height).toBeGreaterThanOrEqual(54);
 				expect(height).toBeLessThanOrEqual(57);
 			}
-			// 8px cell padding, with the identity cell a step wider on the left.
-			expect(rhythm.padding).toEqual({ block: "8px", inline: "8px" });
+			// Basalt cell insets: 12px inline, with the identity and last cells a
+			// step wider on the panel edge.
+			expect(rhythm.padding).toEqual({ block: "8px", inline: "12px" });
 			expect(rhythm.serverInlineStart).toBe("16px");
 			// One font family for values, qualifiers and names; 14px/500 over 12px/400.
 			expect(rhythm.value?.family).not.toMatch(/mono/i);
@@ -494,11 +495,11 @@ test.describe("Hosts list page", () => {
 				expect(rhythm.statusDotLabel).toBe(badgeLabel);
 				expect(rhythm.badgeVisible).toBe(false);
 			}
-			// The spec qualifiers never fold: the machine's own size stays
-			// beside its reading at every width, and the first tag keeps its
-			// full word — a colour dot alone is never acceptable.
-			expect(rhythm.cpuText).toBe("42.1% 8 cores");
-			expect(rhythm.memoryText).toBe("40.6% 8 GB");
+			// The spec qualifier leads and the reading keeps the right edge, so a
+			// column of numbers lines up under its own header; below `xl` the
+			// qualifier gives way and the reading owns the cell alone.
+			expect(rhythm.cpuText).toBe(width === 1440 ? "8 cores 42.1%" : "42.1%");
+			expect(rhythm.memoryText).toBe(width === 1440 ? "8 GB 40.6%" : "40.6%");
 			expect(rhythm.diskText).toBe("42.3%");
 			expect(rhythm.subtitleWords.join(" ")).toContain("production");
 			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
@@ -521,6 +522,48 @@ test.describe("Hosts list page", () => {
 			}
 		}
 	});
+	test("the metric columns spread on a wide viewport instead of squeezing", async ({ page }) => {
+		await page.setViewportSize({ width: 2880, height: 1000 });
+		await page.goto("/hosts");
+		await expect(page.getByTestId("host-row")).toHaveCount(2);
+
+		const geometry = await page.getByRole("table", { name: "Servers" }).evaluate((element) => {
+			const head = Array.from(element.querySelectorAll("th"))
+				.filter((th) => th.getBoundingClientRect().width > 0)
+				.map((th) => ({
+					label: th.textContent.trim(),
+					width: Math.round(th.getBoundingClientRect().width),
+				}));
+			const badge = element.querySelector<HTMLElement>('[data-testid="status-badge"]');
+			const statusCell = element.querySelector<HTMLElement>(
+				'tbody tr[data-testid="host-row"] td:nth-child(2)',
+			);
+			const cells = Array.from(
+				element.querySelectorAll<HTMLElement>('tbody tr[data-testid="host-row"] td'),
+			);
+			return {
+				tableWidth: Math.round(element.getBoundingClientRect().width),
+				head,
+				badgeWidth: badge ? Math.round(badge.getBoundingClientRect().width) : 0,
+				statusWidth: statusCell ? Math.round(statusCell.getBoundingClientRect().width) : 0,
+				overflow: element.scrollWidth - element.clientWidth,
+				cellOverflow: cells.filter((cell) => cell.scrollWidth > cell.clientWidth + 1).length,
+			};
+		});
+
+		// Content-sized columns: the spare width is shared instead of leaving the
+		// identity column with most of the island and the metrics in fixed slots.
+		expect(geometry.overflow).toBeLessThanOrEqual(0);
+		expect(geometry.cellOverflow).toBe(0);
+		expect(geometry.head[0]?.label).toBe("Server");
+		expect(geometry.head[0]?.width).toBeLessThan(geometry.tableWidth * 0.45);
+		for (const column of geometry.head.slice(2)) {
+			expect(column.width).toBeGreaterThanOrEqual(120);
+		}
+		// The status column hugs its badge rather than opening a second gutter.
+		expect(geometry.statusWidth - geometry.badgeWidth).toBeLessThan(60);
+	});
+
 	test("the list keeps the identity cell whole at 1024", async ({ page }) => {
 		await page.goto("/hosts");
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });

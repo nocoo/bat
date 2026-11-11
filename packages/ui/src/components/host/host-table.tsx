@@ -1,10 +1,11 @@
-// Fleet table for the hosts page: one clean line per numeric column in the
-// UI font (tabular numerals keep the columns honest), a lucide anchor on
-// each header, and a fixed 40×14 trend slot right of the value so the
-// numbers never move. The identity cell keeps two lines — hostname and
-// description icon, then architecture or whole-word tags. Spec qualifiers
-// and trend slots give way below `xl`; the state stays readable from the
-// coloured badge icon and tone-coded countdown at every width.
+// Fleet table for the hosts page. One column per metric, each cell one
+// right-aligned reading with its micro-graph on the left: the numbers of a
+// column share a single right edge, the graphs share a single left edge, and
+// the quantifier between them stays muted. Columns size to their content —
+// the identity column takes whatever is left — so a wide viewport widens the
+// gutters instead of squeezing numbers against their neighbours. The trend
+// slot and the spec qualifier give way below `xl`/`2xl`; the state stays
+// readable from the coloured badge icon and tone-coded countdown at every width.
 
 import type { HostOverviewItem, HostTag } from "@bat/shared";
 import {
@@ -53,12 +54,14 @@ import { chart, getSwatchColor } from "@/lib/palette";
 import { cn } from "@/lib/utils";
 import { formatPercent } from "@/lib/workstation-format";
 
-/** The value of a cell — 14px/500 in the UI font, tabular numerals. Plain
- *  strings, because tailwind-merge cannot tell the custom `text-basalt-*`
- *  size and colour utilities apart and would drop one of them. */
+/** The reading itself — 14px/500, tabular numerals so digits stack column to
+ *  column. Plain strings, because tailwind-merge cannot tell the custom
+ *  `text-basalt-*` size and colour utilities apart and would drop one of them. */
 const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums";
-/** The qualifier beside it — 12px muted, wide-view only for machine specs. */
-const CELL_SPEC = "whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground";
+/** The qualifier beside it — 12px muted, and the first thing to give way
+ *  below `xl`: at tablet widths the reading itself owns the cell. */
+const CELL_SPEC =
+	"hidden whitespace-nowrap text-basalt-xs tabular-nums text-basalt-muted-foreground xl:inline";
 const MAX_VISIBLE_TAGS = 3;
 
 /** One header cell: a small muted lucide anchor next to the 12px label.
@@ -72,9 +75,42 @@ function HeadLabel({ icon: Icon, children }: { icon: LucideIcon; children: React
 	);
 }
 
-/** The fixed 40×14 trend slot right of the value. The slot is reserved for
- *  every row (empty when the host has no history) so the numerals keep one
- *  right edge, and the whole slot gives way below `xl`. */
+/** Every metric cell is the same single line, right-aligned: micro-graph,
+ *  muted qualifier, then the reading flush to the column's right edge. */
+function MetricLine({ children }: { children: React.ReactNode }) {
+	return <div className="flex items-center justify-end gap-basalt-space-md">{children}</div>;
+}
+
+/** A usage bar, 32×4, muted rail. It leads the cell so the bar of every row
+ *  starts on one left edge while the readings stay on the right one. */
+function MicroBar({
+	share,
+	color,
+	label,
+	testId,
+}: {
+	share: string;
+	color: string;
+	label: string;
+	testId: string;
+}) {
+	return (
+		<span
+			aria-hidden="true"
+			title={label}
+			className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
+			data-testid={testId}
+		>
+			<span
+				className="block h-full rounded-basalt-full"
+				style={{ width: share, backgroundColor: color }}
+			/>
+		</span>
+	);
+}
+
+/** The trend slot: 40×14, reserved for every row so the readings keep one
+ *  right edge even when a host has no history. */
 function TrendSlot({
 	points,
 	color,
@@ -143,11 +179,6 @@ function DescriptionHint({ hostname, description }: { hostname: string; descript
 	);
 }
 
-/**
- * Tags share the subtitle line: colour dots always, whole names from `xl`
- * up — a tag is never narrower than its full word. Capped at three with a
- * `+N` counter, never pushing the hostname around.
- */
 /**
  * Tags share the subtitle line as dot+name pairs: the first tag is always
  * a full word — a colour dot alone is never an acceptable rendering — and
@@ -272,37 +303,36 @@ export function HostTable({
 	const maxBandwidth = hosts.reduce((max, host) => Math.max(max, host.bandwidth_mbps ?? 0), 0);
 	return (
 		<div data-basalt-table-container="" data-edge="attached">
-			<Table
-				aria-label="Servers"
-				className="lg:table-fixed lg:[&_th]:px-basalt-space-lg lg:[&_td]:px-basalt-space-lg lg:[&_td]:h-basalt-12"
-			>
+			<Table aria-label="Servers">
 				<TableHeader>
 					<TableRow>
-						<TableHead>
+						{/* The identity column absorbs the spare width, so it needs a
+						    floor to keep a hostname and one tag word readable. */}
+						<TableHead className="min-w-[11.5rem]">
 							<HeadLabel icon={Server}>Server</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-22">
+						<TableHead className="hidden w-px xl:table-cell">
 							<HeadLabel icon={Activity}>Status</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-25 xl:w-32" textAlign="end">
+						<TableHead textAlign="end">
 							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-24 xl:w-32" textAlign="end">
+						<TableHead textAlign="end">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-26 xl:w-26" textAlign="end">
+						<TableHead textAlign="end">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-24" textAlign="end">
+						<TableHead className="hidden xl:table-cell" textAlign="end">
 							<HeadLabel icon={Network}>Bandwidth</HeadLabel>
 						</TableHead>
-						<TableHead className="hidden xl:table-cell xl:w-22" textAlign="end">
+						<TableHead className="hidden xl:table-cell" textAlign="end">
 							<HeadLabel icon={HardDrive}>Traffic</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-22 xl:w-26" textAlign="end">
+						<TableHead textAlign="end">
 							<HeadLabel icon={Wallet}>Cost</HeadLabel>
 						</TableHead>
-						<TableHead className="lg:w-24 xl:w-32" textAlign="end">
+						<TableHead textAlign="end">
 							<HeadLabel icon={Timer}>Days left</HeadLabel>
 						</TableHead>
 					</TableRow>
@@ -329,7 +359,7 @@ export function HostTable({
 											/>
 											<Link
 												to={`/hosts/${hashHostId(host.host_id)}`}
-												className="[flex-shrink:0.001] min-w-0 truncate font-medium underline-offset-4 hover:underline"
+												className="min-w-0 truncate font-medium underline-offset-4 hover:underline"
 												title={host.hostname}
 											>
 												{host.hostname}
@@ -365,31 +395,30 @@ export function HostTable({
 								<TableCell className="hidden xl:table-cell">
 									<StatusBadge status={host.status} />
 								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-cpu">
-									<div className="flex items-center justify-end gap-basalt-space-md">
-										<Pct value={host.cpu_usage_pct} />
+								<TableCell textAlign="end" data-testid="host-cpu">
+									<MetricLine>
 										<span className={CELL_SPEC}>{formatCoreCount(host.cpu_logical)}</span>
+										<Pct value={host.cpu_usage_pct} />
 										<TrendSlot
 											points={host.cpu_sparkline}
 											color={chart.pink}
 											label={`${host.hostname} 24 hour CPU`}
 										/>
-									</div>
+									</MetricLine>
 								</TableCell>
-								<TableCell textAlign="end" className="whitespace-nowrap" data-testid="host-memory">
-									<div className="flex items-center justify-end gap-basalt-space-md">
-										<Pct value={host.mem_used_pct} />
+								<TableCell textAlign="end" data-testid="host-memory">
+									<MetricLine>
 										<span className={CELL_SPEC}>{formatSpecSize(host.mem_total_bytes)}</span>
+										<Pct value={host.mem_used_pct} />
 										<TrendSlot
 											points={host.mem_sparkline}
 											color={chart.sky}
 											label={`${host.hostname} 24 hour memory`}
 										/>
-									</div>
+									</MetricLine>
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="whitespace-nowrap"
 									data-testid="host-disk"
 									title={diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
 								>
@@ -398,27 +427,20 @@ export function HostTable({
 									) : (
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<div className="flex cursor-default items-center justify-end gap-basalt-space-md">
-													<span
-														aria-hidden="true"
-														className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
-														data-testid="host-disk-bar"
-													>
-														<span
-															className="block h-full rounded-basalt-full"
-															style={{
-																width: `${Math.min(100, Math.max(0, host.disk_root_used_pct)).toFixed(1)}%`,
-																backgroundColor: diskBarColor(host.disk_root_used_pct),
-															}}
-														/>
-													</span>
+												<MetricLine>
 													<span
 														data-testid="host-disk-pct"
 														className={`${CELL_VALUE} ${pressureClass(host.disk_root_used_pct)}`}
 													>
 														{formatPercent(host.disk_root_used_pct)}
 													</span>
-												</div>
+													<MicroBar
+														testId="host-disk-bar"
+														share={`${Math.min(100, Math.max(0, host.disk_root_used_pct)).toFixed(1)}%`}
+														color={diskBarColor(host.disk_root_used_pct)}
+														label={diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
+													/>
+												</MetricLine>
 											</TooltipTrigger>
 											<TooltipContent side="top" sideOffset={6}>
 												{diskTitle(host.disk_root_used_pct, host.disk_root_total_bytes)}
@@ -428,34 +450,27 @@ export function HostTable({
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="hidden whitespace-nowrap xl:table-cell"
+									className="hidden xl:table-cell"
 									data-testid="host-bandwidth"
 									title={bandwidthTitle(host.bandwidth_mbps)}
 								>
 									{host.bandwidth_mbps === null ? (
 										<Dash />
 									) : (
-										<div className="flex items-center justify-end gap-basalt-space-md">
-											<span
-												aria-hidden="true"
-												className="h-1 w-7 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
-												data-testid="host-bandwidth-bar"
-											>
-												<span
-													className="block h-full rounded-basalt-full"
-													style={{
-														width: bandwidthShare(host.bandwidth_mbps, maxBandwidth),
-														backgroundColor: chart.sky,
-													}}
-												/>
-											</span>
-											<span className={CELL_SPEC}>{formatBandwidthMbps(host.bandwidth_mbps)}</span>
-										</div>
+										<MetricLine>
+											<span className={CELL_VALUE}>{formatBandwidthMbps(host.bandwidth_mbps)}</span>
+											<MicroBar
+												testId="host-bandwidth-bar"
+												share={bandwidthShare(host.bandwidth_mbps, maxBandwidth)}
+												color={chart.sky}
+												label={bandwidthTitle(host.bandwidth_mbps)}
+											/>
+										</MetricLine>
 									)}
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="hidden whitespace-nowrap xl:table-cell"
+									className="hidden xl:table-cell"
 									data-testid="host-traffic"
 									title={trafficTitle(quota, reset)}
 								>
@@ -478,7 +493,6 @@ export function HostTable({
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="whitespace-nowrap"
 									data-testid="host-cost"
 									title={costTitle(host.renews_at, host.cost_amount_cny)}
 								>
@@ -502,34 +516,26 @@ export function HostTable({
 								</TableCell>
 								<TableCell
 									textAlign="end"
-									className="whitespace-nowrap"
 									data-testid="host-days-left"
 									title={daysLeftTitle(daysLeft, periodDays)}
 								>
 									{daysLeft === null ? (
 										<Dash />
 									) : (
-										<div className="flex items-center justify-end gap-basalt-space-md">
-											<span
-												aria-hidden="true"
-												className="h-1 w-8 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted"
-												data-testid="host-days-bar"
-											>
-												<span
-													className="block h-full rounded-basalt-full"
-													style={{
-														width: renewalShare(daysLeft, periodDays),
-														backgroundColor: renewalBarColor(renewalTone(daysLeft)),
-													}}
-												/>
-											</span>
+										<MetricLine>
 											<span
 												data-testid="host-countdown"
-												className={`w-18 shrink-0 text-right text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
+												className={`whitespace-nowrap text-basalt-xs tabular-nums ${renewalToneClass(renewalTone(daysLeft))}`}
 											>
 												{countdown}
 											</span>
-										</div>
+											<MicroBar
+												testId="host-days-bar"
+												share={renewalShare(daysLeft, periodDays)}
+												color={renewalBarColor(renewalTone(daysLeft))}
+												label={daysLeftTitle(daysLeft, periodDays)}
+											/>
+										</MetricLine>
 									)}
 								</TableCell>
 							</TableRow>
@@ -537,8 +543,8 @@ export function HostTable({
 					})}
 				</TableBody>
 				<TableFooter data-testid="host-table-footer">
-					{/* Status and Link only join from `xl`, so the total needs one
-					    row per column count to span them all. */}
+					{/* Status and the traffic columns only join from `xl`, so the
+					    total needs one row per column count to span them all. */}
 					<TableRow className="xl:hidden">
 						<TableCell
 							colSpan={6}
