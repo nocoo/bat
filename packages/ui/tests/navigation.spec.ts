@@ -67,6 +67,8 @@ test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) =
 	const drawer = page.getByRole("dialog");
 	await expect(drawer).toBeVisible();
 	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
+	await expect(drawer).toHaveCSS("padding-left", "0px");
+	await expect(drawer).toHaveCSS("padding-right", "0px");
 	expect(
 		await drawer.evaluate((element) => {
 			const panel = element.getBoundingClientRect();
