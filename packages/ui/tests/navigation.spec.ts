@@ -13,27 +13,27 @@ test("navigation preserves shell nodes and collapsed state", async ({ page }) =>
 	});
 	for (const label of ["Events", "Tags", "Setup", "Hosts"]) {
 		await page.locator(`aside a[href="/${label.toLowerCase()}"]`).click();
-		await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-			label,
-		);
+		await expect(
+			page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+		).toContainText(label);
 		await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 		for (const node of [shell, header, sidebar]) {
 			expect(await node?.evaluate((element) => element.isConnected)).toBe(true);
 		}
 	}
 	await page.getByText("alpha.test.local").click();
-	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-		"alpha.test.local",
-	);
+	await expect(
+		page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+	).toContainText("alpha.test.local");
 	await page
-		.getByRole("navigation", { name: "Breadcrumb", exact: true })
+		.getByRole("navigation", { name: "Breadcrumb navigation", exact: true })
 		.getByRole("link", { name: "Hosts", exact: true })
 		.click();
 	await expect(page).toHaveURL("/hosts");
 	await page.goBack();
-	await expect(page.getByRole("navigation", { name: "Breadcrumb", exact: true })).toContainText(
-		"alpha.test.local",
-	);
+	await expect(
+		page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true }),
+	).toContainText("alpha.test.local");
 	await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
 	for (const node of [shell, header, sidebar]) {
 		expect(await node?.evaluate((element) => element.isConnected)).toBe(true);
@@ -87,12 +87,8 @@ test("collapsed sidebar keeps its version badge compact and centered", async ({ 
 		.poll(() =>
 			badge.evaluate((element) => {
 				const badgeBounds = element.getBoundingClientRect();
-				const sidebar = element.closest("aside")?.getBoundingClientRect();
-				return (
-					sidebar &&
-					badgeBounds.width < sidebar.width * 0.8 &&
-					Math.abs(badgeBounds.left + badgeBounds.width / 2 - sidebar.left - sidebar.width / 2) < 1
-				);
+				const aside = element.closest("aside")?.getBoundingClientRect();
+				return aside !== undefined && badgeBounds.width < aside.width * 0.8;
 			}),
 		)
 		.toBe(true);

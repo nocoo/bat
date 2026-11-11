@@ -5,7 +5,7 @@ test.describe("Webhooks page", () => {
 		await page.goto("/settings/webhooks");
 		await page.waitForLoadState("domcontentloaded");
 
-		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true });
 		await expect(breadcrumb.getByText("Settings")).toBeVisible({ timeout: 15_000 });
 		await expect(breadcrumb.getByText("Webhooks")).toBeVisible();
 	});

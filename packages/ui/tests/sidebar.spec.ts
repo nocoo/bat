@@ -10,8 +10,8 @@ for (const theme of ["light", "dark"]) {
 		const nav = sidebar.locator('[data-slot="sidebar-nav"]');
 		const hosts = sidebar.getByRole("link", { name: "Hosts", exact: true });
 		await expect(hosts).toHaveAttribute("aria-current", "page");
-		await expect(nav).toHaveCSS("padding-left", "8px");
-		await expect(nav).toHaveCSS("padding-right", "8px");
+		await expect(nav).toHaveCSS("padding-left", "16px");
+		await expect(nav).toHaveCSS("padding-right", "16px");
 		const footer = sidebar.locator('[data-slot="sidebar-footer"]');
 		await expect(footer).toHaveCSS("padding-left", "16px");
 		await expect(footer).toHaveCSS("padding-bottom", "16px");
@@ -20,7 +20,7 @@ for (const theme of ["light", "dark"]) {
 		const railBounds = await sidebar.boundingBox();
 		const row = nav.locator('[data-basalt-hover-item][data-hover-selected="true"]');
 		const rowBounds = await row.boundingBox();
-		expect(rowBounds?.x).toBe((railBounds?.x ?? 0) + 8);
+		expect(rowBounds?.x).toBe((railBounds?.x ?? 0) + 16);
 
 		const selectedColor = await row.evaluate((element) => {
 			const probe = document.createElement("span");
@@ -105,4 +105,14 @@ test("mobile navigation stays expanded and closes on the current route without c
 	await expect(page.locator("body")).not.toHaveAttribute("data-scroll-locked");
 	await page.setViewportSize({ width: 1280, height: 720 });
 	await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
+});
+
+test("sidebar sign-out links to Cloudflare Access logout", async ({ page }) => {
+	await page.goto("/hosts");
+	const sidebar = page.getByRole("complementary", { name: "Main navigation", exact: true });
+	const signOut = sidebar.getByRole("link", { name: "Sign out", exact: true });
+	await expect(signOut).toHaveAttribute(
+		"href",
+		"https://nocoo.cloudflareaccess.com/cdn-cgi/access/logout",
+	);
 });

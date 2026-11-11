@@ -144,7 +144,7 @@ test.describe("Workstations list", () => {
 
 	test("breadcrumb resolves the workstation name and returns to the list", async ({ page }) => {
 		await page.goto(`/workstations/${fieldLaptop}`);
-		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb", exact: true });
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true });
 		await expect(breadcrumb).toContainText("Workstations");
 		await expect(breadcrumb).toContainText("Field laptop");
 		await breadcrumb.getByRole("link", { name: "Workstations", exact: true }).click();
