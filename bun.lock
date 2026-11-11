@@ -92,9 +92,6 @@
     "@biomejs/biome",
     "workerd",
   ],
-  "patchedDependencies": {
-    "@nocoo/basalt@3.3.2": "patches/@nocoo%2Fbasalt@3.3.2.patch",
-  },
   "overrides": {
     "nanoid": "^3.3.18",
     "postcss": "8.5.28",
