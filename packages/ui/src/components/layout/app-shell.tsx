@@ -1,18 +1,10 @@
-import {
-	ContentIsland,
-	Sheet,
-	SheetContent,
-	SheetDescription,
-	SheetHeader,
-	SheetTitle,
-} from "@nocoo/basalt";
+import { ContentIsland, SidebarDrawer } from "@nocoo/basalt";
 import { AppHeader, AppHeaderMenuButton, ProjectLinks } from "@nocoo/basalt/components/app-header";
 import {
 	AppMain,
 	AppSkipLink,
 	AppShell as BasaltAppShell,
 } from "@nocoo/basalt/components/app-shell";
-import { SidebarProvider } from "@nocoo/basalt/components/sidebar";
 import { ThemeToggle } from "@nocoo/basalt/components/theme-toggle";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
@@ -56,29 +48,20 @@ function AppShellInner({ children }: AppShellProps) {
 			)}
 
 			{showMobileDrawer && (
-				<Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-					<SheetContent
-						side="left"
-						onCloseAutoFocus={(event) => {
-							event.preventDefault();
-							menuTrigger.current?.focus();
-						}}
-						className="w-[260px] max-w-[260px] border-0 bg-basalt-background p-0 sm:max-w-[260px] sm:p-0"
-					>
-						<SheetHeader className="sr-only">
-							<SheetTitle>Navigation Menu</SheetTitle>
-							<SheetDescription>Browse bat dashboard pages</SheetDescription>
-						</SheetHeader>
-						<SidebarProvider collapsed={false} defaultWidth={260}>
-							<Sidebar
-								ariaLabel="Main navigation drawer"
-								variant="mobile"
-								onNavigate={() => setMobileOpen(false)}
-								onDismiss={() => setMobileOpen(false)}
-							/>
-						</SidebarProvider>
-					</SheetContent>
-				</Sheet>
+				<SidebarDrawer
+					open={mobileOpen}
+					onOpenChange={setMobileOpen}
+					returnFocusRef={menuTrigger}
+					title="Navigation Menu"
+					description="Browse bat dashboard pages"
+				>
+					<Sidebar
+						ariaLabel="Main navigation drawer"
+						variant="mobile"
+						onNavigate={() => setMobileOpen(false)}
+						onDismiss={() => setMobileOpen(false)}
+					/>
+				</SidebarDrawer>
 			)}
 
 			<AppMain>
