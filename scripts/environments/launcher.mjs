@@ -391,7 +391,7 @@ if (import.meta.main) {
 			closing = true;
 			// Bun does not await an async signal handler, so the teardown that
 			// matters for the next launch has to be synchronous.
-			for (const instance of instances.values()) instance.runtime?.killNow?.();
+			for (const instance of runtime.instances.values()) instance.runtime?.killNow?.();
 			process.exit(0);
 		});
 }
