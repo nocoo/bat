@@ -68,10 +68,6 @@ function isItemActive(href: string, pathname: string) {
 	return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function shouldGroupBeOpenOnMount(group: { items: NavItem[] }, pathname: string): boolean {
-	return group.items.some((item) => isItemActive(item.href, pathname));
-}
-
 interface SidebarBodyProps {
 	variant?: "desktop" | "mobile";
 	onNavigate?: () => void;
@@ -136,11 +132,7 @@ function SidebarBody({ variant = "desktop", onNavigate, onDismiss }: SidebarBody
 							);
 						})
 					: NAV_GROUPS.map((group) => (
-							<SidebarGroup
-								key={group.label}
-								label={group.label}
-								defaultOpen={shouldGroupBeOpenOnMount(group, pathname)}
-							>
+							<SidebarGroup key={group.label} label={group.label}>
 								{group.items.map((item) => {
 									const Icon = item.icon;
 									const active = isItemActive(item.href, pathname);
