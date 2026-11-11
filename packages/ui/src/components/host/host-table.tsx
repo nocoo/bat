@@ -45,11 +45,12 @@ import {
 	Timer,
 	Wallet,
 } from "lucide-react";
+import * as React from "react";
 import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { hostStatusLabel, StatusBadge } from "@/components/status-badge";
 import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";
-import { statusDotColor } from "@/lib/host-card-format";
+import { getValueColor, statusDotColor } from "@/lib/host-card-format";
 import { formatCoreCount, formatSpecSize } from "@/lib/host-spec-format";
 import { chart, getSwatchColor } from "@/lib/palette";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,10 @@ const CELL_VALUE = "whitespace-nowrap text-basalt-base font-medium tabular-nums"
 const MAX_VISIBLE_TAGS = 3;
 /** Hover rows reuse the chart tooltip's type: a label and an already
  *  formatted value, so a size never gets run through the numeric formatter. */
-const SPARK_SLOT = "ms-auto h-5 w-16 2xl:h-6 2xl:w-24";
+const SPARK_SLOT = "hidden h-5 w-12 xl:block";
+/** The visible reading: one fixed slot, so the number keeps one right edge
+ *  inside a centred cell while the graph beside it keeps one left edge. */
+const METRIC_VALUE = "w-12 shrink-0 text-right text-basalt-base font-medium tabular-nums";
 
 /** Local browser clock, the one reference every hover time uses. */
 export function localDateTime(seconds: number): string {
@@ -165,8 +169,11 @@ function SnapshotTooltip({
 }) {
 	return (
 		<TooltipContent side="top" sideOffset={6} className="text-basalt-sm">
-			<div className="flex flex-col gap-basalt-space-xs tabular-nums">
-				<span>{localDateTime(at)}</span>
+			<div
+				className="flex flex-col gap-basalt-space-xs tabular-nums"
+				data-testid="snapshot-tooltip"
+			>
+				<span data-testid="snapshot-time">{localDateTime(at)}</span>
 				<span className="text-basalt-muted-foreground">{headline}</span>
 				<span className="text-basalt-muted-foreground">{detail}</span>
 			</div>
@@ -174,13 +181,53 @@ function SnapshotTooltip({
 	);
 }
 
+/** Only pressure is coloured; a healthy reading stays on the neutral rail. */
+function pressureClass(value: number): string {
+	return value >= 60 ? getValueColor(value) : "";
+}
+
+/** The number the cell shows outside the hover: the reading itself, with the
+ *  machine's size left to the tooltip. */
+function Reading({ value }: { value: number | null }) {
+	if (value === null) {
+		return <span className={`${METRIC_VALUE} text-basalt-muted-foreground`}>—</span>;
+	}
+	return <span className={`${METRIC_VALUE} ${pressureClass(value)}`}>{formatPercent(value)}</span>;
+}
+
+/** CPU, memory and disk cells centre their pair in the column, so the graph
+ *  column reads as a column rather than as a ragged right edge. */
+const MetricCell = React.forwardRef<HTMLDivElement, React.ComponentProps<"div">>(
+	({ className, ...props }, ref) => (
+		<div
+			ref={ref}
+			className={cn("flex items-center justify-center gap-basalt-space-md", className)}
+			{...props}
+		/>
+	),
+);
+MetricCell.displayName = "MetricCell";
+
 /** A usage bar, 56×4, muted rail. It is the cell's whole visible content, so
  *  the reading lives in the hover rather than beside it. */
-function UsageBar({ share, color, testId }: { share: string; color: string; testId: string }) {
+function UsageBar({
+	share,
+	color,
+	testId,
+	className,
+}: {
+	share: string;
+	color: string;
+	testId: string;
+	className?: string;
+}) {
 	return (
 		<span
 			aria-hidden="true"
-			className="h-1 w-14 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted 2xl:w-20"
+			className={cn(
+				"h-1 w-10 shrink-0 overflow-hidden rounded-basalt-full bg-basalt-muted",
+				className,
+			)}
 			data-testid={testId}
 		>
 			<span
@@ -351,13 +398,13 @@ export function HostTable({
 						<TableHead className="hidden w-px xl:table-cell">
 							<HeadLabel icon={Activity}>Status</HeadLabel>
 						</TableHead>
-						<TableHead textAlign="end">
+						<TableHead className="text-center">
 							<HeadLabel icon={Cpu}>CPU</HeadLabel>
 						</TableHead>
-						<TableHead textAlign="end">
+						<TableHead className="text-center">
 							<HeadLabel icon={MemoryStick}>Memory</HeadLabel>
 						</TableHead>
-						<TableHead textAlign="end">
+						<TableHead className="text-center">
 							<HeadLabel icon={HardDrive}>Disk</HeadLabel>
 						</TableHead>
 						<TableHead className="hidden xl:table-cell" textAlign="end">
@@ -440,48 +487,58 @@ export function HostTable({
 								<TableCell className="hidden xl:table-cell">
 									<StatusBadge status={host.status} />
 								</TableCell>
-								<TableCell textAlign="end" data-testid="host-cpu">
-									<TrendChart
-										points={host.cpu_sparkline}
-										color={chart.pink}
-										label={
-											host.cpu_usage_pct === null
-												? `${host.hostname} CPU usage, no reading`
-												: `${host.hostname} CPU usage ${formatPercent(host.cpu_usage_pct)}, last 24 hours`
-										}
-										extras={[{ name: "Cores", value: formatCoreCount(host.cpu_logical) ?? "—" }]}
-										formatter={formatPercent}
-									/>
+								<TableCell data-testid="host-cpu">
+									<MetricCell>
+										<Reading value={host.cpu_usage_pct} />
+										<TrendChart
+											points={host.cpu_sparkline}
+											color={chart.pink}
+											label={
+												host.cpu_usage_pct === null
+													? `${host.hostname} CPU usage, no reading`
+													: `${host.hostname} CPU usage ${formatPercent(host.cpu_usage_pct)}, last 24 hours`
+											}
+											extras={[{ name: "Cores", value: formatCoreCount(host.cpu_logical) ?? "—" }]}
+											formatter={formatPercent}
+										/>
+									</MetricCell>
 								</TableCell>
-								<TableCell textAlign="end" data-testid="host-memory">
-									<TrendChart
-										points={host.mem_sparkline}
-										color={chart.sky}
-										label={
-											host.mem_used_pct === null
-												? `${host.hostname} memory usage, no reading`
-												: `${host.hostname} memory usage ${formatPercent(host.mem_used_pct)}, last 24 hours`
-										}
-										extras={[
-											{ name: "Used", value: memoryUsed ?? "—" },
-											{ name: "Total", value: memoryTotal ?? "—" },
-										]}
-										formatter={formatPercent}
-									/>
+								<TableCell data-testid="host-memory">
+									<MetricCell>
+										<Reading value={host.mem_used_pct} />
+										<TrendChart
+											points={host.mem_sparkline}
+											color={chart.sky}
+											label={
+												host.mem_used_pct === null
+													? `${host.hostname} memory usage, no reading`
+													: `${host.hostname} memory usage ${formatPercent(host.mem_used_pct)}, last 24 hours`
+											}
+											extras={[
+												{ name: "Used", value: memoryUsed ?? "—" },
+												{ name: "Total", value: memoryTotal ?? "—" },
+											]}
+											formatter={formatPercent}
+										/>
+									</MetricCell>
 								</TableCell>
-								<TableCell textAlign="end" data-testid="host-disk">
+								<TableCell data-testid="host-disk">
 									{host.disk_root_used_pct === null ? (
-										<Dash />
+										<MetricCell>
+											<Reading value={null} />
+										</MetricCell>
 									) : (
 										<Tooltip>
 											<TooltipTrigger asChild>
-												<span className="inline-flex cursor-default">
+												<MetricCell>
+													<Reading value={host.disk_root_used_pct} />
 													<UsageBar
+														className="hidden xl:block"
 														testId="host-disk-bar"
 														share={`${Math.min(100, Math.max(0, host.disk_root_used_pct)).toFixed(1)}%`}
 														color={diskBarColor(host.disk_root_used_pct)}
 													/>
-												</span>
+												</MetricCell>
 											</TooltipTrigger>
 											<SnapshotTooltip
 												at={host.last_seen}

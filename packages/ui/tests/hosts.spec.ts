@@ -218,7 +218,7 @@ test.describe("Hosts list page", () => {
 		await expect(page.getByText(/^v\d+\.\d+\.\d+$/)).toBeVisible({ timeout: 15_000 });
 	});
 
-	test("metric cells keep their reading behind the hover", async ({ page }) => {
+	test("metric cells show the reading and keep the sizes behind the hover", async ({ page }) => {
 		await page.setViewportSize({ width: 1536, height: 900 });
 		await page.goto("/hosts");
 		const table = page.getByRole("table", { name: "Servers" });
@@ -239,14 +239,14 @@ test.describe("Hosts list page", () => {
 		]);
 
 		const alpha = page.getByTestId("host-row").filter({ hasText: "alpha.test.local" });
-		// The row is for scanning: no metric cell prints a reading or a size.
+		// The reading stays in the row; the machine's own size does not.
 		for (const id of ["host-cpu", "host-memory", "host-disk"]) {
-			await expect(alpha.getByTestId(id)).not.toContainText("%");
+			await expect(alpha.getByTestId(id)).toContainText("%");
+			await expect(alpha.getByTestId(id)).not.toContainText(/GB|cores/);
 		}
 		await expect(alpha.getByTestId("host-cpu").locator("svg")).toBeVisible();
 		await expect(alpha.getByTestId("host-memory").locator("svg")).toBeVisible();
 		await expect(alpha.getByTestId("host-disk-bar")).toBeVisible();
-		await expect(alpha.getByTestId("host-disk")).not.toContainText("GB");
 
 		// Hovering a trend opens the chart tooltip: local timestamp first, then
 		// the reading and the machine's own size.
@@ -270,10 +270,10 @@ test.describe("Hosts list page", () => {
 		await expect(chartTooltip).toContainText("Total");
 		await expect(chartTooltip).toContainText("8 GB");
 
-		// The disk bar carries its reading and size in the hover only.
-		await alpha.getByTestId("host-disk-bar").hover();
-		const diskTooltip = page.getByRole("tooltip").first();
-		await expect(diskTooltip.locator("span").first()).toHaveText(
+		// The disk cell carries its size in the hover only.
+		await alpha.getByTestId("host-disk").hover();
+		const diskTooltip = page.getByTestId("snapshot-tooltip");
+		await expect(diskTooltip.getByTestId("snapshot-time")).toHaveText(
 			/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
 		);
 		await expect(diskTooltip).toContainText("% used");
@@ -347,19 +347,54 @@ test.describe("Hosts list page", () => {
 				const statusDotEl = rows[0]?.querySelector<HTMLElement>('td span[role="img"]');
 				const badgeEl = rows[0]?.querySelector<HTMLElement>('[data-testid="status-badge"]');
 				const hostname = rows[0]?.querySelector<HTMLAnchorElement>("a");
-				const visuals = ["host-cpu", "host-memory", "host-disk", "host-days-left"].map((id) => {
+				// CPU, memory and disk centre a reading plus its visual — the visual
+				// folds below `xl` and the reading stays centred alone. The countdown
+				// stays a right-aligned pair.
+				const MAP_OFFSET = 3;
+				const centred = ["host-cpu", "host-memory", "host-disk"].map((id, index) => {
 					const cell = rows[0]?.querySelector<HTMLElement>(`[data-testid="${id}"]`);
-					const visual = cell?.querySelector<HTMLElement>("svg, [data-testid$='-bar']");
-					if (!cell || !visual) return { id, gap: null };
-					const contentRight =
-						cell.getBoundingClientRect().right -
-						Number.parseFloat(getComputedStyle(cell).paddingRight);
-					return { id, gap: Math.round(contentRight - visual.getBoundingClientRect().right) };
+					const reading = cell?.firstElementChild?.firstElementChild as HTMLElement | null;
+					if (!cell || !reading) return { id, skew: null, reading: null, valueWidth: 0 };
+					const style = getComputedStyle(cell);
+					const box = cell.getBoundingClientRect();
+					const contentLeft = box.left + Number.parseFloat(style.paddingLeft);
+					const contentRight = box.right - Number.parseFloat(style.paddingRight);
+					const first = reading.getBoundingClientRect();
+					// A chart's outer figure is `display: contents`, so measure its
+					// rendered box instead of the zero rect on the figure.
+					const visual = cell.querySelector<HTMLElement>(".basalt-chart, [data-testid$='-bar']");
+					const visualBox = visual && visual.getBoundingClientRect().width > 0 ? visual : null;
+					const groupRight = visualBox ? visualBox.getBoundingClientRect().right : first.right;
+					const cellHeader = element.querySelector<HTMLElement>(
+						`thead th:nth-child(${index + MAP_OFFSET})`,
+					);
+					const headerContent = cellHeader?.firstElementChild?.getBoundingClientRect();
+					return {
+						id,
+						skew: Math.round(Math.abs(first.left - contentLeft - (contentRight - groupRight))),
+						reading: reading.textContent?.trim() ?? "",
+						valueWidth: Math.round(first.width),
+						valueAlign: getComputedStyle(reading).textAlign,
+						visualVisible: Boolean(visualBox),
+						headerSkew: headerContent
+							? Math.round(
+									Math.abs(
+										headerContent.left + headerContent.width / 2 - (box.left + box.width / 2),
+									),
+								)
+							: null,
+					};
 				});
-				const readings = ["host-cpu", "host-memory", "host-disk"].map(
-					(id) =>
-						rows[0]?.querySelector<HTMLElement>(`[data-testid="${id}"]`)?.textContent?.trim() ?? "",
-				);
+				const countdown = rows[0]?.querySelector<HTMLElement>('[data-testid="host-days-left"]');
+				const countdownBar = countdown?.querySelector<HTMLElement>("[data-testid$='-bar']");
+				const countdownGap =
+					countdown && countdownBar
+						? Math.round(
+								countdown.getBoundingClientRect().right -
+									Number.parseFloat(getComputedStyle(countdown).paddingRight) -
+									countdownBar.getBoundingClientRect().right,
+							)
+						: null;
 				return {
 					rowHeights: rows.map((row) => Math.round(row.getBoundingClientRect().height)),
 					padding: cpuCell
@@ -394,8 +429,8 @@ test.describe("Hosts list page", () => {
 								)
 								.map((span) => span.textContent.trim())
 						: [],
-					visuals,
-					readings,
+					centred,
+					countdownGap,
 					tableOverflow: element.scrollWidth - element.clientWidth,
 					cellOverflow: Array.from(element.querySelectorAll<HTMLElement>("td")).filter(
 						(cell) => cell.scrollWidth > cell.clientWidth + 1,
@@ -436,10 +471,20 @@ test.describe("Hosts list page", () => {
 				expect(rhythm.statusDotLabel).toBe(badgeLabel);
 				expect(rhythm.badgeVisible).toBe(false);
 			}
-			// The table is for scanning: no metric cell prints a reading, and each
-			// visual sits flush with its column's content edge.
-			for (const reading of rhythm.readings) expect(reading).toBe("");
-			for (const visual of rhythm.visuals) expect(visual.gap).toBe(0);
+			// One reading per visual column, centred with its graph in a fixed
+			// 48px slot so the numbers keep a single right edge inside the cell,
+			// and the header sits over the middle of the same column.
+			for (const cell of rhythm.centred) {
+				expect(cell.reading).toMatch(/^(\d+(\.\d+)?%|—)$/);
+				expect(cell.valueWidth).toBe(48);
+				expect(cell.valueAlign).toBe("right");
+				expect(cell.skew).toBeLessThanOrEqual(1);
+				expect(cell.headerSkew).toBeLessThanOrEqual(1);
+				// The graph needs the room; below `xl` only the reading fits.
+				expect(cell.visualVisible).toBe(width === 1440);
+			}
+			// The countdown cell keeps its pair flush with the column edge.
+			expect(rhythm.countdownGap).toBe(0);
 			// The subtitle keeps whole words — a colour dot alone is never acceptable.
 			expect(rhythm.subtitleWords.length).toBeGreaterThan(0);
 			expect(rhythm.subtitleWords.join(" ")).not.toContain("…");
