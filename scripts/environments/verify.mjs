@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { launch } from "./launcher.mjs";
-import { readRecordedRecording, SERVER_ALIASES } from "./recorded-demo.mjs";
+import { DEMO_SCENARIOS, readRecordedRecording, SERVER_ALIASES } from "./recorded-demo.mjs";
 import { createRuntime, productionConfig, removeOwned, storageRoot } from "./runtime.mjs";
 
 const near = (actual, expected) =>
@@ -27,7 +27,6 @@ const hostsProjection = (detail) => ({
 	dns_resolvers: detail.dns_resolvers,
 	dns_search: detail.dns_search,
 	boot_time: detail.boot_time,
-	last_seen: detail.last_seen,
 	top_processes_json: detail.top_processes_json,
 	top_processes_ts: detail.top_processes_ts,
 });
@@ -117,6 +116,23 @@ try {
 	}
 	const template = hostsProjection(details[0]);
 	for (const detail of details.slice(1)) assert.deepEqual(hostsProjection(detail), template);
+	// Freshness is the one host field the catalog varies per alias: the status
+	// mixture depends on it, so every alias is checked against its own scenario.
+	for (const detail of details) {
+		assert.equal(detail.last_seen, anchor - DEMO_SCENARIOS[detail.host_id].lastSeenAgeSeconds);
+	}
+	const statusMix = hosts.reduce((counts, host) => {
+		counts[host.status] = (counts[host.status] ?? 0) + 1;
+		return counts;
+	}, {});
+	assert.deepEqual(statusMix, { healthy: 2, warning: 2, critical: 2, offline: 2 });
+	const alerts = await (await fetch(`${prefix}/api/alerts`)).json();
+	assert.deepEqual([...new Set(alerts.map((alert) => alert.rule_id))].sort(), [
+		"no_firewall",
+		"public_port",
+		"ssh_root_login",
+		"systemd_failed",
+	]);
 	assert.equal(new Set(details.map((detail) => detail.public_ip)).size, 8);
 
 	// The demo catalog carries varied billing: every alias that has billing
@@ -171,8 +187,15 @@ try {
 		const devices = new Set(JSON.parse(entry.data.at(-1).disk_json).map((disk) => disk.device));
 		assert.equal(devices.size, entry.host_id === secondFilesystemHostId ? 2 : 1);
 	}
-	for (const tier2 of tier2History.slice(1)) {
-		assert.deepEqual({ ...tier2, host_id: null }, { ...tier2History[0], host_id: null });
+	const capturedTier2 = recording.server.tier2;
+	for (const tier2 of tier2History) {
+		const scenario = DEMO_SCENARIOS[tier2.host_id];
+		assert.deepEqual(tier2.systemd, { ...capturedTier2.systemd, ...scenario.systemd });
+		assert.deepEqual(tier2.security, { ...capturedTier2.security, ...scenario.security });
+		assert.deepEqual(
+			{ ...tier2, host_id: null, systemd: null, security: null },
+			{ ...tier2History[0], host_id: null, systemd: null, security: null },
+		);
 	}
 
 	const workstations = await (await fetch(`${prefix}/api/workstations`)).json();

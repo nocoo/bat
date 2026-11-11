@@ -118,6 +118,91 @@ const DESCRIPTIONS_BY_HOST = {
 		"Object storage node with the bulk archives. Serves the demo recordings and the nightly tarballs, and mirrors them to an offline drive; the dataset grows a few gigabytes every week.",
 };
 
+// Reviewer-facing scenario per alias. The recording holds one freshly reporting
+// healthy host, so a straight replication would show eight identical Healthy
+// cards and, two minutes later, eight Offline ones. Each alias instead keeps a
+// fixed freshness and a set of active alerts whose evidence is present in the
+// catalog it serves: the public port already appears in the captured listening
+// set and is absent from the allowlist, and the security/systemd overrides below
+// are the only invented tier 2 fields. Statuses stay a stable mixture because
+// the launcher rebases these ages onto the current clock.
+const SCENARIO_BY_HOST = {
+	"pw-host-alpha": { lastSeenAgeSeconds: 8 },
+	"pw-host-beta": { lastSeenAgeSeconds: 22 },
+	"demo-server-03": {
+		lastSeenAgeSeconds: 12,
+		alerts: [
+			{
+				rule_id: "public_port",
+				severity: "warning",
+				value: 57423,
+				message: "Unexpected public ports: 57423",
+				ageSeconds: 7300,
+			},
+		],
+	},
+	"demo-server-04": {
+		lastSeenAgeSeconds: 30,
+		alerts: [
+			{
+				rule_id: "systemd_failed",
+				severity: "warning",
+				value: 1,
+				message: "Systemd unit failed: postgresql-backup.service",
+				ageSeconds: 5400,
+			},
+		],
+		systemd: {
+			failed_count: 1,
+			failed: [
+				{
+					unit: "postgresql-backup.service",
+					load_state: "loaded",
+					active_state: "failed",
+					sub_state: "failed",
+					description: "Nightly PostgreSQL base backup",
+				},
+			],
+		},
+	},
+	"demo-server-05": {
+		lastSeenAgeSeconds: 16,
+		alerts: [
+			{
+				rule_id: "no_firewall",
+				severity: "critical",
+				value: 0,
+				message: "No active host firewall",
+				ageSeconds: 86400,
+			},
+		],
+		security: { firewall_active: false, firewall_default_policy: null },
+	},
+	"demo-server-06": { lastSeenAgeSeconds: 420 },
+	"demo-server-07": { lastSeenAgeSeconds: 12240 },
+	"demo-server-08": {
+		lastSeenAgeSeconds: 26,
+		alerts: [
+			{
+				rule_id: "ssh_root_login",
+				severity: "critical",
+				value: 1,
+				message: "SSH root login is enabled (PermitRootLogin yes)",
+				ageSeconds: 172800,
+			},
+		],
+		security: { ssh_root_login: "yes" },
+	},
+};
+
+export const DEMO_SCENARIOS = SCENARIO_BY_HOST;
+
+function aliasScenario(hostId) {
+	const scenario = SCENARIO_BY_HOST[hostId];
+	if (!scenario) throw new Error(`Missing demo scenario for ${hostId}`);
+	return scenario;
+}
+
 // The second alias is the demo's two-filesystem host.
 const SECOND_FILESYSTEM_ALIAS_INDEX = 1;
 
@@ -384,7 +469,7 @@ function aliasContract(alias) {
 
 function hostInsert(recording, alias, aliasIndex, target, anchor) {
 	const detail = recording.server.detail;
-	const lastSeen = ageToEpoch(anchor, detail.last_seen_age_seconds);
+	const lastSeen = ageToEpoch(anchor, aliasScenario(alias.host_id).lastSeenAgeSeconds);
 	const billing = aliasBilling(alias, anchor);
 	const contract = aliasContract(alias);
 	return insert(
@@ -573,6 +658,9 @@ function rebaseDocker(docker, anchor) {
 
 function tier2Insert(alias, recording, anchor) {
 	const tier2 = recording.server.tier2;
+	const scenario = aliasScenario(alias.host_id);
+	const merge = (captured, override) =>
+		override === undefined ? captured : { ...captured, ...override };
 	const section = (value) => (value === null || value === undefined ? null : jsonValue(value));
 	return insert(
 		"tier2_snapshots",
@@ -591,13 +679,31 @@ function tier2Insert(alias, recording, anchor) {
 			alias.host_id,
 			ageToEpoch(anchor, tier2.age_seconds),
 			section(tier2.ports),
-			section(tier2.systemd),
-			section(tier2.security),
+			section(merge(tier2.systemd, scenario.systemd)),
+			section(merge(tier2.security, scenario.security)),
 			section(rebaseDocker(tier2.docker, anchor)),
 			section(tier2.disk_deep),
 			section(tier2.software),
 			section(tier2.websites),
 		],
+	);
+}
+
+function alertInserts(alias, anchor) {
+	const alerts = aliasScenario(alias.host_id).alerts ?? [];
+	return alerts.map((alert) =>
+		insert(
+			"alert_states",
+			["host_id", "rule_id", "severity", "value", "triggered_at", "message"],
+			[
+				alias.host_id,
+				alert.rule_id,
+				alert.severity,
+				alert.value,
+				ageToEpoch(anchor, alert.ageSeconds),
+				alert.message,
+			],
+		),
 	);
 }
 
@@ -880,6 +986,7 @@ export function recordedDemoSql(recording, anchor) {
 		for (const point of recording.server.hourly.data)
 			statements.push(hourlyInsert(alias, point, anchor, index));
 		statements.push(tier2Insert(alias, recording, anchor));
+		statements.push(...alertInserts(alias, anchor));
 	}
 	statements.push(...portInserts(recording, anchor));
 	statements.push(...tagStatements());

@@ -3,18 +3,22 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { ALL_ALERT_RULES } from "../../packages/shared/src/alerts.ts";
 import { fixtureSql } from "./fixtures.mjs";
 import {
 	calendarDateFromAnchor,
+	DEMO_SCENARIOS,
 	readRecordedRecording,
 	reconstructRtts,
 	recordedDemoSql,
 	SERVER_ALIASES,
 } from "./recorded-demo.mjs";
+import { DEMO_TIME_COLUMNS, demoRebaseSql } from "./runtime.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const migrations = join(root, "packages/worker/migrations");
 const focusedSqlPath = join(root, "scripts/environments/focused.sql");
+const ALERT_RULES = new Map(ALL_ALERT_RULES.map((rule) => [rule.id, rule]));
 const ANCHOR = 1_800_000_000;
 const SECOND_FILESYSTEM_HOST_ID = SERVER_ALIASES[1].host_id;
 
@@ -109,21 +113,21 @@ describe("recorded Demo SQL catalog", () => {
 
 		const template = db
 			.query(
-				"SELECT os,kernel,arch,cpu_model,cpu_logical,cpu_physical,mem_total_bytes,swap_total_bytes,virtualization,disks,boot_mode,timezone,dns_resolvers,dns_search,boot_time,last_seen,top_processes_json,top_processes_ts FROM hosts WHERE host_id='pw-host-alpha'",
+				"SELECT os,kernel,arch,cpu_model,cpu_logical,cpu_physical,mem_total_bytes,swap_total_bytes,virtualization,disks,boot_mode,timezone,dns_resolvers,dns_search,boot_time,top_processes_json,top_processes_ts FROM hosts WHERE host_id='pw-host-alpha'",
 			)
 			.get();
 		for (const host of hosts.filter((entry) => entry.host_id !== "pw-host-alpha")) {
 			const row = db
 				.query(
-					"SELECT os,kernel,arch,cpu_model,cpu_logical,cpu_physical,mem_total_bytes,swap_total_bytes,virtualization,disks,boot_mode,timezone,dns_resolvers,dns_search,boot_time,last_seen,top_processes_json,top_processes_ts FROM hosts WHERE host_id=?",
+					"SELECT os,kernel,arch,cpu_model,cpu_logical,cpu_physical,mem_total_bytes,swap_total_bytes,virtualization,disks,boot_mode,timezone,dns_resolvers,dns_search,boot_time,top_processes_json,top_processes_ts FROM hosts WHERE host_id=?",
 				)
 				.get(host.host_id);
 			expect(row).toEqual(template);
 		}
 		expect(JSON.parse(template.top_processes_json).length).toBeGreaterThan(0);
-		expect(template.last_seen).toBe(
-			ANCHOR - readRecordedRecording().server.detail.last_seen_age_seconds,
-		);
+		for (const row of db.query("SELECT host_id,last_seen FROM hosts").all()) {
+			expect(row.last_seen).toBe(ANCHOR - DEMO_SCENARIOS[row.host_id].lastSeenAgeSeconds);
+		}
 
 		const alphaNet = JSON.parse(
 			db.query("SELECT net_interfaces FROM hosts WHERE host_id='pw-host-alpha'").get()
@@ -136,6 +140,75 @@ describe("recorded Demo SQL catalog", () => {
 		expect(alphaNet).not.toEqual(betaNet);
 		expect(alphaNet.some((iface) => iface.ipv4.includes("203.0.113.1"))).toBe(true);
 		expect(betaNet.some((iface) => iface.ipv4.includes("203.0.113.8"))).toBe(true);
+	});
+
+	test("seeds a status mixture whose alerts point at the tier 2 evidence it serves", () => {
+		const alerts = db
+			.query("SELECT host_id,rule_id,severity,value,triggered_at,message FROM alert_states")
+			.all();
+		const lastSeen = new Map(
+			db
+				.query("SELECT host_id,last_seen FROM hosts")
+				.all()
+				.map((row) => [row.host_id, row.last_seen]),
+		);
+		const statusOf = (hostId) => {
+			if (ANCHOR - lastSeen.get(hostId) > 120) return "offline";
+			const own = alerts.filter((alert) => alert.host_id === hostId);
+			if (own.some((alert) => alert.severity === "critical")) return "critical";
+			if (own.some((alert) => alert.severity === "warning")) return "warning";
+			return "healthy";
+		};
+		const statuses = SERVER_ALIASES.map((alias) => statusOf(alias.host_id));
+		expect(statuses.filter((status) => status === "healthy")).toHaveLength(2);
+		expect(statuses.filter((status) => status === "warning")).toHaveLength(2);
+		expect(statuses.filter((status) => status === "critical")).toHaveLength(2);
+		expect(statuses.filter((status) => status === "offline")).toHaveLength(2);
+		for (const alert of alerts) {
+			expect(ALERT_RULES.get(alert.rule_id)?.severity).toBe(alert.severity);
+			expect(alert.triggered_at).toBeLessThan(ANCHOR);
+		}
+
+		const tier2 = (hostId) => {
+			const row = db
+				.query("SELECT ports_json,systemd_json,security_json FROM tier2_snapshots WHERE host_id=?")
+				.get(hostId);
+			return {
+				ports: JSON.parse(row.ports_json),
+				systemd: JSON.parse(row.systemd_json),
+				security: JSON.parse(row.security_json),
+			};
+		};
+		const allowlisted = new Set(
+			db
+				.query("SELECT port FROM port_allowlist WHERE host_id=?")
+				.all("demo-server-03")
+				.map((row) => row.port),
+		);
+		const [publicPortAlert] = alerts.filter((alert) => alert.rule_id === "public_port");
+		const boundAddresses = tier2(publicPortAlert.host_id).ports.listening.filter(
+			(port) => port.port === publicPortAlert.value,
+		);
+		expect(
+			boundAddresses.some((port) => !["127.0.0.1", "::1"].includes(port.bind)) &&
+				!allowlisted.has(publicPortAlert.value),
+		).toBe(true);
+		expect(publicPortAlert.message).toContain(String(publicPortAlert.value));
+
+		const failed = alerts.find((alert) => alert.rule_id === "systemd_failed");
+		const systemd = tier2(failed.host_id).systemd;
+		expect(systemd.failed_count).toBe(systemd.failed.length);
+		expect(systemd.failed.length).toBeGreaterThan(0);
+		expect(failed.message).toContain(systemd.failed[0].unit);
+
+		const noFirewall = alerts.find((alert) => alert.rule_id === "no_firewall");
+		expect(tier2(noFirewall.host_id).security.firewall_active).toBe(false);
+
+		const rootLogin = alerts.find((alert) => alert.rule_id === "ssh_root_login");
+		expect(tier2(rootLogin.host_id).security.ssh_root_login).toBe("yes");
+		expect(alerts.filter((alert) => alert.host_id === noFirewall.host_id).length).toBeGreaterThan(
+			0,
+		);
 	});
 
 	test("replicates captured raw, hourly, tier 2 and process history for every alias", () => {
@@ -186,7 +259,27 @@ describe("recorded Demo SQL catalog", () => {
 				)
 				.get(hostId);
 		const alphaTier2 = tier2("pw-host-alpha");
-		for (const alias of SERVER_ALIASES.slice(1)) expect(tier2(alias.host_id)).toEqual(alphaTier2);
+		const shared = (hostId) =>
+			db
+				.query(
+					"SELECT ts,ports_json,docker_json,disk_deep_json,software_json,websites_json FROM tier2_snapshots WHERE host_id=?",
+				)
+				.get(hostId);
+		for (const alias of SERVER_ALIASES.slice(1))
+			expect(shared(alias.host_id)).toEqual(shared("pw-host-alpha"));
+		const captured = readRecordedRecording().server.tier2;
+		for (const alias of SERVER_ALIASES) {
+			const scenario = DEMO_SCENARIOS[alias.host_id];
+			const row = tier2(alias.host_id);
+			expect(JSON.parse(row.systemd_json)).toEqual({
+				...captured.systemd,
+				...scenario.systemd,
+			});
+			expect(JSON.parse(row.security_json)).toEqual({
+				...captured.security,
+				...scenario.security,
+			});
+		}
 		expect(JSON.parse(alphaTier2.software_json).detected.length).toBeGreaterThan(0);
 	});
 
@@ -701,6 +794,45 @@ describe("recorded Demo SQL catalog", () => {
 			expect(ANCHOR + 86400 - row.ts).toBe(firstAge);
 		} finally {
 			shifted.close();
+		}
+	});
+
+	test("rebases a running store onto a later clock exactly like a fresh seed", () => {
+		const delta = 86_400;
+		const rebased = seeded();
+		rebased.exec(demoRebaseSql(ANCHOR, ANCHOR + delta));
+		const fresh = seeded(ANCHOR + delta);
+		try {
+			for (const [table, columns] of DEMO_TIME_COLUMNS) {
+				for (const column of columns) {
+					const read = (source) =>
+						source
+							.query(
+								`SELECT ${column} AS value FROM ${table} WHERE ${column} IS NOT NULL ORDER BY value`,
+							)
+							.all()
+							.map((row) => row.value);
+					expect(read(rebased)).toEqual(read(fresh));
+				}
+			}
+		} finally {
+			rebased.close();
+			fresh.close();
+		}
+	});
+
+	test("rebases forward only and leaves dashboard edits newer than the anchor alone", () => {
+		const rebased = seeded();
+		try {
+			rebased.exec(
+				`INSERT INTO events(host_id,title,body,source_ip,created_at) VALUES ('pw-host-alpha','edit','edit','127.0.0.1',${ANCHOR + 10})`,
+			);
+			rebased.exec(demoRebaseSql(ANCHOR, ANCHOR + 60));
+			expect(rebased.query("SELECT created_at FROM events").get().created_at).toBe(ANCHOR + 10);
+			expect(demoRebaseSql(ANCHOR, ANCHOR)).toBe("");
+			expect(() => demoRebaseSql(ANCHOR + 60, ANCHOR)).toThrow(/backwards/);
+		} finally {
+			rebased.close();
 		}
 	});
 

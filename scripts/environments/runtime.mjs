@@ -249,17 +249,68 @@ async function stopWorker(child) {
 		throw new Error("Worker did not stop; owned storage retained");
 }
 /**
- * The demo catalog is a snapshot: every sample keeps its captured age, so a
- * store seeded hours ago shows nothing inside a one hour window. Re-seed a
- * demo store older than the freshness window instead of serving an empty
- * dashboard; captured CRUD edits are disposable, raw captures are not.
+ * The Demo catalog stores captured ages as absolute epochs. Instead of
+ * re-seeding an aging store (which would discard dashboard edits), the launcher
+ * rebases every stored timestamp onto the current clock: one uniform delta keeps
+ * the captured relative ages, the seeded freshness scenarios and the chart
+ * windows exactly as reviewed.
  */
-export const DEMO_FRESH_SECONDS = 1800;
+export const DEMO_FIXTURE_VERSION = 4;
 
-export function demoStoreAge(path, now = Math.floor(Date.now() / 1000)) {
-	if (!existsSync(join(path, "owner.json"))) return null;
-	const manifest = JSON.parse(readFileSync(join(path, "owner.json"), "utf8"));
-	return Number.isFinite(manifest.anchor) ? now - manifest.anchor : null;
+export const DEMO_TIME_COLUMNS = [
+	["hosts", ["boot_time", "last_seen", "identity_updated_at", "created_at", "top_processes_ts"]],
+	["metrics_raw", ["ts"]],
+	["metrics_hourly", ["hour_ts"]],
+	["tier2_snapshots", ["ts"]],
+	["alert_states", ["triggered_at"]],
+	["alert_pending", ["first_seen"]],
+	["port_allowlist", ["created_at"]],
+	["workstations", ["created_at", "last_seen_at"]],
+	["workstation_reports", ["received_at", "started_at", "finished_at"]],
+	["workstation_connectivity", ["received_at"]],
+	["agents", ["created_at", "last_seen_at"]],
+	["assets", ["created_at", "updated_at"]],
+	["events", ["created_at"]],
+];
+
+/**
+ * Samples are denser than one minute, so a single `value + delta` update would
+ * collide with rows it has not moved yet inside the (host_id, ts) unique keys.
+ * Those columns move through their negation first, which no stored sample uses.
+ */
+export const DEMO_DENSE_COLUMNS = [
+	["metrics_raw", "ts"],
+	["metrics_hourly", "hour_ts"],
+];
+
+/** Rows newer than the current anchor are real dashboard edits; never move those. */
+export function demoRebaseSql(from, to) {
+	if (!Number.isInteger(from) || !Number.isInteger(to) || from <= 0 || to <= 0)
+		throw new Error("demo rebase needs epoch seconds");
+	const delta = to - from;
+	if (delta < 0) throw new Error("demo rebase cannot move the clock backwards");
+	if (delta === 0) return "";
+	const dense = new Map(DEMO_DENSE_COLUMNS.map(([table, column]) => [`${table}.${column}`, true]));
+	return DEMO_TIME_COLUMNS.flatMap(([table, columns]) =>
+		columns.flatMap((column) =>
+			dense.has(`${table}.${column}`)
+				? [
+						`UPDATE ${table} SET ${column}=-${column} WHERE ${column} IS NOT NULL AND ${column}<=${from};`,
+						`UPDATE ${table} SET ${column}=${delta}-${column} WHERE ${column}<0;`,
+					]
+				: [
+						`UPDATE ${table} SET ${column}=${column}+${delta} WHERE ${column} IS NOT NULL AND ${column}<=${from};`,
+					],
+		),
+	).join("\n");
+}
+
+function demoManifest(path) {
+	try {
+		return JSON.parse(readFileSync(join(path, "owner.json"), "utf8"));
+	} catch {
+		return null;
+	}
 }
 
 export async function createRuntime({
@@ -271,8 +322,8 @@ export async function createRuntime({
 	const owner = mode === "demo" ? "demo" : `e2e-${randomUUID()}`;
 	const path = join(storageRoot, owner);
 	if (mode === "demo" && existsSync(path) && !existsSync(join(path, "running.lock"))) {
-		const age = demoStoreAge(path);
-		if (age !== null && age > DEMO_FRESH_SECONDS) {
+		const manifest = demoManifest(path);
+		if (manifest?.fixtureVersion !== DEMO_FIXTURE_VERSION) {
 			verifyOwnership(path, owner);
 			rmSync(path, { recursive: true });
 		}
@@ -298,7 +349,7 @@ export async function createRuntime({
 					owner,
 					anchor,
 					dataset,
-					fixtureVersion: 3,
+					fixtureVersion: DEMO_FIXTURE_VERSION,
 					ready: false,
 				}),
 				{ mode: 0o600 },
@@ -371,6 +422,16 @@ export async function createRuntime({
 			const { fixtureSql } = await import("./fixtures.mjs");
 			await sql(fixtureSql(dataset, anchor));
 		}
+		const rebase = async (now = Math.floor(Date.now() / 1000)) => {
+			if (mode !== "demo" || now <= anchor) return;
+			await sql(demoRebaseSql(anchor, now));
+			anchor = now;
+			const manifest = verifyOwnership(path, owner);
+			writeFileSync(join(path, "owner.json"), JSON.stringify({ ...manifest, anchor }), {
+				mode: 0o600,
+			});
+		};
+		if (mode === "demo" && !fresh) await rebase();
 		const log = join(path, "worker.log"),
 			fd = openSync(log, "w");
 		child = spawn(
@@ -443,7 +504,10 @@ export async function createRuntime({
 			path,
 			owner,
 			base,
-			anchor,
+			get anchor() {
+				return anchor;
+			},
+			rebase,
 			workerPid: child.pid,
 			identity,
 			token,

@@ -90,12 +90,20 @@ Offline authentication regression: `bun test scripts/environments/production.tes
 
 ## Demo freshness
 
-The Demo catalog is a fixed recording, so its samples keep the age they had when
-the store was seeded. A Demo store older than `DEMO_FRESH_SECONDS` (30 minutes)
-is dropped and rebuilt from the checked-in recording: at launcher start, and on a
-one-minute tick that replaces the runtime behind the current instance id so an
-open browser keeps working. `--mode e2e` and the automated lanes never do this;
-they seed a fresh per-run store already.
+A Demo store keeps the relative ages of the fixed recording, so the launcher
+rebases every stored timestamp onto the current clock instead of re-seeding: at
+startup for an existing store, and on a one-minute tick behind the current
+instance id so an open browser keeps working. One uniform delta moves
+`hosts`, `metrics_raw`, `metrics_hourly`, `tier2_snapshots`, `alert_states`,
+the workstation and the signal tables together, so the seeded status mixture,
+the hour-long chart window and dashboard edits all survive. Rows newer than the
+previous anchor are never moved. `--mode e2e` and the automated lanes never do
+this; they seed a fresh per-run store already.
+
+Each alias carries a scenario preset: two healthy, two warning, two critical and
+two offline hosts, with active alerts whose evidence is visible in the tier 2
+section they point at. A store seeded by an older catalog version is dropped and
+rebuilt once.
 
 ## Fixture matrix and evidence
 

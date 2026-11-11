@@ -180,15 +180,19 @@ The default Demo catalog (fixture version 3) seeds fresh owned stores only:
 
 Every `*_age_seconds` value becomes `anchor - age`; absolute source epochs are
 never stored. The anchor is the fresh store's initialization epoch, so Demo
-history is a snapshot that ages naturally. No replay daemon, keepalive or
-synthetic freshness clock is involved: no sample is ever invented or restamped.
+history is seeded as one snapshot. No sample is invented: recorded values and
+their relative spacing are preserved, and the per-alias scenario presets add
+only the freshness offsets and tier 2 security/systemd fields listed in
+`recorded-demo.mjs`.
 
-A snapshot that ages past its windows would show empty charts, so the local
-launcher re-seeds a Demo store older than `DEMO_FRESH_SECONDS` (30 minutes) — at
-startup and, for a long running gateway, on a minute tick that swaps the runtime
-behind the existing instance id. The store is rebuilt from the checked-in
-recording; captured CRUD edits made in the Demo are disposable, while the
-sanitized catalog stays the only source of the shapes. The isolated capture fixes only its
+A snapshot that ages past its windows would show empty charts and an all-offline
+fleet, so the local launcher rebases the store instead of re-seeding it: one
+uniform delta moves every stored timestamp in `DEMO_TIME_COLUMNS` forward — at
+startup and, for a long running gateway, on a minute tick behind the existing
+instance id. Relative ages, the seeded status mixture and dashboard edits all
+survive, and rows newer than the previous anchor keep their real time. A store
+written by an older fixture version is rebuilt once from the checked-in
+recording. The isolated capture fixes only its
 Playwright page clock to the runtime anchor for deterministic host comparisons;
 it does not change the Demo runtime clock or seeded ages.
 

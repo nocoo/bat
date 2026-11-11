@@ -5,7 +5,6 @@ import { authenticateProd } from "./production.mjs";
 import {
 	assertTestEnvironment,
 	createRuntime,
-	DEMO_FRESH_SECONDS,
 	removeOwned,
 	root,
 	storageRoot,
@@ -307,9 +306,10 @@ export async function launch({
 				},
 			},
 		});
-		// Keep the demo catalog usable for a long running gateway: the recorded
-		// snapshot ages, so a store older than the freshness window is re-seeded
-		// in place, keeping the instance id the browser already holds.
+		// Keep the demo catalog aligned with the wall clock: the recorded ages
+		// would otherwise cross the offline threshold two minutes after seeding.
+		// Rebasing moves every timestamp by one delta, so the seeded status and
+		// alert mixture, the chart windows and dashboard edits all survive.
 		const demoRefresh = setInterval(() => {
 			void (async () => {
 				if (automated) return;
@@ -317,15 +317,10 @@ export async function launch({
 					(candidate) => candidate.mode === "demo" && candidate.active,
 				);
 				if (!instance?.runtime) return;
-				if (Date.now() / 1000 - instance.runtime.anchor <= DEMO_FRESH_SECONDS) return;
 				try {
-					const previous = instance.runtime;
-					await previous.close({ remove: true });
-					const next = await createRuntime({ mode: "demo", dataset: "demo" });
-					instance.runtime = next;
-					demo = next;
+					await instance.runtime.rebase();
 				} catch (error) {
-					console.error("demo catalog refresh failed", error);
+					console.error("demo catalog rebase failed", error);
 				}
 			})();
 		}, 60_000);
