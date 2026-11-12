@@ -1,5 +1,48 @@
 # Changelog
 
+## v4.1.4
+
+### Changed
+
+- Record second review findings
+- Run push-range regression in L1
+- Record review fixes and refreshed gate timings
+- Record measured System0 gate timings
+- Reuse release probe and smoke E2E
+- Migrate quality contract to System0
+- Align structural gate labels
+- Run System0 quality slots natively
+- Add System0 gate infrastructure
+
+### Fixed
+
+- Poll CI state after watch exits
+- Refresh install-state after lockfile updates
+- Read Vitest JSON summaries
+- Verify reused dependencies before cloning state
+- Force-kill foreground pre-commit timeouts
+- Isolate L1 gate probes in a temporary clone
+- Skip deleted refs before checking tools
+- Lint staged workflow deletions and renames
+- Scan full tag history against the pushed remote
+- Bound stage processes and timeouts
+- Scan with the target gitleaks config
+- Install Bun for the Z1 gate
+- Build shared before L1 coverage
+- Lint the snapshot checkout
+- Enforce conditional S3 workflow lint
+- Support captures from OID snapshots
+- Clean failed snapshots safely
+- Snapshot package-local binaries
+- Bound staged secret scans
+- Ignore generated quality cache
+- Cover Rust types and serialize environment suites
+- Enforce declared Bun and staged secret scans
+
+### Removed
+
+- Remove dead snapshot scripts
+
 ## v4.1.3
 
 ### Changed
