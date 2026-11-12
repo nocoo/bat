@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+repo=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 cd "$repo"
 
 command -v actionlint >/dev/null 2>&1 || {
