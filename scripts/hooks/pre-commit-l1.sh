@@ -33,12 +33,11 @@ trap "exit 130" INT
 trap "exit 143" TERM
 trap "exit 129" HUP
 
-timeout 30 gitleaks git --staged --config "$repo/.gitleaks.toml" --no-banner --redact
-timeout 30 bash "$repo/scripts/quality/gitleaks-selftest.sh" "$repo"
-
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/bat-index-XXXXXX")
 logs=$(mktemp -d "${TMPDIR:-/tmp}/bat-precommit-XXXXXX")
 bash "$repo/scripts/quality/git-snapshot.sh" index "$repo" "$snapshot"
+timeout 30 gitleaks git --staged --config "$snapshot/.gitleaks.toml" --no-banner --redact
+timeout 30 bash "$repo/scripts/quality/gitleaks-selftest.sh" "$snapshot"
 bash "$repo/scripts/quality/prepare-snapshot.sh" "$repo" "$snapshot"
 
 cd "$snapshot"

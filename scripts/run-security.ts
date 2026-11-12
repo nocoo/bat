@@ -86,10 +86,12 @@ if (!skipGitleaks) {
 		);
 	}
 	const gitleaks = requireTool("gitleaks");
+	const gitleaksConfig = join(root, ".gitleaks.toml");
+	if (!existsSync(gitleaksConfig)) fail(`missing gitleaks config at ${gitleaksConfig}`);
 	const gitleaksArgs = ["git"];
 	if (gitleaksStaged) gitleaksArgs.push("--staged");
 	else gitleaksArgs.push(`--log-opts=${gitleaksRange}`);
-	gitleaksArgs.push(`--config=${join(gitleaksRepo, ".gitleaks.toml")}`, "--no-banner", "--redact");
+	gitleaksArgs.push(`--config=${gitleaksConfig}`, "--no-banner", "--redact");
 	const result = run(gitleaks, gitleaksArgs, gitleaksRepo);
 	if (result.status !== 0) {
 		process.stderr.write(result.stdout ?? "");
