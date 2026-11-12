@@ -6,7 +6,6 @@ import {
 	buildStaleVersionArgs,
 	CI_REGISTRATION_TIMEOUT_MS,
 	CI_VIEW_TIMEOUT_MS,
-	CI_WATCH_TIMEOUT_MS,
 	type CiRunMetadata,
 	type CiWaitDeps,
 	formatChangelogSection,
@@ -304,7 +303,8 @@ describe("waitForCiSuccess", () => {
 		list: string[];
 		/** Advances the clock before each `gh run list` returns, like a stalled command. */
 		listDelayMs?: number;
-		watchCode?: number;
+		/** Successive `gh run view` payloads; the last one repeats. */
+		views?: (CiRunMetadata | string)[];
 		view?: CiRunMetadata | string;
 		viewCode?: number;
 	}
@@ -324,15 +324,12 @@ describe("waitForCiSuccess", () => {
 						state.now += steps.listDelayMs ?? 0;
 						return { code: 0, stdout: payload, stderr: "" };
 					}
-					case "watch":
-						return { code: steps.watchCode ?? 0, stdout: "", stderr: "" };
 					case "view": {
-						const stdout =
-							typeof steps.view === "string"
-								? steps.view
-								: steps.view
-									? JSON.stringify(steps.view)
-									: "";
+						const next =
+							steps.views && steps.views.length > 1
+								? steps.views.shift()
+								: (steps.views?.[0] ?? steps.view);
+						const stdout = typeof next === "string" ? next : next ? JSON.stringify(next) : "";
 						return { code: steps.viewCode ?? 0, stdout, stderr: "" };
 					}
 					default:
@@ -362,13 +359,20 @@ describe("waitForCiSuccess", () => {
 		expect(listCall).toContain(SHA);
 		expect(listCall).toContain("push");
 		expect(listCall).toContain("main");
-		expect(calls.find((call) => call[1] === "watch")).toEqual([
-			"run",
-			"watch",
-			"42",
-			"--exit-status",
-		]);
-		expect(timeouts).toEqual([60_000, 50_000, CI_WATCH_TIMEOUT_MS, CI_VIEW_TIMEOUT_MS]);
+		expect(calls.filter((call) => call[1] === "watch")).toHaveLength(0);
+		expect(timeouts).toEqual([60_000, 50_000, CI_VIEW_TIMEOUT_MS]);
+	});
+
+	test("keeps polling when the run is still in progress", async () => {
+		const { deps, calls } = fakeDeps({
+			list: [JSON.stringify([ciRun()])],
+			views: [ciRun(), ciRun({ status: "completed", conclusion: "success" })],
+		});
+
+		const final = await waitForCiSuccess(SHA, deps, { watchMs: 60_000, pollMs: 10_000 });
+
+		expect(final.conclusion).toBe("success");
+		expect(calls.filter((call) => call[1] === "view")).toHaveLength(2);
 	});
 
 	test("rejects a matching record that only arrives after the registration deadline", async () => {
@@ -423,23 +427,33 @@ describe("waitForCiSuccess", () => {
 		await expect(waitForCiSuccess(SHA, deps)).rejects.toThrow(/does not match the pushed commit/);
 	});
 
-	test("throws when the watched run fails", async () => {
+	test("throws when the run fails", async () => {
 		const { deps } = fakeDeps({
 			list: [JSON.stringify([ciRun()])],
-			watchCode: 1,
 			view: ciRun({ status: "completed", conclusion: "failure" }),
 		});
 
-		await expect(waitForCiSuccess(SHA, deps)).rejects.toThrow(/did not succeed \(watch exit 1\)/);
+		await expect(waitForCiSuccess(SHA, deps)).rejects.toThrow(/conclusion `failure`/);
 	});
 
-	test("throws when watch passes but the run was not green", async () => {
+	test("throws when the run was not green", async () => {
 		const { deps } = fakeDeps({
 			list: [JSON.stringify([ciRun()])],
 			view: ciRun({ status: "completed", conclusion: "cancelled" }),
 		});
 
 		await expect(waitForCiSuccess(SHA, deps)).rejects.toThrow(/conclusion `cancelled`/);
+	});
+
+	test("times out when the run never completes", async () => {
+		const { deps } = fakeDeps({
+			list: [JSON.stringify([ciRun()])],
+			views: [ciRun()],
+		});
+
+		await expect(waitForCiSuccess(SHA, deps, { watchMs: 30_000, pollMs: 10_000 })).rejects.toThrow(
+			/did not complete within 30000ms/,
+		);
 	});
 });
 

@@ -693,20 +693,24 @@ export async function waitForCiSuccess(
 	}
 
 	const id = String(registered.databaseId);
-	const watched = await deps.run(["run", "watch", id, "--exit-status"], watchMs);
-	if (watched.code !== 0) {
-		throw new Error(`CI run ${id} did not succeed (watch exit ${watched.code})`);
+	const watchDeadline = deps.now() + watchMs;
+	let final: CiRunMetadata;
+	while (true) {
+		const viewed = await deps.run(["run", "view", id, "--json", CI_RUN_FIELDS], CI_VIEW_TIMEOUT_MS);
+		if (viewed.code !== 0) {
+			throw new Error(`could not verify CI run ${id} (exit ${viewed.code})`);
+		}
+		final = parseCiRun(viewed.stdout, "gh run view");
+		assertCiRunIdentity(final, sha);
+		if (final.status === "completed") break;
+		if (deps.now() >= watchDeadline) {
+			throw new Error(`CI run ${id} did not complete within ${watchMs}ms`);
+		}
+		await deps.sleep(pollMs);
 	}
-
-	const viewed = await deps.run(["run", "view", id, "--json", CI_RUN_FIELDS], CI_VIEW_TIMEOUT_MS);
-	if (viewed.code !== 0) {
-		throw new Error(`could not verify CI run ${id} (exit ${viewed.code})`);
-	}
-	const final = parseCiRun(viewed.stdout, "gh run view");
-	assertCiRunIdentity(final, sha);
-	if (final.status !== "completed" || final.conclusion !== "success") {
+	if (final.conclusion !== "success") {
 		throw new Error(
-			`CI run ${id} is ${final.status} with conclusion \`${final.conclusion}\`, expected success`,
+			`CI run ${id} completed with conclusion \`${final.conclusion}\`, expected success`,
 		);
 	}
 	return final;
