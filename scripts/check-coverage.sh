@@ -24,15 +24,29 @@ check_ts_coverage() {
 		echo "npx is required for TypeScript coverage" >&2
 		return 1
 	fi
+	if ! command -v node >/dev/null 2>&1; then
+		echo "node is required to read the coverage summary" >&2
+		return 1
+	fi
 	if ! output=$(cd "$pkg_dir" && npx --no-install vitest run --coverage 2>&1); then
 		echo "✘ ${label}: unit tests or configured coverage thresholds failed"
 		echo "$output"
 		return 1
 	fi
+	local summary="$pkg_dir/coverage/coverage-summary.json"
+	if [ ! -f "$summary" ]; then
+		echo "✘ ${label}: no coverage summary at $summary" >&2
+		echo "$output"
+		return 1
+	fi
 	local coverage
-	coverage=$(printf '%s\n' "$output" | sed -nE 's/^Lines[[:space:]]*:[[:space:]]*([0-9.]+)%.*/\1/p' | head -1)
+	coverage=$(node -e '
+		const fs = require("node:fs");
+		const summary = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+		process.stdout.write(String(summary.total.lines.pct));
+	' "$summary")
 	if [ -z "$coverage" ]; then
-		echo "✘ ${label}: no coverage summary found" >&2
+		echo "✘ ${label}: coverage summary has no line percentage" >&2
 		return 1
 	fi
 	if ! awk -v value="$coverage" -v threshold="$ts_threshold" 'BEGIN { exit !(value >= threshold) }'; then
