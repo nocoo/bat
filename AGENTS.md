@@ -86,8 +86,8 @@ thresholds are preserved. Rust branch coverage is not available from
 
 | Hook       | Current behavior                                                                             | Measured / target                                 |
 | ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 14.81s cold; 12.48s hot; target ≤15s, reject >30s |
-| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:20.73; target ≤2.5min                           |
+| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 14.00s cold; 11.32s hot; target ≤15s, reject >30s |
+| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:25.57; target ≤2.5min                           |
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at

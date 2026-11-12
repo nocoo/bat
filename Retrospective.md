@@ -418,3 +418,18 @@ The migration exposed several failures that looked like successful gates:
   budget. Keep a 64-test smoke set locally and run the full suite in CI.
 - Cleanup traps under `set -u` must use `${var:-}` for variables that may not be
   assigned yet.
+- A tag was scanned as `-1 <oid>`, which only covers the tagged commit. A secret
+  added in an earlier commit and removed before the tag escaped G1. New refs now
+  scan `<oid> --not --remotes=<target-remote>`; use the remote Git actually
+  pushes to, not a hard-coded `origin`.
+- S3 filtered staged paths with `--diff-filter=ACMR`, so deleting a workflow or
+  renaming it out of `.github/workflows` skipped workflow lint. Match both old
+  and new paths from `--name-status -M` across add, copy, modify, rename,
+  delete and type-change statuses.
+- Pre-push required Bun, Cargo, scanners and npm before reading stdin. A
+  deleted-ref push then failed on a machine without those tools instead of
+  skipping the ref. Parse and filter stdin first; require the toolchain only
+  when at least one non-deleted OID remains.
+- `test:l1-gate` wrote probes into the real index and restored it to `HEAD`,
+  which could discard a developer's staged work. Every probe now runs in a
+  temporary local clone with symlinked dependencies and caches.

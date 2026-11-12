@@ -63,16 +63,21 @@ TypeScript types; Biome lint and test-focus scan; TypeScript coverage; script,
 environment and Python unit suites; route/page structural gates; Rust `fmt`,
 `cargo check` and `clippy`; and S3 when relevant workflow files are staged.
 
-The measured runs on 2026-11-12 were 14.81 seconds cold and 12.48 seconds hot.
-Every stage has a timeout and a missing tool or missing exit report fails the
-hook. S3 is started only for staged workflow changes and is always waited on by
-PID, so a slow workflow check cannot be mistaken for success.
+The measured runs on 2026-11-12 were 14.00 seconds cold (Turbo and cargo-lint
+caches cleared) and 11.32 seconds hot. Every stage has a timeout and a missing
+tool or missing exit report fails the hook. S3 is started for staged workflow
+additions, changes, deletions and renames, including a rename out of the
+workflow directory, and is always waited on by PID, so a slow workflow check
+cannot be mistaken for success.
 
 ### pre-push
 
 The hook reads Git's push protocol from stdin and creates a snapshot for each
-local OID. Deleted refs are skipped. The G1 range is derived from that ref and
-its remote OID; a new branch scans the local OID against `origin`.
+local OID. Deleted refs and empty input exit before the toolchain is required.
+The G1 range is derived from the pushed ref and its remote OID. A new branch or
+tag scans every commit reachable from the local OID but not from the actual
+target remote; an existing ref scans `remote-oid..local-oid`. This keeps a tag
+from hiding an earlier secret that a later commit removed.
 
 Current order:
 
@@ -85,9 +90,14 @@ Current order:
 L3 and L4 both use `packages/worker/.wrangler/environments`; they are serialized
 because the environment launcher owns and cleans stores below that root.
 
-The measured pre-push wall time on 2026-11-12 was 2:20.73. The local L4 smoke
-suite passed 64 tests in 35.3 seconds; CI runs the full 194-test Chromium suite
+The measured pre-push wall time on 2026-11-12 was 2:25.57. The local L4 smoke
+suite passed 64 tests in 35.4 seconds; CI runs the full 194-test Chromium suite
 instead.
+
+`bun run test:l1-gate` runs every pre-commit probe in a temporary local clone
+with symlinked dependencies and caches. It never writes the real index or
+worktree; the probe suite covers healthy, staged/worktree mismatch, doc-only,
+mutable workflow, workflow deletion and workflow rename cases.
 
 ## CI
 
