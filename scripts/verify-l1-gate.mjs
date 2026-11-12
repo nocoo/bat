@@ -92,6 +92,10 @@ const clone = join(tempRoot, "repo");
 try {
 	git(["clone", "--local", "--quiet", repo, clone], tmpdir());
 	linkDependencies(repo, clone);
+	execFileSync(process.execPath, ["scripts/quality/install-state.mjs", "--check", clone], {
+		cwd: repo,
+		stdio: "pipe",
+	});
 	execFileSync(process.execPath, ["scripts/quality/install-state.mjs", "--write"], {
 		cwd: clone,
 		stdio: "pipe",
