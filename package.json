@@ -29,7 +29,7 @@
 		"capture:environments": "bun scripts/environments/capture.mjs",
 		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive",
 		"test:l1-gate": "bun scripts/verify-l1-gate.mjs",
-		"test:quality-gate": "bun test scripts/quality/z1-gate.test.ts scripts/check-test-focus.test.ts"
+		"test:quality-gate": "bun test scripts/quality/z1-gate.test.ts scripts/quality/push-range.test.ts scripts/check-test-focus.test.ts"
 	},
 	"trustedDependencies": [
 		"@biomejs/biome",

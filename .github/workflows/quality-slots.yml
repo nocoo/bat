@@ -237,7 +237,8 @@ jobs:
       - name: Script and environment unit tests
         run: |
           bun test scripts/release.test.ts scripts/probe-manifest.test.ts \
-            scripts/quality/z1-gate.test.ts scripts/check-test-focus.test.ts
+            scripts/quality/z1-gate.test.ts scripts/quality/push-range.test.ts \
+            scripts/check-test-focus.test.ts
           bun run test:environments:unit
           python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
       - name: Record tested SHA
