@@ -64,30 +64,30 @@ implementation slots plus Z1; there are no `na` slots. The CI workflow uses the
 native mode: `ci.yml` has one `quality` caller job and
 `quality-slots.yml` owns the named slot jobs.
 
-| Slot | Command / evidence                                                                                  | Checked object                   | Stage                    | Measured (2026-11-12)       | Coverage / gap                                           |
-| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | --------------------------- | -------------------------------------------------------- |
-| S1   | `bun turbo typecheck`; `cargo check --locked --all-features --manifest-path probe/Cargo.toml`       | Index snapshot / CI checkout     | pre-commit               | Rust check 0.6s             | TS strict; Rust cargo check                              |
-| S2   | `biome check --error-on-warnings .`; focus scan; `cargo fmt --check`; `cargo clippy -- -D warnings` | Index snapshot / CI checkout     | pre-commit               | Rust fmt/clippy 0.7s        | zero diagnostics required                                |
-| S3   | actionlint; yamllint; `scripts/check-workflows.py`                                                  | Index snapshot / CI checkout     | pre-commit*, CI          | local workflow lint pending | immutable refs and 12-slot structure                     |
-| G1   | staged `gitleaks`; push-range `gitleaks`; synthetic-secret self-test                                | Staged index / pushed ranges     | pre-commit, pre-push, CI | staged scan 0.02s           | `[extend] useDefault = true`                             |
-| G2   | `osv-scanner` over `bun.lock` and `probe/Cargo.lock`                                                | Snapshot lockfiles / CI checkout | pre-push, CI             | 1.9s local                  | both language locks                                      |
-| B1   | dashboard + Worker assets + public CLI + release probe                                              | Snapshot / CI checkout           | pre-push, CI             | pre-push pending            | real artifacts                                           |
-| L1   | Vitest coverage; nightly `cargo llvm-cov`; script/environment suites                                | Snapshot / CI checkout           | pre-commit, pre-push, CI | TS coverage in 11.77s hook  | TS four-metric 95% target; Rust line/function/region 95% |
-| L2   | `runtime-kv.mjs`; `turbo test:e2e --filter=@bat/worker`                                             | Isolated local runtime           | CI                       | runtime KV 13s              | real Wrangler D1/KV/DO and HTTP                          |
-| L3   | `test:environments`; `probe-integration.mjs`                                                        | Isolated local services          | pre-push, CI             | 28s local                   | probe → Worker → query                                   |
-| L4   | `test:e2e:pw`; `capture:environments`                                                               | Built SPA + local Worker         | pre-push, CI             | 194 tests / 1.7m local      | Chromium journeys and captures                           |
-| P1   | `npm pack`; tarball inspection; throwaway install; installed CLI smoke                              | Built public CLI package         | pre-push, CI             | 34 checks                   | public `@nocoo/bat` tarball                              |
-| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | CI pending                  | all impl success; no skipped impl                        |
+| Slot | Command / evidence                                                                                  | Checked object                   | Stage                    | Measured (2026-11-12)      | Coverage / gap                                           |
+| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | -------------------------- | -------------------------------------------------------- |
+| S1   | `bun turbo typecheck`; `cargo check --locked --all-features --manifest-path probe/Cargo.toml`       | Index snapshot / CI checkout     | pre-commit               | Rust check 0.6s            | TS strict; Rust cargo check                              |
+| S2   | `biome check --error-on-warnings .`; focus scan; `cargo fmt --check`; `cargo clippy -- -D warnings` | Index snapshot / CI checkout     | pre-commit               | Rust fmt/clippy 0.7s       | zero diagnostics required                                |
+| S3   | actionlint; yamllint; `scripts/check-workflows.py`                                                  | Index snapshot / CI checkout     | pre-commit*, CI          | 0.58s local                | immutable refs and 12-slot structure                     |
+| G1   | staged `gitleaks`; push-range `gitleaks`; synthetic-secret self-test                                | Staged index / pushed ranges     | pre-commit, pre-push, CI | staged scan 0.02s          | `[extend] useDefault = true`                             |
+| G2   | `osv-scanner` over `bun.lock` and `probe/Cargo.lock`                                                | Snapshot lockfiles / CI checkout | pre-push, CI             | 1.9s local                 | both language locks                                      |
+| B1   | dashboard + Worker assets + public CLI + release probe                                              | Snapshot / CI checkout           | pre-push, CI             | pre-push pass; probe 13.7s | real artifacts                                           |
+| L1   | Vitest coverage; nightly `cargo llvm-cov`; script/environment suites                                | Snapshot / CI checkout           | pre-commit, pre-push, CI | TS coverage in 11.77s hook | TS four-metric 95% target; Rust line/function/region 95% |
+| L2   | `runtime-kv.mjs`; `turbo test:e2e --filter=@bat/worker`                                             | Isolated local runtime           | CI                       | runtime KV 13s             | real Wrangler D1/KV/DO and HTTP                          |
+| L3   | `test:environments`; `probe-integration.mjs`                                                        | Isolated local services          | pre-push, CI             | 28s local                  | probe → Worker → query                                   |
+| L4   | pre-push `test:e2e:pw:smoke`; CI `test:e2e:pw`; `capture:environments`                              | Built SPA + local Worker         | pre-push, CI             | smoke 64 / 35.3s; CI 194   | Chromium journeys and captures                           |
+| P1   | `npm pack`; tarball inspection; throwaway install; installed CLI smoke                              | Built public CLI package         | pre-push, CI             | 34 checks                  | public `@nocoo/bat` tarball                              |
+| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | real CI pending            | all impl success; no skipped impl                        |
 
 `*` S3 is conditional in pre-commit and always runs in CI. Worker/UI branch
 coverage is 91.16%/94.69%, below the 95% governance target; their existing 90%
 thresholds are preserved. Rust branch coverage is not available from
 `cargo-llvm-cov`; line/function/region coverage is 98.16%/98.09%/98.80%.
 
-| Hook       | Current behavior                                                                             | Measured / target                                  |
-| ---------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 11.77s hot; cold pending; target ≤15s, reject >30s |
-| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 and P1 after L3                  | target ≤2.5min; measured pending                   |
+| Hook       | Current behavior                                                                             | Measured / target                                 |
+| ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 14.81s cold; 12.48s hot; target ≤15s, reject >30s |
+| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:20.73; target ≤2.5min                           |
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at

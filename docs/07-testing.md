@@ -20,7 +20,7 @@
 | L1   | Unit         | Vitest coverage; nightly `cargo llvm-cov`; script and environment unit suites                       | Snapshot / CI checkout           | pre-commit, pre-push, CI | impl   |
 | L2   | Runtime      | real Wrangler D1/KV checks and the Worker HTTP/D1/DO suite                                          | Isolated local runtime           | CI                       | impl   |
 | L3   | Integration  | local environment suite plus `probe → Worker ingest → query`                                        | Isolated local services          | pre-push, CI             | impl   |
-| L4   | E2E          | Chromium Playwright journeys plus disposable environment captures                                   | Built SPA + local Worker         | pre-push, CI             | impl   |
+| L4   | E2E          | pre-push Chromium smoke journeys; CI full Chromium suite; disposable environment captures           | Built SPA + local Worker         | pre-push, CI             | impl   |
 | P1   | Package      | `npm pack`, tarball inspection, throwaway install, installed `bat --version/--help`                 | Built public CLI package         | pre-push, CI             | impl   |
 | Z1   | Gate         | CI `quality / Z1: Gate` verifies all implemented slots, their results and one tested SHA            | CI job results                   | CI                       | impl   |
 
@@ -63,8 +63,10 @@ TypeScript types; Biome lint and test-focus scan; TypeScript coverage; script,
 environment and Python unit suites; route/page structural gates; Rust `fmt`,
 `cargo check` and `clippy`; and S3 when relevant workflow files are staged.
 
-The measured hot run on 2026-11-12 was 11.77 seconds wall time. Every stage has
-a timeout and a missing tool or missing exit report fails the hook.
+The measured runs on 2026-11-12 were 14.81 seconds cold and 12.48 seconds hot.
+Every stage has a timeout and a missing tool or missing exit report fails the
+hook. S3 is started only for staged workflow changes and is always waited on by
+PID, so a slow workflow check cannot be mistaken for success.
 
 ### pre-push
 
@@ -76,11 +78,16 @@ Current order:
 
 1. B1, G1/G2 and Rust L1 coverage run in parallel.
 2. L3 runs the environment suite and probe-to-Worker integration.
-3. L4 runs Playwright and environment capture; P1 runs the packed-CLI consumer
-   check. These share no mutable environment store after L3 has finished.
+3. L4 runs the 64-test Playwright smoke suite and environment capture; P1 runs
+   the packed-CLI consumer check. These share no mutable environment store after
+   L3 has finished.
 
 L3 and L4 both use `packages/worker/.wrangler/environments`; they are serialized
 because the environment launcher owns and cleans stores below that root.
+
+The measured pre-push wall time on 2026-11-12 was 2:20.73. The local L4 smoke
+suite passed 64 tests in 35.3 seconds; CI runs the full 194-test Chromium suite
+instead.
 
 ## CI
 

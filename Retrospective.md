@@ -405,3 +405,16 @@ The migration exposed several failures that looked like successful gates:
 - The local machine had Bun 1.4.4 while `package.json` declared 1.3.11. Comparing
   only the marker's runtime let the mismatch pass. Install-state now checks the
   declared version as well as the lockfile digest.
+- The conditional S3 background job was checked by looking for its `.exit` file,
+  not by waiting for its PID. A slow workflow check could still be running when
+  the hook reported success and cleanup killed it. Wait on the recorded PID.
+- `workflow-lint.sh` used `git rev-parse` to find its root. When a snapshot lived
+  inside another repository, it checked the parent worktree instead of the
+  snapshot. Derive the root from the script path.
+- OID snapshots need package-local `.bin` links, and captures without `.git`
+  need `BAT_CAPTURE_REVISION`; otherwise Vite cannot start and capture cannot
+  identify the pushed revision.
+- Running the full 194-test browser suite in pre-push exceeds the 2.5-minute
+  budget. Keep a 64-test smoke set locally and run the full suite in CI.
+- Cleanup traps under `set -u` must use `${var:-}` for variables that may not be
+  assigned yet.

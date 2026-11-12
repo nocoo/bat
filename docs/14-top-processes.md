@@ -550,7 +550,9 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 ### 9.4 L4 — E2E
 
-不适用。进程数据无法在 CI 环境可靠模拟。
+L4 covers the dashboard journeys (hosts, host detail and navigation) and
+environment capture. Process data comes from the synthetic fixture; CI never
+depends on a live `/proc`.
 
 ---
 
