@@ -228,6 +228,8 @@ jobs:
           fallback: none
       - name: Install nightly coverage toolchain
         run: rustup toolchain install nightly --profile minimal --component llvm-tools-preview
+      - name: Build shared package
+        run: bun turbo build --filter=@bat/shared
       - name: TypeScript coverage
         run: bash scripts/check-coverage.sh --ts
       - name: Rust coverage
