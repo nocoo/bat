@@ -4,6 +4,33 @@ set -euo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=../ensure-tools.sh
 source "$HOOK_DIR/../ensure-tools.sh"
+remote_name="${1:-origin}"
+repo=
+stdin_file=$(mktemp "${TMPDIR:-/tmp}/bat-push-refs-XXXXXX")
+active_file=$(mktemp "${TMPDIR:-/tmp}/bat-push-active-XXXXXX")
+
+cleanup_refs() {
+	rm -f "$stdin_file" "$active_file"
+}
+
+trap cleanup_refs EXIT
+cat >"$stdin_file"
+: >"$active_file"
+
+while IFS=' ' read -r local_ref local_oid remote_ref remote_oid; do
+	[ -n "${local_ref:-}" ] || continue
+	if [[ "$local_oid" =~ ^0+$ ]]; then
+		echo "pre-push: skip deleted ref $local_ref"
+		continue
+	fi
+	printf '%s %s %s %s\n' "$local_ref" "$local_oid" "$remote_ref" "$remote_oid" >>"$active_file"
+done <"$stdin_file"
+
+if [ ! -s "$active_file" ]; then
+	echo "pre-push: no refs to validate"
+	exit 0
+fi
+
 require_tool bun "pre-push quality checks"
 require_tool git "OID snapshots"
 require_tool timeout "per-slot timeouts"
@@ -15,14 +42,6 @@ require_tool node "package checks"
 require_tool npm "P1 package checks"
 
 repo=$(git rev-parse --show-toplevel)
-remote_name="${1:-origin}"
-stdin_file=$(mktemp "${TMPDIR:-/tmp}/bat-push-refs-XXXXXX")
-trap 'rm -f "$stdin_file"' EXIT
-cat >"$stdin_file"
-[ -s "$stdin_file" ] || {
-	echo "pre-push requires Git refs on stdin" >&2
-	exit 1
-}
 
 run_oid() {
 	local local_ref="$1"
@@ -42,6 +61,7 @@ run_oid() {
 		done
 		if [ -n "${snapshot:-}" ]; then rm -rf "$snapshot"; fi
 		if [ -n "${logs:-}" ]; then rm -rf "$logs"; fi
+		cleanup_refs
 		exit "$status"
 	}
 	trap cleanup_oid EXIT
@@ -113,10 +133,6 @@ run_oid() {
 
 while IFS=' ' read -r local_ref local_oid remote_ref remote_oid; do
 	[ -n "${local_ref:-}" ] || continue
-	if [[ "$local_oid" =~ ^0+$ ]]; then
-		echo "pre-push: skip deleted ref $local_ref"
-		continue
-	fi
 	if [[ ! "$local_oid" =~ ^[0-9a-f]{40}$ || ! "$remote_oid" =~ ^[0-9a-f]{40}$ ]]; then
 		echo "pre-push: invalid OID for $local_ref" >&2
 		exit 1
@@ -127,6 +143,8 @@ while IFS=' ' read -r local_ref local_oid remote_ref remote_oid; do
 	fi
 	echo "pre-push: validating $local_ref at $local_oid"
 	run_oid "$local_ref" "$local_oid" "$remote_oid"
-done <"$stdin_file"
+done <"$active_file"
 
+cleanup_refs
+trap - EXIT
 echo "✔ pre-push passed (G1/G2/B1/L1/L3/L4/P1 on pushed OIDs)"
