@@ -15,25 +15,13 @@ require_tool node "package checks"
 require_tool npm "P1 package checks"
 
 repo=$(git rev-parse --show-toplevel)
+remote_name="${1:-origin}"
 stdin_file=$(mktemp "${TMPDIR:-/tmp}/bat-push-refs-XXXXXX")
 trap 'rm -f "$stdin_file"' EXIT
 cat >"$stdin_file"
 [ -s "$stdin_file" ] || {
 	echo "pre-push requires Git refs on stdin" >&2
 	exit 1
-}
-
-push_range() {
-	local_ref="$1"
-	local_oid="$2"
-	remote_oid="$3"
-	if [[ "$local_ref" == refs/tags/* ]]; then
-		printf '%s' "-1 $local_oid"
-	elif [[ "$remote_oid" =~ ^0+$ ]]; then
-		printf '%s' "$local_oid --not --remotes=origin"
-	else
-		printf '%s' "$remote_oid..$local_oid"
-	fi
 }
 
 run_oid() {
@@ -94,7 +82,7 @@ run_oid() {
 		fi
 	}
 
-	range=$(push_range "$local_ref" "$local_oid" "$remote_oid")
+	range=$(bun "$repo/scripts/quality/push-range.ts" "$local_oid" "$remote_oid" "$remote_name")
 	run_bg b1 240 env CARGO_TARGET_DIR="$repo/.cache/quality/cargo-release" bash -c \
 		'bun run build && (cd packages/worker && bun run build) && cargo build --locked --release --manifest-path probe/Cargo.toml'
 	run_bg g1_g2 120 bun scripts/run-security.ts --root "$snapshot" \
