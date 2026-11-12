@@ -48,10 +48,11 @@ run_oid() {
 	cleanup_oid() {
 		status=$?
 		trap - EXIT INT TERM HUP
-		for pid in $pids; do
+		for pid in ${pids:-}; do
 			kill "$pid" 2>/dev/null || true
 		done
-		rm -rf "$snapshot" "$logs"
+		if [ -n "${snapshot:-}" ]; then rm -rf "$snapshot"; fi
+		if [ -n "${logs:-}" ]; then rm -rf "$logs"; fi
 		exit "$status"
 	}
 	trap cleanup_oid EXIT

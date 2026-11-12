@@ -21,11 +21,11 @@ pids=
 cleanup() {
 	status=$?
 	trap - EXIT INT TERM HUP
-	for pid in $pids; do
+	for pid in ${pids:-}; do
 		kill "$pid" 2>/dev/null || true
 	done
-	[ -n "$logs" ] && rm -rf "$logs"
-	[ -n "$snapshot" ] && rm -rf "$snapshot"
+	if [ -n "${logs:-}" ]; then rm -rf "$logs"; fi
+	if [ -n "${snapshot:-}" ]; then rm -rf "$snapshot"; fi
 	exit "$status"
 }
 trap cleanup EXIT
