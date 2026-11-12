@@ -98,7 +98,7 @@
 - Align collapsed SidebarBrand assertions with basalt 3.3
 - Update shell e2e for basalt 3.3 layout
 - Align app shell with basalt 3.3 sidebar and header
-- Upgrade @nocoo/basalt to 3.3.2
+- Upgrade @nocoo/basalt to 3.3.3
 - Migrate mobile navigation to basalt SidebarDrawer
 - Pin release workflows to base-ci v2026.12
 - Migrate to base-ci v2026.12 quality.yml strict slots
