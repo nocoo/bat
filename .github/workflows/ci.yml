@@ -1,5 +1,3 @@
-# CI slot standard v1 (nocoo/base-ci docs/slots.md): S1–S3、G1/G2、B1、L1、L2、L3、Z1 经 quality.yml；
-# P1 todo；Rust probe 为槽位外补充。nocoo/base-ci v2026.12: 顶层 slot 作业，L2/L3 证据上传。
 name: CI
 
 on:
@@ -11,80 +9,8 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
   quality:
-    uses: nocoo/base-ci/.github/workflows/quality.yml@1ea10ecab22b72512399485391603fe03a161016 # v2026.12
-    with:
-      runtime-version: "1.3.11"
-      install-policy: trusted
-      osv-config: osv-scanner.toml
-      test-command: |
-        bash scripts/ci-pre-command.sh
-        bun run test:unit:coverage
-        bun test scripts/release.test.ts scripts/probe-manifest.test.ts
-        bun run test:environments:unit
-        bun run gate:routes
-        bun run gate:pages
-        python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
-      build: true
-      build-command: bun run build
-      workflow-lint: true
-      workflow-lint-required-workflow: nocoo/base-ci/.github/workflows/deploy-worker.yml
-      workflow-lint-yamllint: true
-      l2: true
-      l2-command: |
-        bun run build
-        bun turbo test:e2e --filter=@bat/worker
-        bun run test:environments
-      l3: true
-      l3-browser-directory: packages/ui
-      l3-browsers: chromium
-      l3-prepare-command: bun run build
-      l3-command: |
-        bun run test:e2e:pw
-        bun run capture:environments
-      l3-artifact-name: playwright-report
-      l3-artifact-path: packages/ui/playwright-report/
-      l3-artifact-retention-days: 7
-      env-json: '{"WRANGLER_SEND_METRICS": "false", "CI": "true"}'
-      slot-status: >-
-        {"S1": {"status": "impl"},
-        "S2": {"status": "impl"},
-        "S3": {"status": "impl"},
-        "G1": {"status": "impl"},
-        "G2": {"status": "impl"},
-        "B1": {"status": "impl"},
-        "L1": {"status": "impl"},
-        "L1.5": {"status": "na", "reason": "Worker API 测试经 wrangler dev 起全服务，归入 L2；无独立 vitest-pool-workers 运行时套件"},
-        "L2": {"status": "impl"},
-        "L3": {"status": "impl"},
-        "P1": {"status": "todo", "reason": "发布 @nocoo/bat 但尚未接入 npm pack / publint 等包检查"},
-        "Z1": {"status": "impl"}}
-
-  probe:
-    name: "Probe (Rust)"
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    defaults:
-      run:
-        working-directory: probe
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
-        with:
-          toolchain: stable
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: "probe -> target"
-      - name: "L1: Probe unit tests"
-        run: cargo test --all-features
-      - name: "S2: Clippy"
-        run: cargo clippy -- -D warnings
-      - name: "S2: rustfmt"
-        run: cargo fmt --check
+    uses: ./.github/workflows/quality-slots.yml

@@ -1,0 +1,437 @@
+name: Quality Slots
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  s1-types:
+    name: "S1: Types"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Check TypeScript and Rust types
+        run: |
+          bun turbo typecheck
+          cargo check --locked --all-features --manifest-path probe/Cargo.toml
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  s2-lint:
+    name: "S2: Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - name: Lint TypeScript
+        run: |
+          bun run lint
+          bun run scripts/check-test-focus.ts
+      - name: Lint Rust
+        run: |
+          cargo fmt --check --manifest-path probe/Cargo.toml
+          cargo clippy --locked --all-features --manifest-path probe/Cargo.toml -- -D warnings
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  s3-workflow:
+    name: "S3: Workflow"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install verified actionlint
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Install yamllint
+        run: python3 -m pip install --quiet "yamllint==1.38.0"
+      - name: Validate workflows
+        run: bash scripts/quality/workflow-lint.sh
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  g1-secrets:
+    name: "G1: Secrets"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install security scanners
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+      - name: Verify scanner configuration
+        run: bash scripts/quality/gitleaks-selftest.sh "$GITHUB_WORKSPACE"
+      - name: Scan checked-out content
+        run: |
+          set -euo pipefail
+          snapshot=$(mktemp -d)
+          trap 'rm -rf "$snapshot"' EXIT
+          bash scripts/quality/git-snapshot.sh oid "$GITHUB_WORKSPACE" "$snapshot" HEAD
+          gitleaks detect --no-git --source "$snapshot" --config "$GITHUB_WORKSPACE/.gitleaks.toml" --no-banner --redact
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  g2-dependencies:
+    name: "G2: Dependencies"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Install security scanners
+        uses: nocoo/base-ci/.github/actions/setup-security-scanners@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+      - name: Scan all dependency lockfiles
+        run: bun scripts/run-security.ts --root . --skip-gitleaks
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  b1-build:
+    name: "B1: Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+      - name: Build dashboard, Worker and probe
+        run: |
+          bun run build
+          (cd packages/worker && bun run build)
+          cargo build --locked --release --manifest-path probe/Cargo.toml
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l1-unit:
+    name: "L1: Unit"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+      - name: Install Rust coverage tool
+        uses: taiki-e/install-action@cfdb7ed4ccc7c7dce37759eae89dc5674b469b39 # v2.90.3
+        with:
+          tool: cargo-llvm-cov@0.9.1
+          fallback: none
+      - name: Install nightly coverage toolchain
+        run: rustup toolchain install nightly --profile minimal --component llvm-tools-preview
+      - name: TypeScript coverage
+        run: bash scripts/check-coverage.sh --ts
+      - name: Rust coverage
+        run: bash scripts/check-coverage.sh --rust
+      - name: Script and environment unit tests
+        run: |
+          bun test scripts/release.test.ts scripts/probe-manifest.test.ts \
+            scripts/quality/z1-gate.test.ts scripts/check-test-focus.test.ts
+          bun run test:environments:unit
+          python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l2-runtime:
+    name: "L2: Runtime"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    env:
+      CLOUDFLARE_API_TOKEN: ""
+      CLOUDFLARE_ACCOUNT_ID: ""
+      CF_API_TOKEN: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Build Worker assets
+        run: bun run build
+      - name: Real Wrangler D1 and KV binding checks
+        run: bun scripts/quality/runtime-kv.mjs
+      - name: Real Worker HTTP, D1 and Durable Object suite
+        run: bun turbo test:e2e --filter=@bat/worker
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l3-integration:
+    name: "L3: Integration"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    env:
+      CLOUDFLARE_API_TOKEN: ""
+      CLOUDFLARE_ACCOUNT_ID: ""
+      CF_API_TOKEN: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # v1
+        with:
+          toolchain: stable
+      - name: Build dashboard and probe
+        run: |
+          bun run build
+          cargo build --locked --manifest-path probe/Cargo.toml
+      - name: Structural route and page gates
+        run: |
+          bun run gate:routes
+          bun run gate:pages
+      - name: Local environment integration
+        run: bun run test:environments
+      - name: Probe to Worker to query integration
+        env:
+          BAT_PROBE_BIN: ${{ github.workspace }}/probe/target/debug/bat-probe
+        run: bun scripts/quality/probe-integration.mjs
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l4-e2e:
+    name: "L4: E2E"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    env:
+      CLOUDFLARE_API_TOKEN: ""
+      CLOUDFLARE_ACCOUNT_ID: ""
+      CF_API_TOKEN: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Install Chromium
+        run: bunx playwright install --with-deps chromium
+        working-directory: packages/ui
+      - name: Build dashboard
+        run: bun run build
+      - name: Browser journeys and environment capture
+        run: |
+          bun run test:e2e:pw
+          bun run capture:environments
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: packages/ui/playwright-report/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Upload environment capture evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: environment-captures
+          path: artifacts/environments/automated/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  p1-package:
+    name: "P1: Package"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15
+        with:
+          package-manager: bun
+          runtime-version: "1.3.11"
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Build public CLI package
+        run: bun run build
+      - name: Verify packed CLI consumer
+        run: node scripts/quality/verify-package.mjs
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  z1-gate:
+    name: "Z1: Gate"
+    needs:
+      - s1-types
+      - s2-lint
+      - s3-workflow
+      - g1-secrets
+      - g2-dependencies
+      - b1-build
+      - l1-unit
+      - l2-runtime
+      - l3-integration
+      - l4-e2e
+      - p1-package
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tested-sha: ${{ steps.verify.outputs.tested-sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify all slots
+        id: verify
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
+        run: |
+          bun scripts/quality/z1-gate.mjs
+          echo "tested-sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
