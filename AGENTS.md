@@ -77,7 +77,7 @@ native mode: `ci.yml` has one `quality` caller job and
 | L3   | `test:environments`; `probe-integration.mjs`                                                        | Isolated local services          | pre-push, CI             | 28s local                  | probe → Worker → query                                   |
 | L4   | pre-push `test:e2e:pw:smoke`; CI `test:e2e:pw`; `capture:environments`                              | Built SPA + local Worker         | pre-push, CI             | smoke 64 / 35.3s; CI 194   | Chromium journeys and captures                           |
 | P1   | `npm pack`; tarball inspection; throwaway install; installed CLI smoke                              | Built public CLI package         | pre-push, CI             | 34 checks                  | public `@nocoo/bat` tarball                              |
-| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | real CI pending            | all impl success; no skipped impl                        |
+| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | 15s in CI                  | all impl success; no skipped impl                        |
 
 `*` S3 is conditional in pre-commit and always runs in CI. Worker/UI branch
 coverage is 91.16%/94.69%, below the 95% governance target; their existing 90%
@@ -87,7 +87,11 @@ thresholds are preserved. Rust branch coverage is not available from
 | Hook       | Current behavior                                                                             | Measured / target                                 |
 | ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
 | pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 14.00s cold; 11.32s hot; target ≤15s, reject >30s |
-| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:25.57; target ≤2.5min                           |
+| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:25.57 typical; one 2:44.95 over target          |
+
+The pre-push peak was driven by L4 smoke moving from 35.4s to 46.3s under load.
+Trim the smoke set to 40-48 critical journeys or split capture from smoke before
+treating the 2.5-minute target as stable; CI keeps the full 194-test suite.
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at

@@ -441,3 +441,10 @@ The migration exposed several failures that looked like successful gates:
   `install-state --check` against the clone manifests before writing.
 - The push-range regression existed only in the local hook. CI L1 and
   `test:quality-gate` now run the same file so the two lists cannot drift.
+- `bun run release` updates lockfiles after installing; refresh the install-state
+  marker before committing or the pre-commit dependency check rejects the release.
+- `gh run watch` can return non-zero before a successful run reaches `completed`.
+  Poll `gh run view --json status,conclusion` and only then judge the CI result.
+- The 64-test pre-push smoke is close to the 2.5-minute budget and reached
+  2:44.95 under load. Trim it to 40-48 critical journeys or split capture from
+  the gate before treating the budget as stable.
