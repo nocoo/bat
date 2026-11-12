@@ -19,6 +19,7 @@
 		"test": "turbo test && cd probe && cargo test --quiet",
 		"test:unit:coverage": "bash scripts/check-coverage.sh",
 		"test:e2e:pw": "cd packages/ui && bunx playwright test",
+		"test:e2e:pw:smoke": "cd packages/ui && bunx playwright test tests/hosts.spec.ts tests/host-detail.spec.ts tests/navigation.spec.ts",
 		"gate:routes": "bun run scripts/check-route-coverage.ts",
 		"gate:pages": "bun run scripts/check-page-coverage.ts",
 		"gate:security": "bun run scripts/run-security.ts --gitleaks-staged --gitleaks-repo .",
