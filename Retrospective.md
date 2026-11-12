@@ -433,3 +433,11 @@ The migration exposed several failures that looked like successful gates:
 - `test:l1-gate` wrote probes into the real index and restored it to `HEAD`,
   which could discard a developer's staged work. Every probe now runs in a
   temporary local clone with symlinked dependencies and caches.
+- The background stage fix did not cover the foreground G1, self-test and
+  shared-build timeouts. A tool that ignores `TERM` could still hang the hook;
+  every `timeout` now has `--kill-after=5`.
+- A temporary clone that writes its own install-state marker without checking
+  the source installation can bless stale dependencies. Run the source
+  `install-state --check` against the clone manifests before writing.
+- The push-range regression existed only in the local hook. CI L1 and
+  `test:quality-gate` now run the same file so the two lists cannot drift.

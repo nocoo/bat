@@ -95,9 +95,11 @@ suite passed 64 tests in 35.4 seconds; CI runs the full 194-test Chromium suite
 instead.
 
 `bun run test:l1-gate` runs every pre-commit probe in a temporary local clone
-with symlinked dependencies and caches. It never writes the real index or
-worktree; the probe suite covers healthy, staged/worktree mismatch, doc-only,
-mutable workflow, workflow deletion and workflow rename cases.
+with symlinked dependencies and caches. It first checks the source installation
+against the clone manifests, then writes the clone marker, so a stale install
+cannot be blessed as evidence. It never writes the real index or worktree; the
+probe suite covers healthy, staged/worktree mismatch, doc-only, mutable
+workflow, workflow deletion and workflow rename cases.
 
 ## CI
 
@@ -106,6 +108,8 @@ native `.github/workflows/quality-slots.yml` workflow. The called workflow has
 the 11 implementation jobs above plus `Z1: Gate`. Every implementation job
 exports `tested-sha`; Z1 runs with `if: always()` and rejects a failed, skipped
 or missing implementation slot, a SHA mismatch, or an undeclared blocking job.
+The L1 script suite includes the push-range regression, so the tag and
+actual-remote range rules are checked in CI rather than only by the local hook.
 
 There are no separate slot-outside CI jobs in the current workflow. Build,
 coverage, runtime, integration, browser and package checks are all owned by the
