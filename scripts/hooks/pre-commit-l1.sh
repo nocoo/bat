@@ -37,8 +37,8 @@ trap "exit 129" HUP
 snapshot=$(mktemp -d "${TMPDIR:-/tmp}/bat-index-XXXXXX")
 logs=$(mktemp -d "${TMPDIR:-/tmp}/bat-precommit-XXXXXX")
 bash "$repo/scripts/quality/git-snapshot.sh" index "$repo" "$snapshot"
-timeout 30 gitleaks git --staged --config "$snapshot/.gitleaks.toml" --no-banner --redact
-timeout 30 bash "$repo/scripts/quality/gitleaks-selftest.sh" "$snapshot"
+timeout --kill-after=5 30 gitleaks git --staged --config "$snapshot/.gitleaks.toml" --no-banner --redact
+timeout --kill-after=5 30 bash "$repo/scripts/quality/gitleaks-selftest.sh" "$snapshot"
 bash "$repo/scripts/quality/prepare-snapshot.sh" "$repo" "$snapshot"
 
 cd "$snapshot"
@@ -50,7 +50,7 @@ export CARGO_TARGET_DIR="$repo/.cache/quality/cargo-lint"
 export CARGO_INCREMENTAL=0
 mkdir -p "$XDG_CACHE_HOME" "$XDG_STATE_HOME" "$TURBO_CACHE_DIR" "$CARGO_TARGET_DIR"
 
-timeout 60 bun turbo build --filter=@bat/shared
+timeout --kill-after=5 60 bun turbo build --filter=@bat/shared
 
 run_bg() {
 	name="$1"
