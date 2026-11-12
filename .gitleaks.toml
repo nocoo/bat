@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic secret used by the scanner self-test"
+paths = ['''scripts/quality/gitleaks-selftest\.sh''']

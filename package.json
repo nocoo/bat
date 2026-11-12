@@ -22,12 +22,13 @@
 		"gate:routes": "bun run scripts/check-route-coverage.ts",
 		"gate:pages": "bun run scripts/check-page-coverage.ts",
 		"gate:security": "bun run scripts/run-security.ts",
-		"prepare": "husky",
+		"prepare": "husky && bun scripts/quality/install-state.mjs --write",
 		"test:environments": "bun scripts/environments/verify.mjs",
 		"test:environments:unit": "bun test scripts/environments/",
 		"capture:environments": "bun scripts/environments/capture.mjs",
 		"test:environments:ui": "bun scripts/environments/capture.mjs --interactive",
-		"test:l1-gate": "bun scripts/verify-l1-gate.mjs"
+		"test:l1-gate": "bun scripts/verify-l1-gate.mjs",
+		"test:quality-gate": "bun test scripts/quality/z1-gate.test.ts scripts/check-test-focus.test.ts"
 	},
 	"trustedDependencies": [
 		"@biomejs/biome",

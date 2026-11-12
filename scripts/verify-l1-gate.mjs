@@ -77,9 +77,9 @@ try {
 	const docOnly = runHook(repo, { timeout: 600_000 });
 	check(
 		"non-code-only staged change still runs full L1",
-		/━━━ unit_cov/.test(docOnly.output) &&
-			/Checking coverage threshold/.test(docOnly.output) &&
-			/━━━ rust_lint/.test(docOnly.output),
+		/━━━ coverage_ts/.test(docOnly.output) &&
+			/━━━ rust_s1_s2/.test(docOnly.output) &&
+			/✔ pre-commit passed/.test(docOnly.output),
 		docOnly.output.slice(0, 320),
 	);
 	execFileSync("git", ["restore", "--staged", noticePath], { cwd: repo });

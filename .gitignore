@@ -9,6 +9,7 @@ dist/
 
 # Turbo
 .turbo/
+.cache/
 
 # Environment
 .env

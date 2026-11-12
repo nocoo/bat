@@ -1,5 +1,6 @@
 {
 	"$schema": "https://turbo.build/schema.json",
+	"globalPassThroughEnv": ["NEEDS_JSON", "EXTRA_REQUIRED_JOBS"],
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],

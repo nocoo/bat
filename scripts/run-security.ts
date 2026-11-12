@@ -1,77 +1,102 @@
 #!/usr/bin/env bun
-/**
- * G2 Security Gate — osv-scanner (dependency CVE) + gitleaks (secrets)
- *
- * Pre-push hook runs this alongside L2 E2E tests.
- * Both tools must pass (exit 0) for push to proceed.
- */
+import { spawnSync } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
+import { join, resolve } from "node:path";
 
-import { $ } from "bun";
+const args = process.argv.slice(2);
+const value = (name: string): string | undefined => {
+	const index = args.indexOf(name);
+	return index === -1 ? undefined : args[index + 1];
+};
 
-const results: { tool: string; ok: boolean; output: string }[] = [];
+const root = resolve(value("--root") ?? process.cwd());
+const gitleaksRepo = value("--gitleaks-repo");
+const gitleaksRange = value("--gitleaks-log-opts");
+const skipGitleaks = args.includes("--skip-gitleaks");
 
-// 1. osv-scanner — scan bun.lock for known CVEs
-console.info("→ G2: osv-scanner (bun.lock)");
-try {
-	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=bun.lock`.quiet();
-	results.push({ tool: "osv-scanner", ok: true, output: osv.text() });
-	console.info("  ✔ osv-scanner (JS): no vulnerabilities found");
-} catch (e: unknown) {
-	const err = e as { stderr?: { toString(): string }; message?: string };
-	results.push({ tool: "osv-scanner", ok: false, output: err.stderr?.toString() ?? "" });
-	console.error("  ✘ osv-scanner (JS): vulnerabilities detected");
-	console.error(err.stderr?.toString() ?? err.message);
-}
-
-// 2. osv-scanner — scan Cargo.lock for Rust CVEs
-console.info("→ G2: osv-scanner (Cargo.lock)");
-try {
-	const osv = await $`osv-scanner --config=osv-scanner.toml --lockfile=probe/Cargo.lock`.quiet();
-	results.push({ tool: "osv-scanner-rust", ok: true, output: osv.text() });
-	console.info("  ✔ osv-scanner (Rust): no vulnerabilities found");
-} catch (e: unknown) {
-	const err = e as { stderr?: { toString(): string }; message?: string };
-	results.push({ tool: "osv-scanner-rust", ok: false, output: err.stderr?.toString() ?? "" });
-	console.error("  ✘ osv-scanner (Rust): vulnerabilities detected");
-	console.error(err.stderr?.toString() ?? err.message);
-}
-
-// 3. gitleaks — scan for leaked secrets in commits since upstream
-console.info("→ G2: gitleaks (secrets leak detection)");
-try {
-	// Detect upstream branch dynamically
-	const upstream = (await $`git rev-parse --abbrev-ref @{u}`.quiet()).text().trim();
-	await $`gitleaks git --log-opts=${upstream}..HEAD --no-banner`.quiet();
-	results.push({ tool: "gitleaks", ok: true, output: "" });
-	console.info("  ✔ gitleaks: no leaks detected");
-} catch (e: unknown) {
-	const err = e as { stderr?: { toString(): string }; exitCode?: number; message?: string };
-	// gitleaks exit 1 = leaks found, exit 2+ = error
-	// If no upstream, fall back to scanning all commits
-	if (err.message?.includes("rev-parse")) {
-		console.info("  ⚠ gitleaks: no upstream branch, scanning recent commits");
-		try {
-			await $`gitleaks git --log-opts=-20 --no-banner`.quiet();
-			results.push({ tool: "gitleaks", ok: true, output: "" });
-			console.info("  ✔ gitleaks: no leaks detected");
-		} catch (e2: unknown) {
-			const err2 = e2 as { stderr?: { toString(): string }; message?: string };
-			results.push({ tool: "gitleaks", ok: false, output: err2.stderr?.toString() ?? "" });
-			console.error("  ✘ gitleaks: potential secrets detected");
-			console.error(err2.stderr?.toString() ?? err2.message);
-		}
-	} else {
-		results.push({ tool: "gitleaks", ok: false, output: err.stderr?.toString() ?? "" });
-		console.error("  ✘ gitleaks: potential secrets detected");
-		console.error(err.stderr?.toString() ?? err.message);
-	}
-}
-
-// Summary
-const failed = results.filter((r) => !r.ok);
-if (failed.length > 0) {
-	console.error(`\n✘ G2 Security gate FAILED (${failed.map((f) => f.tool).join(", ")})`);
+const fail = (message: string): never => {
+	console.error(`✘ security gate failed: ${message}`);
 	process.exit(1);
+};
+
+const requireTool = (tool: string): string => {
+	const found = Bun.which(tool);
+	if (!found) fail(`${tool} is required but was not found`);
+	return found;
+};
+
+const run = (command: string, commandArgs: string[], cwd: string) => {
+	const result = spawnSync(command, commandArgs, {
+		cwd,
+		encoding: "utf8",
+		env: { ...process.env, WRANGLER_SEND_METRICS: "false" },
+	});
+	if (result.error) fail(`${command} could not run: ${result.error.message}`);
+	return result;
+};
+
+const packageLocks = new Set([
+	"bun.lock",
+	"bun.lockb",
+	"package-lock.json",
+	"pnpm-lock.yaml",
+	"yarn.lock",
+	"Cargo.lock",
+]);
+const lockfiles: string[] = [];
+
+const walk = (dir: string) => {
+	for (const entry of readdirSync(dir, { withFileTypes: true })) {
+		if (
+			entry.isDirectory() &&
+			["node_modules", "target", ".git", ".wrangler", ".cache", "artifacts"].includes(entry.name)
+		) {
+			continue;
+		}
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) walk(path);
+		else if (packageLocks.has(entry.name)) lockfiles.push(path);
+	}
+};
+
+walk(root);
+lockfiles.sort();
+if (lockfiles.length === 0) fail(`no dependency lockfiles found below ${root}`);
+
+const osv = requireTool("osv-scanner");
+const config = join(root, "osv-scanner.toml");
+for (const lockfile of lockfiles) {
+	if (!existsSync(lockfile)) fail(`lockfile disappeared: ${lockfile}`);
+	const osvArgs = ["scan", `--lockfile=${lockfile}`];
+	if (existsSync(config)) osvArgs.push(`--config=${config}`);
+	const result = run(osv, osvArgs, root);
+	if (result.status !== 0) {
+		process.stderr.write(result.stdout ?? "");
+		process.stderr.write(result.stderr ?? "");
+		fail(`osv-scanner rejected ${lockfile}`);
+	}
+	console.log(`✔ osv-scanner: ${lockfile}`);
 }
 
-console.info("\n✔ G2 Security gate PASSED");
+if (!skipGitleaks) {
+	if (!gitleaksRepo || !gitleaksRange) {
+		fail("G1 requires --gitleaks-repo and --gitleaks-log-opts; recent-commit fallbacks are unsafe");
+	}
+	const gitleaks = requireTool("gitleaks");
+	const gitleaksArgs = [
+		"git",
+		`--log-opts=${gitleaksRange}`,
+		`--config=${join(gitleaksRepo, ".gitleaks.toml")}`,
+		"--no-banner",
+		"--redact",
+	];
+	const result = run(gitleaks, gitleaksArgs, gitleaksRepo);
+	if (result.status !== 0) {
+		process.stderr.write(result.stdout ?? "");
+		process.stderr.write(result.stderr ?? "");
+		fail(`gitleaks rejected the pushed range ${gitleaksRange}`);
+	}
+	console.log(`✔ gitleaks: ${gitleaksRange}`);
+}
+
+console.log(skipGitleaks ? "✔ G2 dependency scan passed" : "✔ G1/G2 security gate passed");

@@ -1,108 +1,80 @@
 #!/usr/bin/env bash
-# Check coverage for TypeScript packages (vitest) and Rust probe (cargo-llvm-cov)
-# Fails if any package drops below the threshold
 set -euo pipefail
 
-THRESHOLD="${1:-95}"
-RUST_THRESHOLD="${2:-90}"
+mode="${1:-all}"
+case "$mode" in
+	--ts) run_ts=1; run_rust=0 ;;
+	--rust) run_ts=0; run_rust=1 ;;
+	all) run_ts=1; run_rust=1 ;;
+	*)
+		echo "usage: check-coverage.sh [--ts|--rust|all]" >&2
+		exit 2
+		;;
+esac
 
-# Parse the vitest v8 coverage "All files" row.
-# Format:
-#   File       | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
-#   All files  |  98.11  |  95.06   |  99.34  |  98.01  |
-#
-# We check line coverage (column 5).
+ts_threshold="${TS_THRESHOLD:-95}"
+rust_threshold="${RUST_THRESHOLD:-95}"
+failed=0
+
 check_ts_coverage() {
-  local pkg="$1"
-  local output="$2"
-
-  # Preferred: parse the "Lines : X% (Y/Z)" line from the coverage summary,
-  # which is printed whether or not any per-file rows are present.
-  local coverage
-  coverage=$(echo "$output" | grep -E "^Lines\s*:" | awk -F'[:%]' '{print $2}' | tr -d ' ' | head -1)
-
-  # Fallback: parse the "All files" row (only present when at least one file
-  # has < 100% coverage).
-  if [ -z "$coverage" ]; then
-    coverage=$(echo "$output" | grep -E "^All files" | awk -F'|' '{print $5}' | tr -d ' ' | head -1)
-  fi
-
-  if [ -z "$coverage" ]; then
-    echo "✘ ${pkg}: no coverage data found (FAIL — cannot verify threshold)"
-    return 1
-  fi
-
-  local int_coverage
-  int_coverage=$(echo "$coverage" | cut -d. -f1)
-
-  if [ "$int_coverage" -lt "$THRESHOLD" ]; then
-    echo "✘ ${pkg}: coverage ${coverage}% < ${THRESHOLD}% threshold"
-    return 1
-  fi
-
-  echo "✔ ${pkg}: coverage ${coverage}% ≥ ${THRESHOLD}%"
-  return 0
+	local pkg_dir="$1"
+	local label="$2"
+	local output
+	if ! command -v npx >/dev/null 2>&1; then
+		echo "npx is required for TypeScript coverage" >&2
+		return 1
+	fi
+	if ! output=$(cd "$pkg_dir" && npx --no-install vitest run --coverage 2>&1); then
+		echo "✘ ${label}: unit tests or configured coverage thresholds failed"
+		echo "$output"
+		return 1
+	fi
+	local coverage
+	coverage=$(printf '%s\n' "$output" | sed -nE 's/^Lines[[:space:]]*:[[:space:]]*([0-9.]+)%.*/\1/p' | head -1)
+	if [ -z "$coverage" ]; then
+		echo "✘ ${label}: no coverage summary found" >&2
+		return 1
+	fi
+	if ! awk -v value="$coverage" -v threshold="$ts_threshold" 'BEGIN { exit !(value >= threshold) }'; then
+		echo "✘ ${label}: line coverage ${coverage}% < ${ts_threshold}%"
+		return 1
+	fi
+	echo "✔ ${label}: line coverage ${coverage}% ≥ ${ts_threshold}%"
 }
 
 check_rust_coverage() {
-  if ! command -v cargo-llvm-cov &>/dev/null; then
-    echo "✘ probe: cargo-llvm-cov not installed — install with 'cargo install cargo-llvm-cov' and 'rustup component add llvm-tools-preview'"
-    return 1
-  fi
-
-  # Prefer nightly for coverage(off) attribute support
-  local toolchain=""
-  if rustup run nightly rustc --version &>/dev/null; then
-    toolchain="+nightly"
-  else
-    echo "⚠ probe: nightly toolchain not found, falling back to stable (coverage(off) annotations ignored)"
-  fi
-
-  echo "→ probe (Rust): running cargo ${toolchain:-stable} llvm-cov..."
-  # shellcheck disable=SC2086
-  if ! cargo $toolchain llvm-cov --fail-under-lines "$RUST_THRESHOLD" --manifest-path probe/Cargo.toml 2>&1 | tail -3; then
-    echo "✘ probe: line coverage < ${RUST_THRESHOLD}% threshold"
-    return 1
-  fi
-
-  echo "✔ probe: line coverage ≥ ${RUST_THRESHOLD}%"
-  return 0
+	if ! command -v cargo-llvm-cov >/dev/null 2>&1; then
+		echo "cargo-llvm-cov is required; install it before running Rust coverage" >&2
+		return 1
+	fi
+	if ! rustup run nightly rustc --version >/dev/null 2>&1; then
+		echo "nightly Rust with llvm-tools-preview is required; stable is not accepted" >&2
+		return 1
+	fi
+	local output
+	if ! output=$(cargo +nightly llvm-cov \
+		--locked \
+		--fail-under-lines "$rust_threshold" \
+		--fail-under-functions "$rust_threshold" \
+		--fail-under-regions "$rust_threshold" \
+		--manifest-path probe/Cargo.toml 2>&1); then
+		printf '%s\n' "$output" | tail -20
+		echo "✘ probe: line/function/region coverage below ${rust_threshold}% or tests failed"
+		return 1
+	fi
+	printf '%s\n' "$output" | tail -4
+	echo "✔ probe: line/function/region coverage ≥ ${rust_threshold}%"
 }
 
-echo "Checking coverage threshold: TS=${THRESHOLD}% Rust=${RUST_THRESHOLD}%"
-echo "---"
-
-failed=0
-
-# TypeScript packages — run vitest in each package dir
-for pkg in shared worker ui cli; do
-  pkg_dir="packages/${pkg}"
-  filter="@bat/${pkg}"
-  if [ "$pkg" = "cli" ]; then
-    filter="@nocoo/bat"
-  fi
-
-  if ! output=$(cd "$pkg_dir" && npx vitest run --coverage 2>&1); then
-    echo "✘ ${filter}: unit tests or configured coverage thresholds failed"
-    echo "$output"
-    failed=1
-    continue
-  fi
-  if ! check_ts_coverage "$filter" "$output"; then
-    failed=1
-  fi
-done
-
-# Rust probe
-if ! check_rust_coverage; then
-  failed=1
+if [ "$run_ts" = 1 ]; then
+	check_ts_coverage packages/shared "@bat/shared" || failed=1
+	check_ts_coverage packages/worker "@bat/worker" || failed=1
+	check_ts_coverage packages/ui "@bat/ui" || failed=1
+	check_ts_coverage packages/cli "@nocoo/bat" || failed=1
 fi
 
-if [ "$failed" -ne 0 ]; then
-  echo "---"
-  echo "Coverage check FAILED"
-  exit 1
+if [ "$run_rust" = 1 ]; then
+	check_rust_coverage || failed=1
 fi
 
-echo "---"
-echo "Coverage check PASSED"
+exit "$failed"
