@@ -84,7 +84,7 @@ bunx playwright install chromium
 bun run test:e2e:pw
 ```
 
-The first command runs TypeScript and Rust unit tests. L2 and L3 use fresh native
+The first command runs TypeScript and Rust unit tests. L2 Runtime, L3 Integration and L4 E2E use fresh native
 Worker/D1 resources, identities and ephemeral ports per run, with owned storage
 under `packages/worker/.wrangler/environments/e2e-<uuid>`.
 Test launchers reject inherited production credentials, enforce the automated

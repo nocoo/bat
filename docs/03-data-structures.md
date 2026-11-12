@@ -726,14 +726,15 @@ The `@bat/shared` package contains pure type definitions and constants. Testing 
 | `alerts.test.ts`    | Alert rule definitions are complete (all 6 rules), severity values valid, duration values correct |
 | `constants.test.ts` | Threshold values match documented rules, retention/interval values correct                        |
 
-### L2 — Lint
+### S2 — Lint
 
 - Biome strict mode, zero errors + zero warnings
 - Typecheck: `tsc --noEmit`
 
-### L3/L4
+### L2/L3/L4
 
-Not applicable — `@bat/shared` is a pure types/constants package with no runtime behavior or API surface.
+Not applicable — `@bat/shared` is a pure types/constants package with no
+runtime, service or UI surface.
 
 ### Atomic commits (this module)
 

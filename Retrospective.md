@@ -387,3 +387,21 @@ The launcher's SIGTERM handler still does not reliably tear down the worker grou
 under Bun; the local restart script kills the worker tree explicitly before
 relaunching. Treat "no orphan workerd after stop" as unproven until that handler is
 verified.
+
+## 2026-11-12 - System0 migration: verify the target, not the wrapper
+
+The migration exposed several failures that looked like successful gates:
+
+- v2026.15 is an annotated tag; its tag object SHA is not a valid `uses:` target.
+  Resolve `^{commit}` and pin `777bbe4f9bacab8a91d8c01974480a6ee23d28e0`.
+- G1 over the working tree scanned `node_modules` and produced hundreds of false
+  positives. Snapshot tracked content for CI and scan the staged index locally.
+- A background stage that was not waited on let cleanup delete its snapshot before
+  `cargo check` ran, which appeared as "Current directory is invalid". Wait for the
+  exact PID and preserve its exit status.
+- L3 and L4 both own `packages/worker/.wrangler/environments`; running them
+  concurrently deletes each other's stores. Run L3 first, then L4 and P1.
+- `bun --cwd` is not a supported flag in this toolchain; use a subshell.
+- The local machine had Bun 1.4.4 while `package.json` declared 1.3.11. Comparing
+  only the marker's runtime let the mismatch pass. Install-state now checks the
+  declared version as well as the lockfile digest.

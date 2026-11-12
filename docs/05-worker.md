@@ -313,12 +313,12 @@ Defined in `index.ts` scheduled handler.
 
 **Coverage target**: ≥ 90% on all services and middleware.
 
-### L2 — Lint
+### S2 — Lint
 
 - Biome strict mode, zero errors + zero warnings
 - Typecheck: `tsc --noEmit`
 
-### L3 — API E2E (`bun test` + local Wrangler)
+### L2 — Runtime (`bun test` + local Wrangler)
 
 Test every Worker route against local Wrangler dev server:
 
@@ -343,11 +343,13 @@ Test every Worker route against local Wrangler dev server:
 | Write key on read route  | `GET /api/hosts` (write key)           | 403, scope mismatch                                        |
 | Read key on write route  | `POST /api/ingest` (read key)          | 403, scope mismatch                                        |
 
-**Server convention**: Worker dev on port 37025, API E2E on port 18787.
+The automated launcher allocates ephemeral loopback ports and a per-run D1/KV/DO
+store. Never use the daily gateway or a fixed test port.
 
 ### L4
 
-Not applicable — Worker has no UI. API coverage is handled by L3.
+The Worker itself has no browser surface; dashboard journeys run in L4. Worker
+HTTP, D1 and Durable Object behavior is covered by L2 Runtime.
 
 ---
 

@@ -334,7 +334,8 @@ Do not copy a snippet from this file. Production config is `packages/worker/wran
 
 ### Test environment
 
-L2/L3 tests use local Miniflare D1 only (`--local` flag) — no remote test database or `[env.test]` environment. See [07-testing.md § D1 Isolation](./07-testing.md#d1--test-isolation).
+L2/L3/L4 tests use local Miniflare D1 only (`--local` flag) — no remote test
+database or `[env.test]` environment. See [07-testing.md § Isolation](./07-testing.md#isolation).
 
 ---
 

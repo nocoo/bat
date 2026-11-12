@@ -1,5 +1,9 @@
 # Quality System Upgrade — Tier C → S
 
+> **Historical:** this document records the 2026 6DQ migration. It is superseded
+> by the System0 12-slot model in [07-testing.md](./07-testing.md) and
+> [AGENTS.md](../AGENTS.md); do not use its slot names as the current contract.
+
 > Upgrade bat from the legacy four-layer testing architecture to the six-dimension quality system:
 > **three test layers (L1/L2/L3) + two gates (G1/G2) + one isolation (D1)**.
 

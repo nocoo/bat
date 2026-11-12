@@ -15,7 +15,7 @@ instead of synthetic shapes. The raw capture never enters this repository.
 3. The coordinator audits the sanitized result (identifier sweep, diff review)
    before staging the JSON under the local environment fixtures directory.
 4. Only the sanitized recording is checked in, and only as development fixture
-   data. Automated L2/L3 lanes keep their fully synthetic fixtures.
+   data. Automated L2 Runtime and L3 Integration lanes keep their fully synthetic fixtures.
 
 Raw captures are never read by CI, tests or agents. Sanitizer tests use
 hand-written synthetic payloads with deliberate canary strings; loader tests use
@@ -198,6 +198,6 @@ it does not change the Demo runtime clock or seeded ages.
 
 The focused synthetic catalog (`alpha.test.local`, `beta.test.local`, four
 synthetic workstations) remains byte-for-byte independent and continues to feed
-the automated L2/L3 suites. The recorded catalog is exercised by the isolated
+the automated L2/L3/L4 suites. The recorded catalog is exercised by the isolated
 rich Demo acceptance (`verify.mjs`, `capture.mjs`), not by focused Playwright
 fixtures.

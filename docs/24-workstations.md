@@ -290,7 +290,7 @@ dashboard.
 
 - Unit: `packages/worker/src/**/workstation*.test.ts` (pure helpers, D1 adapter over the mock,
   route/middleware behaviour) and `packages/shared/src/__tests__/workstations.test.ts`.
-- L2: `packages/worker/test/e2e/workstations.test.ts` enrolls with a local Access fixture key, exchanges
+- L2 Runtime: `packages/worker/test/e2e/workstations.test.ts` enrolls with a local Access fixture key, exchanges
   a PKCE code, probes, uploads an idempotent report, reads history and revokes over real local HTTP
   with native persistence. `packages/worker/test/e2e/connect-workstations.test.ts` covers ws-only,
   mixed, empty and write keys, denial, filtered connectivity and immediate revocation, plus the

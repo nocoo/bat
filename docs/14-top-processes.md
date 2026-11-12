@@ -534,12 +534,12 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 
 **Coverage target**: Probe collector ≥ 90%, Dashboard transform ≥ 90%
 
-### 9.2 L2 — Lint
+### 9.2 S2 — Lint
 
 - `cargo clippy` (probe) — 0 warnings
 - `bun lint` (worker + dashboard) — 0 warnings
 
-### 9.3 L3 — API E2E
+### 9.3 L2 — Runtime
 
 | Test                                                     | Assertion                               |
 | -------------------------------------------------------- | --------------------------------------- |
@@ -548,7 +548,7 @@ Top processes 是**诊断辅助数据**，不是独立告警信号。原因：
 | GET /api/hosts/:id/metrics (raw range)                   | Response includes `top_processes_json`  |
 | GET /api/hosts/:id/metrics (hourly range)                | Response has `top_processes_json: null` |
 
-### 9.4 L4 — BDD E2E
+### 9.4 L4 — E2E
 
 不适用。进程数据无法在 CI 环境可靠模拟。
 

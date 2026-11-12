@@ -1,379 +1,141 @@
-# 07 — Testing & Quality System
+# 07 — Testing and System0 Quality
 
-> Six-dimension quality system: **three test layers (L1/L2/L3) + two gates (G1/G2) + one isolation (D1)**.
-> Each dimension has defined scope, tools, trigger timing, pass criteria, and failure behavior.
+> Bat uses the System0 12-slot quality model. The old 6DQ names are gone:
+> L1.5 is L2 Runtime, old L2 API is L3 Integration, and old L3 Browser is L4 E2E.
 >
-> Related documents:
-> - [02-architecture.md](./02-architecture.md) — System overview, verification checklist
-> - [03-data-structures.md](./03-data-structures.md) — Shared types testing (L1)
-> - [04-probe.md](./04-probe.md) — Probe testing (L1)
-> - [05-worker.md](./05-worker.md) — Worker testing (L1, L2)
-> - [06-ui.md](./06-ui.md) — UI SPA (L3 Playwright E2E)
-> - [19-edge-deployment.md](./19-edge-deployment.md) — Edge deployment design
+> The contract is in [AGENTS.md](../AGENTS.md); slot definitions are in the
+> System0 quality skill. This document records the repository's actual commands,
+> evidence boundaries and current gaps.
 
----
+## Slot map
 
-## Dimension Overview
+| Slot | Name         | Command / evidence                                                                                  | Checked object                   | Stage                    | Status |
+| ---- | ------------ | --------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | ------ |
+| S1   | Types        | `bun turbo typecheck`; `cargo check --locked --all-features --manifest-path probe/Cargo.toml`       | Index snapshot / CI checkout     | pre-commit               | impl   |
+| S2   | Lint         | `biome check --error-on-warnings .`; focus scan; `cargo fmt --check`; `cargo clippy -- -D warnings` | Index snapshot / CI checkout     | pre-commit               | impl   |
+| S3   | Workflow     | actionlint, yamllint and `scripts/check-workflows.py`                                               | Index snapshot / CI checkout     | pre-commit*, CI          | impl   |
+| G1   | Secrets      | `gitleaks git --staged`; push-range scan; scanner self-test with a synthetic secret                 | Staged index / pushed ranges     | pre-commit, pre-push, CI | impl   |
+| G2   | Dependencies | `osv-scanner` over `bun.lock` and `probe/Cargo.lock`                                                | Snapshot lockfiles / CI checkout | pre-push, CI             | impl   |
+| B1   | Build        | dashboard + Worker assets + public CLI + release probe                                              | Snapshot / CI checkout           | pre-push, CI             | impl   |
+| L1   | Unit         | Vitest coverage; nightly `cargo llvm-cov`; script and environment unit suites                       | Snapshot / CI checkout           | pre-commit, pre-push, CI | impl   |
+| L2   | Runtime      | real Wrangler D1/KV checks and the Worker HTTP/D1/DO suite                                          | Isolated local runtime           | CI                       | impl   |
+| L3   | Integration  | local environment suite plus `probe → Worker ingest → query`                                        | Isolated local services          | pre-push, CI             | impl   |
+| L4   | E2E          | Chromium Playwright journeys plus disposable environment captures                                   | Built SPA + local Worker         | pre-push, CI             | impl   |
+| P1   | Package      | `npm pack`, tarball inspection, throwaway install, installed `bat --version/--help`                 | Built public CLI package         | pre-push, CI             | impl   |
+| Z1   | Gate         | CI `quality / Z1: Gate` verifies all implemented slots, their results and one tested SHA            | CI job results                   | CI                       | impl   |
 
-| Dimension          | What                           | Tools                                  | Trigger    | Pass criteria              |
-| ------------------ | ------------------------------ | -------------------------------------- | ---------- | -------------------------- |
-| **L1** Unit        | Pure logic tests               | Bun test (TS), `cargo llvm-cov` (Rust) | pre-commit | ≥ 90% TS, ≥ 95% Rust       |
-| **L2** Integration | Real HTTP E2E against Wrangler | Bun test + local Wrangler/D1           | pre-push   | 100% route coverage        |
-| **L3** Browser E2E | User flows in real browser     | Playwright (Chromium)                  | CI only    | All specs pass             |
-| **G1** Static      | Type errors, lint, format      | Biome, tsc, clippy, cargo fmt          | pre-commit | 0 diagnostics              |
-| **G2** Security    | CVEs + secrets                 | osv-scanner, gitleaks                  | pre-push   | 0 vulnerabilities, 0 leaks |
-| **D1** Isolation   | Test/prod resource separation  | Local Miniflare only (`--local`)       | runtime    | L2/L3 never touch prod D1  |
+`*` S3 runs in pre-commit only when the staged index touches workflows or the
+workflow checker. CI always runs it.
 
-### Tier System
+## Coverage
 
-| Tier  | Requirement                  | Current status |
-| ----- | ---------------------------- | -------------- |
-| **S** | All six dimensions green     | **Yes**        |
-| **A** | L1 + L2 + G1 + D1 + one more | —              |
-| **B** | L1 + G1                      | —              |
-| **C** | Any basic dimension failing  | —              |
+`scripts/check-coverage.sh --ts` runs each package's Vitest configuration and
+then enforces line coverage ≥ 95%. The Vitest configs enforce the package
+thresholds; the current measured values are:
 
----
+| Package       | Lines | Branches | Functions | Statements |
+| ------------- | ----: | -------: | --------: | ---------: |
+| `@bat/shared` | 98.87 |    97.95 |     98.71 |      98.66 |
+| `@bat/worker` | 95.80 |    91.16 |     95.53 |      95.45 |
+| `@bat/ui`     | 99.00 |    94.69 |     98.47 |      98.86 |
+| `@nocoo/bat`  | 98.96 |    95.25 |     97.96 |      98.89 |
 
-## L1 — Unit Tests
+Worker and UI keep their existing branch thresholds at 90%; their measured
+branches are still below the System0 95% governance target. This is a recorded
+gap, not a passing claim.
 
-**What**: Pure logic tests. No network, no database, no browser. Fast, deterministic.
+Rust coverage runs `cargo +nightly llvm-cov` with 95% fail-under thresholds for
+lines, functions and regions. Current measured values are 98.16% lines, 98.09%
+functions and 98.80% regions. `cargo-llvm-cov` does not provide branch coverage,
+so no branch number is claimed for Rust.
 
-**When**: Every commit (pre-commit hook).
+## Local hooks
 
-**Tools**: `bun test` (TypeScript), `cargo test` / `cargo llvm-cov` (Rust).
+### pre-commit
 
-### Coverage targets
+The hook materialises the Git index with `git checkout-index`, checks the
+installed Bun version and dependency digest against the declared toolchain and
+lockfiles, then runs the selected checks in parallel. It never reads unstaged
+fixes as evidence.
 
-| Module        | Tool             | Target | Key test areas                                                                              |
-| ------------- | ---------------- | ------ | ------------------------------------------------------------------------------------------- |
-| `@bat/shared` | Bun test         | ≥ 90%  | Alert rule definitions, threshold constants, type guards                                    |
-| `@bat/worker` | Bun test         | ≥ 90%  | Alert evaluation (6 rules), aggregation SQL, metrics resolution, middleware, route handlers |
-| `probe/`      | `cargo llvm-cov` | ≥ 95%  | Procfs parsing, delta calc, rate math, config parsing, payload serialization, retry logic   |
+Current stages: G1 staged secret scan and scanner self-test; shared build;
+TypeScript types; Biome lint and test-focus scan; TypeScript coverage; script,
+environment and Python unit suites; route/page structural gates; Rust `fmt`,
+`cargo check` and `clippy`; and S3 when relevant workflow files are staged.
 
-`@bat/ui` has no unit tests — it is a thin SPA shell. Build verification only.
+The measured hot run on 2026-11-12 was 11.77 seconds wall time. Every stage has
+a timeout and a missing tool or missing exit report fails the hook.
 
-### Conventions
+### pre-push
 
-- **TS**: Test files colocated as `*.test.ts` alongside source
-- **Rust**: `#[cfg(test)]` modules inline, or `tests/` for integration-style
-- **Fixtures**: Embedded strings (not real `/proc` reads) for determinism
-- **Mocks**: Minimal — prefer testing pure functions. Mock HTTP only for sender/retry tests
+The hook reads Git's push protocol from stdin and creates a snapshot for each
+local OID. Deleted refs are skipped. The G1 range is derived from that ref and
+its remote OID; a new branch scans the local OID against `origin`.
 
-### Run
+Current order:
 
-```bash
-# TS coverage
-bash scripts/check-coverage.sh 90 95
+1. B1, G1/G2 and Rust L1 coverage run in parallel.
+2. L3 runs the environment suite and probe-to-Worker integration.
+3. L4 runs Playwright and environment capture; P1 runs the packed-CLI consumer
+   check. These share no mutable environment store after L3 has finished.
 
-# Rust coverage
-cd probe && cargo llvm-cov --text
-```
+L3 and L4 both use `packages/worker/.wrangler/environments`; they are serialized
+because the environment launcher owns and cleans stores below that root.
 
-### Failure behavior
+## CI
 
-Pre-commit hook blocks the commit. Developer must fix before retrying.
+`.github/workflows/ci.yml` has one caller job named `quality`, which invokes the
+native `.github/workflows/quality-slots.yml` workflow. The called workflow has
+the 11 implementation jobs above plus `Z1: Gate`. Every implementation job
+exports `tested-sha`; Z1 runs with `if: always()` and rejects a failed, skipped
+or missing implementation slot, a SHA mismatch, or an undeclared blocking job.
 
----
+There are no separate slot-outside CI jobs in the current workflow. Build,
+coverage, runtime, integration, browser and package checks are all owned by the
+named slots. Evidence from L4 is uploaded with `if: always()`.
 
-## L2 — Integration E2E
+## Isolation
 
-**What**: End-to-end HTTP tests against a real local Wrangler dev server with real local D1. Tests the full request → middleware → D1 query → response cycle.
+L2, L3 and L4 use the shared native launcher, fresh local D1/KV/Durable Object
+resources, generated identities and ephemeral loopback ports. The launcher
+rejects inherited production-capable Cloudflare credentials and verifies the
+per-run ownership marker before cleanup. Tests never use the daily gateway,
+remote D1/KV, a deployed Worker or production data.
 
-**When**: Every push (pre-push hook).
+The focused automated fixture catalog remains synthetic. The checked-in
+recorded Demo catalog is exercised by the isolated rich Demo acceptance and
+capture paths, not by focused Playwright fixtures.
 
-**Scope**: Native Worker API acceptance (171 tests in the environment migration verification).
-
-### Port convention
-
-| Purpose                           | Port                     |
-| --------------------------------- | ------------------------ |
-| Daily gateway                     | 7025                     |
-| Native Worker / Vite / inspectors | Ephemeral loopback ports |
-| L2 and L3 gateways                | Per-run ephemeral ports  |
-
-### How it works
-
-1. `test:e2e` starts Wrangler on an ephemeral loopback port with `--persist-to .wrangler/environments/e2e-<uuid>`
-2. Applies all D1 migrations to the local database
-3. Runs the Vitest suite against the per-run loopback URL
-4. Tests execute sequentially (some tests depend on prior state, e.g. create → read → delete)
-5. Wrangler process is killed on exit
-
-### Auth during L2
-
-Tests use normal scoped read/write keys or signed fixture Access JWTs. Localhost does not bypass authentication. Invalid signatures and unauthorized mutations fail normally.
-
-### Run
-
-```bash
-bun run turbo test:e2e --filter=@bat/worker
-```
-
-### Migration sync requirement
-
-Native Wrangler applies every numbered production migration through `d1 migrations apply --local`. Migration failure aborts startup; no hardcoded migration list is maintained.
-
-### Failure behavior
-
-Pre-push hook blocks the push. All 57 tests must pass.
-
----
-
-## L3 — Browser E2E
-
-**What**: Browser-level Playwright tests verifying user-visible behavior. Real Chromium browser interacts with a real Wrangler server serving the built SPA.
-
-**When**: CI only (too slow for local hooks, ~30s+ with browser startup).
-
-**Scope**: 69 tests across 7 spec files covering all UI pages.
-
-### Architecture
-
-```
-Playwright (Chromium)
-      │
-      ▼
-  ephemeral loopback gateway → native Wrangler
-      │
-      ├── /* → static assets (built SPA)
-      └── /api/* → Worker handlers → local D1
-```
-
-### Native isolation and authentication
-
-L2 and L3 use `scripts/environments/test-process.mjs` to start the dedicated
-automated launcher. Each run gets ephemeral ports, independent local D1/KV/DO,
-production migrations, signed fixture identity and guarded cleanup. There is no
-localhost authentication bypass and no business API mock in the browser suite.
-Read/write keys and Access JWTs follow their normal verification paths.
-
-Focused SQL fixtures live in `scripts/environments/focused.sql`; rich Demo
-fixtures and real API seed scenarios live in `fixtures.mjs`. Playwright runs
-conflicting mutations serially and never reuses a daily server.
-See [the environment matrix](23-local-environments.md) for commands and evidence.
-
-### Run
+## Commands
 
 ```bash
-# Run all L3 tests
-cd packages/ui && bunx playwright test
-
-# Run with UI (interactive debugging)
-cd packages/ui && bunx playwright test --ui
-
-# From root
+bun install --frozen-lockfile
+bun run typecheck
+bun run lint
+bun run test:unit:coverage
+bun run test:l1-gate
+bun run test:quality-gate
+bun turbo test:e2e --filter=@bat/worker
+bun run test:environments
+bun scripts/quality/runtime-kv.mjs
+bun scripts/quality/probe-integration.mjs
 bun run test:e2e:pw
+bun run capture:environments
+bun scripts/quality/verify-package.mjs
+cargo test --manifest-path probe/Cargo.toml
+cargo clippy --manifest-path probe/Cargo.toml -- -D warnings
+cargo fmt --manifest-path probe/Cargo.toml --check
+bun run gate:security
 ```
 
-### Failure behavior
-
-CI job fails; PR cannot merge. Test report uploaded as CI artifact for debugging.
-
----
-
-## G1 — Static Analysis
-
-**What**: Zero tolerance for type errors, lint warnings, and format violations.
-
-**When**: Every commit (pre-commit hook).
-
-### Tools
-
-| Module          | Tool           | Config                                             |
-| --------------- | -------------- | -------------------------------------------------- |
-| All TS packages | Biome          | `biome.json` at repo root, `all: true` strict mode |
-| All TS packages | TypeScript     | `tsc --noEmit` (typecheck only)                    |
-| `probe/`        | `cargo clippy` | `-- -D warnings` (deny all warnings)               |
-| `probe/`        | `cargo fmt`    | `--check` (format verification)                    |
-
-Biome lint runs via `lint-staged` on staged files only (incremental).
-
-### Failure behavior
-
-Pre-commit hook blocks the commit. Zero diagnostics required.
-
----
-
-## G2 — Security Gate
-
-**What**: Dependency CVE scanning and secrets leak detection.
-
-**When**: Every push (pre-push hook) + CI.
-
-### Tools
-
-| Tool        | What                                  | Scope                                       |
-| ----------- | ------------------------------------- | ------------------------------------------- |
-| osv-scanner | Known CVEs in dependencies            | `bun.lock` (JS) + `probe/Cargo.lock` (Rust) |
-| gitleaks    | Secrets/credentials in staged commits | scans entire git history                    |
-
-### Run
-
-```bash
-# JS dependencies
-osv-scanner scan --lockfile=bun.lock
-
-# Rust dependencies
-osv-scanner scan --lockfile=probe/Cargo.lock
-
-# Secrets detection
-gitleaks protect --staged --no-banner
-```
-
-### Failure behavior
-
-Pre-push hook blocks the push. Zero vulnerabilities, zero leaks required.
-
----
-
-## D1 — Test Isolation
-
-**What**: L2/L3 tests run against local Miniflare D1 only, never touching production.
-
-**When**: Enforced by the shared native launcher and ownership checks in `scripts/environments/runtime.mjs`.
-
-### Isolation layers
-
-| Layer | Mechanism                                        | What it prevents                                                                   |
-| ----- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| 1     | `--local` flag                                   | Wrangler uses in-process Miniflare, not remote CF                                  |
-| 2     | `--persist-to .wrangler/environments/e2e-<uuid>` | Dedicated state dir, separate from other runs                                      |
-| 3     | OS-assigned HTTP and Inspector ports             | Concurrent runs cannot collide or probe another run's Worker                       |
-| 4     | `_test_marker` row asserted                      | Per-store owner and env markers created by the launcher, checked with its manifest |
-| 5     | Env var guard                                    | Refuses to start if `CLOUDFLARE_API_TOKEN` / `CLOUDFLARE_ACCOUNT_ID` set           |
-
-### Failure behavior
-
-L2 global-setup aborts if any isolation check fails (missing marker, blocked env vars).
-
-### Note
-
-There is no remote `bat-db-test` database or `[env.test]` wrangler environment. Isolation is achieved entirely through local Miniflare.
-
----
-
-## Hook Execution Model
-
-### pre-commit: L1 + G1 + G2 + gates (7 parallel stages)
-
-Runs on every `git commit`. All stages execute in parallel; any failure blocks the commit.
-
-| Stage       | Command                                            | What                                              |
-| ----------- | -------------------------------------------------- | ------------------------------------------------- |
-| `unit_cov`  | `bash scripts/check-coverage.sh 90 95`             | L1: TS + Rust unit tests with coverage            |
-| `typecheck` | `bun turbo typecheck`                              | G1: TypeScript type checking                      |
-| `lint`      | `bunx lint-staged`                                 | G1: Biome lint on staged files                    |
-| `rust_lint` | `cargo fmt --check && cargo clippy -- -D warnings` | G1: Rust format + lint (only if `probe/` changed) |
-| `gitleaks`  | `gitleaks protect --staged --no-banner`            | G2: Secrets detection on staged changes           |
-| `routes`    | `bun run gate:routes`                              | L2: Structural route coverage gate                |
-| `pages`     | `bun run gate:pages`                               | L3: Structural page coverage gate                 |
-
-**Total time**: ~15-20s (parallel, dominated by unit tests + Rust compilation).
-
-### pre-push: L2 + G2 (3 parallel stages)
-
-Runs before `git push`. All stages execute in parallel; any failure blocks the push.
-
-| Stage      | Command                                        | What                           |
-| ---------- | ---------------------------------------------- | ------------------------------ |
-| `l2_e2e`   | `bun run turbo test:e2e --filter=@bat/worker`  | L2: Full API E2E               |
-| `osv_js`   | `osv-scanner scan --lockfile=bun.lock`         | G2: CVE scanning for JS deps   |
-| `osv_rust` | `osv-scanner scan --lockfile=probe/Cargo.lock` | G2: CVE scanning for Rust deps |
-
-**Total time**: ~25-30s (parallel, dominated by Wrangler startup + test execution).
-
-### What's NOT in hooks
-
-| Dimension       | Why not in hooks                                                       |
-| --------------- | ---------------------------------------------------------------------- |
-| L3 (Playwright) | ~30s+ with browser startup, requires built UI assets — runs in CI only |
-
----
-
-## CI Pipeline
-
-GitHub Actions runs all dimensions in parallel for maximum speed.
-
-```yaml
-# .github/workflows/ci.yml
-jobs:
-  quality: # L1 + G1 + G2 via nocoo/base-ci
-  coverage-gates: # Route + page structural coverage
-  l2-e2e: # L2: Worker E2E (local Wrangler/D1)
-  l3-playwright: # L3: Browser E2E (Chromium)
-  probe: # Rust: cargo test + clippy + fmt
-```
-
-### Job details
-
-| Job              | Runs                                                          | Duration                    | Dependencies                |
-| ---------------- | ------------------------------------------------------------- | --------------------------- | --------------------------- |
-| `quality`        | L1 unit tests, G1 typecheck + lint, G2 osv-scanner + gitleaks | ~45s                        | None                        |
-| `coverage-gates` | gate:routes + gate:pages structural coverage                  | ~10s                        | None                        |
-| `l2-e2e`         | Worker API E2E tests against local Wrangler                   | ~30s                        | None                        |
-| `l3-playwright`  | Playwright browser tests with Chromium                        | ~60s                        | None (builds UI internally) |
-| `probe`          | `cargo test` + `cargo clippy` + `cargo fmt --check`           | ~60s (cold) / ~20s (cached) | None                        |
-
-All five jobs run in parallel (no `needs` dependency). Total CI time: ~60s (wall clock).
-
-### CI-specific details
-
-- **`secrets: inherit`**: Required for G2 security scanning
-- **Local D1**: L2 and L3 both use Wrangler's local miniflare D1 emulation — no cloud secrets needed
-- **Rust caching**: `Swatinem/rust-cache` reduces probe build from ~2min to ~20s
-- **L3 report**: Playwright HTML report uploaded as artifact on failure
-- **`workflow_dispatch`**: Manual CI trigger available from GitHub UI
-
----
-
-## Cross-Module Integration Verification
-
-Manual verification before each deployment (not automated in hooks):
-
-| #   | Scenario                | How to verify                                                                     |
-| --- | ----------------------- | --------------------------------------------------------------------------------- |
-| 1   | Probe → Worker ingest   | Run Probe against local Wrangler, check `metrics_raw` in D1                       |
-| 2   | Probe → Worker identity | Restart Probe, check `hosts` table updated                                        |
-| 3   | Alert evaluation        | Send metrics exceeding thresholds, check `alert_states` populated                 |
-| 4   | Live endpoint           | After alerts fire, `curl /api/live` returns correct status + HTTP code            |
-| 5   | UI → Worker API         | Login to UI, verify host list loads from Worker via SWR                           |
-| 6   | Time range switching    | Select 7d range in UI, verify hourly resolution data returned                     |
-| 7   | Retired host rejection  | Retire a host via D1 console, verify Probe gets 403                               |
-| 8   | Aggregation cron        | Trigger`__scheduled`, verify `metrics_hourly` populated, old `metrics_raw` purged |
-
----
-
-## Quick Reference
-
-### Run everything locally
-
-```bash
-# L1 + G1 (same as pre-commit)
-bash scripts/check-coverage.sh 90 95
-bun turbo typecheck
-bunx lint-staged
-
-# L2 (same as pre-push)
-bun run turbo test:e2e --filter=@bat/worker
-
-# L3 (CI only, but runnable locally)
-cd packages/ui && bunx playwright test
-
-# G2
-osv-scanner scan --lockfile=bun.lock
-osv-scanner scan --lockfile=probe/Cargo.lock
-
-# D1 isolation check
-bun run scripts/verify-test-bindings.ts
-```
-
-### Test counts
-
-| Layer     | Tests                 | Specs/Files                 |
-| --------- | --------------------- | --------------------------- |
-| L1 TS     | Coverage-based (≥90%) | Colocated `*.test.ts`       |
-| L1 Rust   | Coverage-based (≥95%) | Inline `#[cfg(test)]`       |
-| L2        | 57                    | 1 file (`wrangler.test.ts`) |
-| L3        | 69                    | 7 specs                     |
-| **Total** | **126+**              | —                           |
+`gate:security` scans staged content for G1 and all dependency lockfiles for G2.
+It does not use a recent-commit fallback; push and CI paths pass an explicit
+range or checkout snapshot.
+
+## Remaining gaps
+
+- Worker and UI branch coverage remain below 95%; their existing 90% branch
+  thresholds are preserved rather than lowered further.
+- Rust branch coverage is unavailable in the current `cargo-llvm-cov` version.
+- Native scheduler acceptance and fleet probe installation remain manual and
+  outside the automated slots.

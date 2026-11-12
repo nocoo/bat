@@ -243,16 +243,20 @@ WantedBy=multi-user.target
 
 **Fixture approach**: Tests use embedded string fixtures (not real `/proc` reads) to ensure determinism and cross-platform test execution.
 
-**Coverage target**: ≥ 90% on all pure logic modules (`config`, `rate`, `collectors/*`, `payload`). `main.rs` and `sender.rs` integration paths excluded from coverage (tested via L3).
+**Coverage target**: ≥ 95% lines, functions and regions across the measured
+probe crate. `main.rs` and `sender.rs` integration paths are exercised through
+the L3 integration flow.
 
-### L2 — Lint
+### S2 — Lint
 
 - `cargo clippy -- -D warnings` (deny all warnings)
 - `cargo fmt --check`
 
-### L3 — Integration Test
+### L3 — Integration
 
-Manual: build release binary, run against local Wrangler Worker (`pnpm --filter @bat/worker dev`), verify:
+Automated by `bun scripts/quality/probe-integration.mjs`: build the probe, start
+an isolated local Worker, submit an observation and query it back. The check
+verifies:
 
 - Identity appears in D1 `hosts` table
 - Metrics appear in `metrics_raw`
@@ -260,7 +264,8 @@ Manual: build release binary, run against local Wrangler Worker (`pnpm --filter 
 
 ### L4
 
-Not applicable — Probe is a headless daemon, no UI.
+The probe itself has no browser surface. Dashboard journeys run in L4; probe
+participation is covered by L3.
 
 ---
 

@@ -8,7 +8,7 @@
 > - [04-probe.md](./04-probe.md) — Rust probe implementation
 > - [05-worker.md](./05-worker.md) — CF Worker routes, ingest, alerts, health endpoint
 > - [06-ui.md](./06-ui.md) — Vite + React SPA, Cloudflare Access auth
-> - [07-testing.md](./07-testing.md) — Six-dimension quality system, Husky hooks
+> - [07-testing.md](./07-testing.md) — System0 12-slot quality system, Husky hooks
 
 ## Overview
 
@@ -121,7 +121,7 @@ bat/
 │   └── ui/                         # @bat/ui — Vite + React SPA
 │       ├── package.json
 │       ├── vite.config.ts
-│       ├── playwright.config.ts    # L3 Playwright E2E config
+│       ├── playwright.config.ts    # L4 Playwright E2E config
 │       ├── tests/                  # Playwright test specs
 │       └── src/
 │           ├── App.tsx             # React Router routes

@@ -14,7 +14,7 @@ Current setup and operational boundaries are in [probe installation, development
 | 04  | [probe](./04-probe.md)                                                   | Rust probe: collectors, main loop, config, systemd                                                                      |
 | 05  | [worker](./05-worker.md)                                                 | CF Worker: routes, ingest, alerts, health endpoint, aggregation cron                                                    |
 | 06  | [ui](./06-ui.md)                                                         | Vite + React SPA: Cloudflare Access auth, shadcn/ui, charts                                                             |
-| 07  | [testing](./07-testing.md)                                               | Four-layer testing strategy, Husky hooks                                                                                |
+| 07  | [testing](./07-testing.md)                                               | System0 12-slot quality system, local hooks and CI                                                                      |
 | 08  | [commits](./08-commits.md)                                               | Atomic commits plan (Phase 0–5, 46 commits)                                                                             |
 | 09  | [tier3-signals](./09-tier3-signals.md)                                   | Tier 3 design rationale: PSI, disk I/O, TCP state, OOM kills, FD usage                                                  |
 | 10  | [host-inventory](./10-host-inventory.md)                                 | Host inventory design: CPU topology, virtualization, network, block devices                                             |
@@ -24,7 +24,7 @@ Current setup and operational boundaries are in [probe installation, development
 | 14  | [top-processes](./14-top-processes.md)                                   | Per-process CPU/Memory/IO monitoring: procfs collection, Top 50 snapshot, Dashboard table with sort/filter/color        |
 | 15  | [enhanced-software-and-websites](./15-enhanced-software-and-websites.md) | Expand software registry (frp/Xray/n8n/etc.), Docker image→software mapping, Nginx/Apache vhost website discovery       |
 | 16  | [monitoring-api](./16-monitoring-api.md)                                 | Monitoring API for Uptime Kuma integration: host health tiers, group aggregation, alert endpoints, auto-onboarding flow |
-| 18  | [quality-system-upgrade](./18-quality-system-upgrade.md)                 | Six-dimension quality system upgrade (L1/L2/L3 + G1/G2 + D1): Tier C → S roadmap, 12 atomic commits                     |
+| 18  | [quality-system-upgrade](./18-quality-system-upgrade.md)                 | Historical 6DQ upgrade record; superseded by System0 and docs/07                                                        |
 | 19  | [edge-deployment](./19-edge-deployment.md)                               | Single-Worker and dual-domain deployment background                                                                     |
 | 20  | [D1-to-KV migration](./20-d1-to-kv-migration.md)                         | Optional KV caches and D1 query reduction                                                                               |
 | 21  | [development](./21-development.md)                                       | Current probe installation, CLI, configuration, local tests, retention, and release behavior                            |

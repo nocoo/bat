@@ -14,7 +14,7 @@ Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](
 
 - One Worker serves API and SPA. Browser host `bat.hexly.ai` uses Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
 - Daily local gateway 7025 (`bat.dev.hexly.ai`) starts Demo by default using the checked-in, de-identified observation catalog in `scripts/environments/fixtures/recorded.json`. Server aliases share one workload template; the focused automated catalog stays synthetic. Only explicit Prod selection uses the production Access proxy. Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway.
-- L2/L3 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
+- L2/L3/L4 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
 - Apply production D1 migrations before code that needs new columns. Preserve migration data with copy/rename rather than destructive table replacement; the E2E harness discovers numbered migrations automatically.
 - `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
 - Keep MVVM boundaries and thin routes. Route/page scan hits are structural evidence, not assertion quality.
@@ -40,39 +40,58 @@ bun run typecheck
 bun run lint
 bun run build
 bun run test:unit:coverage
+bun run test:l1-gate
+bun run test:quality-gate
 bun turbo test:e2e --filter=@bat/worker
 bun run test:e2e:pw
+bun scripts/quality/runtime-kv.mjs
+bun scripts/quality/probe-integration.mjs
+bun scripts/quality/verify-package.mjs
 cargo test --manifest-path probe/Cargo.toml
 cargo clippy --manifest-path probe/Cargo.toml -- -D warnings
 cargo fmt --manifest-path probe/Cargo.toml --check
 bun run gate:security
 ```
 
-Build the UI before L2/L3 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CF_API_TOKEN` for isolated tests; the L2 runner rejects production-capable credentials. Never run tests against the daily Vite proxy.
+Build the UI before L2/L3/L4 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CF_API_TOKEN` for isolated tests; the runtime runner rejects production-capable credentials. Never run tests against the daily Vite proxy.
 
 Environment design, fixture matrix, and capture limitations: [local environments](docs/23-local-environments.md). Legacy `.wrangler/state` and `.wrangler/e2e-pw` are never reset by these commands.
 
 ## Testing and quality contract
 
-6DQ keeps its name with unified L1, L2/L3, G2 and D1; the owner merged former G1 into L1 on 2026-09-21. Statuses: `enforced`, `planned`, `manual`, `N/A`.
+System0 quality 1.3.0, base-ci v2026.15. The repository implements all 11
+implementation slots plus Z1; there are no `na` slots. The CI workflow uses the
+native mode: `ci.yml` has one `quality` caller job and
+`quality-slots.yml` owns the named slot jobs.
 
-| Dimension         | Required proof                                                                                                                  | Status   | Current enforcement / gap                                                                                                                                                                                                                                                                                                         |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| L1 TypeScript     | Statements, branches, functions and lines each ≥95%; no `.skip`/`.only`; strict types and check-only lint, zero errors/warnings | planned  | Pre-commit materialises the index (`git checkout-index`), symlinks `node_modules`, then runs parallel coverage (TS≥90% lines commit / shared four-metric 95% in CI), `turbo typecheck`, full-repo `biome check`, route/page gates and environment unit tests. Isolation: `bun run test:l1-gate`. Skip/focus gate still incomplete |
-| L1 Rust           | Preserve ≥95% lines and raise measurable remaining coverage to ≥95%; clippy warnings denied and rustfmt check                   | planned  | Pre-commit always runs `cargo fmt --check` and `cargo clippy -D warnings` on the index snapshot plus llvm-cov in `check-coverage.sh`. CI probe job mirrors tests/lint. Branch/function/statement enforcement is absent                                                                                                            |
-| L2 API            | Real local HTTP over 100% of endpoint/method combinations                                                                       | planned  | Pre-push/CI run real Wrangler tests and route mapping; static coverage hits do not verify every assertion/method                                                                                                                                                                                                                  |
-| L3 UI/probe       | Critical dashboard and probe-to-server workflows                                                                                | planned  | CI Chromium covers dashboard; complete native probe system acceptance is not enforced                                                                                                                                                                                                                                             |
-| G2 security       | Secret and dependency scans in both lanes; missing tools fail                                                                   | enforced | Pre-push scans Bun/Cargo locks and secrets; CI default quality scan covers Bun only. Local secret range uses upstream or a recent-commit fallback                                                                                                                                                                                 |
-| D1 isolation      | Per-run local stores, guards and verified marker before mutations/cleanup                                                       | planned  | Both lanes use fresh native stores/identities and ports through the shared launcher; owner and D1 markers gate cleanup                                                                                                                                                                                                            |
-| Build             | Real dashboard bundle and native artifact                                                                                       | enforced | CI prepares UI, probe compiles during tests; release packages its intended artifacts                                                                                                                                                                                                                                              |
-| Docs / operations | Architecture and migration/release behavior reviewed                                                                            | manual   | Numbered docs and maintainer checks                                                                                                                                                                                                                                                                                               |
+| Slot | Command / evidence                                                                                  | Checked object                   | Stage                    | Measured (2026-11-12)       | Coverage / gap                                           |
+| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | --------------------------- | -------------------------------------------------------- |
+| S1   | `bun turbo typecheck`; `cargo check --locked --all-features --manifest-path probe/Cargo.toml`       | Index snapshot / CI checkout     | pre-commit               | Rust check 0.6s             | TS strict; Rust cargo check                              |
+| S2   | `biome check --error-on-warnings .`; focus scan; `cargo fmt --check`; `cargo clippy -- -D warnings` | Index snapshot / CI checkout     | pre-commit               | Rust fmt/clippy 0.7s        | zero diagnostics required                                |
+| S3   | actionlint; yamllint; `scripts/check-workflows.py`                                                  | Index snapshot / CI checkout     | pre-commit*, CI          | local workflow lint pending | immutable refs and 12-slot structure                     |
+| G1   | staged `gitleaks`; push-range `gitleaks`; synthetic-secret self-test                                | Staged index / pushed ranges     | pre-commit, pre-push, CI | staged scan 0.02s           | `[extend] useDefault = true`                             |
+| G2   | `osv-scanner` over `bun.lock` and `probe/Cargo.lock`                                                | Snapshot lockfiles / CI checkout | pre-push, CI             | 1.9s local                  | both language locks                                      |
+| B1   | dashboard + Worker assets + public CLI + release probe                                              | Snapshot / CI checkout           | pre-push, CI             | pre-push pending            | real artifacts                                           |
+| L1   | Vitest coverage; nightly `cargo llvm-cov`; script/environment suites                                | Snapshot / CI checkout           | pre-commit, pre-push, CI | TS coverage in 11.77s hook  | TS four-metric 95% target; Rust line/function/region 95% |
+| L2   | `runtime-kv.mjs`; `turbo test:e2e --filter=@bat/worker`                                             | Isolated local runtime           | CI                       | runtime KV 13s              | real Wrangler D1/KV/DO and HTTP                          |
+| L3   | `test:environments`; `probe-integration.mjs`                                                        | Isolated local services          | pre-push, CI             | 28s local                   | probe → Worker → query                                   |
+| L4   | `test:e2e:pw`; `capture:environments`                                                               | Built SPA + local Worker         | pre-push, CI             | 194 tests / 1.7m local      | Chromium journeys and captures                           |
+| P1   | `npm pack`; tarball inspection; throwaway install; installed CLI smoke                              | Built public CLI package         | pre-push, CI             | 34 checks                   | public `@nocoo/bat` tarball                              |
+| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | CI pending                  | all impl success; no skipped impl                        |
 
-| Hook       | Current behavior                                                                                                                | Required follow-up                                                                   |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| pre-commit | Index snapshot via `checkout-index`: gitleaks, parallel coverage/typecheck/lint (full tree)/routes/pages/env UT/rust fmt+clippy | Target wall time <30s (warm cache); rejection probes in `scripts/verify-l1-gate.mjs` |
-| pre-push   | Local Worker L2 and G2 in parallel                                                                                              | Test commits named by stdin push refs, <3min                                         |
+`*` S3 is conditional in pre-commit and always runs in CI. Worker/UI branch
+coverage is 91.16%/94.69%, below the 95% governance target; their existing 90%
+thresholds are preserved. Rust branch coverage is not available from
+`cargo-llvm-cov`; line/function/region coverage is 98.16%/98.09%/98.80%.
 
-Install restores Husky. Hooks must stay check-only; never use `--no-verify` on commits or branch pushes. CI pins shared workflows at `ac635753a869cb85fad1f52aae4ccbd6119f3cae`.
+| Hook       | Current behavior                                                                             | Measured / target                                  |
+| ---------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 11.77s hot; cold pending; target ≤15s, reject >30s |
+| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 and P1 after L3                  | target ≤2.5min; measured pending                   |
+
+Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
+commits or branch pushes. CI pins base-ci at
+`777bbe4f9bacab8a91d8c01974480a6ee23d28e0 # v2026.15`.
 
 ## Resources and isolation
 
@@ -81,6 +100,7 @@ Install restores Husky. Hooks must stay check-only; never use `--no-verify` on c
 | Daily dev | Gateway 7025; `.wrangler/environments/demo`          | Persistent offline-fixture CRUD; explicit Prod access only          |
 | L2        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Automated lock, fresh identity, owned D1 cleanup                    |
 | L3        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
+| L4        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Playwright and capture share the launcher root; never run with L3   |
 
 Every Worker test lane must reject remote bindings, assert test context, initialize `_test_marker(key,value)` with `env=test` and verify it before resets/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid workerd pipe failures.
 
