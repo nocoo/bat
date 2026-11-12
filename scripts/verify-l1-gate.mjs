@@ -47,6 +47,8 @@ const versionPath = "packages/shared/src/version.ts";
 const versionGood = readFileSync(join(repo, versionPath), "utf8");
 const versionBad =
 	'// l1-gate probe: staged index type error\nexport const BAT_VERSION: number = "4.0.1";\n';
+const workflowPath = ".github/workflows/quality-slots.yml";
+const workflowGood = readFileSync(join(repo, workflowPath), "utf8");
 
 try {
 	const healthy = runHook(repo, { timeout: 600_000 });
@@ -85,6 +87,23 @@ try {
 	execFileSync("git", ["restore", "--staged", noticePath], { cwd: repo });
 	writeFileSync(join(repo, noticePath), noticeGood);
 
+	const workflowBad = workflowGood.replace(
+		"actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
+		"actions/checkout@main",
+	);
+	writeFileSync(join(repo, workflowPath), workflowBad);
+	execFileSync("git", ["add", "--", workflowPath], { cwd: repo });
+	writeFileSync(join(repo, workflowPath), workflowGood);
+	const mutableWorkflow = runHook(repo, { timeout: 600_000 });
+	check(
+		"staged mutable workflow ref rejects in S3",
+		mutableWorkflow.status !== 0 &&
+			/mutable external reference actions\/checkout@main/.test(mutableWorkflow.output),
+		mutableWorkflow.output.slice(0, 480),
+	);
+	execFileSync("git", ["restore", "--staged", workflowPath], { cwd: repo });
+	writeFileSync(join(repo, workflowPath), workflowGood);
+
 	check(
 		"repository index untouched",
 		git(["diff", "--cached", "--name-only"], repo).trim() === indexBefore,
@@ -93,7 +112,10 @@ try {
 	console.error(err);
 	failed = 1;
 } finally {
+	execFileSync("git", ["restore", "--staged", versionPath], { cwd: repo });
 	writeFileSync(join(repo, versionPath), versionGood);
+	execFileSync("git", ["restore", "--staged", workflowPath], { cwd: repo });
+	writeFileSync(join(repo, workflowPath), workflowGood);
 	rmSync(join(repo, ".tmp-l1-gate"), { recursive: true, force: true });
 }
 

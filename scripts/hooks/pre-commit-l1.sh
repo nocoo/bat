@@ -114,7 +114,7 @@ wait_stage python_unit "$pid_python_unit"
 wait_stage routes "$pid_routes"
 wait_stage pages "$pid_pages"
 wait_stage rust_s1_s2 "$pid_rust_s1_s2"
-if [ -f "$logs/workflow.exit" ]; then
+if [ -n "${pid_workflow:-}" ]; then
 	wait_stage workflow "$pid_workflow"
 fi
 
