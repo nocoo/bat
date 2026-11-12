@@ -12,6 +12,7 @@ const value = (name: string): string | undefined => {
 const root = resolve(value("--root") ?? process.cwd());
 const gitleaksRepo = value("--gitleaks-repo");
 const gitleaksRange = value("--gitleaks-log-opts");
+const gitleaksStaged = args.includes("--gitleaks-staged");
 const skipGitleaks = args.includes("--skip-gitleaks");
 
 const fail = (message: string): never => {
@@ -79,24 +80,25 @@ for (const lockfile of lockfiles) {
 }
 
 if (!skipGitleaks) {
-	if (!gitleaksRepo || !gitleaksRange) {
-		fail("G1 requires --gitleaks-repo and --gitleaks-log-opts; recent-commit fallbacks are unsafe");
+	if (!gitleaksRepo || (!gitleaksStaged && !gitleaksRange)) {
+		fail(
+			"G1 requires --gitleaks-repo with --gitleaks-staged or --gitleaks-log-opts; recent-commit fallbacks are unsafe",
+		);
 	}
 	const gitleaks = requireTool("gitleaks");
-	const gitleaksArgs = [
-		"git",
-		`--log-opts=${gitleaksRange}`,
-		`--config=${join(gitleaksRepo, ".gitleaks.toml")}`,
-		"--no-banner",
-		"--redact",
-	];
+	const gitleaksArgs = ["git"];
+	if (gitleaksStaged) gitleaksArgs.push("--staged");
+	else gitleaksArgs.push(`--log-opts=${gitleaksRange}`);
+	gitleaksArgs.push(`--config=${join(gitleaksRepo, ".gitleaks.toml")}`, "--no-banner", "--redact");
 	const result = run(gitleaks, gitleaksArgs, gitleaksRepo);
 	if (result.status !== 0) {
 		process.stderr.write(result.stdout ?? "");
 		process.stderr.write(result.stderr ?? "");
-		fail(`gitleaks rejected the pushed range ${gitleaksRange}`);
+		fail(
+			gitleaksStaged ? "gitleaks rejected staged content" : `gitleaks rejected ${gitleaksRange}`,
+		);
 	}
-	console.log(`✔ gitleaks: ${gitleaksRange}`);
+	console.log(gitleaksStaged ? "✔ gitleaks: staged content" : `✔ gitleaks: ${gitleaksRange}`);
 }
 
 console.log(skipGitleaks ? "✔ G2 dependency scan passed" : "✔ G1/G2 security gate passed");

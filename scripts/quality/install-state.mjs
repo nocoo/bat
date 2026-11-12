@@ -6,6 +6,16 @@ import { join, resolve } from "node:path";
 const root = resolve(import.meta.dirname, "../..");
 const markerPath = join(root, ".cache/bat/install-state.json");
 
+const declaredBun = (base) => {
+	const packageManager = JSON.parse(
+		readFileSync(join(base, "package.json"), "utf8"),
+	).packageManager;
+	if (typeof packageManager !== "string" || !packageManager.startsWith("bun@")) {
+		throw new Error("package.json must declare a bun packageManager version");
+	}
+	return packageManager.slice("bun@".length);
+};
+
 const manifestPaths = (base) => {
 	const paths = ["package.json", "bun.lock", "probe/Cargo.lock"];
 	for (const entry of readdirSync(join(base, "packages"), { withFileTypes: true })) {
@@ -24,9 +34,15 @@ const stateFor = (base) => {
 		hash.update(readFileSync(join(base, path)));
 		hash.update("\0");
 	}
+	const bun = declaredBun(base);
+	if (Bun.version !== bun) {
+		throw new Error(
+			`Bun toolchain drift: package.json declares ${bun}, current is ${Bun.version}; use the declared Bun`,
+		);
+	}
 	return {
 		digest: hash.digest("hex"),
-		bun: Bun.version,
+		bun,
 	};
 };
 
