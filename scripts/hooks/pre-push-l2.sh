@@ -108,10 +108,11 @@ run_oid() {
 	run_bg l3 240 env CARGO_TARGET_DIR="$repo/.cache/quality/cargo-debug" \
 		BAT_PROBE_BIN="$repo/.cache/quality/cargo-debug/debug/bat-probe" bash -c \
 		'cargo build --locked --manifest-path probe/Cargo.toml && bun run test:environments && bun scripts/quality/probe-integration.mjs'
+	wait_stage l3 "$pid_l3"
+	pids=
+
 	run_bg l4 240 bash -c 'bun run test:e2e:pw && bun run capture:environments'
 	run_bg p1 90 bun scripts/quality/verify-package.mjs
-
-	wait_stage l3 "$pid_l3"
 	wait_stage l4 "$pid_l4"
 	wait_stage p1 "$pid_p1"
 

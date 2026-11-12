@@ -96,7 +96,7 @@ run_bg python_unit 30 python3 -m unittest discover -s scripts -p 'test_prune_pro
 run_bg routes 30 bun run gate:routes
 run_bg pages 30 bun run gate:pages
 run_bg rust_s1_s2 120 bash -c \
-	'cargo fmt --check --manifest-path probe/Cargo.toml && cargo clippy --locked --all-features --manifest-path probe/Cargo.toml -- -D warnings'
+	'cargo fmt --check --manifest-path probe/Cargo.toml && cargo check --locked --all-features --manifest-path probe/Cargo.toml && cargo clippy --locked --all-features --manifest-path probe/Cargo.toml -- -D warnings'
 
 if git -C "$repo" diff --cached --name-only --diff-filter=ACMR | grep -Eq \
 	'^(\.github/(workflows|actions)/|scripts/check-workflows\.py$|scripts/quality/workflow-lint\.sh$)'; then
