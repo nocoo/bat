@@ -793,6 +793,11 @@ async function main(): Promise<void> {
 			console.error("❌ cargo lockfile version sync failed");
 			process.exit(1);
 		}
+		await runOrDie(
+			"bun",
+			["scripts/quality/install-state.mjs", "--write"],
+			"Failed to refresh install-state after lockfile updates",
+		);
 	}
 
 	const commits = await getCommitsSinceTag(lastTag);
