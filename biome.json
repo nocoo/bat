@@ -62,6 +62,7 @@
 			"!**/node_modules",
 			"!**/dist",
 			"!**/.turbo",
+			"!**/.cache",
 			"!**/.next",
 			"!**/coverage",
 			"!artifacts/environments",
