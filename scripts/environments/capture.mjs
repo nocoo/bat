@@ -163,10 +163,12 @@ try {
 		`${output}/manifest.json`,
 		JSON.stringify(
 			{
-				revision: execFileSync("git", ["rev-parse", "HEAD"], {
-					cwd: root,
-					encoding: "utf8",
-				}).trim(),
+				revision:
+					process.env.BAT_CAPTURE_REVISION ??
+					execFileSync("git", ["rev-parse", "HEAD"], {
+						cwd: root,
+						encoding: "utf8",
+					}).trim(),
 				fixtureVersion: 3,
 				viewport: { width: 1440, height: 1000 },
 				locale: "en-US",

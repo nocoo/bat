@@ -1,6 +1,6 @@
 {
 	"$schema": "https://turbo.build/schema.json",
-	"globalPassThroughEnv": ["NEEDS_JSON", "EXTRA_REQUIRED_JOBS"],
+	"globalPassThroughEnv": ["NEEDS_JSON", "EXTRA_REQUIRED_JOBS", "BAT_CAPTURE_REVISION"],
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],
