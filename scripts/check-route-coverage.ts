@@ -161,7 +161,7 @@ function isMatch(route: Route, request: Route): boolean {
 // ---------------------------------------------------------------------------
 
 function main(): void {
-	console.info("=== L2 Route Coverage Gate ===\n");
+	console.info("=== L3 Route Coverage Gate ===\n");
 
 	const declared = discoverDeclaredRoutes();
 	const requests = discoverE2ERequests();

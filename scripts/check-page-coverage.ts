@@ -127,7 +127,7 @@ function isCovered(page: Page, targets: string[]): boolean {
 // ---------------------------------------------------------------------------
 
 function main(): void {
-	console.info("=== L3 Page Coverage Gate ===\n");
+	console.info("=== L4 Page Coverage Gate ===\n");
 
 	const pages = discoverClientRoutes();
 	const targets = discoverPlaywrightTargets();

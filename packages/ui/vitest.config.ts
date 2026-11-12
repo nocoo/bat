@@ -17,7 +17,7 @@ export default defineConfig({
 			//
 			// What's intentionally NOT covered here:
 			//   - src/components/**, src/routes/**, src/App.tsx, src/main.tsx
-			//     React UI shells. Behavior is asserted by the Playwright L3
+			//     React UI shells. Behavior is asserted by the Playwright L4
 			//     suite in tests/playwright/, which exercises real browser
 			//     flows against a local Wrangler. Adding a parallel jsdom UT
 			//     pass for them would duplicate L3 without catching new bugs.
