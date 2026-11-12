@@ -20,6 +20,9 @@ for package_dir in "$snapshot"/packages/*; do
 	snap_nm="$package_dir/node_modules"
 	[ -d "$repo_nm" ] || continue
 	mkdir -p "$snap_nm"
+	if [ -d "$repo_nm/.bin" ]; then
+		ln -sfn "$repo_nm/.bin" "$snap_nm/.bin"
+	fi
 	for entry in "$repo_nm"/*; do
 		[ -e "$entry" ] || continue
 		base="${entry##*/}"
