@@ -50,6 +50,7 @@ run_oid() {
 		trap - EXIT INT TERM HUP
 		for pid in ${pids:-}; do
 			kill "$pid" 2>/dev/null || true
+			wait "$pid" 2>/dev/null || true
 		done
 		if [ -n "${snapshot:-}" ]; then rm -rf "$snapshot"; fi
 		if [ -n "${logs:-}" ]; then rm -rf "$logs"; fi
@@ -75,7 +76,7 @@ run_oid() {
 		name="$1"
 		seconds="$2"
 		shift 2
-		timeout "$seconds" "$@" >"$logs/$name.log" 2>&1 &
+		timeout --kill-after=5 "$seconds" "$@" >"$logs/$name.log" 2>&1 &
 		pid=$!
 		pids="$pids $pid"
 		eval "pid_$name=$pid"

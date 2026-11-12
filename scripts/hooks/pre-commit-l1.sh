@@ -23,6 +23,7 @@ cleanup() {
 	trap - EXIT INT TERM HUP
 	for pid in ${pids:-}; do
 		kill "$pid" 2>/dev/null || true
+		wait "$pid" 2>/dev/null || true
 	done
 	if [ -n "${logs:-}" ]; then rm -rf "$logs"; fi
 	if [ -n "${snapshot:-}" ]; then rm -rf "$snapshot"; fi
@@ -63,8 +64,7 @@ run_bg() {
 		export TURBO_CACHE_DIR="$repo/.cache/quality/turbo"
 		export CARGO_TARGET_DIR="$repo/.cache/quality/cargo-lint"
 		export CARGO_INCREMENTAL=0
-		timeout "$seconds" "$@" >"$logs/$name.log" 2>&1
-		echo $? >"$logs/$name.exit"
+		exec timeout --kill-after=5 "$seconds" "$@" >"$logs/$name.log" 2>&1
 	) &
 	pid=$!
 	pids="$pids $pid"
@@ -74,8 +74,7 @@ run_bg() {
 wait_stage() {
 	name="$1"
 	pid="$2"
-	wait "$pid" 2>/dev/null || true
-	status=$(cat "$logs/$name.exit" 2>/dev/null || echo 1)
+	if wait "$pid" 2>/dev/null; then status=0; else status=$?; fi
 	echo "━━━ $name (exit=$status) ━━━"
 	cat "$logs/$name.log" 2>/dev/null || true
 	if [ "$status" -ne 0 ]; then
