@@ -1,5 +1,24 @@
 # Changelog
 
+## v4.1.5
+
+### Changed
+
+- Bump @nocoo/basalt to 3.3.4
+- Refresh PR checks after basalt 3.3.3 rebase
+- Bump @nocoo/basalt to ^3.3.3
+- Revert "fix(deps): patch basalt 3.3.2 SidebarDrawer sheet padding"
+- Restore SidebarDrawer padding assertions
+- Cover SidebarDrawer in shell navigation e2e
+- Use basalt SidebarDrawer for mobile nav
+- Pin @nocoo/basalt to 3.3.2
+- Record final gate and release evidence
+
+### Fixed
+
+- Satisfy clippy map_unwrap_or on Rust 1.100
+- Patch basalt 3.3.2 SidebarDrawer sheet padding
+
 ## v4.1.4
 
 ### Changed
