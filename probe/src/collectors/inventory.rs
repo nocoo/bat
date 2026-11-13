@@ -181,8 +181,7 @@ pub fn read_net_interfaces_from(
         let base = format!("{sysfs_net_dir}/{iface}");
 
         let mac = std::fs::read_to_string(format!("{base}/address"))
-            .map(|c| parse_mac(&c))
-            .unwrap_or_default();
+            .map_or_else(|_| String::new(), |c| parse_mac(&c));
 
         let speed_mbps = std::fs::read_to_string(format!("{base}/speed"))
             .ok()
@@ -547,9 +546,7 @@ pub fn parse_resolv_conf(content: &str) -> DnsConfig {
 
 /// Read DNS configuration from a file (parameterized path for testing).
 pub fn read_dns_config_from(path: &str) -> DnsConfig {
-    std::fs::read_to_string(path)
-        .map(|c| parse_resolv_conf(&c))
-        .unwrap_or_default()
+    std::fs::read_to_string(path).map_or_else(|_| DnsConfig::default(), |c| parse_resolv_conf(&c))
 }
 
 /// Read DNS configuration from `/etc/resolv.conf`.

@@ -52,6 +52,7 @@ test("mobile navigation closes the drawer and restores focus without replacing t
 	await menu.click();
 	const drawer = page.getByRole("dialog");
 	await expect(drawer).toBeVisible();
+	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
 	await drawer.getByRole("link", { name: "Events", exact: true }).click();
 	await expect(page).toHaveURL("/events");
 	await expect(drawer).not.toBeVisible();
@@ -65,6 +66,7 @@ test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) =
 	await page.getByRole("button", { name: "Open navigation menu" }).click();
 	const drawer = page.getByRole("dialog");
 	await expect(drawer).toBeVisible();
+	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
 	await expect(drawer).toHaveCSS("padding-left", "0px");
 	await expect(drawer).toHaveCSS("padding-right", "0px");
 	expect(

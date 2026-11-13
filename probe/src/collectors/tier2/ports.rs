@@ -159,9 +159,7 @@ pub fn parse_socket_inode(link_target: &str) -> Option<u64> {
 /// Read the process name from `/proc/{pid}/comm`.
 pub fn read_process_name(proc_path: &Path, pid: u32) -> String {
     let comm_path = proc_path.join(format!("{pid}")).join("comm");
-    std::fs::read_to_string(comm_path)
-        .map(|s| s.trim().to_string())
-        .unwrap_or_default()
+    std::fs::read_to_string(comm_path).map_or_else(|_| String::new(), |s| s.trim().to_string())
 }
 
 /// Build a map from socket inode → (pid, `process_name`) by scanning `/proc/{pid}/fd/`.

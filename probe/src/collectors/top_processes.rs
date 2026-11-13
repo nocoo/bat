@@ -370,8 +370,7 @@ pub fn read_proc_io(pid: u32) -> Option<ProcIo> {
 pub fn read_passwd_map() -> HashMap<u32, String> {
     std::fs::read_to_string("/etc/passwd")
         .ok()
-        .map(|c| parse_passwd(&c))
-        .unwrap_or_default()
+        .map_or_else(HashMap::new, |c| parse_passwd(&c))
 }
 
 /// List all numeric PID directories under `/proc/`.
