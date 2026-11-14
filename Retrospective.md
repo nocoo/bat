@@ -458,3 +458,12 @@ drift error for a difference that never affects the installed dependencies. The
 gate now hashes only the manifests and lockfiles. Turbo still requires the
 `packageManager` field to be present, so it stays as an untouched hint of the
 CI-pinned Bun and nothing enforces it.
+
+## 2026-11-14 - Keep one Pin for the CI runtime, not eleven
+
+`setup-js` resolves an empty `runtime-version` from the project `packageManager`,
+so the ten identical `runtime-version` inputs in `quality-slots.yml` only
+duplicated one string. They are gone; `packageManager` is the single source. The
+release caller still passes an exact version because `deploy-worker.yml` rejects
+an empty one by contract, and that call now names the Bun release the repository
+actually runs (1.4.4) instead of the stale 1.3.11.
