@@ -44,7 +44,7 @@
 		"better-sqlite3": "13.1.1",
 		"husky": "^9.1.0",
 		"lint-staged": "17.6.0",
-		"turbo": "2.11.10",
+		"turbo": "2.11.11",
 		"typescript": "^7.0.2",
 		"vitest": "5.1.0"
 	},
