@@ -44,7 +44,7 @@
       "version": "4.1.5",
       "dependencies": {
         "@bat/shared": "workspace:*",
-        "@nocoo/basalt": "^3.3.4",
+        "@nocoo/basalt": "3.3.4",
         "@xyflow/react": "12.12.1",
         "clsx": "^2.1.1",
         "lucide-react": "1.72.0",
