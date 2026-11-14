@@ -448,3 +448,13 @@ The migration exposed several failures that looked like successful gates:
 - The 64-test pre-push smoke is close to the 2.5-minute budget and reached
   2:44.95 under load. Trim it to 40-48 critical journeys or split capture from
   the gate before treating the budget as stable.
+
+## 2026-11-14 - Do not pin the local Bun version in install-state
+
+The install-state gate compared the declared `packageManager` version with the
+running `Bun.version`, so a machine on a newer Bun could not even run
+`bun install --frozen-lockfile`: the `prepare` step failed with a toolchain
+drift error for a difference that never affects the installed dependencies. The
+gate now hashes only the manifests and lockfiles. Turbo still requires the
+`packageManager` field to be present, so it stays as an untouched hint of the
+CI-pinned Bun and nothing enforces it.

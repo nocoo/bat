@@ -25,7 +25,7 @@ Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](
 
 ## Setup and commands
 
-TypeScript 7, Bun 1.3.11/Turbo, Hono Worker, Vite SPA; Rust probe lane with cargo, clippy, rustfmt and cargo-llvm-cov; D1 `bat-db`, optional production `BAT_KV` and a Connect coordinator Durable Object. `packages/shared/` and `packages/worker/` hold types and Worker/API/SPA assets; `packages/ui/`, `packages/cli/` and `probe/` hold the dashboard, public Node.js CLI and Rust agent. The root build includes the bundled CLI; its runtime needs Node.js 22+ rather than Bun.
+TypeScript 7, Bun/Turbo (CI pins Bun 1.3.11), Hono Worker, Vite SPA; Rust probe lane with cargo, clippy, rustfmt and cargo-llvm-cov; D1 `bat-db`, optional production `BAT_KV` and a Connect coordinator Durable Object. `packages/shared/` and `packages/worker/` hold types and Worker/API/SPA assets; `packages/ui/`, `packages/cli/` and `probe/` hold the dashboard, public Node.js CLI and Rust agent. The root build includes the bundled CLI; its runtime needs Node.js 22+ rather than Bun.
 
 Run from the root after a frozen Bun install. Rust coverage needs `cargo-llvm-cov` and LLVM tools; nightly preserves existing `coverage(off)` annotations. Browser tests need Chromium in `packages/ui`.
 
