@@ -3,15 +3,24 @@ import { computeWorkstationStatus } from "@bat/shared";
 import { Button } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { Laptop, Terminal } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@nocoo/basalt/components/toggle-group";
+import { Laptop, LayoutGrid, Table2, Terminal } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
+import { WorkstationCardGrid } from "@/components/workstation/workstation-card-grid";
 import { WorkstationPairDialog } from "@/components/workstation/workstation-pair-dialog";
 import { WorkstationSetupDialog } from "@/components/workstation/workstation-setup-dialog";
 import { WorkstationTable } from "@/components/workstation/workstation-table";
 import { useWorkstations } from "@/hooks";
 import { chart } from "@/lib/palette";
+import {
+	isWorkstationsView,
+	loadWorkstationsView,
+	saveWorkstationsView,
+	type WorkstationsView,
+} from "@/lib/workstation-view";
 
 function EmptyWorkstations() {
 	return (
@@ -74,10 +83,42 @@ function summaryItems(records: readonly WorkstationListItem[], now: number): Rea
 	];
 }
 
+function WorkstationsViewSwitch({
+	view,
+	onChange,
+}: {
+	view: WorkstationsView;
+	onChange: (view: WorkstationsView) => void;
+}) {
+	return (
+		<ToggleGroup
+			type="single"
+			value={view}
+			onValueChange={(next) => {
+				if (isWorkstationsView(next)) onChange(next);
+			}}
+			aria-label="Workstations view"
+		>
+			<ToggleGroupItem value="table" aria-label="Table view" data-testid="workstations-view-table">
+				<Table2 className="size-4" strokeWidth={1.5} aria-hidden="true" />
+			</ToggleGroupItem>
+			<ToggleGroupItem value="cards" aria-label="Card view" data-testid="workstations-view-cards">
+				<LayoutGrid className="size-4" strokeWidth={1.5} aria-hidden="true" />
+			</ToggleGroupItem>
+		</ToggleGroup>
+	);
+}
+
 export function WorkstationsPage() {
 	const { data, error, isLoading, mutate } = useWorkstations();
+	const [view, setView] = useState<WorkstationsView>(loadWorkstationsView);
 	const now = Math.floor(Date.now() / 1000);
 	const records = data ?? [];
+
+	const handleViewChange = (next: WorkstationsView) => {
+		setView(next);
+		saveWorkstationsView(next);
+	};
 
 	if (error && data === undefined) {
 		return (
@@ -119,10 +160,11 @@ export function WorkstationsPage() {
 				title="Workstations"
 				description="Your laptops and desktops, reporting capacity and reachability from outside the fleet."
 				actions={
-					<>
+					<div className="flex items-center justify-end gap-basalt-space-md whitespace-nowrap">
 						<WorkstationPairDialog />
 						<WorkstationSetupDialog />
-					</>
+						<WorkstationsViewSwitch view={view} onChange={handleViewChange} />
+					</div>
 				}
 			/>
 
@@ -133,15 +175,21 @@ export function WorkstationsPage() {
 			) : (
 				<>
 					<PageSummary items={summaryItems(records, now)} />
-					<LayerCard data-testid="workstation-table">
-						<LayerCard.Header>
-							<h2>Machines</h2>
-							<span className="text-basalt-sm text-basalt-muted-foreground">
-								{records.length} enrolled
-							</span>
-						</LayerCard.Header>
-						<WorkstationTable records={records} now={now} />
-					</LayerCard>
+					{view === "cards" ? (
+						<div className="flex flex-col gap-basalt-space-md" data-testid="workstation-card-view">
+							<WorkstationCardGrid records={records} now={now} />
+						</div>
+					) : (
+						<LayerCard data-testid="workstation-table">
+							<LayerCard.Header>
+								<h2>Machines</h2>
+								<span className="text-basalt-sm text-basalt-muted-foreground">
+									{records.length} enrolled
+								</span>
+							</LayerCard.Header>
+							<WorkstationTable records={records} now={now} />
+						</LayerCard>
+					)}
 					<p className="text-basalt-sm text-basalt-muted-foreground">
 						Stale means no report for more than 30 minutes. It is informational and never raises a
 						fleet alert.
