@@ -199,9 +199,11 @@ try {
 	}
 
 	const workstations = await (await fetch(`${prefix}/api/workstations`)).json();
-	assert.equal(workstations.length, 1);
-	const workstation = workstations[0];
-	assert.equal(workstation.id, "00000000-0000-4000-8000-000000000001");
+	assert.equal(workstations.length, 6);
+	const workstation = workstations.find(
+		(candidate) => candidate.id === "00000000-0000-4000-8000-000000000001",
+	);
+	assert.ok(workstation);
 	assert.equal(workstation.owner, "email:operator@example.test");
 	assert.equal(
 		workstation.latest_report.report_id,
@@ -348,7 +350,7 @@ try {
 	assert.notEqual(reborn.id, victim.id);
 	assert.equal((await fetch(`${app.base}/__bat/instances/${reborn.id}/api/hosts`)).status, 200);
 	console.log(
-		"PASS: real recorded catalog (8 aliases, one workstation), authentication, ownership guard, parallel E2E stores, config parity, instance assets isolation, real settings CRUD, environment recovery (unknown previous, inactive previous, dead worker)",
+		"PASS: real recorded catalog (8 aliases, 6 workstations), authentication, ownership guard, parallel E2E stores, config parity, instance assets isolation, real settings CRUD, environment recovery (unknown previous, inactive previous, dead worker)",
 	);
 } finally {
 	await app.close();
