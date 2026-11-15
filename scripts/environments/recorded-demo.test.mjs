@@ -372,23 +372,27 @@ describe("recorded Demo SQL catalog", () => {
 		expect(JSON.parse(row.disk_io_json)).toEqual(point.disk_io);
 	});
 
-	test("seeds one workstation with a non-usable credential and captured payload", () => {
-		const workstation = db.query("SELECT * FROM workstations").get();
+	test("seeds six workstations with non-usable credentials and captured payloads", () => {
+		const workstation = db
+			.query("SELECT * FROM workstations WHERE id = '00000000-0000-4000-8000-000000000001'")
+			.get();
 		expect(workstation.id).toBe("00000000-0000-4000-8000-000000000001");
 		expect(workstation.owner).toBe("email:operator@example.test");
 		expect(workstation.disabled).toBe(0);
 		expect(workstation.token_prefix).toBe("batw_fixture");
 		expect(workstation.token_hash).toMatch(/^[0-9a-f]{64}$/);
 		expect(workstation.token_hash).not.toBe("0".repeat(64));
-		expect(db.query("SELECT COUNT(*) AS count FROM workstations").get().count).toBe(1);
-		expect(db.query("SELECT COUNT(*) AS count FROM workstation_reports").get().count).toBe(4);
+		expect(db.query("SELECT COUNT(*) AS count FROM workstations").get().count).toBe(6);
+		expect(db.query("SELECT COUNT(*) AS count FROM workstation_reports").get().count).toBe(6 * 4);
 		expect(db.query("SELECT COUNT(*) AS count FROM workstation_connectivity").get().count).toBe(
-			4 * 8,
+			6 * 4 * 8,
 		);
 
 		const latest = readRecordedRecording().workstation.detail.latest_report;
 		const report = db
-			.query("SELECT * FROM workstation_reports ORDER BY received_at DESC LIMIT 1")
+			.query(
+				"SELECT * FROM workstation_reports WHERE workstation_id = '00000000-0000-4000-8000-000000000001' ORDER BY received_at DESC LIMIT 1",
+			)
 			.get();
 		expect(report.report_id).toBe(latest.report_id);
 		expect(report.received_at).toBe(ANCHOR - latest.received_at_age_seconds);
@@ -690,7 +694,7 @@ describe("recorded Demo SQL catalog", () => {
 		const latest = recording.workstation.detail.latest_report;
 		const latestRows = db
 			.query(
-				"SELECT server_id,rtts,received,status FROM workstation_connectivity WHERE received_at=? ",
+				"SELECT server_id,rtts,received,status FROM workstation_connectivity WHERE workstation_id = '00000000-0000-4000-8000-000000000001' AND received_at=? ",
 			)
 			.all(ANCHOR - latest.received_at_age_seconds);
 		expect(latestRows.length).toBe(8);

@@ -775,9 +775,98 @@ export function reconstructRtts({ received, avg, min, max }) {
 	return [min, max, Math.max(0, third)];
 }
 
-function workstationStatements(recording, anchor) {
+const WORKSTATION_ALIASES = [
+	{ canonical: true },
+	{
+		id: "00000000-0000-4000-8000-000000000002",
+		installationId: "10000000-0000-4000-8000-000000000002",
+		name: "Studio MacBook Pro",
+		hostname: "studio-mbp.example.test",
+		os: "macOS 15.3",
+		arch: "arm64",
+		publicIp: "198.51.100.24",
+		lastSeenAgeSeconds: 180,
+		disabled: false,
+		cpuScale: 0.65,
+		memPct: 54.2,
+		diskPct: 38.4,
+		rttOffset: 6,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000003",
+		installationId: "10000000-0000-4000-8000-000000000003",
+		name: "Build Runner Linux",
+		hostname: "runner-01.example.test",
+		os: "Ubuntu 24.04",
+		arch: "x86_64",
+		publicIp: "203.0.113.42",
+		lastSeenAgeSeconds: 45,
+		disabled: false,
+		cpuScale: 2.4,
+		memPct: 76.8,
+		diskPct: 68.5,
+		rttOffset: -4,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000004",
+		installationId: "10000000-0000-4000-8000-000000000004",
+		name: "Lab ThinkPad",
+		hostname: "thinkpad-lab.example.test",
+		os: "Debian 12",
+		arch: "x86_64",
+		publicIp: "192.0.2.88",
+		lastSeenAgeSeconds: 5400,
+		disabled: false,
+		cpuScale: 0.4,
+		memPct: 41.0,
+		diskPct: 52.3,
+		rttOffset: 18,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000005",
+		installationId: "10000000-0000-4000-8000-000000000005",
+		name: "Office iMac",
+		hostname: "imac-office.example.test",
+		os: "macOS 14.7",
+		arch: "arm64",
+		publicIp: "198.51.100.77",
+		lastSeenAgeSeconds: 720,
+		disabled: false,
+		cpuScale: 1.15,
+		memPct: 62.5,
+		diskPct: 29.1,
+		rttOffset: 11,
+	},
+	{
+		id: "00000000-0000-4000-8000-000000000006",
+		installationId: "10000000-0000-4000-8000-000000000006",
+		name: "Edge Mini PC",
+		hostname: "mini-edge.example.test",
+		os: "Alpine Linux 3.20",
+		arch: "x86_64",
+		publicIp: "203.0.113.99",
+		lastSeenAgeSeconds: 86400,
+		disabled: true,
+		cpuScale: 0.8,
+		memPct: 33.0,
+		diskPct: 84.2,
+		rttOffset: 24,
+	},
+];
+
+function clampPct(value) {
+	return Math.round(Math.min(99, Math.max(1, value)) * 10) / 10;
+}
+
+function shiftRtts(rtts, offset) {
+	return rtts.map((rtt) =>
+		rtt === null ? null : Math.max(1, Math.round((rtt + offset) * 10) / 10),
+	);
+}
+
+function workstationStatementsForAlias(recording, anchor, wsAlias, aliasIndex) {
 	const workstation = recording.workstation.detail;
-	const workstationId = workstation.id;
+	const workstationId = wsAlias.canonical ? workstation.id : wsAlias.id;
 	if (typeof workstationId !== "string" || workstationId === "")
 		throw new Error("recording.workstation.detail.id is required");
 	const latest = workstation.latest_report;
@@ -807,6 +896,14 @@ function workstationStatements(recording, anchor) {
 		status: source.status,
 	});
 
+	const wsName = wsAlias.canonical ? workstation.name : wsAlias.name;
+	const wsPublicIp = wsAlias.canonical ? workstation.public_ip : wsAlias.publicIp;
+	const wsDisabled = wsAlias.canonical ? (workstation.disabled ? 1 : 0) : wsAlias.disabled ? 1 : 0;
+	const wsLastSeenAge = wsAlias.canonical
+		? workstation.last_seen_at_age_seconds
+		: wsAlias.lastSeenAgeSeconds;
+	const wsInstallationId = wsAlias.canonical ? WORKSTATION_INSTALLATION_ID : wsAlias.installationId;
+
 	const statements = [];
 	const hash = createHash("sha256")
 		.update(`${WORKSTATION_TOKEN_PREFIX}:${workstationId}`)
@@ -831,12 +928,12 @@ function workstationStatements(recording, anchor) {
 			[
 				workstationId,
 				workstation.owner,
-				WORKSTATION_INSTALLATION_ID,
-				workstation.name,
+				wsInstallationId,
+				wsName,
 				ageToEpoch(anchor, workstation.created_at_age_seconds),
-				ageToEpoch(anchor, workstation.last_seen_at_age_seconds),
-				workstation.public_ip,
-				workstation.disabled ? 1 : 0,
+				ageToEpoch(anchor, wsLastSeenAge),
+				wsPublicIp,
+				wsDisabled,
 				hash,
 				WORKSTATION_TOKEN_PREFIX,
 				1,
@@ -850,10 +947,14 @@ function workstationStatements(recording, anchor) {
 	);
 	for (const point of points) {
 		const isLatest = point.received_at_age_seconds === latest.received_at_age_seconds;
-		const reportId = isLatest
-			? latest.report_id
-			: `20000000-0000-4000-8000-${String(point.received_at_age_seconds).padStart(12, "0")}`;
-		const receivedAt = ageToEpoch(anchor, point.received_at_age_seconds);
+		const reportId =
+			wsAlias.canonical && isLatest
+				? latest.report_id
+				: `${wsAlias.canonical ? 20000000 : 30000000 + aliasIndex}-0000-4000-8000-${String(point.received_at_age_seconds).padStart(12, "0")}`;
+		const ageShift = wsAlias.canonical
+			? 0
+			: Math.max(0, wsLastSeenAge - latest.received_at_age_seconds);
+		const receivedAt = ageToEpoch(anchor, point.received_at_age_seconds + ageShift);
 		const connectivity = [];
 		const connectivityStatements = [];
 		for (const alias of SERVER_ALIASES) {
@@ -870,7 +971,7 @@ function workstationStatements(recording, anchor) {
 				received: sample.received,
 				status: sample.status,
 			};
-			const rtts = captured
+			const baseRtts = captured
 				? captured.rtts_ms
 				: reconstructRtts({
 						received: sample.received,
@@ -878,6 +979,7 @@ function workstationStatements(recording, anchor) {
 						min: sample.rtt_min_ms,
 						max: sample.rtt_max_ms,
 					});
+			const rtts = wsAlias.canonical ? baseRtts : shiftRtts(baseRtts, wsAlias.rttOffset);
 			connectivity.push(reportConnectivity(alias.server_id, rtts, source));
 			connectivityStatements.push(
 				insert(
@@ -909,18 +1011,26 @@ function workstationStatements(recording, anchor) {
 				),
 			);
 		}
-		const payload = isLatest
-			? reportPayload(latest, connectivity, anchor)
-			: reportPayload(
-					{
+		const cpuPct =
+			wsAlias.canonical || point.cpu_usage_pct === null
+				? point.cpu_usage_pct
+				: clampPct(point.cpu_usage_pct * wsAlias.cpuScale);
+		const memPct = wsAlias.canonical ? point.mem_used_pct : wsAlias.memPct;
+		const diskList = wsAlias.canonical
+			? latest.disk
+			: latest.disk.map((d, idx) => (idx === 0 ? { ...d, used_pct: wsAlias.diskPct } : d));
+		const reportSource = wsAlias.canonical
+			? isLatest
+				? latest
+				: {
 						...latest,
 						report_id: reportId,
 						started_at_age_seconds: point.started_at_age_seconds,
 						finished_at_age_seconds: point.finished_at_age_seconds,
-						cpu: { ...latest.cpu, usage_pct: point.cpu_usage_pct },
+						cpu: { ...latest.cpu, usage_pct: cpuPct },
 						mem: {
 							...latest.mem,
-							used_pct: point.mem_used_pct,
+							used_pct: memPct,
 							total_bytes: point.mem_total_bytes,
 							available_bytes: point.mem_available_bytes,
 						},
@@ -929,10 +1039,29 @@ function workstationStatements(recording, anchor) {
 						network: { interfaces: [] },
 						collection_errors: [],
 						targets_error: null,
+					}
+			: {
+					...latest,
+					report_id: reportId,
+					hostname: wsAlias.hostname,
+					os: wsAlias.os,
+					arch: wsAlias.arch,
+					started_at_age_seconds: point.started_at_age_seconds + ageShift,
+					finished_at_age_seconds: point.finished_at_age_seconds + ageShift,
+					cpu: { ...latest.cpu, usage_pct: cpuPct },
+					mem: {
+						...latest.mem,
+						used_pct: memPct,
+						total_bytes: point.mem_total_bytes,
+						available_bytes: point.mem_available_bytes,
 					},
-					connectivity,
-					anchor,
-				);
+					uptime_seconds: point.uptime_seconds + aliasIndex * 86400,
+					disk: isLatest ? diskList : [],
+					network: isLatest ? latest.network : { interfaces: [] },
+					collection_errors: [],
+					targets_error: null,
+				};
+		const payload = reportPayload(reportSource, connectivity, anchor);
 		statements.push(
 			insert(
 				"workstation_reports",
@@ -956,13 +1085,13 @@ function workstationStatements(recording, anchor) {
 					reportId,
 					createHash("sha256").update(`${workstationId}:${reportId}`).digest("hex"),
 					receivedAt,
-					ageToEpoch(anchor, point.started_at_age_seconds),
-					ageToEpoch(anchor, point.finished_at_age_seconds),
-					point.cpu_usage_pct,
-					point.mem_used_pct,
+					ageToEpoch(anchor, point.started_at_age_seconds + ageShift),
+					ageToEpoch(anchor, point.finished_at_age_seconds + ageShift),
+					cpuPct,
+					memPct,
 					point.mem_total_bytes,
 					point.mem_available_bytes,
-					point.uptime_seconds,
+					wsAlias.canonical ? point.uptime_seconds : point.uptime_seconds + aliasIndex * 86400,
 					jsonValue(payload),
 					null,
 				],
@@ -971,6 +1100,12 @@ function workstationStatements(recording, anchor) {
 		statements.push(...connectivityStatements);
 	}
 	return statements;
+}
+
+function workstationStatements(recording, anchor) {
+	return WORKSTATION_ALIASES.flatMap((wsAlias, index) =>
+		workstationStatementsForAlias(recording, anchor, wsAlias, index),
+	);
 }
 
 export function recordedDemoSql(recording, anchor) {
