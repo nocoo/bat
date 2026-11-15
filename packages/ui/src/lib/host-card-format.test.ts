@@ -1,6 +1,7 @@
 import type { SparklinePoint } from "@bat/shared";
 import { describe, expect, test } from "vitest";
 import {
+	filledSegments,
 	formatCpuTopology,
 	formatDiskUsage,
 	formatLastSeen,
@@ -101,6 +102,21 @@ describe("formatDiskUsage", () => {
 	test("rounds to integer percent or returns —", () => {
 		expect(formatDiskUsage(null)).toBe("—");
 		expect(formatDiskUsage(47.6)).toBe("48%");
+	});
+});
+
+describe("filledSegments", () => {
+	test("maps null and non-positive percentages to 0", () => {
+		expect(filledSegments(null)).toBe(0);
+		expect(filledSegments(0)).toBe(0);
+		expect(filledSegments(-5)).toBe(0);
+	});
+	test("lights at least 1 segment for positive percentages", () => {
+		expect(filledSegments(0.3)).toBe(1);
+		expect(filledSegments(10.2)).toBe(1);
+		expect(filledSegments(26.1)).toBe(3);
+		expect(filledSegments(100)).toBe(10);
+		expect(filledSegments(120)).toBe(10);
 	});
 });
 

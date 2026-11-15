@@ -113,11 +113,14 @@ test.describe("Hosts card view", () => {
 		for (const tag of ["production", "us-east", "edge"]) {
 			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
 		}
-		for (const label of ["CPU", "Memory", "Disk", "Load 1m", "Net", "Uptime"]) {
+		for (const label of ["NET", "LOAD 1M", "BANDWIDTH", "TRAFFIC", "RESET", "ALERTS"]) {
 			await expect(alpha.getByText(label, { exact: true })).toBeVisible();
 		}
+		await expect(alpha.getByText(/UP /)).toBeVisible();
 		await expect(alpha.getByText(/8 cores/)).toBeVisible();
-		await expect(alpha.getByRole("progressbar", { name: "CPU usage" })).toBeVisible();
+		for (const bar of ["CPU usage", "Memory usage", "Disk usage", "Swap usage"]) {
+			await expect(alpha.getByRole("progressbar", { name: bar })).toBeVisible();
+		}
 
 		// The description affordance reveals its tooltip without navigating.
 		const hint = alpha.getByRole("button", { name: "Description of alpha.test.local" });
@@ -130,13 +133,13 @@ test.describe("Hosts card view", () => {
 		// The contract rows sit after the live metrics, formatted by the
 		// shared formatters, dashed when the host carries no contract.
 		const beta = grid.getByTestId("host-card").filter({ hasText: "beta.test.local" });
-		await expect(alpha.getByText("Bandwidth", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("Traffic", { exact: true })).toBeVisible();
-		await expect(alpha.getByText("Reset", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("BANDWIDTH", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("TRAFFIC", { exact: true })).toBeVisible();
+		await expect(alpha.getByText("RESET", { exact: true })).toBeVisible();
 		// The traffic row carries its period, the reset day its calendar.
 		await expect(alpha.getByText("500 GB/mo", { exact: true })).toBeVisible();
 		await expect(alpha.getByText("1st", { exact: true })).toBeVisible();
-		await expect(beta.getByText("Bandwidth", { exact: true })).toBeVisible();
+		await expect(beta.getByText("BANDWIDTH", { exact: true })).toBeVisible();
 		await expect(beta).toContainText("—");
 
 		// The card itself is one link to the detail page.

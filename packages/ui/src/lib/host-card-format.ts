@@ -106,6 +106,14 @@ export function formatDiskUsage(pct: number | null): string {
 	return pct === null ? "—" : `${Math.round(pct)}%`;
 }
 
+/** Number of lit segments in a discrete usage bar (at least 1 when pct > 0). */
+export function filledSegments(pct: number | null, total = 10): number {
+	if (pct === null || pct <= 0 || total <= 0) {
+		return 0;
+	}
+	return Math.min(total, Math.max(1, Math.round((pct / 100) * total)));
+}
+
 // ---------------------------------------------------------------------------
 // Theming
 // ---------------------------------------------------------------------------
