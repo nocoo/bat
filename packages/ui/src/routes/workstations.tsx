@@ -7,7 +7,11 @@ import { ToggleGroup, ToggleGroupItem } from "@nocoo/basalt/components/toggle-gr
 import { Laptop, LayoutGrid, Table2, Terminal } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
-import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
+import {
+	SkeletonCardGrid,
+	SkeletonSummary,
+	SkeletonTable,
+} from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { WorkstationCardGrid } from "@/components/workstation/workstation-card-grid";
 import { WorkstationPairDialog } from "@/components/workstation/workstation-pair-dialog";
@@ -149,7 +153,11 @@ export function WorkstationsPage() {
 					description="Your laptops and desktops, reporting capacity and reachability from outside the fleet."
 				/>
 				<SkeletonSummary />
-				<SkeletonTable rows={4} columns={7} />
+				{view === "cards" ? (
+					<SkeletonCardGrid cards={6} bars={3} />
+				) : (
+					<SkeletonTable rows={6} columns={7} />
+				)}
 			</div>
 		);
 	}

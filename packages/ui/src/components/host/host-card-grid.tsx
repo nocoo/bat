@@ -223,7 +223,7 @@ export function HostCardGrid({
 						/>
 						<div className="pointer-events-none relative flex h-full flex-col gap-3">
 							{/* Header: status square + hostname + description hint | status badge */}
-							<div className="flex min-w-0 items-center gap-basalt-space-xs">
+							<div className="flex min-w-0 items-center gap-basalt-space-lg">
 								<span
 									className={cn("size-2.5 shrink-0 rounded-[2px]", statusDotColor(host.status))}
 									aria-hidden="true"

@@ -16,7 +16,11 @@ import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { HostCardGrid } from "@/components/host/host-card-grid";
 import { HostTable } from "@/components/host/host-table";
-import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
+import {
+	SkeletonCardGrid,
+	SkeletonSummary,
+	SkeletonTable,
+} from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";
 import { TagFilterBar } from "@/components/tag-filter-bar";
 import { useHosts, useHostTags, useTags } from "@/hooks";
@@ -180,7 +184,11 @@ export function HostsPage() {
 				description="Monitored servers and real-time infrastructure status."
 			/>
 			<SkeletonSummary />
-			<SkeletonTable rows={8} columns={7} />
+			{view === "cards" ? (
+				<SkeletonCardGrid cards={6} bars={4} />
+			) : (
+				<SkeletonTable rows={8} columns={7} />
+			)}
 		</div>
 	) : error && !hosts ? (
 		<HostsError message={error.message} />
