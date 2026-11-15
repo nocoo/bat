@@ -1,5 +1,36 @@
 # Changelog
 
+## v4.1.8
+
+### Added
+
+- Add card grid view for workstations page
+- Redesign host card grid with compact telemetry layout
+
+### Changed
+
+- Expect six workstations in demo L3 verification
+- Polish card header spacing and skeleton proportions
+- Seed six varied workstations in recorded demo catalog
+- Refine host card grid spacing and alert hierarchy
+- Upgrade @nocoo/basalt to 3.3.6 (#687)
+- Bump @nocoo/basalt to 3.3.5
+- Bump @nocoo/basalt to 3.3.4 (#682)
+- Bump @nocoo/basalt to 3.3.4
+- Bump turbo 2.11.10 → 2.11.11 (#678)
+- Bump hono 4.13.17 → 4.13.18 (#677)
+- Bump better-sqlite3 13.0.3 → 13.1.1 (#676)
+- Bump @biomejs/biome 2.6.6 → 2.6.7 (#675)
+- Bump lucide-react 1.70.0 → 1.72.0 (#672)
+- Bump jose 6.2.15 → 6.2.17 (#663)
+- Bump vite 8.3.5 → 8.3.8 (#661)
+- Bump @vitejs/plugin-react 6.1.2 → 6.3.0 (#652)
+- Resolve ci bun version from package.json
+
+### Fixed
+
+- Drop bun version pin from install-state gate
+
 ## v4.1.7
 
 ### Added
