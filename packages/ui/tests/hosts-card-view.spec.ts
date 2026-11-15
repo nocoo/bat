@@ -113,10 +113,9 @@ test.describe("Hosts card view", () => {
 		for (const tag of ["production", "us-east", "edge"]) {
 			await expect(alpha.getByText(tag, { exact: true })).toBeVisible();
 		}
-		for (const label of ["NET", "LOAD 1M", "BANDWIDTH", "TRAFFIC", "RESET", "ALERTS"]) {
+		for (const label of ["NET", "LOAD 1M", "UPTIME", "BANDWIDTH", "TRAFFIC", "RESET"]) {
 			await expect(alpha.getByText(label, { exact: true })).toBeVisible();
 		}
-		await expect(alpha.getByText(/UP /)).toBeVisible();
 		await expect(alpha.getByText(/8 cores/)).toBeVisible();
 		for (const bar of ["CPU usage", "Memory usage", "Disk usage", "Swap usage"]) {
 			await expect(alpha.getByRole("progressbar", { name: bar })).toBeVisible();

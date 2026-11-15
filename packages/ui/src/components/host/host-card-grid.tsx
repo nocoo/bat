@@ -167,8 +167,8 @@ function SpecSubCard({
 	accentColor: string;
 }) {
 	return (
-		<div className="flex min-w-0 flex-col gap-0.5 rounded-basalt-md border border-basalt-border/80 bg-basalt-muted/35 px-basalt-space-md py-basalt-space-sm">
-			<span className="inline-flex min-w-0 items-center gap-1 text-basalt-sm font-medium text-basalt-muted-foreground">
+		<div className="flex min-w-0 flex-col gap-basalt-space-xs rounded-basalt-md border border-basalt-border/70 bg-basalt-muted/30 px-basalt-space-lg py-basalt-space-md">
+			<span className="inline-flex min-w-0 items-center gap-1.5 text-basalt-sm font-medium text-basalt-muted-foreground">
 				<span
 					className="size-1.5 shrink-0 rounded-[1px]"
 					style={{ backgroundColor: accentColor }}
@@ -196,7 +196,7 @@ export function HostCardGrid({
 	const today = todayCalendarDate(new Date(now * 1000));
 	return (
 		<div
-			className="grid auto-rows-fr grid-cols-1 items-stretch gap-basalt-layout-sm sm:grid-cols-2 2xl:grid-cols-3"
+			className="grid auto-rows-fr grid-cols-1 items-stretch gap-basalt-layout md:grid-cols-2 2xl:grid-cols-3"
 			data-testid="host-card-grid"
 		>
 			{hosts.map((host, index) => {
@@ -212,7 +212,6 @@ export function HostCardGrid({
 					<LayerCard
 						key={host.host_id}
 						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
-						padding="sm"
 						data-testid="host-card"
 						data-view-enter="true"
 						style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
@@ -222,7 +221,7 @@ export function HostCardGrid({
 							className="absolute inset-0 z-20 rounded-basalt-lg"
 							aria-label={`Open ${host.hostname}`}
 						/>
-						<div className="pointer-events-none relative flex h-full flex-col gap-basalt-space-md">
+						<div className="pointer-events-none relative flex h-full flex-col gap-3">
 							{/* Header: status square + hostname + description hint | status badge */}
 							<div className="flex min-w-0 items-center gap-basalt-space-xs">
 								<span
@@ -272,7 +271,7 @@ export function HostCardGrid({
 							</div>
 
 							{/* 2x3 telemetry & contract matrix */}
-							<div className="grid grid-cols-3 gap-x-basalt-space-lg gap-y-basalt-space-sm">
+							<div className="grid grid-cols-3 gap-x-basalt-space-lg gap-y-basalt-space-md">
 								<TelemetryCell
 									label="NET"
 									value={
@@ -298,6 +297,7 @@ export function HostCardGrid({
 										)
 									}
 								/>
+								<TelemetryCell label="UPTIME" value={uptime} />
 								<TelemetryCell
 									label="BANDWIDTH"
 									value={formatBandwidthMbps(host.bandwidth_mbps) ?? "—"}
@@ -310,20 +310,10 @@ export function HostCardGrid({
 									label="RESET"
 									value={formatResetDayCompact(host.traffic_reset_day) ?? "—"}
 								/>
-								<TelemetryCell
-									label="ALERTS"
-									value={
-										host.alert_count > 0 ? (
-											<span className="text-basalt-destructive">{host.alert_count} active</span>
-										) : (
-											<span className="text-basalt-muted-foreground">0</span>
-										)
-									}
-								/>
 							</div>
 
 							{/* 3-column framed capacity sub-cards */}
-							<div className="grid grid-cols-3 gap-basalt-space-sm">
+							<div className="grid grid-cols-3 gap-basalt-space-md">
 								<SpecSubCard
 									label="CPU"
 									primary={formatCoreCount(host.cpu_logical) || "—"}
@@ -343,14 +333,14 @@ export function HostCardGrid({
 								<SpecSubCard
 									label="DISK"
 									primary={diskUsage ?? "—"}
-									secondary={`UP ${uptime}`}
+									secondary={host.os ? host.os.split(" ")[0] : "ROOT /"}
 									accentColor={chart.amber}
 								/>
 							</div>
 
 							{/* Optional tags */}
 							{visibleTags.length > 0 && (
-								<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-xs">
+								<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-sm">
 									{visibleTags.map((tag) => (
 										<TagChip key={tag.id} name={tag.name} color={tag.color} />
 									))}
@@ -362,8 +352,8 @@ export function HostCardGrid({
 								</div>
 							)}
 
-							{/* Footer: billing + countdown on left, last-seen age on right */}
-							<div className="mt-auto flex min-w-0 items-center justify-between gap-basalt-space-sm border-t border-basalt-border/70 pt-basalt-space-sm">
+							{/* Footer: billing + countdown + active alerts on left, last-seen age on right */}
+							<div className="mt-auto flex min-w-0 items-center justify-between gap-basalt-space-sm border-t border-basalt-border/70 pt-basalt-space-md">
 								<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-sm">
 									{dailyCost !== null && (
 										<Badge variant="secondary" className={NUMERIC}>
@@ -383,6 +373,11 @@ export function HostCardGrid({
 									)}
 									{dailyCost === null && countdown === null && (
 										<span className="text-basalt-sm text-basalt-muted-foreground">No billing</span>
+									)}
+									{host.alert_count > 0 && (
+										<Badge variant="destructive" className={NUMERIC}>
+											{host.alert_count} active
+										</Badge>
 									)}
 								</div>
 								<span
