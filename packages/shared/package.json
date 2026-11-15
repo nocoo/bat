@@ -1,6 +1,6 @@
 {
 	"name": "@bat/shared",
-	"version": "4.1.5",
+	"version": "4.1.6",
 	"private": true,
 	"type": "module",
 	"main": "./dist/index.js",
