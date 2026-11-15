@@ -17,7 +17,7 @@
 	},
 	"dependencies": {
 		"@bat/shared": "workspace:*",
-		"@nocoo/basalt": "3.3.5",
+		"@nocoo/basalt": "3.3.6",
 		"@xyflow/react": "12.12.1",
 		"clsx": "^2.1.1",
 		"lucide-react": "1.72.0",
