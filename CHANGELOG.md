@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.1.9
+
+### Changed
+
+- Document Apple container CLI for probe cross-compile
+
 ## v4.1.8
 
 ### Added
