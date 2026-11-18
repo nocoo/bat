@@ -1,5 +1,11 @@
 # Changelog
 
+## v4.1.10
+
+### Changed
+
+- Upgrade @nocoo/basalt to ^3.5.1 (#699)
+
 ## v4.1.9
 
 ### Changed
