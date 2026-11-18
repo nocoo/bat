@@ -9,7 +9,7 @@ import {
 	TableRow,
 	TableSortableHeader,
 } from "@nocoo/basalt/components/table";
-import { Activity } from "lucide-react";
+import { Activity } from "@nocoo/basalt/icons";
 import { useMemo, useState } from "react";
 import {
 	cpuColor,

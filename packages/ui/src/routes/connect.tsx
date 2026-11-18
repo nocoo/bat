@@ -24,6 +24,7 @@ import { CodeBlock } from "@nocoo/basalt/components/code";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { Radio } from "@nocoo/basalt/components/radio";
+import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
 import {
 	ArrowUpRight,
 	Check,
@@ -37,11 +38,10 @@ import {
 	RefreshCw,
 	Terminal,
 	Trash2,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { INLINE_SEGMENT } from "@/components/layout/segment";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useWorkstations } from "@/hooks";
 import {
 	connectDate,
@@ -499,9 +499,9 @@ export function ConnectPage() {
 						{tokens.isLoading || servers.isLoading ? (
 							<LayerCard>
 								<LayerCard.Body className="space-y-4">
-									<Skeleton className="h-6 w-40" />
-									<Skeleton className="h-16 w-full" />
-									<Skeleton className="h-6 w-56" />
+									<SkeletonLine className="h-6 w-40" style={{ width: undefined }} />
+									<SkeletonLine className="h-16 w-full" style={{ width: undefined }} />
+									<SkeletonLine className="h-6 w-56" style={{ width: undefined }} />
 								</LayerCard.Body>
 							</LayerCard>
 						) : !tokens.data?.data.length ? (

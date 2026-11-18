@@ -6,7 +6,7 @@ import {
 	CollapsibleTrigger,
 } from "@nocoo/basalt/components/collapsible";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { Check, Plus, Radio, Shield, X } from "lucide-react";
+import { Check, Plus, Radio, Shield, X } from "@nocoo/basalt/icons";
 import { useCallback, useMemo, useState } from "react";
 import { useSWRConfig } from "swr";
 import { deleteAPI, postAPI } from "@/api";

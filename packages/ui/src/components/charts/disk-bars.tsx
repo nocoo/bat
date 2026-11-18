@@ -1,10 +1,10 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { LayerCard } from "@nocoo/basalt";
-import { DonutChart } from "@nocoo/basalt/charts/donut";
-import { HardDrive } from "lucide-react";
+import { HardDrive } from "@nocoo/basalt/icons";
 import { useMemo } from "react";
 import { chart, chartMuted } from "../../lib/palette";
 import { formatBytes, transformDiskData } from "../../lib/transforms";
+import { DonutChart } from "./donut-chart";
 
 export function DiskBars({ data }: { data: MetricsDataPoint[] }) {
 	const disks = useMemo(() => transformDiskData(data), [data]);

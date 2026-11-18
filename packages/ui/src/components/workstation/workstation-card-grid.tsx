@@ -211,7 +211,7 @@ export function WorkstationCardGrid({
 				return (
 					<LayerCard
 						key={record.id}
-						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
+						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-fade-up motion-reduce:animate-none"
 						data-testid="workstation-card"
 						data-view-enter="true"
 						style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}

@@ -10,7 +10,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@nocoo/basalt/components/select";
-import { AlertTriangle, Plus, RefreshCw, Trash2, Webhook } from "lucide-react";
+import { AlertTriangle, Plus, RefreshCw, Trash2, Webhook } from "@nocoo/basalt/icons";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI } from "@/api";
 import { SkeletonCard, SkeletonTable } from "@/components/layout/page-skeleton";

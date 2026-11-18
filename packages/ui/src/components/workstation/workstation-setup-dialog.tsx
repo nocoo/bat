@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@nocoo/basalt/components/dialog";
-import { Terminal } from "lucide-react";
+import { Terminal } from "@nocoo/basalt/icons";
 
 const STEPS = [
 	{

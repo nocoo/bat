@@ -1,4 +1,4 @@
-import { Check, Copy, TriangleAlert } from "lucide-react";
+import { Check, Copy, TriangleAlert } from "@nocoo/basalt/icons";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { abbreviateAddress } from "../lib/ip-abbreviation";
 
@@ -110,13 +110,13 @@ export function IpAddressRow({
 					{state === "copied" ? (
 						<Check
 							aria-hidden="true"
-							className="size-basalt-icon text-basalt-success animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
+							className="size-basalt-icon text-basalt-success animate-fade-up motion-reduce:animate-none"
 							strokeWidth={2}
 						/>
 					) : state === "failed" ? (
 						<TriangleAlert
 							aria-hidden="true"
-							className="size-basalt-icon text-basalt-warning animate-in fade-in zoom-in-50 duration-basalt-normal motion-reduce:animate-none"
+							className="size-basalt-icon text-basalt-warning animate-fade-up motion-reduce:animate-none"
 							strokeWidth={2}
 						/>
 					) : (

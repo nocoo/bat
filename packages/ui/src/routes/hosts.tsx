@@ -10,7 +10,7 @@ import {
 	SelectValue,
 } from "@nocoo/basalt/components/select";
 import { ToggleGroup, ToggleGroupItem } from "@nocoo/basalt/components/toggle-group";
-import { AlertTriangle, LayoutGrid, Server, Table2 } from "lucide-react";
+import { AlertTriangle, LayoutGrid, Server, Table2 } from "@nocoo/basalt/icons";
 import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
@@ -257,10 +257,7 @@ export function HostsPage() {
 					</div>
 				</div>
 			) : (
-				<LayerCard
-					data-testid="host-list"
-					className="animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
-				>
+				<LayerCard data-testid="host-list" className="animate-fade-up motion-reduce:animate-none">
 					<LayerCard.Header>
 						<h2>Servers</h2>
 						<span className="text-basalt-sm text-basalt-muted-foreground">

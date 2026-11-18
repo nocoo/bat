@@ -5,7 +5,7 @@
 import type { WorkstationRecord } from "@bat/shared";
 import { DescriptionList } from "@nocoo/basalt/components/description-list";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { Laptop, Network } from "lucide-react";
+import { Laptop, Network } from "@nocoo/basalt/icons";
 import { formatTimestamp } from "@/lib/format";
 import { formatMemory } from "@/lib/host-card-format";
 import { formatUptime } from "@/lib/workstation-format";

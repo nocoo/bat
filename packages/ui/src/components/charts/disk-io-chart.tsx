@@ -1,5 +1,5 @@
 import type { MetricsDataPoint } from "@bat/shared";
-import { HardDrive } from "lucide-react";
+import { HardDrive } from "@nocoo/basalt/icons";
 import { useMemo } from "react";
 import { Area, CartesianGrid, ComposedChart, Line, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";

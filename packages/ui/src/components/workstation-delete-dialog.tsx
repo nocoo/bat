@@ -10,7 +10,7 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from "@nocoo/basalt/components/alert-dialog";
-import { Trash2 } from "lucide-react";
+import { Trash2 } from "@nocoo/basalt/icons";
 import { useId, useState } from "react";
 import { useNavigate } from "react-router";
 import { useDeleteWorkstation } from "@/hooks";

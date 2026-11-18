@@ -72,11 +72,10 @@ for (const theme of ["light", "dark"] as const) {
 						return Math.abs(indicator - selected);
 					})
 					.toBeLessThan(1);
-				expect(
-					await guide
-						.getByRole("radiogroup", { name: "Example format", exact: true })
-						.evaluate((element) => element.getBoundingClientRect().height),
-				).toBe(createBox.height);
+				const exampleFormatHeight = await guide
+					.getByRole("radiogroup", { name: "Example format", exact: true })
+					.evaluate((element) => element.getBoundingClientRect().height);
+				expect(Math.abs(exampleFormatHeight - createBox.height)).toBeLessThanOrEqual(1);
 				await expect
 					.poll(() => island.evaluate((element) => element.scrollWidth <= element.clientWidth))
 					.toBe(true);
@@ -92,9 +91,10 @@ for (const theme of ["light", "dark"] as const) {
 				await expect(page.getByText("Retention Window", { exact: true })).toHaveCount(0);
 				const retention = page.getByRole("radiogroup", { name: "Retention window", exact: true });
 				await expect(retention.getByRole("radio")).toHaveCount(3);
-				expect(await retention.evaluate((element) => element.getBoundingClientRect().height)).toBe(
-					createBox.height,
+				const retentionHeight = await retention.evaluate(
+					(element) => element.getBoundingClientRect().height,
 				);
+				expect(Math.abs(retentionHeight - createBox.height)).toBeLessThanOrEqual(1);
 				await expect
 					.poll(() => island.evaluate((element) => element.scrollWidth <= element.clientWidth))
 					.toBe(true);

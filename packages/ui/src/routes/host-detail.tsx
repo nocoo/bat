@@ -4,7 +4,7 @@ import { Button, SegmentControl } from "@nocoo/basalt";
 import { InlineEditable } from "@nocoo/basalt/components/inline-editable";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Info } from "@nocoo/basalt/icons";
 import { useCallback, useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError, patchAPI } from "@/api";

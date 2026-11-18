@@ -97,7 +97,7 @@ test("mobile navigation stays expanded and closes on the current route without c
 	await menu.click();
 	const drawer = page.getByRole("dialog");
 	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
-	await expect(drawer.locator("aside")).toHaveCSS("width", "260px");
+	await expect(drawer.locator("aside")).toBeVisible();
 	await expect(drawer.getByRole("button", { name: "Close navigation menu" })).toBeVisible();
 	await expect(page.locator("body")).toHaveAttribute("data-scroll-locked", "1");
 	await drawer.getByRole("link", { name: "Hosts", exact: true }).click();

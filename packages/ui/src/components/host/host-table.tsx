@@ -20,9 +20,8 @@ import {
 	renewalBadgeLabel,
 	renewalTone,
 } from "@bat/shared";
-import { LineChart } from "@nocoo/basalt/charts/line";
-import { ChartTooltipContent, type ChartTooltipItem } from "@nocoo/basalt/charts/tooltip";
 import { Button } from "@nocoo/basalt/components/button";
+import { ChartTooltipContent, type ChartTooltipItem } from "@nocoo/basalt/components/chart";
 import {
 	Table,
 	TableBody,
@@ -44,9 +43,10 @@ import {
 	Server,
 	Timer,
 	Wallet,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 import * as React from "react";
 import { Link } from "react-router";
+import { LineChart } from "@/components/charts/line-chart";
 import { FleetCostTotal } from "@/components/host/fleet-cost-total";
 import { hostStatusLabel, StatusBadge } from "@/components/status-badge";
 import { formatCny, renewalToneClass, todayCalendarDate } from "@/lib/billing-format";

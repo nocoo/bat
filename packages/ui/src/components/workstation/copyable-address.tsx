@@ -6,7 +6,7 @@
 // control with a muted family label and an in-place copy affordance.
 
 import { Button } from "@nocoo/basalt";
-import { Check, Copy, TriangleAlert } from "lucide-react";
+import { Check, Copy, TriangleAlert } from "@nocoo/basalt/icons";
 import { useEffect, useState } from "react";
 
 type CopyState = "idle" | "copied" | "failed";

@@ -2,7 +2,7 @@
 // recharts geometry / series config and let these handle the boilerplate
 // shared across every chart card.
 import { LayerCard } from "@nocoo/basalt";
-import type { LucideIcon } from "lucide-react";
+import type { LucideIcon } from "@nocoo/basalt/icons";
 import type { ReactNode } from "react";
 
 /** Card wrapper used by every chart (consistent padding + radius). */

@@ -1,4 +1,4 @@
-import { ChartTooltipContent } from "@nocoo/basalt/charts/tooltip";
+import { ChartTooltipContent } from "@nocoo/basalt/components/chart";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
 
 interface ChartTooltipProps {

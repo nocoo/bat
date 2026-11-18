@@ -4,7 +4,6 @@
 
 import type { WorkstationConnectivityStatus } from "@bat/shared";
 import { hashHostId } from "@bat/shared";
-import { LineChart } from "@nocoo/basalt/charts/line";
 import {
 	Table,
 	TableBody,
@@ -14,6 +13,7 @@ import {
 	TableRow,
 } from "@nocoo/basalt/components/table";
 import { Link } from "react-router";
+import { LineChart } from "@/components/charts/line-chart";
 import type { TargetRow } from "@/lib/workstation-detail";
 import { statusColor, statusLabel } from "@/lib/workstation-detail";
 import { formatLoss, formatRtt } from "@/lib/workstation-format";

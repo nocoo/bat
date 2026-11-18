@@ -10,7 +10,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nocoo/basalt/components/table";
-import { AlertTriangle, Bell } from "lucide-react";
+import { AlertTriangle, Bell } from "@nocoo/basalt/icons";
 import { Link } from "react-router";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";
 import { PageSummary, type ReadingItem } from "@/components/layout/reading";

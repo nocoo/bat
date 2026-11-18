@@ -57,8 +57,8 @@ for (const theme of ["light", "dark"] as const) {
 				await expect
 					.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
 					.toBe(true);
-				await expect(island).toHaveCSS("padding-left", width >= 1024 ? "24px" : "16px");
-				await expect(island).toHaveCSS("padding-top", "16px");
+				await expect(island).toHaveCSS("padding-left", width >= 1024 ? "32px" : "16px");
+				await expect(island).toHaveCSS("padding-top", width >= 768 ? "24px" : "16px");
 				if (path === "/hosts" || path === "/tags") {
 					await page.screenshot({
 						path: testInfo.outputPath(`${title.toLowerCase()}-${theme}-${width}.png`),

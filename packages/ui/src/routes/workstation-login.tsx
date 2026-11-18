@@ -9,7 +9,7 @@ import {
 	type LucideIcon,
 	Tag,
 	Terminal,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { useSearchParams } from "react-router";
 import { authorizeWorkstationAPI } from "@/api";
@@ -36,7 +36,7 @@ function ConsentShell({ children }: { children: React.ReactNode }) {
 		<main className="basalt-ui flex min-h-dvh items-center justify-center bg-basalt-background p-basalt-space-lg">
 			<div
 				data-basalt-surface-root=""
-				className="flex w-full max-w-lg flex-col overflow-hidden rounded-basalt-lg bg-basalt-card ring-1 ring-basalt-border"
+				className="flex w-full max-w-lg flex-col overflow-hidden rounded-basalt-lg bg-basalt-card ring-1 ring-basalt-border/80 shadow-basalt-card"
 			>
 				<div className="flex items-center justify-between gap-basalt-layout bg-basalt-primary px-basalt-card py-basalt-space-lg">
 					<span className="flex items-center gap-basalt-space-md text-basalt-base font-semibold text-basalt-primary-foreground">

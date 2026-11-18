@@ -4,7 +4,7 @@ import { Button } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { ToggleGroup, ToggleGroupItem } from "@nocoo/basalt/components/toggle-group";
-import { Laptop, LayoutGrid, Table2, Terminal } from "lucide-react";
+import { Laptop, LayoutGrid, Table2, Terminal } from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { Link } from "react-router";
 import {

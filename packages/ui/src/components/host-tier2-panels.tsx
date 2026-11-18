@@ -1,6 +1,6 @@
 import type { Tier2Snapshot } from "@bat/shared";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { Globe, Lock, Package, Unlock } from "lucide-react";
+import { Globe, Lock, Package, Unlock } from "@nocoo/basalt/icons";
 import {
 	dedupeAndSortWebsites,
 	groupSoftwareByCategory,

@@ -6,7 +6,7 @@ import {
 	CircleOff,
 	type LucideIcon,
 	TriangleAlert,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 
 const STATUS_CONFIG: Record<
 	HostStatus,

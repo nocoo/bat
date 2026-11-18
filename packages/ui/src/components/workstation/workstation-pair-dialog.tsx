@@ -14,7 +14,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@nocoo/basalt/components/dialog";
-import { Check, Link2 } from "lucide-react";
+import { Check, Link2 } from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { ApiError, approveWorkstationPairAPI } from "@/api";
 import { useWorkstations } from "@/hooks";

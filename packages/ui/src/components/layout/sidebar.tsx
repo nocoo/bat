@@ -31,7 +31,7 @@ import {
 	Server,
 	Tag,
 	Webhook,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 import { useLocation } from "react-router";
 import { useMe } from "@/hooks";
 import { ACCESS_LOGOUT_URL } from "@/lib/access";
@@ -197,7 +197,7 @@ export function DesktopSidebarProvider({
 	children: React.ReactNode;
 }) {
 	return (
-		<SidebarProvider collapsed={collapsed} onCollapsedChange={onCollapsedChange} defaultWidth={260}>
+		<SidebarProvider collapsed={collapsed} onCollapsedChange={onCollapsedChange}>
 			{children}
 		</SidebarProvider>
 	);
