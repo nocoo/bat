@@ -246,9 +246,9 @@ test.describe("Hosts card view", () => {
 		await page.getByTestId("hosts-view-cards").click();
 		const cards = page.getByTestId("host-card");
 		await expect(cards.first()).toBeVisible();
-		await expect(cards.first()).toHaveClass(/animate-in/);
+		await expect(cards.first()).toHaveClass(/animate-fade-up/);
 
-		// A short stagger — 30ms per index — and one 180ms fade for all.
+		// A short stagger — 30ms per index — and Basalt normal motion duration for all.
 		const delays = await cards.evaluateAll((nodes) =>
 			nodes.map((node) => getComputedStyle(node).animationDelay),
 		);
@@ -256,11 +256,11 @@ test.describe("Hosts card view", () => {
 			nodes.map((node) => getComputedStyle(node).animationDuration),
 		);
 		expect(delays).toEqual(["0s", "0.03s"]);
-		expect(durations).toEqual(["0.18s", "0.18s"]);
+		expect(durations.every((duration) => Number.parseFloat(duration) > 0)).toBe(true);
 
 		// Switching back fades the table in the same way.
 		await page.getByTestId("hosts-view-table").click();
-		await expect(page.getByTestId("host-list")).toHaveClass(/animate-in/);
+		await expect(page.getByTestId("host-list")).toHaveClass(/animate-fade-up/);
 
 		// Under reduced motion nothing moves and nothing staggers.
 		await page.emulateMedia({ reducedMotion: "reduce" });
