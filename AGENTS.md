@@ -114,7 +114,7 @@ Authorized maintainers use `bun run release` (patch default; `-- minor`, `-- maj
 
 R2 probe release retention: after both architectures and their SHA-256 files are successfully uploaded to the version directory and `latest/`, run `python3 scripts/prune-probe-releases.py --release-version X.Y.Z --apply`. Keep only the three newest numeric `X.Y.Z` version directories under `zhe/apps/bat/`, plus `latest/`; never delete other prefixes or non-version keys. The script defaults to a dry run, requires complete retained releases and matching `latest/`, and verifies the remaining inventory. Serialize probe releases so upload and cleanup cannot overlap. For one-time cleanup, wait for any in-flight probe upload to finish and use the same script. Required credentials: `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`; never print them.
 
-Preserve static musl probe packaging and version targets, including release snapshots. Procedures and live checks: [edge deployment](docs/19-edge-deployment.md), [probe](docs/04-probe.md), [Connect](docs/22-connect.md).
+Preserve static musl probe packaging and version targets, including release snapshots. Optional container-based probe cross-compilation (`probe/Dockerfile.build`) supports `apple/container` (`container build --platform linux/amd64 -f probe/Dockerfile.build -o type=local,dest=probe/out .`, with `--dns <ip>` behind fake-ip proxies) without Docker Desktop; all `L1`–`L4` test lanes run natively without containers. Procedures and live checks: [edge deployment](docs/19-edge-deployment.md), [probe](docs/04-probe.md), [Connect](docs/22-connect.md).
 
 ## Retrospective
 

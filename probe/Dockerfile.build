@@ -1,7 +1,12 @@
 # Cross-compile bat-probe as a fully static musl binary.
 # Produces a zero-dependency ELF that runs on any Linux (glibc version irrelevant).
 #
-# Usage:
+# Usage (Apple container CLI, no Docker Desktop required):
+#   container build --platform linux/amd64 -f probe/Dockerfile.build -o type=local,dest=probe/out .
+#   container build --platform linux/arm64 -f probe/Dockerfile.build -o type=local,dest=probe/out .
+#   (Behind corporate fake-ip proxies, pass --dns <reachable-dns-ip> and reset stale buildkit if needed.)
+#
+# Usage (Docker):
 #   docker build --platform linux/amd64  -f probe/Dockerfile.build -o probe/out .
 #   docker build --platform linux/arm64  -f probe/Dockerfile.build -o probe/out .
 

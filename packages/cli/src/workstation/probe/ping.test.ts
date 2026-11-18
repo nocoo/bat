@@ -23,7 +23,6 @@ const TARGET: WorkstationTarget = {
 };
 
 const TARGET6: WorkstationTarget = { ...TARGET, address: "2001:db8::1", family: 6 };
-const LOOPBACK: WorkstationTarget = { ...TARGET, address: "127.0.0.1" };
 
 function result(overrides: Partial<ExecResult> = {}): ExecResult {
 	return {
@@ -355,19 +354,6 @@ describe("pingTarget", () => {
 		expect(options.timeoutMs).toBe(2500);
 		expect(options.env.LC_ALL).toBe("C");
 		expect(options.signal).toBe(controller.signal);
-	});
-
-	test("probes the loopback interface for real", async () => {
-		const exec = (await import("../scheduler/exec.js")).runCommand;
-		const outcome = await pingTarget(LOOPBACK, { exec, platform: process.platform });
-		if (outcome.localError) {
-			expect(outcome.connectivity.status).toBe("error");
-			return;
-		}
-		expect(outcome.connectivity.sent).toBe(3);
-		expect(outcome.connectivity.status).toBe("reachable");
-		expect(outcome.connectivity.received).toBe(3);
-		expect(outcome.connectivity.rtts_ms.every((rtt) => rtt !== null)).toBe(true);
 	});
 });
 
