@@ -88,10 +88,8 @@ function AppShellInner({ children }: AppShellProps) {
 					}
 				/>
 
-				<div className="flex min-h-0 flex-1 flex-col px-2 pb-2 md:px-3 md:pb-3">
-					<ContentIsland className="bat-workspace md:p-basalt-layout lg:px-basalt-layout-lg">
-						{children}
-					</ContentIsland>
+				<div className="flex min-h-0 flex-1 flex-col px-basalt-space-lg pb-basalt-space-lg md:px-basalt-layout-sm md:pb-basalt-layout-sm">
+					<ContentIsland className="bat-workspace">{children}</ContentIsland>
 				</div>
 			</AppMain>
 		</BasaltAppShell>

@@ -1,8 +1,8 @@
 // Current utilisation as rings: one value each for CPU, memory and the root
 // volume. A platform that reports no CPU usage shows a dash, never a 0 ring.
 
-import { Gauge } from "@nocoo/basalt/charts/gauge";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
+import { Gauge } from "@/components/charts/gauge";
 import { chart } from "@/lib/palette";
 import { formatPercent } from "@/lib/workstation-format";
 

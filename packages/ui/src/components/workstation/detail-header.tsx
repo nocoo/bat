@@ -6,7 +6,7 @@ import type { WorkstationRecord, WorkstationStatus } from "@bat/shared";
 import { Button, SegmentControl } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "@nocoo/basalt/icons";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { type ReadingItem, Readings } from "@/components/layout/reading";

@@ -6,7 +6,7 @@ import {
 } from "@nocoo/basalt/components/collapsible";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, Terminal } from "lucide-react";
+import { AlertTriangle, Terminal } from "@nocoo/basalt/icons";
 import { SkeletonCard } from "@/components/layout/page-skeleton";
 import { useSetup } from "@/hooks";
 

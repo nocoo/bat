@@ -2,8 +2,8 @@
 // authorized servers answered, and the counts behind it. This is a snapshot of
 // the newest sample, not a claim about uptime over the window.
 
-import { DonutChart } from "@nocoo/basalt/charts/donut";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
+import { DonutChart } from "@/components/charts/donut-chart";
 import type { StatusSlice } from "@/lib/workstation-detail";
 
 export function ReachabilityMixCard({

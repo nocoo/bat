@@ -10,7 +10,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@nocoo/basalt/components/table";
-import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, ScrollText } from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { Link } from "react-router";
 import { SkeletonSummary, SkeletonTable } from "@/components/layout/page-skeleton";

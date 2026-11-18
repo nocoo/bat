@@ -12,7 +12,7 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from "@nocoo/basalt/components/dialog";
-import { Pencil } from "lucide-react";
+import { Pencil } from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { ApiError, renameWorkstationAPI } from "@/api";
 import { useWorkstations } from "@/hooks";

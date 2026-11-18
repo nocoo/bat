@@ -20,7 +20,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { WorkstationConnectivityStatus } from "@bat/shared";
-import { Laptop, Server } from "lucide-react";
+import { Laptop, Server } from "@nocoo/basalt/icons";
 import { useEffect, useMemo, useState } from "react";
 import { chartMuted } from "@/lib/palette";
 import type { TargetRow } from "@/lib/workstation-detail";

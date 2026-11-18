@@ -1,6 +1,6 @@
 import type { AlertItem } from "@bat/shared";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { Bell } from "lucide-react";
+import { Bell } from "@nocoo/basalt/icons";
 import { formatRelativeTime, severityColorClass, sortAlertsBySeverity } from "@/lib/alerts-format";
 
 interface HostAlertsCardProps {

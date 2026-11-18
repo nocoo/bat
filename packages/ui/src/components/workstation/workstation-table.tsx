@@ -4,7 +4,6 @@
 
 import type { SparklinePoint, WorkstationListItem } from "@bat/shared";
 import { computeWorkstationStatus } from "@bat/shared";
-import { LineChart } from "@nocoo/basalt/charts/line";
 import {
 	Table,
 	TableBody,
@@ -15,6 +14,7 @@ import {
 } from "@nocoo/basalt/components/table";
 import { useMemo } from "react";
 import { Link } from "react-router";
+import { LineChart } from "@/components/charts/line-chart";
 import { WorkstationStatusBadge } from "@/components/workstation-status-badge";
 import { chart } from "@/lib/palette";
 import { formatPercent, rootDiskUsedPct, workstationLastSeen } from "@/lib/workstation-format";

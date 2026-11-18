@@ -3,7 +3,7 @@ import { computeWorkstationStatus, hashHostId, WORKSTATION_PING_COUNT } from "@b
 import { Button } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft } from "@nocoo/basalt/icons";
 import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { ApiError } from "@/api";

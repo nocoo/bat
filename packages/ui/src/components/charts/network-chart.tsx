@@ -1,5 +1,5 @@
 import type { MetricsDataPoint, MetricsResolution } from "@bat/shared";
-import { Globe } from "lucide-react";
+import { Globe } from "@nocoo/basalt/icons";
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";

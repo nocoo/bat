@@ -2,7 +2,7 @@ import { RETENTION_OPTIONS, type RetentionDays } from "@bat/shared";
 import { SegmentControl } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check } from "@nocoo/basalt/icons";
 import { useCallback, useState } from "react";
 import { putAPI } from "@/api";
 import { SkeletonCard } from "@/components/layout/page-skeleton";

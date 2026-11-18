@@ -22,7 +22,7 @@ import { Badge } from "@nocoo/basalt/components/badge";
 import { Button } from "@nocoo/basalt/components/button";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@nocoo/basalt/components/tooltip";
-import { Info } from "lucide-react";
+import { Info } from "@nocoo/basalt/icons";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { StatusBadge } from "@/components/status-badge";
@@ -211,7 +211,7 @@ export function HostCardGrid({
 				return (
 					<LayerCard
 						key={host.host_id}
-						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-in fade-in slide-in-from-bottom-2 duration-180 fill-mode-both motion-reduce:animate-none"
+						className="group relative h-full transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-md hover:ring-basalt-border motion-reduce:transition-none animate-fade-up motion-reduce:animate-none"
 						data-testid="host-card"
 						data-view-enter="true"
 						style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}

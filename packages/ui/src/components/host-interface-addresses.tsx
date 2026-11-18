@@ -7,7 +7,7 @@ import {
 	Network,
 	Shield,
 	Wifi,
-} from "lucide-react";
+} from "@nocoo/basalt/icons";
 import { IpAddressRow } from "./ip-address-row";
 
 function interfaceIcon(iface: string): LucideIcon {

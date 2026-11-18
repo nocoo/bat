@@ -1,5 +1,5 @@
 import type { MetricsDataPoint } from "@bat/shared";
-import { Gauge } from "lucide-react";
+import { Gauge } from "@nocoo/basalt/icons";
 import { useMemo } from "react";
 import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";

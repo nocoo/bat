@@ -1,6 +1,6 @@
 import type { MetricsDataPoint } from "@bat/shared";
 import { ALERT_THRESHOLDS } from "@bat/shared";
-import { HardDrive } from "lucide-react";
+import { HardDrive } from "@nocoo/basalt/icons";
 import { useMemo } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, Tooltip, XAxis, YAxis } from "recharts";
 import { chart, chartAxis } from "@/lib/palette";

@@ -9,7 +9,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@nocoo/basalt/components/select";
-import { AlertTriangle, Plus, Tag, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Tag, Trash2 } from "@nocoo/basalt/icons";
 import { useCallback, useState } from "react";
 import { deleteAPI, postAPI, putAPI } from "@/api";
 import { SkeletonCard, SkeletonTable } from "@/components/layout/page-skeleton";

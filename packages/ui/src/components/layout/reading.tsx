@@ -2,9 +2,9 @@
 // an optional window trend. Workstation and server detail pages use the same
 // anatomy so the two pages read as one product.
 
-import { LineChart } from "@nocoo/basalt/charts/line";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import type { ReactNode } from "react";
+import { LineChart } from "@/components/charts/line-chart";
 
 export interface TrendPoint {
 	x: number;

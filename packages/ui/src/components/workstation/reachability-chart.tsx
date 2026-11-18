@@ -3,10 +3,23 @@
 // Selecting a legend entry is the focus control; nothing is fabricated for a
 // target that never answered.
 
-import { cartesianAxisProps, chartTooltipProps, GRID_PROPS } from "@nocoo/basalt/charts/config";
-import { ChartShell } from "@nocoo/basalt/charts/frame";
-import { CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
-import { Skeleton } from "@/components/ui/skeleton";
+import {
+	ChartShell,
+	cartesianAxisProps,
+	chartTooltipProps,
+	GRID_PROPS,
+	RESPONSIVE_CONTAINER_PROPS,
+} from "@nocoo/basalt/components/chart";
+import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
+import {
+	CartesianGrid,
+	Line,
+	LineChart,
+	ResponsiveContainer,
+	Tooltip,
+	XAxis,
+	YAxis,
+} from "recharts";
 import { chartAxis } from "@/lib/palette";
 import type { TargetRow } from "@/lib/workstation-detail";
 import { clockLabel, reachabilitySeries } from "@/lib/workstation-detail";
@@ -98,7 +111,7 @@ export function ReachabilityChart({
 	onRetry: () => void;
 }) {
 	if (loading) {
-		return <Skeleton className="h-56 w-full" />;
+		return <SkeletonLine className="h-56 w-full" style={{ width: undefined }} />;
 	}
 
 	if (error) {
@@ -152,68 +165,70 @@ export function ReachabilityChart({
 			}
 			summary="Mean round-trip time per report. A line stops where the probe went unanswered; the dashed axis carries the selected target's loss."
 		>
-			<LineChart data={data} margin={{ top: 8, right: hasLoss ? 4 : 8, bottom: 0, left: 0 }}>
-				<CartesianGrid {...GRID_PROPS} />
-				<XAxis
-					dataKey="x"
-					{...cartesianAxisProps()}
-					tickFormatter={(value) => clockLabel(value, windowSeconds)}
-					minTickGap={32}
-				/>
-				<YAxis
-					yAxisId="rtt"
-					domain={[0, "auto"]}
-					{...cartesianAxisProps()}
-					tickFormatter={(value: number) => `${Math.round(value)}ms`}
-					width={48}
-				/>
-				{hasLoss && (
-					<YAxis
-						yAxisId="loss"
-						orientation="right"
-						domain={[0, 100]}
+			<ResponsiveContainer {...RESPONSIVE_CONTAINER_PROPS}>
+				<LineChart data={data} margin={{ top: 8, right: hasLoss ? 4 : 8, bottom: 0, left: 0 }}>
+					<CartesianGrid {...GRID_PROPS} />
+					<XAxis
+						dataKey="x"
 						{...cartesianAxisProps()}
-						tickFormatter={(value: number) => `${value}%`}
-						width={36}
+						tickFormatter={(value) => clockLabel(value, windowSeconds)}
+						minTickGap={32}
 					/>
-				)}
-				<Tooltip
-					{...chartTooltipProps({ cursor: "line" })}
-					content={<ReachabilityTooltip windowSeconds={windowSeconds} />}
-				/>
-				{series.keys.map((key) => {
-					const dimmed = focused !== null && focused.serverId !== key.serverId;
-					return (
+					<YAxis
+						yAxisId="rtt"
+						domain={[0, "auto"]}
+						{...cartesianAxisProps()}
+						tickFormatter={(value: number) => `${Math.round(value)}ms`}
+						width={48}
+					/>
+					{hasLoss && (
+						<YAxis
+							yAxisId="loss"
+							orientation="right"
+							domain={[0, 100]}
+							{...cartesianAxisProps()}
+							tickFormatter={(value: number) => `${value}%`}
+							width={36}
+						/>
+					)}
+					<Tooltip
+						{...chartTooltipProps({ cursor: "line" })}
+						content={<ReachabilityTooltip windowSeconds={windowSeconds} />}
+					/>
+					{series.keys.map((key) => {
+						const dimmed = focused !== null && focused.serverId !== key.serverId;
+						return (
+							<Line
+								key={key.key}
+								yAxisId="rtt"
+								type="monotone"
+								dataKey={key.key}
+								name={key.label}
+								stroke={key.color}
+								strokeWidth={dimmed ? 1.25 : 1.75}
+								strokeOpacity={dimmed ? 0.22 : 1}
+								dot={series.data.length <= 12}
+								isAnimationActive={false}
+								connectNulls={false}
+							/>
+						);
+					})}
+					{hasLoss && (
 						<Line
-							key={key.key}
-							yAxisId="rtt"
+							yAxisId="loss"
 							type="monotone"
-							dataKey={key.key}
-							name={key.label}
-							stroke={key.color}
-							strokeWidth={dimmed ? 1.25 : 1.75}
-							strokeOpacity={dimmed ? 0.22 : 1}
-							dot={series.data.length <= 12}
+							dataKey="loss"
+							name={`${focused?.name ?? ""} loss`}
+							stroke={LOSS_COLOR}
+							strokeWidth={1.25}
+							strokeDasharray="4 3"
+							dot={false}
 							isAnimationActive={false}
 							connectNulls={false}
 						/>
-					);
-				})}
-				{hasLoss && (
-					<Line
-						yAxisId="loss"
-						type="monotone"
-						dataKey="loss"
-						name={`${focused?.name ?? ""} loss`}
-						stroke={LOSS_COLOR}
-						strokeWidth={1.25}
-						strokeDasharray="4 3"
-						dot={false}
-						isAnimationActive={false}
-						connectNulls={false}
-					/>
-				)}
-			</LineChart>
+					)}
+				</LineChart>
+			</ResponsiveContainer>
 		</ChartShell>
 	);
 }

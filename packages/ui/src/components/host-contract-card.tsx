@@ -9,7 +9,7 @@ import type { BillingFields, ContractFields } from "@bat/shared";
 import { formatBandwidthMbps, formatResetDayCompact, formatTrafficQuotaGb } from "@bat/shared";
 import { Button, Field, Input } from "@nocoo/basalt";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { Pencil, Wallet } from "lucide-react";
+import { Pencil, Wallet } from "@nocoo/basalt/icons";
 import { type FormEvent, useCallback, useState } from "react";
 import { patchAPI } from "@/api";
 import {
