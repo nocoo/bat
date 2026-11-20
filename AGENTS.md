@@ -1,97 +1,71 @@
 # Bat
 
-VPS monitoring with a Rust probe, Cloudflare Worker API and Vite dashboard.
-Profile: native-hybrid, with TypeScript and Rust lanes.
-Direction: [docs/02-architecture.md](docs/02-architecture.md) and [development](docs/21-development.md). Frameworks must not rewrite this file.
+VPS monitoring monorepo with a Rust probe (`probe/`), Cloudflare Worker API + SPA (`packages/worker/`), Vite dashboard (`packages/ui/`), shared types (`packages/shared/`), and public Node.js CLI `@nocoo/bat` (`packages/cli/`).
+Docs: [README](README.md) · [Docs Index](docs/README.md) · [Architecture](docs/02-architecture.md) · [Testing](docs/07-testing.md) · [Development](docs/21-development.md) · [Environments](docs/23-local-environments.md) · [Workstations](docs/24-workstations.md) · [Retrospective](Retrospective.md)
 
-## Scope and instruction sources
+## Commands
 
-- This file is the only project handbook; nested files do not compete with it. Do not create a `CLAUDE.md` alias or copy.
-- This file is the contract; hooks, CI and configuration enforce it. Raise weaker enforcement instead of lowering this contract.
-- Human docs: [README.md](README.md) and the [docs index](docs/README.md). Version: root `package.json`, synchronized by `scripts/release.ts`. Enforcement: `.husky/`, CI/release workflows, per-package Vitest configs, `scripts/check-coverage.sh`. Local secrets: ignored `packages/worker/.dev.vars` and `packages/ui/.env.local`; production Worker secrets are managed separately. Machine rules/accidents: global `AGENTS.md` and `rules/`; [Retrospective.md](Retrospective.md).
+Run from root with TypeScript 7, Bun 1.4.4/Turbo, Node.js 22+ (CLI runtime), stable Rust (`cargo`, `clippy`, `rustfmt`), nightly `cargo-llvm-cov` + LLVM tools (preserves `coverage(off)`), and Chromium in `packages/ui`. Bindings: D1 `bat-db`, optional prod `BAT_KV`, and Connect coordinator Durable Object. Local secrets live in gitignored `packages/worker/.dev.vars` and `packages/ui/.env.local`; prod Worker secrets are managed separately.
 
-## Project invariants
-
-- One Worker serves API and SPA. Browser host `bat.hexly.ai` uses Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
-- Daily local gateway 7025 (`bat.dev.hexly.ai`) starts Demo by default using the checked-in, de-identified observation catalog in `scripts/environments/fixtures/recorded.json`. Server aliases share one workload template; the focused automated catalog stays synthetic. Only explicit Prod selection uses the production Access proxy. Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway.
-- L2/L3/L4 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
-- Apply production D1 migrations before code that needs new columns. Preserve migration data with copy/rename rather than destructive table replacement; the E2E harness discovers numbered migrations automatically.
-- `BAT_KV` is an optional cache: absent KV falls back to D1. Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers or bodies in observability.
-- Keep MVVM boundaries and thin routes. Route/page scan hits are structural evidence, not assertion quality.
-- Use Bun, not pnpm. Release through the existing script and CD; laptop `bun run deploy` / `wrangler deploy` would race CD. Probe fleet upgrades remain manual.
-- `packages/cli` builds the public `@nocoo/bat` package with only the `bat` executable. Workstation commands use isolated credentials below `~/.config/bat/workstation/`; assets credentials and the original heartbeat service remain separate. npm installation never registers tasks or collects data.
-- Workstations are not server hosts. Dedicated `batw_` credentials can only discover authorized public targets, submit their own observations and revoke themselves. Enrollment uses Access consent plus one-use PKCE codes. Connect workstation grants are explicit, and connectivity reads require both workstation and target-server authorization.
-- Workstation schedules run a bounded one-shot probe every ten minutes in the current user's session. Never test by registering actual tasks or changing ACLs in the real home directory. Automated fixtures use temporary stores and fake command executors; native scheduler acceptance remains separately authorized.
-
-## Setup and commands
-
-TypeScript 7, Bun 1.4.4/Turbo, Hono Worker, Vite SPA; Rust probe lane with cargo, clippy, rustfmt and cargo-llvm-cov; D1 `bat-db`, optional production `BAT_KV` and a Connect coordinator Durable Object. `packages/shared/` and `packages/worker/` hold types and Worker/API/SPA assets; `packages/ui/`, `packages/cli/` and `probe/` hold the dashboard, public Node.js CLI and Rust agent. The root build includes the bundled CLI; its runtime needs Node.js 22+ rather than Bun.
-
-Run from the root after a frozen Bun install. Rust coverage needs `cargo-llvm-cov` and LLVM tools; nightly preserves existing `coverage(off)` annotations. Browser tests need Chromium in `packages/ui`.
-
-```bash
+```sh
 bun install --frozen-lockfile
-bun run dev # persistent Demo; --mode e2e for switchable manual E2E
-bun run dev:built # build first; same local control
-bun run demo:reset # stop Demo launcher first
-bun run test:environments
-bun run capture:environments # disposable rich E2E captures
-bun run typecheck
-bun run lint
-bun run build
-bun run test:unit:coverage
-bun run test:l1-gate
-bun run test:quality-gate
-bun turbo test:e2e --filter=@bat/worker
-bun run test:e2e:pw
-bun scripts/quality/runtime-kv.mjs
-bun scripts/quality/probe-integration.mjs
-bun scripts/quality/verify-package.mjs
+bun run dev                            # gateway 7025 persistent Demo; --mode e2e for manual E2E
+bun run dev:built                      # build first; same local control
+bun run demo:reset                     # stop Demo launcher first
+bun run typecheck                      # S1 TS
+bun run lint                           # S2 Biome check-only, 0 warnings
+bun run build                          # B1 shared + UI/Worker static assets + @nocoo/bat CLI
+bun run test:unit:coverage             # L1 TS + Rust coverage (scripts/check-coverage.sh)
+bun run test:l1-gate                   # pre-commit probe suite in temp clone
+bun run test:quality-gate              # Z1 / push-range / focus-check unit tests
+bun run test:environments              # L3 local environment suite
+bun run capture:environments           # L4 disposable rich E2E captures
+bun turbo test:e2e --filter=@bat/worker # L2 real Worker HTTP / D1 / DO
+bun run test:e2e:pw                    # L4 Playwright full suite (test:e2e:pw:smoke for smoke)
+bun scripts/quality/runtime-kv.mjs     # L2 real Wrangler D1 / KV bindings
+bun scripts/quality/probe-integration.mjs # L3 probe -> Worker -> query
+bun scripts/quality/verify-package.mjs # P1 packed @nocoo/bat consumer
+bun run gate:security                  # G1 staged gitleaks + G2 osv-scanner
 cargo test --manifest-path probe/Cargo.toml
-cargo clippy --manifest-path probe/Cargo.toml -- -D warnings
+cargo clippy --locked --all-features --manifest-path probe/Cargo.toml -- -D warnings
 cargo fmt --manifest-path probe/Cargo.toml --check
-bun run gate:security
 ```
 
-Build the UI before L2/L3/L4 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` and `CF_API_TOKEN` for isolated tests; the runtime runner rejects production-capable credentials. Never run tests against the daily Vite proxy.
+Build the UI (`bun run build`) before L2/L3/L4 so Worker static assets are real. Unset `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CF_API_TOKEN` for isolated tests (the runner rejects production-capable credentials).
 
-Environment design, fixture matrix, and capture limitations: [local environments](docs/23-local-environments.md). Legacy `.wrangler/state` and `.wrangler/e2e-pw` are never reset by these commands.
+## Invariants
 
-## Testing and quality contract
+- Single Worker serves API and SPA: browser host `bat.hexly.ai` uses Cloudflare Access; ingestion host `bat-ingest.worker.hexly.ai` uses `BAT_WRITE_KEY` / `BAT_READ_KEY`.
+- Daily gateway 7025 (`bat.dev.hexly.ai`) boots Demo from de-identified `scripts/environments/fixtures/recorded.json` (shared alias template; automated fixtures stay synthetic); only Prod uses Access proxy.
+- Vite and native local Workers use ephemeral loopback ports; never test against the daily gateway. Legacy `.wrangler/state` and `.wrangler/e2e-pw` are untouched ([Environments](docs/23-local-environments.md)).
+- L2/L3/L4 must remain local with dedicated persistence and guarded fixtures. Never use remote D1/KV or deploy remote `-test` resources.
+- Apply production D1 migrations before code that needs new columns; preserve data via copy/rename rather than destructive table replacement. E2E auto-discovers numbered migrations.
+- `BAT_KV` is an optional cache (absent KV falls back to D1). Connect uses a Durable Object and versioned keys; never collect invocation URLs, headers, or bodies in observability ([Connect](docs/22-connect.md)).
+- Keep MVVM boundaries and thin routes; route/page scan hits (`gate:routes`, `gate:pages`) are structural evidence, not assertion quality.
+- Use Bun (never pnpm). Root `package.json` is the version source, synced by `scripts/release.ts` (including release snapshots). Never run laptop `bun run deploy` / `wrangler deploy` (races CD).
+- `packages/cli` publishes `@nocoo/bat` (`bat` binary only; Node.js 22+). `npm install` never registers tasks or collects data; workstation creds stay in `~/.config/bat/workstation/`, separate from assets/heartbeat.
+- Workstations are not server hosts: enrollment uses Access consent + one-use PKCE; `batw_` keys only discover authorized public targets, submit own reports, and self-revoke ([Workstations](docs/24-workstations.md)).
+- Connect workstation grants are explicit and read-only; connectivity reads require authorization on both the workstation and each target server.
+- Workstation schedules run a bounded 10-min probe in the user session. Never register real tasks or alter real home ACLs in tests; use temp stores and fake executors (native scheduler acceptance is manual).
+- Authorized releases run `bun run release` (patch default; `-- minor`, `-- major`, explicit version, `-- --dry-run`), requiring `gh` auth and green CI on the exact commit; verify GitHub Release separately.
+- CD (`.github/workflows/release.yml`) owns D1 migration, Worker deploy, and static musl probe R2 upload/pruning ([Development](docs/21-development.md), [Edge](docs/19-edge-deployment.md), [Probe](docs/04-probe.md)).
 
-System0 quality 1.3.0, base-ci v2026.15. The repository implements all 11
-implementation slots plus Z1; there are no `na` slots. The CI workflow uses the
-native mode: `ci.yml` has one `quality` caller job and
-`quality-slots.yml` owns the named slot jobs.
+## Quality & Local Gates
 
-| Slot | Command / evidence                                                                                  | Checked object                   | Stage                    | Measured (2026-11-12)      | Coverage / gap                                           |
-| ---- | --------------------------------------------------------------------------------------------------- | -------------------------------- | ------------------------ | -------------------------- | -------------------------------------------------------- |
-| S1   | `bun turbo typecheck`; `cargo check --locked --all-features --manifest-path probe/Cargo.toml`       | Index snapshot / CI checkout     | pre-commit               | Rust check 0.6s            | TS strict; Rust cargo check                              |
-| S2   | `biome check --error-on-warnings .`; focus scan; `cargo fmt --check`; `cargo clippy -- -D warnings` | Index snapshot / CI checkout     | pre-commit               | Rust fmt/clippy 0.7s       | zero diagnostics required                                |
-| S3   | actionlint; yamllint; `scripts/check-workflows.py`                                                  | Index snapshot / CI checkout     | pre-commit*, CI          | 0.58s local                | immutable refs and 12-slot structure                     |
-| G1   | staged `gitleaks`; push-range `gitleaks`; synthetic-secret self-test                                | Staged index / pushed ranges     | pre-commit, pre-push, CI | staged scan 0.02s          | `[extend] useDefault = true`                             |
-| G2   | `osv-scanner` over `bun.lock` and `probe/Cargo.lock`                                                | Snapshot lockfiles / CI checkout | pre-push, CI             | 1.9s local                 | both language locks                                      |
-| B1   | dashboard + Worker assets + public CLI + release probe                                              | Snapshot / CI checkout           | pre-push, CI             | pre-push pass; probe 13.7s | real artifacts                                           |
-| L1   | Vitest coverage; nightly `cargo llvm-cov`; script/environment suites                                | Snapshot / CI checkout           | pre-commit, pre-push, CI | TS coverage in 11.77s hook | TS four-metric 95% target; Rust line/function/region 95% |
-| L2   | `runtime-kv.mjs`; `turbo test:e2e --filter=@bat/worker`                                             | Isolated local runtime           | CI                       | runtime KV 13s             | real Wrangler D1/KV/DO and HTTP                          |
-| L3   | `test:environments`; `probe-integration.mjs`                                                        | Isolated local services          | pre-push, CI             | 28s local                  | probe → Worker → query                                   |
-| L4   | pre-push `test:e2e:pw:smoke`; CI `test:e2e:pw`; `capture:environments`                              | Built SPA + local Worker         | pre-push, CI             | smoke 64 / 35.3s; CI 194   | Chromium journeys and captures                           |
-| P1   | `npm pack`; tarball inspection; throwaway install; installed CLI smoke                              | Built public CLI package         | pre-push, CI             | 34 checks                  | public `@nocoo/bat` tarball                              |
-| Z1   | `quality / Z1: Gate` verifies results and one tested SHA                                            | CI job results                   | CI                       | 15s in CI                  | all impl success; no skipped impl                        |
+Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision live in `.github/workflows/quality-slots.yml` (called by `.github/workflows/ci.yml`; `quality / Z1: Gate` required on `main`). All 11 delivery slots and `Z1` are `enforced` (`N/A`: none); slot map, per-package Vitest thresholds, and benchmarks live in [Testing](docs/07-testing.md). Raise weaker enforcement instead of lowering this contract. Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
-`*` S3 is conditional in pre-commit and always runs in CI. Worker/UI branch
-coverage is 91.16%/94.69%, below the 95% governance target; their existing 90%
-thresholds are preserved. Rust branch coverage is not available from
-`cargo-llvm-cov`; line/function/region coverage is 98.16%/98.09%/98.80%.
+- **Exceptions / gaps**: Worker/UI branches keep 90% thresholds (<95% target); Rust `cargo-llvm-cov` omits branches (95% line/function/region on nightly); scheduler acceptance and probe upgrades are `manual`.
+- **Local hooks**: installed via `bun run prepare` (`.husky/` -> `scripts/hooks/`); check-only, never use `--no-verify`.
+- **pre-commit**: verifies the staged index snapshot (`G1`, `S1`, `S2`, TS `L1`, script/env/Python unit, route/page gates, conditional `S3`).
+- **pre-push**: verifies each pushed local OID (`B1`, `G1`/`G2`, Rust `L1`, `L3`, `L4` smoke + capture, `P1`).
 
-| Hook       | Current behavior                                                                             | Measured / target                                 |
-| ---------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| pre-commit | Index snapshot via `checkout-index`; G1; parallel S1/S2/L1 and structural gates; optional S3 | 14.00s cold; 11.32s hot; target ≤15s, reject >30s |
-| pre-push   | stdin local-OID snapshot; B1/G1/G2/L1 parallel; L3 next; L4 smoke and P1 after L3            | 2:25.57 typical; one 2:44.95 over target          |
+## Resources & Isolation
 
-The pre-push peak was driven by L4 smoke moving from 35.4s to 46.3s under load.
-Trim the smoke set to 40-48 critical journeys or split capture from smoke before
-treating the 2.5-minute target as stable; CI keeps the full 194-test suite.
+| Lane           | Endpoint / State                                                              | Boundary                                                                                |
+| -------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Daily dev      | Gateway `127.0.0.1:7025` (`bat.dev.hexly.ai`), `.wrangler/environments/demo`  | Persistent Demo CRUD; explicit Prod access only; never run tests here                   |
+| Isolated tests | Ephemeral loopback ports, `.wrangler/environments/e2e-<uuid>`                 | Fresh D1/KV/DO and identity per run; serial mutations; never run L3 and L4 concurrently |
+| Prod           | `https://bat.hexly.ai` (Access) · `https://bat-ingest.worker.hexly.ai` (keys) | Read-only checks unless deployment is authorized                                        |
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at
@@ -106,7 +80,7 @@ commits or branch pushes. CI pins base-ci at
 | L3        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Per-run native state; serial conflicting scenarios, no server reuse |
 | L4        | Ephemeral ports; `.wrangler/environments/e2e-<uuid>` | Playwright and capture share the launcher root; never run with L3   |
 
-Every Worker test lane must reject remote bindings, assert test context, initialize `_test_marker(key,value)` with `env=test` and verify it before resets/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid workerd pipe failures.
+Every Worker test lane must reject remote bindings and production Cloudflare credentials, assert test context, initialize `_test_marker(key,value)` with `env=test`, and verify ownership before reset/cleanup. Keep Wrangler logs redirected as the L3 wrapper does to avoid `workerd` pipe failures.
 
 ## Operations / release
 
@@ -118,4 +92,4 @@ Preserve static musl probe packaging and version targets, including release snap
 
 ## Retrospective
 
-Narratives remain in [Retrospective.md](Retrospective.md); keep only recurring rules here, cross-project lessons in global rules/nmem and deterministic checks in hooks/tests.
+Record incident narratives in [Retrospective.md](Retrospective.md); promote recurring project constraints to `Invariants` above and enforceable safeguards to tests/hooks.
