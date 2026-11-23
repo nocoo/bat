@@ -126,17 +126,17 @@ describe("usageBarFill / getValueColor / statusDotColor", () => {
 		expect(usageBarFill(32)).toBe("hsl(var(--bat-chart-2))");
 		expect(usageBarFill(59.9)).toBe("hsl(var(--bat-chart-2))");
 		expect(usageBarFill(60)).toBe("hsl(var(--basalt-warning))");
-		expect(usageBarFill(80)).toBe("hsl(var(--basalt-destructive))");
+		expect(usageBarFill(80)).toBe("hsl(var(--basalt-danger-solid))");
 	});
 	test("value color thresholds", () => {
 		expect(getValueColor(20)).toBe("text-basalt-success");
 		expect(getValueColor(60)).toBe("text-basalt-warning");
-		expect(getValueColor(95)).toBe("text-basalt-destructive");
+		expect(getValueColor(95)).toBe("text-basalt-danger");
 	});
 	test("status dot color mapping", () => {
 		expect(statusDotColor("healthy")).toBe("bg-basalt-success");
 		expect(statusDotColor("warning")).toBe("bg-basalt-warning");
-		expect(statusDotColor("critical")).toBe("bg-basalt-destructive");
+		expect(statusDotColor("critical")).toBe("bg-basalt-danger-solid");
 		expect(statusDotColor("unknown")).toBe("bg-basalt-muted-foreground");
 		expect(statusDotColor("offline")).toBe("bg-basalt-muted-foreground");
 	});

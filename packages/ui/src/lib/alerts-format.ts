@@ -8,7 +8,7 @@ import type { AlertSeverity } from "@bat/shared";
 export function severityColorClass(s: AlertSeverity): string {
 	switch (s) {
 		case "critical":
-			return "text-basalt-destructive";
+			return "text-basalt-danger";
 		case "warning":
 			return "text-basalt-warning";
 		default:

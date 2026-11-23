@@ -14,8 +14,8 @@ const a = (severity: AlertItem["severity"], triggered_at: number, rule_id = "r")
 });
 
 describe("severityColorClass", () => {
-	test("critical → destructive", () => {
-		expect(severityColorClass("critical")).toBe("text-basalt-destructive");
+	test("critical → danger", () => {
+		expect(severityColorClass("critical")).toBe("text-basalt-danger");
 	});
 	test("warning → warning", () => {
 		expect(severityColorClass("warning")).toBe("text-basalt-warning");

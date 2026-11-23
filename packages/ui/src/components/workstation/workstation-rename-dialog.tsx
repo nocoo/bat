@@ -90,7 +90,7 @@ export function WorkstationRenameDialog({ workstation }: { workstation: Workstat
 						autoFocus={true}
 					/>
 					{error !== null && (
-						<p role="alert" className="text-basalt-sm text-basalt-destructive">
+						<p role="alert" className="text-basalt-sm text-basalt-danger">
 							{error}
 						</p>
 					)}

@@ -473,7 +473,7 @@ export function ConnectPage() {
 				{(error || loadError) && (
 					<div
 						role="alert"
-						className="rounded-lg border border-basalt-destructive/30 bg-basalt-destructive/10 p-4 text-basalt-base text-basalt-destructive"
+						className="rounded-lg border border-basalt-danger/30 bg-basalt-danger-tint p-4 text-basalt-base text-basalt-danger"
 					>
 						{error || loadError?.message}
 					</div>
@@ -788,7 +788,7 @@ export function ConnectPage() {
 						</div>
 						{accessControls}
 						{error && (
-							<p role="alert" className="text-basalt-base text-basalt-destructive">
+							<p role="alert" className="text-basalt-base text-basalt-danger">
 								{error}
 							</p>
 						)}
@@ -870,7 +870,7 @@ export function ConnectPage() {
 							</>
 						)}
 						{error && (
-							<p role="alert" className="text-basalt-base text-basalt-destructive">
+							<p role="alert" className="text-basalt-base text-basalt-danger">
 								{error}
 							</p>
 						)}

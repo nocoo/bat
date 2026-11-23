@@ -130,7 +130,7 @@ export function AlertsPage() {
 					<LayerCard.Body className="flex items-start gap-basalt-space-md">
 						<AlertTriangle
 							aria-hidden="true"
-							className="mt-basalt-space-xs size-4 shrink-0 text-basalt-destructive"
+							className="mt-basalt-space-xs size-4 shrink-0 text-basalt-danger"
 						/>
 						<p className="text-basalt-sm text-basalt-muted-foreground">{error.message}</p>
 					</LayerCard.Body>

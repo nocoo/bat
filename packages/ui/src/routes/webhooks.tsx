@@ -87,7 +87,7 @@ export function WebhooksPage() {
 		</div>
 	) : error && !webhooks ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-danger" strokeWidth={1} />
 			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">
 				Failed to load webhooks
 			</h2>
@@ -102,7 +102,7 @@ export function WebhooksPage() {
 
 			{actionError && (
 				<LayerCard>
-					<LayerCard.Body className="flex items-start gap-basalt-space-md text-basalt-sm text-basalt-destructive">
+					<LayerCard.Body className="flex items-start gap-basalt-space-md text-basalt-sm text-basalt-danger">
 						<AlertTriangle
 							aria-hidden="true"
 							className="mt-basalt-space-xs size-4 shrink-0"

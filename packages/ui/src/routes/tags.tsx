@@ -95,7 +95,7 @@ export function TagsPage() {
 		</div>
 	) : error && !tags ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-destructive" strokeWidth={1} />
+			<AlertTriangle className="h-12 w-12 mb-4 text-basalt-danger" strokeWidth={1} />
 			<h2 className="text-basalt-lg font-semibold text-basalt-foreground">Failed to load tags</h2>
 			<p className="mt-2 text-basalt-base">{error.message}</p>
 		</div>

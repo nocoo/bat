@@ -78,10 +78,7 @@ function ConsentProblem({ message }: { message: string }) {
 	return (
 		<ConsentShell>
 			<div className="flex flex-col gap-basalt-layout p-basalt-card">
-				<Gutter
-					icon={AlertTriangle}
-					iconClassName="mt-basalt-space-md size-5 text-basalt-destructive"
-				>
+				<Gutter icon={AlertTriangle} iconClassName="mt-basalt-space-md size-5 text-basalt-danger">
 					<div className="space-y-basalt-space-lg">
 						<h1 className="text-basalt-3xl font-semibold text-basalt-foreground">
 							Authorization request rejected
@@ -240,7 +237,7 @@ function ConsentForm({ params }: { params: WorkstationLoginParams }) {
 				</div>
 
 				{error && (
-					<p role="alert" className="pt-basalt-layout text-basalt-sm text-basalt-destructive">
+					<p role="alert" className="pt-basalt-layout text-basalt-sm text-basalt-danger">
 						{error}
 					</p>
 				)}

@@ -330,7 +330,7 @@ function trafficTitle(
 }
 
 function diskBarColor(usedPct: number): string {
-	if (usedPct >= 80) return "hsl(var(--basalt-destructive))";
+	if (usedPct >= 80) return "hsl(var(--basalt-danger-solid))";
 	if (usedPct >= 60) return "hsl(var(--basalt-warning))";
 	return chart.sky;
 }
@@ -359,7 +359,7 @@ function renewalShare(days: number, period: number | null): string {
 }
 
 function renewalBarColor(tone: RenewalTone): string {
-	if (tone === "overdue") return "hsl(var(--basalt-destructive))";
+	if (tone === "overdue") return "hsl(var(--basalt-danger-solid))";
 	if (tone === "warning") return "hsl(var(--basalt-warning))";
 	return chart.sky;
 }

@@ -91,10 +91,10 @@ export function fleetCostSummary(hosts: readonly HostOverviewItem[]): FleetCostS
 	};
 }
 
-/** Text colour for a renewal countdown: destructive when overdue, warning
+/** Text colour for a renewal countdown: danger when overdue, warning
  *  inside the last week, muted otherwise. */
 export function renewalToneClass(tone: RenewalTone): string {
-	if (tone === "overdue") return "text-basalt-destructive";
+	if (tone === "overdue") return "text-basalt-danger";
 	if (tone === "warning") return "text-basalt-warning";
 	return "text-basalt-muted-foreground";
 }

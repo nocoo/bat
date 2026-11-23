@@ -83,8 +83,8 @@ for (const theme of ["light", "dark"] as const) {
 		await expect(tags.getByText("Tags", { exact: true })).toHaveCount(0);
 		await expect(tags.locator("svg.lucide-tags")).toHaveCount(0);
 		await expect(remove).toHaveText("");
-		await expect(remove).toHaveClass(/bg-basalt-destructive/);
-		await expect(remove).toHaveClass(/text-basalt-destructive-foreground/);
+		await expect(remove).toHaveClass(/bg-basalt-danger-solid/);
+		await expect(remove).toHaveClass(/text-basalt-danger-solid-foreground/);
 		await expect(remove.locator("svg[aria-hidden=true]")).toBeVisible();
 		const boxes = await Promise.all(
 			[title, status, chips.nth(0), chips.nth(1), add, time, remove].map(async (control) => {

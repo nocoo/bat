@@ -66,7 +66,7 @@ export function SetupPage() {
 		</div>
 	) : error && !config ? (
 		<div className="flex flex-col items-center justify-center py-20 text-basalt-muted-foreground">
-			<AlertTriangle className="mb-4 h-12 w-12 text-basalt-destructive" strokeWidth={1} />
+			<AlertTriangle className="mb-4 h-12 w-12 text-basalt-danger" strokeWidth={1} />
 			<h2 className="text-basalt-xl font-semibold text-basalt-foreground">
 				Failed to load setup configuration
 			</h2>

@@ -196,7 +196,7 @@ export function HostContractCard({
 							/>
 						</Field>
 						{error && (
-							<p className="text-basalt-sm text-basalt-destructive" role="alert">
+							<p className="text-basalt-sm text-basalt-danger" role="alert">
 								{error}
 							</p>
 						)}
@@ -226,7 +226,7 @@ export function HostContractCard({
 								<p
 									className={`text-basalt-2xl font-semibold tabular-nums ${
 										view.tone === "overdue"
-											? "text-basalt-destructive"
+											? "text-basalt-danger"
 											: view.tone === "warning"
 												? "text-basalt-warning"
 												: "text-basalt-foreground"
