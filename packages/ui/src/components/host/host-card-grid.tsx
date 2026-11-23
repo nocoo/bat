@@ -48,7 +48,7 @@ const SEGMENT_INDICES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] as const;
 
 function segmentFill(pct: number | null, seriesColor: string): string {
 	if (pct !== null && pct >= 80) {
-		return "hsl(var(--basalt-destructive))";
+		return "hsl(var(--basalt-danger-solid))";
 	}
 	if (pct !== null && pct >= 60) {
 		return "hsl(var(--basalt-warning))";

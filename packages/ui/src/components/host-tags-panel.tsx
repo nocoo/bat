@@ -144,7 +144,7 @@ export function HostTagsPanel({ hostId }: HostTagsPanelProps) {
 				}}
 			/>
 			{error && (
-				<p role="alert" className="mt-2 text-basalt-base text-basalt-destructive">
+				<p role="alert" className="mt-2 text-basalt-base text-basalt-danger">
 					{error}
 				</p>
 			)}

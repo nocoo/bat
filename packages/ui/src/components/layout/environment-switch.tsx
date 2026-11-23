@@ -27,7 +27,7 @@ export function EnvironmentSwitch() {
 	return (
 		<div className="flex items-center gap-2">
 			{error && (
-				<span role="alert" className="text-basalt-sm text-basalt-destructive">
+				<span role="alert" className="text-basalt-sm text-basalt-danger">
 					{error}
 				</span>
 			)}

@@ -104,7 +104,7 @@ export function WorkstationPairDialog() {
 							disabled={pending}
 						/>
 						{error !== null && (
-							<p role="alert" className="text-basalt-sm text-basalt-destructive">
+							<p role="alert" className="text-basalt-sm text-basalt-danger">
 								{error}
 							</p>
 						)}

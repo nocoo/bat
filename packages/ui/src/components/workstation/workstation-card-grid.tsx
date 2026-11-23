@@ -33,7 +33,7 @@ const MAX_CONNECTIVITY_CARDS = 3;
 
 function segmentFill(pct: number | null, seriesColor: string): string {
 	if (pct !== null && pct >= 80) {
-		return "hsl(var(--basalt-destructive))";
+		return "hsl(var(--basalt-danger-solid))";
 	}
 	if (pct !== null && pct >= 60) {
 		return "hsl(var(--basalt-warning))";
@@ -63,7 +63,7 @@ function connectivityDotColor(status: WorkstationConnectivityStatus): string {
 		return "bg-basalt-warning";
 	}
 	if (status === "timeout" || status === "unreachable" || status === "error") {
-		return "bg-basalt-destructive";
+		return "bg-basalt-danger-solid";
 	}
 	return "bg-basalt-muted-foreground";
 }
@@ -175,7 +175,7 @@ function ConnectivitySubCard({ entry }: { entry: WorkstationConnectivity }) {
 				className={cn(
 					"truncate",
 					NUMERIC,
-					loss !== null && loss > 0 ? "text-basalt-destructive" : "text-basalt-muted-foreground",
+					loss !== null && loss > 0 ? "text-basalt-danger" : "text-basalt-muted-foreground",
 				)}
 			>
 				LOSS {formatLoss(entry)}

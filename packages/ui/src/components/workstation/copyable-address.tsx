@@ -55,11 +55,7 @@ export function CopyableAddress({ value }: { value: string | null }) {
 					{state === "copied" ? (
 						<Check aria-hidden="true" className="text-basalt-success" strokeWidth={1.5} />
 					) : state === "failed" ? (
-						<TriangleAlert
-							aria-hidden="true"
-							className="text-basalt-destructive"
-							strokeWidth={1.5}
-						/>
+						<TriangleAlert aria-hidden="true" className="text-basalt-danger" strokeWidth={1.5} />
 					) : (
 						<Copy aria-hidden="true" strokeWidth={1.5} />
 					)}

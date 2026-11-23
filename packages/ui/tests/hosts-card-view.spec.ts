@@ -165,7 +165,7 @@ test.describe("Hosts card view", () => {
 		await page.getByTestId("hosts-view-cards").click();
 		const beta = page.getByTestId("host-card").filter({ hasText: "beta.test.local" });
 		await expect(beta.getByTestId("host-countdown")).toHaveText("3d overdue");
-		await expect(beta.getByTestId("host-countdown")).toHaveClass(/text-basalt-destructive/);
+		await expect(beta.getByTestId("host-countdown")).toHaveClass(/text-basalt-danger/);
 
 		await setBilling(page, betaHid, {
 			cost_amount_cny: null,

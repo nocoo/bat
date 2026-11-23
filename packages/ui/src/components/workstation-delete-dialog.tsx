@@ -87,7 +87,7 @@ export function WorkstationDeleteDialog({ workstation }: { workstation: Workstat
 						</div>
 					)}
 					{error && (
-						<p role="alert" className="text-basalt-destructive">
+						<p role="alert" className="text-basalt-danger">
 							{error}
 						</p>
 					)}

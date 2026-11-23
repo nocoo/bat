@@ -67,7 +67,7 @@ export function HostDeleteDialog({ host, routeId }: { host: HostOverviewItem; ro
 					{recent && (
 						<div
 							role="alert"
-							className="flex gap-basalt-space-lg rounded-basalt-md bg-basalt-destructive/10 p-basalt-layout-sm text-basalt-destructive"
+							className="flex gap-basalt-space-lg rounded-basalt-md bg-basalt-danger-tint p-basalt-layout-sm text-basalt-danger"
 						>
 							<AlertTriangle className="size-5 shrink-0" aria-hidden="true" />
 							<div className="space-y-basalt-space-sm">
@@ -113,7 +113,7 @@ export function HostDeleteDialog({ host, routeId }: { host: HostOverviewItem; ro
 						</div>
 					)}
 					{error && (
-						<p role="alert" className="text-basalt-destructive">
+						<p role="alert" className="text-basalt-danger">
 							{error}
 						</p>
 					)}

@@ -24,7 +24,7 @@ function lossClass(loss: number | null): string {
 	if (loss === null || loss === 0) {
 		return "text-basalt-muted-foreground";
 	}
-	return loss >= 100 ? "text-basalt-destructive" : "text-basalt-warning";
+	return loss >= 100 ? "text-basalt-danger" : "text-basalt-warning";
 }
 
 function StatusDot({ status }: { status: WorkstationConnectivityStatus }) {

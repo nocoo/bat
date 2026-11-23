@@ -19,7 +19,7 @@ export function stateColor(state: string): string {
 		case "D":
 			return "text-basalt-warning";
 		case "Z":
-			return "text-basalt-destructive";
+			return "text-basalt-danger";
 		default:
 			return "text-basalt-muted-foreground";
 	}
@@ -31,7 +31,7 @@ export function cpuColor(pct: number | null): string {
 		return "";
 	}
 	if (pct > 80) {
-		return "text-basalt-destructive";
+		return "text-basalt-danger";
 	}
 	if (pct > 50) {
 		return "text-basalt-warning";
@@ -42,7 +42,7 @@ export function cpuColor(pct: number | null): string {
 /** Tailwind class for per-process memory %: 15/30 thresholds. */
 export function memPctColor(pct: number): string {
 	if (pct > 30) {
-		return "text-basalt-destructive";
+		return "text-basalt-danger";
 	}
 	if (pct > 15) {
 		return "text-basalt-warning";
@@ -53,7 +53,7 @@ export function memPctColor(pct: number): string {
 /** Tailwind class for thread count: 50/100 thresholds. */
 export function threadColor(count: number): string {
 	if (count > 100) {
-		return "text-basalt-destructive";
+		return "text-basalt-danger";
 	}
 	if (count > 50) {
 		return "text-basalt-warning";

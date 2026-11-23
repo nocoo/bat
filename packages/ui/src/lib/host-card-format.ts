@@ -121,11 +121,11 @@ export function filledSegments(pct: number | null, total = 10): number {
 /**
  * Inline fill colour for the host-card usage bars: a neutral chart blue
  * below the warning threshold so the bar reads as a magnitude, not a
- * verdict; warning from 60, destructive from 80.
+ * verdict; warning from 60, danger from 80.
  */
 export function usageBarFill(value: number): string {
 	if (value >= 80) {
-		return "hsl(var(--basalt-destructive))";
+		return "hsl(var(--basalt-danger-solid))";
 	}
 	if (value >= 60) {
 		return "hsl(var(--basalt-warning))";
@@ -136,7 +136,7 @@ export function usageBarFill(value: number): string {
 /** Tailwind text class matching {@link getBarColor}. */
 export function getValueColor(value: number): string {
 	if (value >= 80) {
-		return "text-basalt-destructive";
+		return "text-basalt-danger";
 	}
 	if (value >= 60) {
 		return "text-basalt-warning";
@@ -153,7 +153,7 @@ export function statusDotColor(status: string): string {
 		return "bg-basalt-warning";
 	}
 	if (status === "critical") {
-		return "bg-basalt-destructive";
+		return "bg-basalt-danger-solid";
 	}
 	return "bg-basalt-muted-foreground";
 }
