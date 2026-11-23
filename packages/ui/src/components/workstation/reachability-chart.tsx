@@ -4,13 +4,13 @@
 // target that never answered.
 
 import {
-	ChartShell,
+	ChartFrame,
 	cartesianAxisProps,
 	chartTooltipProps,
 	GRID_PROPS,
 	RESPONSIVE_CONTAINER_PROPS,
 } from "@nocoo/basalt/components/chart";
-import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
+import { Skeleton } from "@nocoo/basalt/components/skeleton";
 import {
 	CartesianGrid,
 	Line,
@@ -111,7 +111,7 @@ export function ReachabilityChart({
 	onRetry: () => void;
 }) {
 	if (loading) {
-		return <SkeletonLine className="h-56 w-full" style={{ width: undefined }} />;
+		return <Skeleton className="h-56 w-full" style={{ width: undefined }} />;
 	}
 
 	if (error) {
@@ -148,7 +148,7 @@ export function ReachabilityChart({
 	}));
 
 	return (
-		<ChartShell
+		<ChartFrame
 			ariaLabel={`Round-trip time to ${rows.length} servers across ${series.data.length} samples`}
 			className="h-72 w-full"
 			legend={
@@ -229,7 +229,7 @@ export function ReachabilityChart({
 					)}
 				</LineChart>
 			</ResponsiveContainer>
-		</ChartShell>
+		</ChartFrame>
 	);
 }
 

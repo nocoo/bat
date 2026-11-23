@@ -1,7 +1,7 @@
 import {
 	ANIMATION_PROPS,
+	ChartFrame,
 	ChartLegend,
-	ChartShell,
 	type ChartTooltipItem,
 	cartesianAxisProps,
 	chartTooltipProps,
@@ -65,7 +65,7 @@ export function LineChart({
 		: [];
 
 	return (
-		<ChartShell
+		<ChartFrame
 			ariaLabel={ariaLabel}
 			className={className}
 			accessibilityLayer={accessibilityLayer}
@@ -90,6 +90,6 @@ export function LineChart({
 					))}
 				</RechartsLineChart>
 			</ResponsiveContainer>
-		</ChartShell>
+		</ChartFrame>
 	);
 }

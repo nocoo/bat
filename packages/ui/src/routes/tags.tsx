@@ -292,7 +292,7 @@ function TagRow({
 			</Select>
 
 			{/* Host count */}
-			<Badge variant="secondary" className="tabular-nums">
+			<Badge tone="neutral" className="tabular-nums">
 				{tag.host_count} {tag.host_count === 1 ? "host" : "hosts"}
 			</Badge>
 

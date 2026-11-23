@@ -18,10 +18,10 @@ import { useAlerts, useHosts } from "@/hooks";
 import { formatTimestamp } from "@/lib/format";
 import { chart } from "@/lib/palette";
 
-const TONE: Record<AlertSeverity, "destructive" | "warning" | "secondary"> = {
-	critical: "destructive",
+const TONE: Record<AlertSeverity, "danger" | "warning" | "info"> = {
+	critical: "danger",
 	warning: "warning",
-	info: "secondary",
+	info: "info",
 };
 
 function AlertTable({ alerts }: { alerts: AlertItem[] }) {
@@ -57,7 +57,7 @@ function AlertTable({ alerts }: { alerts: AlertItem[] }) {
 									</Link>
 								</TableCell>
 								<TableCell>
-									<Badge variant={TONE[alert.severity]}>{alert.severity}</Badge>
+									<Badge tone={TONE[alert.severity]}>{alert.severity}</Badge>
 								</TableCell>
 								<TableCell className="whitespace-nowrap font-mono text-basalt-sm">
 									{alert.rule_id}

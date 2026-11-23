@@ -12,14 +12,14 @@ const STATUS_CONFIG: Record<
 	HostStatus,
 	{
 		label: string;
-		variant: "success" | "warning" | "destructive" | "secondary" | "purple";
+		tone: "success" | "warning" | "danger" | "neutral";
 		icon: LucideIcon;
 	}
 > = {
-	healthy: { label: "Healthy", variant: "success", icon: CircleCheckBig },
-	warning: { label: "Warning", variant: "warning", icon: TriangleAlert },
-	critical: { label: "Critical", variant: "destructive", icon: CircleAlert },
-	offline: { label: "Offline", variant: "secondary", icon: CircleOff },
+	healthy: { label: "Healthy", tone: "success", icon: CircleCheckBig },
+	warning: { label: "Warning", tone: "warning", icon: TriangleAlert },
+	critical: { label: "Critical", tone: "danger", icon: CircleAlert },
+	offline: { label: "Offline", tone: "neutral", icon: CircleOff },
 };
 
 /** The state's accessible name — also carried by the list's status dot. */
@@ -32,7 +32,7 @@ export function StatusBadge({ status }: { status: HostStatus }) {
 	const Icon = config.icon;
 	return (
 		<Badge
-			variant={config.variant}
+			tone={config.tone}
 			className="h-basalt-control-sm shrink-0 gap-basalt-space-sm whitespace-nowrap"
 			data-testid="status-badge"
 			title={config.label}

@@ -356,7 +356,7 @@ export function HostCardGrid({
 							<div className="mt-auto flex min-w-0 items-center justify-between gap-basalt-space-sm border-t border-basalt-border/70 pt-basalt-space-md">
 								<div className="flex min-w-0 flex-wrap items-center gap-basalt-space-sm">
 									{dailyCost !== null && (
-										<Badge variant="secondary" className={NUMERIC}>
+										<Badge tone="neutral" className={NUMERIC}>
 											{formatCny(dailyCost)}/day
 										</Badge>
 									)}
@@ -375,7 +375,7 @@ export function HostCardGrid({
 										<span className="text-basalt-sm text-basalt-muted-foreground">No billing</span>
 									)}
 									{host.alert_count > 0 && (
-										<Badge variant="destructive" className={NUMERIC}>
+										<Badge tone="danger" className={NUMERIC}>
 											{host.alert_count} active
 										</Badge>
 									)}

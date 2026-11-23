@@ -4,13 +4,13 @@
 // for; change the component and you must change the skeleton beside it.
 
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
-import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
+import { Skeleton as BasaltSkeleton } from "@nocoo/basalt/components/skeleton";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 function Skeleton({ className, style, ...props }: React.ComponentProps<"div">) {
 	return (
-		<SkeletonLine
+		<BasaltSkeleton
 			className={cn("h-full w-full", className)}
 			style={{ width: undefined, ...style }}
 			{...props}

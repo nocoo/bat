@@ -1,7 +1,7 @@
 import {
 	ANIMATION_PROPS,
+	ChartFrame,
 	ChartLegend,
-	ChartShell,
 	chartTooltipProps,
 	getChartColor,
 	RESPONSIVE_CONTAINER_PROPS,
@@ -54,7 +54,7 @@ export function DonutChart({
 		: [];
 
 	return (
-		<ChartShell
+		<ChartFrame
 			ariaLabel={ariaLabel}
 			className={className}
 			summary={summary}
@@ -79,6 +79,6 @@ export function DonutChart({
 					<Tooltip {...tooltipConfig} />
 				</PieChart>
 			</ResponsiveContainer>
-		</ChartShell>
+		</ChartFrame>
 	);
 }

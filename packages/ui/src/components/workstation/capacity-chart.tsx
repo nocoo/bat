@@ -3,13 +3,13 @@
 // without pretending days and percent are comparable.
 
 import {
-	ChartShell,
+	ChartFrame,
 	cartesianAxisProps,
 	chartTooltipProps,
 	GRID_PROPS,
 	RESPONSIVE_CONTAINER_PROPS,
 } from "@nocoo/basalt/components/chart";
-import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
+import { Skeleton } from "@nocoo/basalt/components/skeleton";
 import {
 	Area,
 	CartesianGrid,
@@ -47,7 +47,7 @@ export function CapacityChart({
 	onRetry: () => void;
 }) {
 	if (loading) {
-		return <SkeletonLine className="h-60 w-full" style={{ width: undefined }} />;
+		return <Skeleton className="h-60 w-full" style={{ width: undefined }} />;
 	}
 
 	if (error) {
@@ -81,7 +81,7 @@ export function CapacityChart({
 	];
 
 	return (
-		<ChartShell
+		<ChartFrame
 			ariaLabel={`CPU, memory and uptime across ${points.length} samples`}
 			className="h-64 w-full"
 			legend={<SeriesLegend items={legend} label="Machine load series" />}
@@ -169,6 +169,6 @@ export function CapacityChart({
 					/>
 				</ComposedChart>
 			</ResponsiveContainer>
-		</ChartShell>
+		</ChartFrame>
 	);
 }

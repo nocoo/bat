@@ -24,7 +24,7 @@ import { CodeBlock } from "@nocoo/basalt/components/code";
 import { LayerCard } from "@nocoo/basalt/components/layer-card";
 import { PageHeader } from "@nocoo/basalt/components/page-header";
 import { Radio } from "@nocoo/basalt/components/radio";
-import { SkeletonLine } from "@nocoo/basalt/components/skeleton-line";
+import { Skeleton } from "@nocoo/basalt/components/skeleton";
 import {
 	ArrowUpRight,
 	Check,
@@ -494,14 +494,14 @@ export function ConnectPage() {
 							<h2 id="tokens-heading" className="text-basalt-lg font-semibold tracking-tight">
 								Access tokens
 							</h2>
-							<Badge variant="secondary">{active} active</Badge>
+							<Badge tone="neutral">{active} active</Badge>
 						</div>
 						{tokens.isLoading || servers.isLoading ? (
 							<LayerCard>
 								<LayerCard.Body className="space-y-4">
-									<SkeletonLine className="h-6 w-40" style={{ width: undefined }} />
-									<SkeletonLine className="h-16 w-full" style={{ width: undefined }} />
-									<SkeletonLine className="h-6 w-56" style={{ width: undefined }} />
+									<Skeleton className="h-6 w-40" style={{ width: undefined }} />
+									<Skeleton className="h-16 w-full" style={{ width: undefined }} />
+									<Skeleton className="h-6 w-56" style={{ width: undefined }} />
 								</LayerCard.Body>
 							</LayerCard>
 						) : !tokens.data?.data.length ? (
@@ -528,7 +528,7 @@ export function ConnectPage() {
 												<div className="min-w-0">
 													<div className="flex flex-wrap items-center gap-2">
 														<h3 className="break-all font-semibold">{token.name}</h3>
-														<Badge variant={token.scope === "write" ? "purple" : "teal"}>
+														<Badge tone={token.scope === "write" ? "warning" : "info"}>
 															{token.scope === "write" ? "Read + write" : "Read only"}
 														</Badge>
 														{status !== "Active" && <Badge variant="outline">{status}</Badge>}

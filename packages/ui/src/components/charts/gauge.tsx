@@ -1,6 +1,6 @@
 import {
 	ANIMATION_PROPS,
-	ChartShell,
+	ChartFrame,
 	chartMuted,
 	chartTooltipProps,
 	getChartColor,
@@ -34,7 +34,7 @@ export function Gauge({
 	});
 
 	return (
-		<ChartShell ariaLabel={ariaLabel} className={className}>
+		<ChartFrame ariaLabel={ariaLabel} className={className}>
 			<ResponsiveContainer {...RESPONSIVE_CONTAINER_PROPS}>
 				<PieChart>
 					<Pie
@@ -57,6 +57,6 @@ export function Gauge({
 					<Tooltip {...tooltipConfig} />
 				</PieChart>
 			</ResponsiveContainer>
-		</ChartShell>
+		</ChartFrame>
 	);
 }
