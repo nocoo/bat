@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
 	test: {
+		allowOnly: false,
+		passWithNoTests: false,
 		globals: true,
 		include: ["src/**/*.test.ts"],
 		coverage: {
