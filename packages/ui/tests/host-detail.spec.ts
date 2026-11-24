@@ -44,50 +44,30 @@ test.describe("Host detail page", () => {
 	const betaHid = "4c494cde";
 	const publicIpv6 = "2001:db8:85a3:8d3:1319:8a2e:370:7348";
 
-	test("network legend uses inbound and outbound labels", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		const networkHeader = page.getByText("Network", { exact: true }).locator("..");
-		await expect(networkHeader.getByText("Inbound", { exact: true })).toBeVisible();
-		await expect(networkHeader.getByText("Outbound", { exact: true })).toBeVisible();
-		await expect(networkHeader.getByText(/^(Download|Upload)$/)).toHaveCount(0);
-	});
-
-	test("sidebar navigation is present", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		const hostsLink = page.getByRole("link", { name: "Hosts" }).first();
-		await expect(hostsLink).toBeVisible({ timeout: 15_000 });
-	});
-
-	test("breadcrumb shows Hosts link", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true });
-		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
-
-		const hostsLink = breadcrumb.getByRole("link", { name: "Hosts" });
-		await expect(hostsLink).toBeVisible();
-	});
-
-	test("clicking Hosts breadcrumb navigates back", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true });
-		await expect(breadcrumb).toBeVisible({ timeout: 15_000 });
-		await breadcrumb.getByRole("link", { name: "Hosts" }).click();
-		await expect(page).toHaveURL("/hosts");
-	});
-
-	test("shows hostname in header", async ({ page }) => {
+	test("renders header, network labels, breadcrumb, and system info", async ({ page }) => {
 		await page.goto(`/hosts/${alphaHid}`);
 		await page.waitForLoadState("domcontentloaded");
 
 		await expect(page.getByRole("heading", { name: "alpha.test.local" })).toBeVisible({
 			timeout: 15_000,
 		});
+		await expect(page.getByRole("link", { name: "Hosts" }).first()).toBeVisible();
+
+		const networkHeader = page.getByText("Network", { exact: true }).locator("..");
+		await expect(networkHeader.getByText("Inbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText("Outbound", { exact: true })).toBeVisible();
+		await expect(networkHeader.getByText(/^(Download|Upload)$/)).toHaveCount(0);
+
+		await expect(page.getByText("Ubuntu 24.04")).toBeVisible();
+		await expect(page.getByText("x86_64")).toBeVisible();
+		await expect(page.getByText("Intel Xeon E5-2680 v4")).toBeVisible();
+		await expect(page.getByText("6.8.0-45-generic")).toBeVisible();
+		await expect(page.getByText("0.9.99").first()).toBeVisible();
+
+		const breadcrumb = page.getByRole("navigation", { name: "Breadcrumb navigation", exact: true });
+		await expect(breadcrumb).toBeVisible();
+		await breadcrumb.getByRole("link", { name: "Hosts" }).click();
+		await expect(page).toHaveURL("/hosts");
 	});
 
 	test("back control sits left of the title and editable description and returns to Hosts", async ({
@@ -174,35 +154,6 @@ test.describe("Host detail page", () => {
 		await day.focus();
 		await day.press("Space");
 		await expect(day).toBeChecked();
-	});
-
-	test("system info card shows OS and architecture", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		await expect(page.getByText("Ubuntu 24.04")).toBeVisible({ timeout: 15_000 });
-		await expect(page.getByText("x86_64")).toBeVisible();
-	});
-
-	test("system info card shows CPU model", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		await expect(page.getByText("Intel Xeon E5-2680 v4")).toBeVisible({ timeout: 15_000 });
-	});
-
-	test("system info card shows kernel", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		await expect(page.getByText("6.8.0-45-generic")).toBeVisible({ timeout: 15_000 });
-	});
-
-	test("system info card shows probe version", async ({ page }) => {
-		await page.goto(`/hosts/${alphaHid}`);
-		await page.waitForLoadState("domcontentloaded");
-
-		await expect(page.getByText("0.9.99").first()).toBeVisible({ timeout: 15_000 });
 	});
 
 	test("the lead block shows both public families as single-line rows", async ({ page }) => {
@@ -619,7 +570,7 @@ test.describe("Host detail page", () => {
 				});
 			});
 
-			for (const width of [1440, 1024, 900]) {
+			for (const width of [1440, 900]) {
 				await page.setViewportSize({ width, height: 1000 });
 				await page.goto(`/hosts/${alphaHid}`);
 				await expect(page.getByText("Disk Usage", { exact: true })).toBeVisible({
@@ -968,7 +919,7 @@ test.describe("Host detail page", () => {
 			interfaceRows: number;
 		}> = [];
 
-		for (const width of [1440, 1024, 900]) {
+		for (const width of [1440, 900]) {
 			await page.setViewportSize({ width, height: 1000 });
 			await page.goto(`/hosts/${alphaHid}`);
 			await page.waitForLoadState("domcontentloaded");

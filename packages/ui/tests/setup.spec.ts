@@ -6,84 +6,39 @@ import { expect, test } from "@playwright/test";
  * Tests verify the setup/installation guide page functionality.
  */
 test.describe("Setup page", () => {
-	test("page loads with Install Probe heading", async ({ page }) => {
+	test("renders installation guide, copy controls, and collapsible uninstall", async ({ page }) => {
 		await page.goto("/setup");
 		await page.waitForLoadState("domcontentloaded");
 
-		// Main heading should be visible
 		await expect(page.getByRole("heading", { name: "Install Probe" })).toBeVisible({
 			timeout: 15_000,
 		});
-	});
-
-	test("shows prerequisites section", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
-
-		// Prerequisites text should be visible
-		await expect(page.getByText("Prerequisites")).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByText("Prerequisites")).toBeVisible();
 		await expect(page.getByText("Linux server (x86_64 or aarch64)")).toBeVisible();
 		await expect(page.getByText("Root access (sudo)")).toBeVisible();
-	});
 
-	test("shows step-by-step installation guide", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
-
-		// Step headings should be visible
-		await expect(page.getByText("Step 1 — Get your write key")).toBeVisible({ timeout: 15_000 });
-		await expect(page.getByText("Step 2 — Install the binary and the unit")).toBeVisible();
-		await expect(page.getByText("Step 3 — Configure")).toBeVisible();
-		await expect(page.getByText("Step 4 — Start and verify")).toBeVisible();
-	});
-
-	test("shows the manifest and a real install command", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
+		for (const step of [
+			"Step 1 — Get your write key",
+			"Step 2 — Install the binary and the unit",
+			"Step 3 — Configure",
+			"Step 4 — Start and verify",
+		]) {
+			await expect(page.getByText(step)).toBeVisible();
+		}
 
 		await expect(
 			page.getByText("https://s.zhe.to/apps/bat/latest/manifest.json", { exact: true }),
-		).toBeVisible({ timeout: 15_000 });
+		).toBeVisible();
 		await expect(page.getByText(/bat-probe-linux-\$arch/).first()).toBeVisible();
-	});
-
-	test("shows install command with placeholder", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
-
-		// Install command should contain the placeholder in a code block
-		// The placeholder appears in a pre > code block
-		await expect(page.locator("pre").first()).toBeVisible({ timeout: 15_000 });
-
-		// Check that YOUR_WRITE_KEY appears somewhere in the page (multiple instances ok)
+		await expect(page.locator("pre").first()).toBeVisible();
 		await expect(page.getByText("YOUR_WRITE_KEY").first()).toBeVisible();
-	});
+		await expect(page.getByRole("button", { name: "Copy code" }).first()).toBeVisible();
 
-	test("has copy button for code blocks", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
-
-		// Should have copy buttons (aria-label="Copy to clipboard")
-		const copyButtons = page.getByRole("button", { name: "Copy code" });
-		await expect(copyButtons.first()).toBeVisible({ timeout: 15_000 });
-	});
-
-	test("uninstall section is collapsible", async ({ page }) => {
-		await page.goto("/setup");
-		await page.waitForLoadState("domcontentloaded");
-
-		// Uninstall button should be visible
 		const uninstallButton = page.getByRole("button", { name: "Uninstall" });
-		await expect(uninstallButton).toBeVisible({ timeout: 15_000 });
-
-		// Initially, uninstall command should NOT be visible
 		const uninstallCmd = page.getByText("systemctl disable --now bat-probe");
+		await expect(uninstallButton).toBeVisible();
 		await expect(uninstallCmd).toBeHidden();
-
-		// Click to expand
 		await uninstallButton.click();
-
-		// Now uninstall command should be visible
 		await expect(uninstallCmd).toBeVisible();
 	});
 });

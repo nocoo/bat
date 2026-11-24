@@ -94,7 +94,7 @@ The measured pre-push wall time on 2026-11-12 was 2:25.57, with two later runs
 at 146.30 and 146.36 seconds. One load-sensitive run measured 164.95 seconds
 (2:44.95), over the 2.5-minute target: L4 smoke moved from 35.4 to 46.3 seconds.
 Trim the 64-test smoke set to 40-48 critical journeys or split capture from the
-smoke gate to restore margin; CI runs the full 194-test Chromium suite instead.
+smoke gate to restore margin; CI runs the full Chromium suite instead.
 
 `bun run test:l1-gate` runs every pre-commit probe in a temporary local clone
 with symlinked dependencies and caches. It first checks the source installation
