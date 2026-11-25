@@ -17,11 +17,11 @@ bun run lint                           # S2 Biome check-only, 0 warnings
 bun run build                          # B1 shared + UI/Worker static assets + @nocoo/bat CLI
 bun run test:unit:coverage             # L1 TS + Rust coverage (scripts/check-coverage.sh)
 bun run test:l1-gate                   # pre-commit probe suite in temp clone
-bun run test:quality-gate              # Z1 / push-range unit tests
+bun run test:quality-gate              # push-range unit tests
 bun run test:environments              # L3 local environment suite
 bun run capture:environments           # L4 disposable rich E2E captures
 bun turbo test:e2e --filter=@bat/worker # L2 real Worker HTTP / D1 / DO
-bun run test:e2e:pw                    # L4 Playwright full suite (test:e2e:pw:smoke for smoke)
+bun run test:e2e:pw                    # L4 Playwright core smoke suite (test:e2e:pw:smoke for hosts/nav subset)
 bun scripts/quality/runtime-kv.mjs     # L2 real Wrangler D1 / KV bindings
 bun scripts/quality/probe-integration.mjs # L3 probe -> Worker -> query
 bun scripts/quality/verify-package.mjs # P1 packed @nocoo/bat consumer
@@ -69,7 +69,7 @@ Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision liv
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at
-`dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17`.
+`bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c # v2026.18`.
 
 ## Resources and isolation
 

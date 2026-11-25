@@ -20,9 +20,9 @@
 | L1   | Unit         | Vitest coverage; nightly `cargo llvm-cov`; script and environment unit suites                       | Snapshot / CI checkout           | pre-commit, pre-push, CI | impl   |
 | L2   | Runtime      | real Wrangler D1/KV checks and the Worker HTTP/D1/DO suite                                          | Isolated local runtime           | CI                       | impl   |
 | L3   | Integration  | local environment suite plus `probe → Worker ingest → query`                                        | Isolated local services          | pre-push, CI             | impl   |
-| L4   | E2E          | pre-push Chromium smoke journeys; CI full Chromium suite; disposable environment captures           | Built SPA + local Worker         | pre-push, CI             | impl   |
+| L4   | E2E          | core Chromium user-journey smoke suite + disposable environment captures                            | Built SPA + local Worker         | pre-push, CI             | impl   |
 | P1   | Package      | `npm pack`, tarball inspection, throwaway install, installed `bat --version/--help`                 | Built public CLI package         | pre-push, CI             | impl   |
-| Z1   | Gate         | CI `quality / Z1: Gate` verifies all implemented slots, their results and one tested SHA            | CI job results                   | CI                       | impl   |
+| Z1   | Gate         | CI `quality / Z1: Gate` verifies all implemented slots, their results and matching `expected-sha`   | CI job results                   | CI                       | impl   |
 
 `*` S3 runs in pre-commit only when the staged index touches workflows or the
 workflow checker. CI always runs it.

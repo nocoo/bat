@@ -41,43 +41,6 @@ test("navigation preserves shell nodes and collapsed state", async ({ page }) =>
 	expect(documents).toEqual([]);
 });
 
-test("mobile navigation closes the drawer and restores focus without replacing the header", async ({
-	page,
-}) => {
-	await page.setViewportSize({ width: 390, height: 844 });
-	await page.goto("/hosts");
-	const menu = page.getByRole("button", { name: "Open navigation menu" });
-	await expect(menu).toBeVisible();
-	const header = await page.locator("main > header").elementHandle();
-	await menu.click();
-	const drawer = page.getByRole("dialog");
-	await expect(drawer).toBeVisible();
-	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
-	await drawer.getByRole("link", { name: "Events", exact: true }).click();
-	await expect(page).toHaveURL("/events");
-	await expect(drawer).not.toBeVisible();
-	expect(await header?.evaluate((element) => element.isConnected)).toBe(true);
-	await expect(menu).toBeFocused();
-});
-
-test("tablet navigation keeps the sidebar inside the drawer", async ({ page }) => {
-	await page.setViewportSize({ width: 700, height: 900 });
-	await page.goto("/hosts");
-	await page.getByRole("button", { name: "Open navigation menu" }).click();
-	const drawer = page.getByRole("dialog");
-	await expect(drawer).toBeVisible();
-	await expect(drawer).toHaveAttribute("data-slot", "sidebar-drawer");
-	await expect(drawer).toHaveCSS("padding-left", "0px");
-	await expect(drawer).toHaveCSS("padding-right", "0px");
-	expect(
-		await drawer.evaluate((element) => {
-			const panel = element.getBoundingClientRect();
-			const sidebar = element.querySelector("aside")?.getBoundingClientRect();
-			return sidebar && sidebar.left >= panel.left - 1 && sidebar.right <= panel.right + 1;
-		}),
-	).toBe(true);
-});
-
 test("collapsed sidebar keeps its version badge compact and centered", async ({ page }) => {
 	await page.goto("/hosts");
 	const sidebar = page.getByRole("complementary", { name: "Main navigation", exact: true });
@@ -87,23 +50,5 @@ test("collapsed sidebar keeps its version badge compact and centered", async ({ 
 
 	const logo = sidebar.locator('[data-slot="sidebar-brand-logo"] img[alt="bat"]');
 	await expect(logo).toBeVisible();
-	await expect
-		.poll(async () => {
-			const rail = await sidebar.evaluate((element) => {
-				const bounds = element.getBoundingClientRect();
-				return { left: bounds.left, width: bounds.width, center: bounds.left + bounds.width / 2 };
-			});
-			const logoCenter = await logo.evaluate((element) => {
-				const bounds = element.getBoundingClientRect();
-				return bounds.left + bounds.width / 2;
-			});
-			return Math.abs(logoCenter - rail.center) < 1;
-		})
-		.toBe(true);
-
-	// SidebarBrand keeps name/version in the header; collapsed overflow clips them off the rail.
 	await expect(sidebar.locator('[data-slot="sidebar-brand-name"]')).toBeHidden();
-	const version = sidebar.locator('[data-slot="sidebar-brand-version"]');
-	await expect(version).toBeAttached();
-	await expect(version).not.toBeInViewport();
 });

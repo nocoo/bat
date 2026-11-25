@@ -87,7 +87,7 @@ run_bg types 90 bun turbo typecheck
 run_bg lint 60 bun run lint
 run_bg coverage_ts 120 bash scripts/check-coverage.sh --ts
 run_bg scripts_unit 60 bun test scripts/release.test.ts scripts/probe-manifest.test.ts \
-	scripts/quality/z1-gate.test.ts scripts/quality/push-range.test.ts
+	scripts/quality/push-range.test.ts
 run_bg environments 60 bun run test:environments:unit
 run_bg python_unit 30 python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
 run_bg routes 30 bun run gate:routes

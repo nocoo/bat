@@ -7,7 +7,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github/workflows"
-BASE_CI = "dc858360aa7812db61fd9d825943e4efd4dcd0e7"
+BASE_CI = "bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c"
 SLOT_JOBS = [
     ("s1-types", "S1: Types"),
     ("s2-lint", "S2: Lint"),
@@ -75,6 +75,9 @@ def check_slots():
     triggers = data.get("on", data.get(True))
     if not isinstance(triggers, dict) or "workflow_call" not in triggers:
         raise SystemExit("quality-slots.yml must use workflow_call")
+    for reference in uses_values(data):
+        if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
+            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.18: {reference}")
     workflow_jobs = jobs(data)
     expected = dict(SLOT_JOBS)
     if set(workflow_jobs) != set(expected) | {"z1-gate"}:
@@ -87,11 +90,17 @@ def check_slots():
             raise SystemExit(f"{job_id}: missing timeout-minutes")
         if job.get("outputs", {}).get("tested-sha") != "${{ steps.tested-sha.outputs.sha }}":
             raise SystemExit(f"{job_id}: missing tested-sha output")
+    l4_uses = list(uses_values(workflow_jobs["l4-e2e"]))
+    if f"nocoo/base-ci/.github/actions/setup-playwright@{BASE_CI}" not in l4_uses:
+        raise SystemExit("l4-e2e must use nocoo/base-ci setup-playwright")
     z1 = workflow_jobs["z1-gate"]
     if set(z1.get("needs", [])) != set(expected):
         raise SystemExit("z1-gate must need every slot job")
     if z1.get("if") != "always()":
         raise SystemExit("z1-gate must run with if: always()")
+    z1_uses = list(uses_values(z1))
+    if z1_uses != [f"nocoo/base-ci/.github/actions/z1-gate@{BASE_CI}"]:
+        raise SystemExit("z1-gate must use only checkout-free nocoo/base-ci z1-gate")
 
 
 def check_release():
@@ -99,7 +108,7 @@ def check_release():
     references = list(uses_values(data))
     for reference in references:
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"release.yml must pin base-ci v2026.17: {reference}")
+            raise SystemExit(f"release.yml must pin base-ci v2026.18: {reference}")
     release_sources = [
         step
         for job in jobs(data).values()
