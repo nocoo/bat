@@ -67,6 +67,7 @@ export function verifyOwnership(path, owner) {
 	if (realpathSync(dbs[0]) !== resolve(dbs[0])) throw new Error("Symlink database rejected");
 	const db = new Database(dbs[0], { readwrite: true, create: false });
 	try {
+		db.exec("PRAGMA busy_timeout = 5000;");
 		const marker = db.query("SELECT value FROM _test_marker WHERE key='owner'").get();
 		const context = db.query("SELECT value FROM _test_marker WHERE key='env'").get();
 		if (marker?.value !== owner || context?.value !== (owner === "demo" ? "demo" : "test"))
