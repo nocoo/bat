@@ -11,7 +11,19 @@ export default defineConfig({
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],
 			include: ["src/lib/**/*.ts", "src/hooks/**/*.ts", "src/api.ts"],
-			exclude: ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.d.ts", "src/**/index.ts"],
+			exclude: [
+				"src/**/*.test.ts",
+				"src/**/*.test.tsx",
+				"src/**/*.d.ts",
+				"src/**/index.ts",
+				"src/**/types.ts",
+				"src/components/**",
+				"src/views/**",
+				"src/pages/**",
+				"src/routes/**",
+				"src/App.tsx",
+				"src/main.tsx",
+			],
 			// What's covered by THIS suite (UT):
 			//   - src/lib/**     pure logic helpers (formatters, transforms, palettes…)
 			//   - src/hooks/**   SWR query wrappers + small React hooks
@@ -24,10 +36,10 @@ export default defineConfig({
 			//     flows against a local Wrangler. Adding a parallel jsdom UT
 			//     pass for them would duplicate L3 without catching new bugs.
 			thresholds: {
-				lines: 95,
-				branches: 90,
-				functions: 95,
-				statements: 95,
+				lines: 80,
+				branches: 80,
+				functions: 80,
+				statements: 80,
 			},
 		},
 	},

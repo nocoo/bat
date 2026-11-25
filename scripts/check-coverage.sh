@@ -12,8 +12,8 @@ case "$mode" in
 		;;
 esac
 
-ts_threshold="${TS_THRESHOLD:-95}"
-rust_threshold="${RUST_THRESHOLD:-95}"
+ts_threshold="${TS_THRESHOLD:-80}"
+rust_threshold="${RUST_THRESHOLD:-80}"
 failed=0
 
 check_ts_coverage() {

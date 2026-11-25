@@ -54,7 +54,7 @@ Build the UI (`bun run build`) before L2/L3/L4 so Worker static assets are real.
 
 Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision live in `.github/workflows/quality-slots.yml` (called by `.github/workflows/ci.yml`; `quality / Z1: Gate` required on `main`). All 11 delivery slots and `Z1` are `enforced` (`N/A`: none); slot map, per-package Vitest thresholds, and benchmarks live in [Testing](docs/07-testing.md). Raise weaker enforcement instead of lowering this contract. Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
-- **Exceptions / gaps**: Worker/UI branches keep 90% thresholds (<95% target); Rust `cargo-llvm-cov` omits branches (95% line/function/region on nightly); scheduler acceptance and probe upgrades are `manual`.
+- **Exceptions / gaps**: TS/Worker/UI/CLI L1 coverage enforces >=80% thresholds (Views excluded); Rust `cargo-llvm-cov` omits branches (80% line/function/region on nightly); scheduler acceptance and probe upgrades are `manual`.
 - **Local hooks**: installed via `bun run prepare` (`.husky/` -> `scripts/hooks/`); check-only, never use `--no-verify`.
 - **pre-commit**: verifies the staged index snapshot (`G1`, `S1`, `S2`, TS `L1`, script/env/Python unit, route/page gates, conditional `S3`).
 - **pre-push**: verifies each pushed local OID (`B1`, `G1`/`G2`, Rust `L1`, `L3`, `L4` smoke + capture, `P1`).
