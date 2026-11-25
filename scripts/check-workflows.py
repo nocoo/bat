@@ -7,7 +7,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github/workflows"
-BASE_CI = "6424d395d36a815d931f10e557762eb635d511c0"
+BASE_CI = "dc858360aa7812db61fd9d825943e4efd4dcd0e7"
 SLOT_JOBS = [
     ("s1-types", "S1: Types"),
     ("s2-lint", "S2: Lint"),
@@ -99,7 +99,7 @@ def check_release():
     references = list(uses_values(data))
     for reference in references:
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"release.yml must pin base-ci v2026.16: {reference}")
+            raise SystemExit(f"release.yml must pin base-ci v2026.17: {reference}")
     release_sources = [
         step
         for job in jobs(data).values()

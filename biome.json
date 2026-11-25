@@ -29,6 +29,8 @@
 			},
 			"suspicious": {
 				"noConsole": "off",
+				"noFocusedTests": "error",
+				"noSkippedTests": "error",
 				"noReactSpecificProps": "off",
 				"useAwait": "off"
 			},

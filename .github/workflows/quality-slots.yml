@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -60,7 +60,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -76,9 +76,7 @@ jobs:
         with:
           workspaces: "probe"
       - name: Lint TypeScript
-        run: |
-          bun run lint
-          bun run scripts/check-test-focus.ts
+        run: bun run lint
       - name: Lint Rust
         run: |
           cargo fmt --check --manifest-path probe/Cargo.toml
@@ -99,19 +97,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install verified actionlint
-        run: |
-          set -euo pipefail
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
-            -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
-          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
-      - name: Install yamllint
-        run: python3 -m pip install --quiet "yamllint==1.38.0"
-      - name: Validate workflows
-        run: bash scripts/quality/workflow-lint.sh
+      - name: Lint workflows
+        uses: nocoo/base-ci/.github/actions/lint-workflows@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -128,17 +115,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install security scanners
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
-      - name: Verify scanner configuration
-        run: bash scripts/quality/gitleaks-selftest.sh "$GITHUB_WORKSPACE"
-      - name: Scan checked-out content
-        run: |
-          set -euo pipefail
-          snapshot=$(mktemp -d)
-          trap 'rm -rf "$snapshot"' EXIT
-          bash scripts/quality/git-snapshot.sh oid "$GITHUB_WORKSPACE" "$snapshot" HEAD
-          gitleaks detect --no-git --source "$snapshot" --config "$GITHUB_WORKSPACE/.gitleaks.toml" --no-banner --redact
+          fetch-depth: 1
+      - name: Scan secrets
+        uses: nocoo/base-ci/.github/actions/scan-secrets@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -155,15 +134,12 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+      - name: Scan dependencies
+        uses: nocoo/base-ci/.github/actions/scan-dependencies@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
-          package-manager: bun
-          install-policy: blocked
-      - name: Install security scanners
-        uses: nocoo/base-ci/.github/actions/setup-security-scanners@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
-      - name: Scan all dependency lockfiles
-        run: bun scripts/run-security.ts --root . --skip-gitleaks
+          lockfiles: |
+            bun.lock
+            probe/Cargo.lock
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -181,7 +157,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -217,7 +193,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -249,8 +225,7 @@ jobs:
       - name: Script and environment unit tests
         run: |
           bun test scripts/release.test.ts scripts/probe-manifest.test.ts \
-            scripts/quality/z1-gate.test.ts scripts/quality/push-range.test.ts \
-            scripts/check-test-focus.test.ts
+            scripts/quality/z1-gate.test.ts scripts/quality/push-range.test.ts
           bun run test:environments:unit
           python3 -m unittest discover -s scripts -p 'test_prune_probe_releases.py'
       - name: Record tested SHA
@@ -274,7 +249,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -307,7 +282,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -356,7 +331,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -415,7 +390,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
@@ -455,7 +430,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@6424d395d36a815d931f10e557762eb635d511c0 # v2026.16
+        uses: nocoo/base-ci/.github/actions/setup-js@dc858360aa7812db61fd9d825943e4efd4dcd0e7 # v2026.17
         with:
           package-manager: bun
           install-policy: blocked
