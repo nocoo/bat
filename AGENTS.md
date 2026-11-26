@@ -69,7 +69,7 @@ Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision liv
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at
-`98fc023423f82b010f17e0ebbc9dd580fe68736a # v2026.19`.
+`e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20`.
 
 ## Resources and isolation
 
