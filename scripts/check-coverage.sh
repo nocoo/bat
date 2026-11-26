@@ -82,9 +82,18 @@ check_rust_coverage() {
 
 if [ "$run_ts" = 1 ]; then
 	check_ts_coverage packages/shared "@bat/shared" || failed=1
-	check_ts_coverage packages/worker "@bat/worker" || failed=1
-	check_ts_coverage packages/ui "@bat/ui" || failed=1
-	check_ts_coverage packages/cli "@nocoo/bat" || failed=1
+	ts_logs=$(mktemp -d "${TMPDIR:-/tmp}/bat-ts-cov-XXXXXX")
+	check_ts_coverage packages/worker "@bat/worker" >"$ts_logs/worker.log" 2>&1 &
+	pid_worker=$!
+	(
+		check_ts_coverage packages/ui "@bat/ui" || exit 1
+		check_ts_coverage packages/cli "@nocoo/bat" || exit 1
+	) >"$ts_logs/ui-cli.log" 2>&1 &
+	pid_ui_cli=$!
+	wait "$pid_worker" || failed=1
+	wait "$pid_ui_cli" || failed=1
+	cat "$ts_logs/worker.log" "$ts_logs/ui-cli.log"
+	rm -rf "$ts_logs"
 fi
 
 if [ "$run_rust" = 1 ]; then
