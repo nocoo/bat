@@ -15,7 +15,8 @@ SLOT_JOBS = [
     ("g1-secrets", "G1: Secrets"),
     ("g2-dependencies", "G2: Dependencies"),
     ("b1-build", "B1: Build"),
-    ("l1-unit", "L1: Unit"),
+    ("l1-unit-ts", "L1: Unit (TS)"),
+    ("l1-unit-rust", "L1: Unit (Rust)"),
     ("l2-runtime", "L2: Runtime"),
     ("l3-integration", "L3: Integration"),
     ("l4-e2e", "L4: E2E"),
@@ -81,7 +82,7 @@ def check_slots():
     workflow_jobs = jobs(data)
     expected = dict(SLOT_JOBS)
     if set(workflow_jobs) != set(expected) | {"z1-gate"}:
-        raise SystemExit("quality-slots.yml must contain exactly the 11 slot jobs and z1-gate")
+        raise SystemExit("quality-slots.yml must contain exactly the 12 slot jobs and z1-gate")
     for job_id, name in expected.items():
         job = workflow_jobs[job_id]
         if job.get("name") != name:
