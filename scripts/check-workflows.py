@@ -7,7 +7,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github/workflows"
-BASE_CI = "bfaac83b5a4d5c7ed26320bb5b09f3ca0a01932c"
+BASE_CI = "98fc023423f82b010f17e0ebbc9dd580fe68736a"
 SLOT_JOBS = [
     ("s1-types", "S1: Types"),
     ("s2-lint", "S2: Lint"),
@@ -77,7 +77,7 @@ def check_slots():
         raise SystemExit("quality-slots.yml must use workflow_call")
     for reference in uses_values(data):
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.18: {reference}")
+            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.19: {reference}")
     workflow_jobs = jobs(data)
     expected = dict(SLOT_JOBS)
     if set(workflow_jobs) != set(expected) | {"z1-gate"}:
@@ -108,7 +108,7 @@ def check_release():
     references = list(uses_values(data))
     for reference in references:
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"release.yml must pin base-ci v2026.18: {reference}")
+            raise SystemExit(f"release.yml must pin base-ci v2026.19: {reference}")
     release_sources = [
         step
         for job in jobs(data).values()
