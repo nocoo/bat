@@ -107,7 +107,8 @@ workflow, workflow deletion and workflow rename cases.
 
 `.github/workflows/ci.yml` has one caller job named `quality`, which invokes the
 native `.github/workflows/quality-slots.yml` workflow. The called workflow has
-the 11 implementation jobs above plus `Z1: Gate`. Every implementation job
+the 11 implementation slots (with L1 split into TS/Rust and L3 split into Probe
+and Environments 1/2, 2/2) plus `Z1: Gate`. Every implementation job
 exports `tested-sha`; Z1 runs with `if: always()` and rejects a failed, skipped
 or missing implementation slot, a SHA mismatch, or an undeclared blocking job.
 The L1 script suite includes the push-range regression, so the tag and

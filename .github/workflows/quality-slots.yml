@@ -173,9 +173,11 @@ jobs:
           workspaces: "probe"
       - name: Build dashboard, Worker and probe
         run: |
-          bun run build
-          (cd packages/worker && bun run build)
-          cargo build --locked --release --manifest-path probe/Cargo.toml
+          (bun run build && (cd packages/worker && bun run build)) &
+          js_pid=$!
+          CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
+            cargo build --locked --release --manifest-path probe/Cargo.toml
+          wait "$js_pid"
       - name: Upload B1 worker static assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -327,8 +329,8 @@ jobs:
         if: always()
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  l3-integration:
-    name: "L3: Integration"
+  l3-integration-probe:
+    name: "L3: Integration (Probe)"
     needs:
       - b1-build
     runs-on: ubuntu-latest
@@ -372,12 +374,92 @@ jobs:
         run: |
           bun run gate:routes
           bun run gate:pages
-      - name: Local environment integration
-        run: bun run test:environments
       - name: Probe to Worker to query integration
         env:
           BAT_PROBE_BIN: ${{ github.workspace }}/probe/target/release/bat-probe
         run: bun scripts/quality/probe-integration.mjs
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l3-integration-env-1:
+    name: "L3: Integration (Environments 1/2)"
+    needs:
+      - b1-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    env:
+      CLOUDFLARE_API_TOKEN: ""
+      CLOUDFLARE_ACCOUNT_ID: ""
+      CF_API_TOKEN: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        with:
+          package-manager: bun
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Download B1 worker static assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: b1-worker-static
+          path: packages/worker/static
+      - name: Download B1 shared dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: b1-shared-dist
+          path: packages/shared/dist
+      - name: Local environment integration (1/2)
+        run: bun scripts/environments/verify.mjs --part=1/2
+      - name: Record tested SHA
+        id: tested-sha
+        if: always()
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  l3-integration-env-2:
+    name: "L3: Integration (Environments 2/2)"
+    needs:
+      - b1-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      tested-sha: ${{ steps.tested-sha.outputs.sha }}
+    env:
+      CLOUDFLARE_API_TOKEN: ""
+      CLOUDFLARE_ACCOUNT_ID: ""
+      CF_API_TOKEN: ""
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Setup JavaScript
+        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        with:
+          package-manager: bun
+          install-policy: blocked
+      - name: Record installed dependency state
+        run: bun scripts/quality/install-state.mjs --write
+      - name: Download B1 worker static assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: b1-worker-static
+          path: packages/worker/static
+      - name: Download B1 shared dist
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: b1-shared-dist
+          path: packages/shared/dist
+      - name: Local environment integration (2/2)
+        run: bun scripts/environments/verify.mjs --part=2/2
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -494,7 +576,9 @@ jobs:
       - l1-unit-ts
       - l1-unit-rust
       - l2-runtime
-      - l3-integration
+      - l3-integration-probe
+      - l3-integration-env-1
+      - l3-integration-env-2
       - l4-e2e
       - p1-package
     if: always()
@@ -519,7 +603,9 @@ jobs:
             l1-unit-ts=L1: Unit (TS)
             l1-unit-rust=L1: Unit (Rust)
             l2-runtime=L2: Runtime
-            l3-integration=L3: Integration
+            l3-integration-probe=L3: Integration (Probe)
+            l3-integration-env-1=L3: Integration (Environments 1/2)
+            l3-integration-env-2=L3: Integration (Environments 2/2)
             l4-e2e=L4: E2E
             p1-package=P1: Package
           skipped-jobs: ""
