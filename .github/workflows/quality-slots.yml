@@ -171,12 +171,12 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: "probe"
-          shared-key: "b1-no-lto-v1"
+          shared-key: "b1-opt0-v1"
       - name: Build dashboard, Worker and probe
         run: |
           (bun run build && (cd packages/worker && bun run build)) &
           js_pid=$!
-          CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
+          CARGO_PROFILE_RELEASE_OPT_LEVEL=0 CARGO_PROFILE_RELEASE_LTO=false CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16 \
             cargo build --locked --release --manifest-path probe/Cargo.toml
           wait "$js_pid"
       - name: Upload B1 worker static assets
