@@ -7,7 +7,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github/workflows"
-BASE_CI = "e5876a604547b1ddb0916f16dd841a4f832609a0"
+BASE_CI = "3703a073693d598159e87f77f99587e586c14cfe"
 SLOT_JOBS = [
     ("s1-types", "S1: Types"),
     ("s2-lint", "S2: Lint"),
@@ -61,16 +61,27 @@ def check_immutable_refs():
                 raise SystemExit(f"{path}: mutable external reference {ref}")
 
 
-def check_ci():
-    data = load(WORKFLOWS / "ci.yml")
+def check_pipeline():
+    data = load(WORKFLOWS / "pipeline.yml")
+    triggers = data.get("on", data.get(True))
+    if not isinstance(triggers, dict) or "tags" in (triggers.get("push") or {}):
+        raise SystemExit("pipeline.yml must not declare tag triggers")
     workflow_jobs = jobs(data)
-    if list(workflow_jobs) != ["quality"]:
-        raise SystemExit("ci.yml must contain exactly the quality caller job")
-    job = workflow_jobs["quality"]
-    if job.get("name") not in (None, "quality"):
-        raise SystemExit("ci.yml quality job must not change the check-name prefix")
-    if job.get("uses") != "./.github/workflows/quality-slots.yml":
-        raise SystemExit("ci.yml must call the local quality-slots workflow")
+    if list(workflow_jobs) != ["quality", "deploy"]:
+        raise SystemExit("pipeline.yml must contain quality and deploy jobs")
+    quality = workflow_jobs["quality"]
+    if quality.get("name") not in (None, "quality"):
+        raise SystemExit("pipeline.yml quality job must not change the check-name prefix")
+    if quality.get("uses") != "./.github/workflows/quality-slots.yml":
+        raise SystemExit("pipeline.yml must call the local quality-slots workflow")
+    deploy = workflow_jobs["deploy"]
+    if deploy.get("uses") != f"nocoo/base-ci/.github/workflows/deploy-worker.yml@{BASE_CI}":
+        raise SystemExit(f"pipeline.yml deploy job must pin base-ci deploy-worker v2026.24")
+    if deploy.get("needs") != ["quality"]:
+        raise SystemExit("pipeline.yml deploy job must need quality")
+    with_values = deploy.get("with", {})
+    if not with_values.get("verify-command"):
+        raise SystemExit("pipeline.yml deploy job must configure verify-command (D5)")
 
 
 def check_slots():
@@ -80,7 +91,7 @@ def check_slots():
         raise SystemExit("quality-slots.yml must use workflow_call")
     for reference in uses_values(data):
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.20: {reference}")
+            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.24: {reference}")
     workflow_jobs = jobs(data)
     expected = dict(SLOT_JOBS)
     if set(workflow_jobs) != set(expected) | {"z1-gate"}:
@@ -106,34 +117,33 @@ def check_slots():
         raise SystemExit("z1-gate must use only checkout-free nocoo/base-ci z1-gate")
 
 
-def check_release():
-    data = load(WORKFLOWS / "release.yml")
+def check_probe_release():
+    data = load(WORKFLOWS / "probe-release.yml")
     references = list(uses_values(data))
     for reference in references:
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"release.yml must pin base-ci v2026.20: {reference}")
+            raise SystemExit(f"probe-release.yml must pin base-ci v2026.24: {reference}")
     release_sources = [
         step
         for job in jobs(data).values()
         for step in job.get("steps", [])
         if isinstance(step, dict) and "release-source@" in step.get("uses", "")
     ]
-    deploy_jobs = [
-        job for job in jobs(data).values() if "deploy-worker.yml@" in job.get("uses", "")
-    ]
-    if len(release_sources) != 1 or len(deploy_jobs) != 1:
-        raise SystemExit("release.yml must have one deploy-worker job and one probe release-source")
-    for item in [*release_sources, *deploy_jobs]:
+    if len(release_sources) != 1:
+        raise SystemExit("probe-release.yml must have one probe release-source step")
+    for item in release_sources:
         with_values = item.get("with", {})
         if with_values.get("required-quality-check") != "quality / Z1: Gate":
-            raise SystemExit("release source must require quality / Z1: Gate")
+            raise SystemExit("probe release-source must require quality / Z1: Gate")
+        if with_values.get("expected-workflow-path") != ".github/workflows/pipeline.yml":
+            raise SystemExit("probe release-source must check .github/workflows/pipeline.yml")
 
 
 def main():
     check_immutable_refs()
-    check_ci()
+    check_pipeline()
     check_slots()
-    check_release()
+    check_probe_release()
     print("workflow structure verified")
 
 

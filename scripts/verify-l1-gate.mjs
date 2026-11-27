@@ -107,7 +107,7 @@ try {
 		'// l1-gate probe: staged index type error\nexport const BAT_VERSION: number = "4.0.1";\n';
 	const workflowPath = ".github/workflows/quality-slots.yml";
 	const workflowGood = readFileSync(join(clone, workflowPath), "utf8");
-	const releasePath = ".github/workflows/release.yml";
+	const releasePath = ".github/workflows/pipeline.yml";
 	const reset = () => git(["reset", "--hard", "HEAD"], clone);
 
 	const healthy = runHook(clone, { timeout: 600_000 });
@@ -169,7 +169,7 @@ try {
 	);
 	reset();
 
-	git(["mv", releasePath, "docs/release.yml.probe"], clone);
+	git(["mv", releasePath, "docs/pipeline.yml.probe"], clone);
 	const renamedWorkflow = runHook(clone, { timeout: 600_000 });
 	check(
 		"workflow rename out of the directory still runs S3",

@@ -5,7 +5,7 @@ on:
 
 permissions:
   contents: read
-  actions: write
+  actions: read
 
 concurrency:
   group: quality-${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +24,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -60,7 +60,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -98,7 +98,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint workflows
-        uses: nocoo/base-ci/.github/actions/lint-workflows@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/lint-workflows@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -117,7 +117,7 @@ jobs:
           persist-credentials: false
           fetch-depth: 1
       - name: Scan secrets
-        uses: nocoo/base-ci/.github/actions/scan-secrets@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/scan-secrets@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
       - name: Record tested SHA
         id: tested-sha
         if: always()
@@ -135,7 +135,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Scan dependencies
-        uses: nocoo/base-ci/.github/actions/scan-dependencies@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/scan-dependencies@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           lockfiles: |
             bun.lock
@@ -157,7 +157,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -184,6 +184,15 @@ jobs:
         with:
           name: b1-worker-static
           path: packages/worker/static/
+          retention-days: 1
+          if-no-files-found: error
+      - name: Package B1 worker bundle
+        run: tar -czf b1-worker-bundle.tar.gz packages/shared/dist packages/worker/static
+      - name: Upload B1 worker bundle
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: b1-worker-bundle
+          path: b1-worker-bundle.tar.gz
           retention-days: 1
           if-no-files-found: error
       - name: Upload B1 shared dist
@@ -224,7 +233,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -305,7 +314,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -348,7 +357,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -402,7 +411,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -443,7 +452,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -484,14 +493,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
       - name: Record installed dependency state
         run: bun scripts/quality/install-state.mjs --write
       - name: Setup Playwright
-        uses: nocoo/base-ci/.github/actions/setup-playwright@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-playwright@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           working-directory: packages/ui
           package-manager: bun
@@ -551,7 +560,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Setup JavaScript
-        uses: nocoo/base-ci/.github/actions/setup-js@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/setup-js@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           package-manager: bun
           install-policy: blocked
@@ -596,7 +605,7 @@ jobs:
     steps:
       - name: Verify all slots
         id: verify
-        uses: nocoo/base-ci/.github/actions/z1-gate@e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20
+        uses: nocoo/base-ci/.github/actions/z1-gate@3703a073693d598159e87f77f99587e586c14cfe # v2026.24
         with:
           needs-json: ${{ toJSON(needs) }}
           expected-sha: ${{ github.sha }}

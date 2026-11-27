@@ -48,11 +48,11 @@ Build the UI (`bun run build`) before L2/L3/L4 so Worker static assets are real.
 - Connect workstation grants are explicit and read-only; connectivity reads require authorization on both the workstation and each target server.
 - Workstation schedules run a bounded 10-min probe in the user session. Never register real tasks or alter real home ACLs in tests; use temp stores and fake executors (native scheduler acceptance is manual).
 - Authorized releases run `bun run release` (patch default; `-- minor`, `-- major`, explicit version, `-- --dry-run`), requiring `gh` auth and green CI on the exact commit; verify GitHub Release separately.
-- CD (`.github/workflows/release.yml`) owns D1 migration, Worker deploy, and static musl probe R2 upload/pruning ([Development](docs/21-development.md), [Edge](docs/19-edge-deployment.md), [Probe](docs/04-probe.md)).
+- CD (`.github/workflows/pipeline.yml` `deploy` job, `D1`–`D5` via `deploy-worker.yml`) owns D1 migration and Worker deploy on `main` push after `quality / Z1: Gate` passes (or `workflow_dispatch` with `deploy=true`), reusing the `B1` `b1-worker-bundle` artifact without rebuilding and verifying `https://bat-ingest.worker.hexly.ai/api/live`; `.github/workflows/probe-release.yml` owns tag-triggered static musl probe R2 upload/pruning and manual `connect-access-audit` ([Development](docs/21-development.md), [Edge](docs/19-edge-deployment.md), [Probe](docs/04-probe.md)).
 
 ## Quality & Local Gates
 
-Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision live in `.github/workflows/quality-slots.yml` (called by `.github/workflows/ci.yml`; `quality / Z1: Gate` required on `main`). All 11 delivery slots and `Z1` are `enforced` (`N/A`: none); slot map, per-package Vitest thresholds, and benchmarks live in [Testing](docs/07-testing.md). Raise weaker enforcement instead of lowering this contract. Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
+Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision live in `.github/workflows/quality-slots.yml` (called by `.github/workflows/pipeline.yml`; `quality / Z1: Gate` required on `main`). All 11 delivery slots and `Z1` are `enforced` (`N/A`: none); slot map, per-package Vitest thresholds, and benchmarks live in [Testing](docs/07-testing.md). Raise weaker enforcement instead of lowering this contract. Status vocabulary: `enforced`, `planned`, `manual`, `N/A`.
 
 - **Exceptions / gaps**: TS/Worker/UI/CLI L1 coverage enforces >=80% thresholds (Views excluded); Rust `cargo-llvm-cov` omits branches (80% line/function/region on nightly); scheduler acceptance and probe upgrades are `manual`.
 - **Local hooks**: installed via `bun run prepare` (`.husky/` -> `scripts/hooks/`); check-only, never use `--no-verify`.
@@ -69,7 +69,7 @@ Follows `system1-quality`; CI slot definitions and pinned `base-ci` revision liv
 
 Install restores Husky. Hooks must stay check-only; never use `--no-verify` on
 commits or branch pushes. CI pins base-ci at
-`e5876a604547b1ddb0916f16dd841a4f832609a0 # v2026.20`.
+`3703a073693d598159e87f77f99587e586c14cfe # v2026.24`.
 
 ## Resources and isolation
 

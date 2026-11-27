@@ -291,7 +291,7 @@ describe("waitForCiSuccess", () => {
 			headSha: SHA,
 			headBranch: "main",
 			event: "push",
-			workflowName: "CI",
+			workflowName: "Pipeline",
 			status: "in_progress",
 			conclusion: "",
 			...overrides,
@@ -355,7 +355,7 @@ describe("waitForCiSuccess", () => {
 		expect(final.conclusion).toBe("success");
 		expect(calls.filter((call) => call[1] === "list")).toHaveLength(2);
 		const listCall = calls[0] ?? [];
-		expect(listCall).toContain(".github/workflows/ci.yml");
+		expect(listCall).toContain(".github/workflows/pipeline.yml");
 		expect(listCall).toContain(SHA);
 		expect(listCall).toContain("push");
 		expect(listCall).toContain("main");

@@ -579,8 +579,8 @@ export function buildStaleVersionArgs(version: string): string[] {
 // CI gate before tagging
 // ---------------------------------------------------------------------------
 
-const CI_WORKFLOW = ".github/workflows/ci.yml";
-const CI_WORKFLOW_NAME = "CI";
+const CI_WORKFLOW = ".github/workflows/pipeline.yml";
+const CI_WORKFLOW_NAME = "Pipeline";
 const CI_BRANCH = "main";
 const CI_RUN_FIELDS = "databaseId,headSha,headBranch,event,workflowName,status,conclusion";
 export const CI_REGISTRATION_TIMEOUT_MS = 5 * 60_000;
