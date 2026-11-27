@@ -171,6 +171,7 @@ jobs:
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: "probe"
+          shared-key: "b1-no-lto-v1"
       - name: Build dashboard, Worker and probe
         run: |
           (bun run build && (cd packages/worker && bun run build)) &
@@ -507,8 +508,14 @@ jobs:
           path: packages/shared/dist
       - name: Browser journeys and environment capture
         run: |
-          bun run test:e2e:pw
-          bun run capture:environments
+          (bun run test:e2e:pw) &
+          pw_pid=$!
+          (bun run capture:environments) &
+          cap_pid=$!
+          status=0
+          wait "$pw_pid" || status=$?
+          wait "$cap_pid" || status=$?
+          exit "$status"
       - name: Upload Playwright evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
