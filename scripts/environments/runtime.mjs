@@ -53,6 +53,25 @@ function files(path) {
 		e.isDirectory() ? files(join(path, e.name)) : [join(path, e.name)],
 	);
 }
+function findOwnedD1Database(path) {
+	const dbs = files(join(path, "state")).filter(
+		(p) => p.endsWith(".sqlite") && !p.endsWith("/metadata.sqlite") && p.includes("/d1/"),
+	);
+	if (dbs.length !== 1) throw new Error("Expected one owned D1 database");
+	if (realpathSync(dbs[0]) !== resolve(dbs[0])) throw new Error("Symlink database rejected");
+	return dbs[0];
+}
+function initTestMarker(path, mode, owner) {
+	const db = new Database(findOwnedD1Database(path), { readwrite: true, create: false });
+	try {
+		db.exec("PRAGMA busy_timeout = 5000;");
+		db.exec(
+			`CREATE TABLE _test_marker(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO _test_marker VALUES ('env','${mode === "demo" ? "demo" : "test"}'),('owner','${owner}');`,
+		);
+	} finally {
+		db.close();
+	}
+}
 export function verifyOwnership(path, owner) {
 	if (resolve(path) !== join(storageRoot, owner) || !/^(demo|e2e-[a-f0-9-]{36})$/.test(owner))
 		throw new Error("Foreign storage path");
@@ -60,12 +79,7 @@ export function verifyOwnership(path, owner) {
 	const manifest = JSON.parse(readFileSync(join(path, "owner.json"), "utf8"));
 	if (manifest.owner !== owner || manifest.application !== "bat")
 		throw new Error("Foreign storage owner");
-	const dbs = files(join(path, "state")).filter(
-		(p) => p.endsWith(".sqlite") && !p.endsWith("/metadata.sqlite") && p.includes("/d1/"),
-	);
-	if (dbs.length !== 1) throw new Error("Expected one owned D1 database");
-	if (realpathSync(dbs[0]) !== resolve(dbs[0])) throw new Error("Symlink database rejected");
-	const db = new Database(dbs[0], { readwrite: true, create: false });
+	const db = new Database(findOwnedD1Database(path), { readwrite: true, create: false });
 	try {
 		db.exec("PRAGMA busy_timeout = 5000;");
 		const marker = db.query("SELECT value FROM _test_marker WHERE key='owner'").get();
@@ -405,11 +419,7 @@ export async function createRuntime({
 				join(path, "command.sql"),
 			]);
 		};
-		if (fresh)
-			await sql(
-				`CREATE TABLE _test_marker(key TEXT PRIMARY KEY,value TEXT NOT NULL); INSERT INTO _test_marker VALUES ('env','${mode === "demo" ? "demo" : "test"}'),('owner','${owner}');`,
-			);
-		verifyOwnership(path, owner);
+		if (!fresh) verifyOwnership(path, owner);
 		await execute(path, [
 			"d1",
 			"migrations",
@@ -419,6 +429,8 @@ export async function createRuntime({
 			"--persist-to",
 			join(path, "state"),
 		]);
+		if (fresh) initTestMarker(path, mode, owner);
+		verifyOwnership(path, owner);
 		if (fresh && dataset !== "empty") {
 			const { fixtureSql } = await import("./fixtures.mjs");
 			await sql(fixtureSql(dataset, anchor));
