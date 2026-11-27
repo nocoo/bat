@@ -7,7 +7,7 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WORKFLOWS = ROOT / ".github/workflows"
-BASE_CI = "3703a073693d598159e87f77f99587e586c14cfe"
+BASE_CI = "9933a7461a312cfaac526ccc5907357a7e3f669a"
 SLOT_JOBS = [
     ("s1-types", "S1: Types"),
     ("s2-lint", "S2: Lint"),
@@ -76,7 +76,7 @@ def check_pipeline():
         raise SystemExit("pipeline.yml must call the local quality-slots workflow")
     deploy = workflow_jobs["deploy"]
     if deploy.get("uses") != f"nocoo/base-ci/.github/workflows/deploy-worker.yml@{BASE_CI}":
-        raise SystemExit(f"pipeline.yml deploy job must pin base-ci deploy-worker v2026.24")
+        raise SystemExit(f"pipeline.yml deploy job must pin base-ci deploy-worker v2026.25")
     if deploy.get("needs") != ["quality"]:
         raise SystemExit("pipeline.yml deploy job must need quality")
     with_values = deploy.get("with", {})
@@ -91,7 +91,7 @@ def check_slots():
         raise SystemExit("quality-slots.yml must use workflow_call")
     for reference in uses_values(data):
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.24: {reference}")
+            raise SystemExit(f"quality-slots.yml must pin base-ci v2026.25: {reference}")
     workflow_jobs = jobs(data)
     expected = dict(SLOT_JOBS)
     if set(workflow_jobs) != set(expected) | {"z1-gate"}:
@@ -122,7 +122,7 @@ def check_probe_release():
     references = list(uses_values(data))
     for reference in references:
         if "nocoo/base-ci/" in reference and not reference.endswith(f"@{BASE_CI}"):
-            raise SystemExit(f"probe-release.yml must pin base-ci v2026.24: {reference}")
+            raise SystemExit(f"probe-release.yml must pin base-ci v2026.25: {reference}")
     release_sources = [
         step
         for job in jobs(data).values()
