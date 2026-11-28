@@ -6,14 +6,13 @@ export default defineConfig({
 		passWithNoTests: false,
 		globals: true,
 		environment: "happy-dom",
-		include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+		include: ["src/**/*.test.ts"],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "json-summary", "html"],
 			include: ["src/lib/**/*.ts", "src/hooks/**/*.ts", "src/api.ts"],
 			exclude: [
 				"src/**/*.test.ts",
-				"src/**/*.test.tsx",
 				"src/**/*.d.ts",
 				"src/**/index.ts",
 				"src/**/types.ts",
@@ -36,10 +35,10 @@ export default defineConfig({
 			//     flows against a local Wrangler. Adding a parallel jsdom UT
 			//     pass for them would duplicate L3 without catching new bugs.
 			thresholds: {
-				lines: 80,
-				branches: 80,
-				functions: 80,
-				statements: 80,
+				lines: 90,
+				branches: 85,
+				functions: 90,
+				statements: 90,
 			},
 		},
 	},
